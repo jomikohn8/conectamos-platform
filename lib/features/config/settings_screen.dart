@@ -686,7 +686,9 @@ class _UserRowState extends ConsumerState<_UserRow> {
 
   String get _id     => widget.user['id']?.toString() ?? '';
   String get _name   => widget.user['name']?.toString() ?? widget.user['display_name']?.toString() ?? '';
-  String get _email  => widget.user['email']?.toString() ?? '';
+  String get _email  => widget.user['email']?.toString() ??
+                        widget.user['user_email']?.toString() ??
+                        widget.user['email_address']?.toString() ?? '';
   String get _role   => widget.user['role']?.toString() ?? 'operator';
   String get _status => widget.user['status']?.toString() ?? 'active';
   bool   get _isActive => _status == 'active';
@@ -889,16 +891,44 @@ class _InviteUserDialog extends ConsumerStatefulWidget {
 
 class _InviteUserDialogState extends ConsumerState<_InviteUserDialog> {
   final _emailCtrl = TextEditingController();
-  String _role = 'operator';
+  // Roles loaded from API: [{id, name}, ...]
+  List<Map<String, dynamic>> _availableRoles = [];
+  String? _roleId;   // UUID del rol seleccionado
+  bool _rolesLoading = true;
   bool _sending = false;
   String? _error;
 
-  static const _roles = ['operator', 'supervisor', 'admin'];
+  @override
+  void initState() {
+    super.initState();
+    _loadRoles();
+  }
 
   @override
   void dispose() {
     _emailCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadRoles() async {
+    try {
+      final res = await ApiClient.instance.get(
+        '/iam/roles',
+        queryParameters: {'tenant_id': widget.tenantId},
+      );
+      if (!mounted) return;
+      final data = res.data;
+      final List raw = data is List ? data : (data['roles'] ?? data['items'] ?? []) as List;
+      final roles = raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      setState(() {
+        _availableRoles = roles;
+        _roleId = roles.isNotEmpty ? roles.first['id']?.toString() : null;
+        _rolesLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _rolesLoading = false);
+    }
   }
 
   Future<void> _send() async {
@@ -907,11 +937,15 @@ class _InviteUserDialogState extends ConsumerState<_InviteUserDialog> {
       setState(() => _error = 'Ingresa un email');
       return;
     }
+    if (_roleId == null || _roleId!.isEmpty) {
+      setState(() => _error = 'Selecciona un rol');
+      return;
+    }
     setState(() { _sending = true; _error = null; });
     try {
       await ApiClient.instance.post('/iam/invite', data: {
         'email': email,
-        'role': _role,
+        'role_id': _roleId,
         'tenant_id': widget.tenantId,
       });
       if (!mounted) return;
@@ -967,36 +1001,57 @@ class _InviteUserDialogState extends ConsumerState<_InviteUserDialog> {
                 ),
               ),
               const SizedBox(height: 6),
-              Container(
-                height: 40,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                decoration: BoxDecoration(
-                  color: AppColors.ctSurface2,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppColors.ctBorder2),
-                ),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    value: _role,
-                    isExpanded: true,
-                    isDense: true,
-                    style: const TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 13,
-                      color: AppColors.ctText,
+              _rolesLoading
+                  ? const SizedBox(
+                      height: 40,
+                      child: Center(
+                        child: SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: AppColors.ctTeal,
+                          ),
+                        ),
+                      ),
+                    )
+                  : Container(
+                      height: 40,
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: AppColors.ctSurface2,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppColors.ctBorder2),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: _availableRoles.any((r) => r['id']?.toString() == _roleId)
+                              ? _roleId
+                              : null,
+                          isExpanded: true,
+                          isDense: true,
+                          style: const TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 13,
+                            color: AppColors.ctText,
+                          ),
+                          icon: const Icon(
+                            Icons.keyboard_arrow_down_rounded,
+                            size: 16,
+                            color: AppColors.ctText3,
+                          ),
+                          items: _availableRoles.map((r) {
+                            final id   = r['id']?.toString() ?? '';
+                            final name = r['name']?.toString() ?? id;
+                            return DropdownMenuItem<String>(
+                              value: id,
+                              child: Text(name),
+                            );
+                          }).toList(),
+                          onChanged: (v) { if (v != null) setState(() => _roleId = v); },
+                        ),
+                      ),
                     ),
-                    icon: const Icon(
-                      Icons.keyboard_arrow_down_rounded,
-                      size: 16,
-                      color: AppColors.ctText3,
-                    ),
-                    items: _roles
-                        .map((r) => DropdownMenuItem(value: r, child: Text(r)))
-                        .toList(),
-                    onChanged: (v) { if (v != null) setState(() => _role = v); },
-                  ),
-                ),
-              ),
               if (_error != null) ...[
                 const SizedBox(height: 14),
                 _FeedbackBanner(message: _error!, isError: true),
