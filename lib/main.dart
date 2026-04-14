@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/router/app_router.dart';
@@ -9,6 +10,7 @@ const _supabaseUrl = 'https://atqmtsmjpjtrqooibubm.supabase.co';
 const _supabaseAnonKey = 'sb_publishable_DqEJfyb-C4-0GfrmLI-QdQ_nwRmghCG';
 
 Future<void> main() async {
+  usePathUrlStrategy();
   WidgetsFlutterBinding.ensureInitialized();
 
   await Supabase.initialize(

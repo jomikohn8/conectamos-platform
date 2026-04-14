@@ -33,6 +33,10 @@ dependencies:
   # URL launcher
   url_launcher: ^6.3.1
 
+  # Path URL strategy (Flutter Web)
+  flutter_web_plugins:
+    sdk: flutter
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
