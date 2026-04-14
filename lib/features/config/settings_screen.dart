@@ -479,7 +479,7 @@ class _BillingCardState extends ConsumerState<_BillingCard> {
   }
 }
 
-// ── FutureProvider para usuarios ──────────────────────────────────────────────
+// ── FutureProviders para usuarios y roles ─────────────────────────────────────
 
 final _usersListProvider =
     FutureProvider.autoDispose.family<List<Map<String, dynamic>>, String>(
@@ -497,6 +497,28 @@ final _usersListProvider =
   },
 );
 
+final _rolesMapProvider =
+    FutureProvider.autoDispose.family<Map<String, String>, String>(
+  (ref, tenantId) async {
+    if (tenantId.isEmpty) return {};
+    final res = await ApiClient.instance.get(
+      '/iam/roles',
+      queryParameters: {'tenant_id': tenantId},
+    );
+    final data = res.data;
+    final List raw = data is List
+        ? data
+        : (data['roles'] ?? data['items'] ?? []) as List;
+    final map = <String, String>{};
+    for (final e in raw) {
+      final id   = e['id']?.toString() ?? '';
+      final name = e['name']?.toString() ?? '';
+      if (id.isNotEmpty) map[id] = name;
+    }
+    return map;
+  },
+);
+
 // ── Sección 4 — Usuarios ──────────────────────────────────────────────────────
 
 class _UsersCard extends ConsumerWidget {
@@ -506,6 +528,7 @@ class _UsersCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final tenantId   = ref.watch(activeTenantIdProvider);
     final usersAsync = ref.watch(_usersListProvider(tenantId));
+    final roleMap    = ref.watch(_rolesMapProvider(tenantId)).valueOrNull ?? {};
 
     return Container(
       width: double.infinity,
@@ -589,6 +612,7 @@ class _UsersCard extends ConsumerWidget {
                 : _UsersTable(
                     users: users,
                     tenantId: tenantId,
+                    roleMap: roleMap,
                     onRefresh: () =>
                         ref.invalidate(_usersListProvider(tenantId)),
                   ),
@@ -605,10 +629,12 @@ class _UsersTable extends StatelessWidget {
   const _UsersTable({
     required this.users,
     required this.tenantId,
+    required this.roleMap,
     required this.onRefresh,
   });
   final List<Map<String, dynamic>> users;
   final String tenantId;
+  final Map<String, String> roleMap;
   final VoidCallback onRefresh;
 
   static const _h = TextStyle(
@@ -658,6 +684,7 @@ class _UsersTable extends StatelessWidget {
                 _UserRow(
                   user: u,
                   tenantId: tenantId,
+                  roleMap: roleMap,
                   isLast: i == users.length - 1,
                   onRefresh: onRefresh,
                 ),
@@ -676,11 +703,13 @@ class _UserRow extends ConsumerStatefulWidget {
   const _UserRow({
     required this.user,
     required this.tenantId,
+    required this.roleMap,
     required this.isLast,
     required this.onRefresh,
   });
   final Map<String, dynamic> user;
   final String tenantId;
+  final Map<String, String> roleMap;
   final bool isLast;
   final VoidCallback onRefresh;
 
@@ -704,9 +733,21 @@ class _UserRowState extends ConsumerState<_UserRow> {
       widget.user['phone']?.toString() ??
       widget.user['telefono']?.toString() ??
       widget.user['phone_number']?.toString() ?? '';
-  String get _role =>
-      widget.user['role']?.toString() ??
-      widget.user['role_name']?.toString() ?? '';
+  String get _roleId =>
+      widget.user['role_id']?.toString() ?? '';
+  String get _role {
+    // Try nested roles object returned by the API join
+    final nested = widget.user['roles'];
+    if (nested is Map) {
+      final name = nested['name']?.toString();
+      if (name != null && name.isNotEmpty) return name;
+    }
+    // Fall back to roleMap loaded separately
+    if (_roleId.isNotEmpty) return widget.roleMap[_roleId] ?? _roleId;
+    return widget.user['role']?.toString() ??
+           widget.user['role_name']?.toString() ?? '';
+  }
+
   String get _status => widget.user['status']?.toString() ?? 'active';
 
   Future<void> _patch(Map<String, dynamic> body) async {
@@ -741,6 +782,18 @@ class _UserRowState extends ConsumerState<_UserRow> {
         userId: _id,
         tenantId: widget.tenantId,
         onChanged: widget.onRefresh,
+      ),
+    );
+  }
+
+  void _showEditDialog() {
+    showDialog(
+      context: context,
+      builder: (_) => _EditUserDialog(
+        userId: _id,
+        initialNombre: _name,
+        initialTelefono: _phone,
+        onSaved: widget.onRefresh,
       ),
     );
   }
@@ -850,65 +903,63 @@ class _UserRowState extends ConsumerState<_UserRow> {
                         final items = <PopupMenuEntry<String>>[];
                         if (_status == 'active') {
                           items.add(const PopupMenuItem(
+                            value: 'edit',
+                            child: Text('Editar',
+                                style: TextStyle(
+                                    fontFamily: 'Inter', fontSize: 13)),
+                          ));
+                          items.add(const PopupMenuItem(
+                            value: 'role',
+                            child: Text('Cambiar rol',
+                                style: TextStyle(
+                                    fontFamily: 'Inter', fontSize: 13)),
+                          ));
+                          items.add(const PopupMenuItem(
                             value: 'suspend',
-                            child: Text(
-                              'Suspender',
-                              style: TextStyle(
-                                fontFamily: 'Inter',
-                                fontSize: 13,
-                              ),
-                            ),
+                            child: Text('Suspender',
+                                style: TextStyle(
+                                    fontFamily: 'Inter', fontSize: 13)),
                           ));
                         } else if (_status == 'suspended') {
                           items.add(const PopupMenuItem(
+                            value: 'edit',
+                            child: Text('Editar',
+                                style: TextStyle(
+                                    fontFamily: 'Inter', fontSize: 13)),
+                          ));
+                          items.add(const PopupMenuItem(
+                            value: 'role',
+                            child: Text('Cambiar rol',
+                                style: TextStyle(
+                                    fontFamily: 'Inter', fontSize: 13)),
+                          ));
+                          items.add(const PopupMenuItem(
                             value: 'reactivate',
-                            child: Text(
-                              'Reactivar',
-                              style: TextStyle(
-                                fontFamily: 'Inter',
-                                fontSize: 13,
-                              ),
-                            ),
+                            child: Text('Reactivar',
+                                style: TextStyle(
+                                    fontFamily: 'Inter', fontSize: 13)),
                           ));
                         } else if (_status == 'invited') {
                           items.add(const PopupMenuItem(
                             value: 'resend',
-                            child: Text(
-                              'Reenviar invitación',
-                              style: TextStyle(
-                                fontFamily: 'Inter',
-                                fontSize: 13,
-                              ),
-                            ),
+                            child: Text('Reenviar invitación',
+                                style: TextStyle(
+                                    fontFamily: 'Inter', fontSize: 13)),
                           ));
                         }
-                        items.add(const PopupMenuItem(
-                          value: 'role',
-                          child: Text(
-                            'Cambiar rol',
-                            style: TextStyle(
-                              fontFamily: 'Inter',
-                              fontSize: 13,
-                            ),
-                          ),
-                        ));
                         return items;
                       },
                       onSelected: (v) {
-                        if (v == 'suspend') {
-                          _patch({
-                            'status': 'suspended',
-                            'tenant_id': widget.tenantId,
-                          });
-                        } else if (v == 'reactivate') {
-                          _patch({
-                            'status': 'active',
-                            'tenant_id': widget.tenantId,
-                          });
-                        } else if (v == 'resend') {
-                          _resendInvitation();
+                        if (v == 'edit') {
+                          _showEditDialog();
                         } else if (v == 'role') {
                           _showChangeRoleDialog();
+                        } else if (v == 'suspend') {
+                          _patch({'status': 'suspended'});
+                        } else if (v == 'reactivate') {
+                          _patch({'status': 'active'});
+                        } else if (v == 'resend') {
+                          _resendInvitation();
                         }
                       },
                     ),
@@ -986,6 +1037,139 @@ class _StatusBadge extends StatelessWidget {
           fontSize: 11,
           fontWeight: FontWeight.w600,
           color: textColor,
+        ),
+      ),
+    );
+  }
+}
+
+// ── Dialog: Editar usuario ────────────────────────────────────────────────────
+
+class _EditUserDialog extends StatefulWidget {
+  const _EditUserDialog({
+    required this.userId,
+    required this.initialNombre,
+    required this.initialTelefono,
+    required this.onSaved,
+  });
+  final String userId;
+  final String initialNombre;
+  final String initialTelefono;
+  final VoidCallback onSaved;
+
+  @override
+  State<_EditUserDialog> createState() => _EditUserDialogState();
+}
+
+class _EditUserDialogState extends State<_EditUserDialog> {
+  late final TextEditingController _nombreCtrl;
+  late final TextEditingController _telefonoCtrl;
+  bool _saving = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _nombreCtrl   = TextEditingController(text: widget.initialNombre);
+    _telefonoCtrl = TextEditingController(text: widget.initialTelefono);
+  }
+
+  @override
+  void dispose() {
+    _nombreCtrl.dispose();
+    _telefonoCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final nombre = _nombreCtrl.text.trim();
+    if (nombre.isEmpty) {
+      setState(() => _error = 'Ingresa el nombre completo');
+      return;
+    }
+    setState(() { _saving = true; _error = null; });
+    try {
+      await ApiClient.instance.patch(
+        '/iam/users/${widget.userId}',
+        data: {
+          'nombre':   nombre,
+          'telefono': _telefonoCtrl.text.trim(),
+        },
+      );
+      if (!mounted) return;
+      widget.onSaved();
+      Navigator.pop(context);
+    } on DioException catch (e) {
+      if (!mounted) return;
+      final detail = e.response?.data is Map
+          ? e.response!.data['detail']?.toString()
+          : e.response?.data?.toString();
+      setState(() { _saving = false; _error = detail ?? 'Error al guardar'; });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() { _saving = false; _error = 'Error: $e'; });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: AppColors.ctSurface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: const BorderSide(color: AppColors.ctBorder),
+      ),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 400),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Editar usuario',
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.ctText,
+                ),
+              ),
+              const SizedBox(height: 20),
+              _Field(
+                label: 'Nombre completo',
+                ctrl: _nombreCtrl,
+                placeholder: 'Juan García',
+              ),
+              const SizedBox(height: 12),
+              _Field(
+                label: 'Teléfono (opcional)',
+                ctrl: _telefonoCtrl,
+                placeholder: '+52 55 1234 5678',
+              ),
+              if (_error != null) ...[
+                const SizedBox(height: 12),
+                _FeedbackBanner(message: _error!, isError: true),
+              ],
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  _OutlineButton(
+                    label: 'Cancelar',
+                    onTap: () => Navigator.pop(context),
+                  ),
+                  const SizedBox(width: 10),
+                  _PrimaryButton(
+                    label: 'Guardar',
+                    loading: _saving,
+                    onTap: _saving ? null : _save,
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
