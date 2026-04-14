@@ -44,11 +44,7 @@ class _WhatsAppConfigScreenState extends ConsumerState<WhatsAppConfigScreen> {
       case _WaTab.credentials:
         return const _CredentialsTab();
       case _WaTab.templates:
-        return const _PlaceholderTab(
-          icon: Icons.format_list_bulleted_rounded,
-          title: 'Próximamente',
-          subtitle: 'Gestión de plantillas aprobadas por Meta',
-        );
+        return const _TemplatesTab();
       case _WaTab.welcome:
         return const _PlaceholderTab(
           icon: Icons.waving_hand_rounded,
@@ -384,6 +380,1207 @@ class _CredentialsTabState extends ConsumerState<_CredentialsTab> {
     );
   }
 }
+
+// ── FutureProvider para plantillas ───────────────────────────────────────────
+
+final _templatesProvider =
+    FutureProvider.autoDispose.family<List<Map<String, dynamic>>, String>(
+  (ref, tenantId) async {
+    if (tenantId.isEmpty) return [];
+    final res = await ApiClient.instance.get(
+      '/templates',
+      queryParameters: {'tenant_id': tenantId},
+    );
+    final data = res.data;
+    final List raw = data is List
+        ? data
+        : (data['templates'] ?? data['items'] ?? []) as List;
+    return raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+  },
+);
+
+// ── Tab Plantillas ────────────────────────────────────────────────────────────
+
+class _TemplatesTab extends ConsumerStatefulWidget {
+  const _TemplatesTab();
+
+  @override
+  ConsumerState<_TemplatesTab> createState() => _TemplatesTabState();
+}
+
+class _TemplatesTabState extends ConsumerState<_TemplatesTab> {
+  bool _syncing = false;
+
+  Future<void> _sync(String tenantId) async {
+    if (tenantId.isEmpty) return;
+    setState(() => _syncing = true);
+    try {
+      await ApiClient.instance.post(
+        '/templates/sync',
+        queryParameters: {'tenant_id': tenantId},
+      );
+      if (!mounted) return;
+      ref.invalidate(_templatesProvider(tenantId));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(_waSnack('Error al sincronizar: $e'));
+    } finally {
+      if (mounted) setState(() => _syncing = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tenantId      = ref.watch(activeTenantIdProvider);
+    final templatesAsync = ref.watch(_templatesProvider(tenantId));
+
+    return Column(
+      children: [
+        // Header bar
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
+          decoration: const BoxDecoration(
+            border: Border(bottom: BorderSide(color: AppColors.ctBorder)),
+          ),
+          child: Row(
+            children: [
+              // Info note
+              Expanded(
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.info_outline_rounded,
+                      size: 14,
+                      color: AppColors.ctText3,
+                    ),
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
+                        'Solo las plantillas APPROVED pueden enviarse. PENDING y REJECTED no están disponibles para mensajes.',
+                        style: const TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 11,
+                          color: AppColors.ctText3,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              // Sync button
+              _WaOutlineButton(
+                label: _syncing ? 'Sincronizando...' : 'Sincronizar',
+                icon: Icons.sync_rounded,
+                loading: _syncing,
+                onTap: _syncing ? null : () => _sync(tenantId),
+              ),
+              const SizedBox(width: 8),
+              // New template button
+              _WaPrimaryButton(
+                label: '+ Nueva plantilla',
+                onTap: () => showDialog(
+                  context: context,
+                  builder: (_) => _NewTemplateDialog(
+                    tenantId: tenantId,
+                    onCreated: () {
+                      ref.invalidate(_templatesProvider(tenantId));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        _waSnack('Plantilla enviada a Meta para aprobación'),
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        // Content
+        Expanded(
+          child: templatesAsync.when(
+            loading: () => const Center(
+              child: CircularProgressIndicator(color: AppColors.ctTeal),
+            ),
+            error: (e, _) => Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.error_outline_rounded,
+                      size: 32, color: AppColors.ctText3),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Error al cargar plantillas: $e',
+                    style: const TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 13,
+                      color: AppColors.ctText2,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 12),
+                  TextButton(
+                    onPressed: () =>
+                        ref.invalidate(_templatesProvider(tenantId)),
+                    child: const Text(
+                      'Reintentar',
+                      style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 12,
+                          color: AppColors.ctTeal),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            data: (templates) => templates.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 52,
+                          height: 52,
+                          decoration: BoxDecoration(
+                            color: AppColors.ctSurface2,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          alignment: Alignment.center,
+                          child: const Icon(Icons.format_list_bulleted_rounded,
+                              size: 24, color: AppColors.ctText3),
+                        ),
+                        const SizedBox(height: 14),
+                        const Text(
+                          'Sin plantillas',
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.ctText,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        const Text(
+                          'Crea una plantilla o sincroniza con Meta.',
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 13,
+                            color: AppColors.ctText2,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : SingleChildScrollView(
+                    padding: const EdgeInsets.all(22),
+                    child: _TemplatesTable(
+                      templates: templates,
+                      tenantId: tenantId,
+                      onRefresh: () =>
+                          ref.invalidate(_templatesProvider(tenantId)),
+                    ),
+                  ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Tabla de plantillas ───────────────────────────────────────────────────────
+
+class _TemplatesTable extends StatelessWidget {
+  const _TemplatesTable({
+    required this.templates,
+    required this.tenantId,
+    required this.onRefresh,
+  });
+  final List<Map<String, dynamic>> templates;
+  final String tenantId;
+  final VoidCallback onRefresh;
+
+  static const _h = TextStyle(
+    fontFamily: 'Inter',
+    fontSize: 10,
+    fontWeight: FontWeight.w600,
+    color: AppColors.ctText2,
+    letterSpacing: 0.4,
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: AppColors.ctBorder),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: const BoxDecoration(
+              color: AppColors.ctSurface2,
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(7),
+                topRight: Radius.circular(7),
+              ),
+            ),
+            child: const Row(
+              children: [
+                Expanded(flex: 3, child: Text('NOMBRE', style: _h)),
+                Expanded(flex: 2, child: Text('CATEGORÍA', style: _h)),
+                Expanded(flex: 1, child: Text('IDIOMA', style: _h)),
+                Expanded(flex: 3, child: Text('VARIABLES', style: _h)),
+                Expanded(flex: 2, child: Text('STATUS', style: _h)),
+                SizedBox(width: 36),
+              ],
+            ),
+          ),
+          ...templates.asMap().entries.map((entry) {
+            final i = entry.key;
+            final t = entry.value;
+            return Column(
+              children: [
+                if (i > 0) const Divider(height: 1, color: AppColors.ctBorder),
+                _TemplateRow(
+                  template: t,
+                  tenantId: tenantId,
+                  isLast: i == templates.length - 1,
+                  onRefresh: onRefresh,
+                ),
+              ],
+            );
+          }),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Fila de plantilla ─────────────────────────────────────────────────────────
+
+class _TemplateRow extends StatefulWidget {
+  const _TemplateRow({
+    required this.template,
+    required this.tenantId,
+    required this.isLast,
+    required this.onRefresh,
+  });
+  final Map<String, dynamic> template;
+  final String tenantId;
+  final bool isLast;
+  final VoidCallback onRefresh;
+
+  @override
+  State<_TemplateRow> createState() => _TemplateRowState();
+}
+
+class _TemplateRowState extends State<_TemplateRow> {
+  bool _hovered  = false;
+  bool _deleting = false;
+
+  String get _id       => widget.template['id']?.toString() ?? '';
+  String get _name     => widget.template['name']?.toString() ?? '';
+  String get _category => widget.template['category']?.toString() ?? '';
+  String get _language => widget.template['language']?.toString() ?? '';
+  String get _status   => widget.template['status']?.toString().toUpperCase() ?? '';
+  bool   get _isWelcome => widget.template['is_welcome'] == true;
+
+  List<String> get _variables {
+    final v = widget.template['variables'];
+    if (v is List) return v.map((e) => e.toString()).toList();
+    return [];
+  }
+
+  Future<void> _delete() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: AppColors.ctSurface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: AppColors.ctBorder),
+        ),
+        title: const Text(
+          'Eliminar plantilla',
+          style: TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+            color: AppColors.ctText,
+          ),
+        ),
+        content: Text(
+          '¿Estás seguro de que deseas eliminar la plantilla "$_name"? Esta acción no se puede deshacer.',
+          style: const TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 13,
+            color: AppColors.ctText2,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text(
+              'Cancelar',
+              style: TextStyle(
+                  fontFamily: 'Inter', fontSize: 13, color: AppColors.ctText2),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text(
+              'Eliminar',
+              style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 13,
+                  color: AppColors.ctRedText),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    setState(() => _deleting = true);
+    try {
+      await ApiClient.instance.delete('/templates/$_id');
+      widget.onRefresh();
+    } catch (e) {
+      if (mounted) {
+        setState(() => _deleting = false);
+        ScaffoldMessenger.of(context)
+            .showSnackBar(_waSnack('Error al eliminar: $e'));
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final borderRadius = widget.isLast
+        ? const BorderRadius.only(
+            bottomLeft: Radius.circular(7),
+            bottomRight: Radius.circular(7),
+          )
+        : BorderRadius.zero;
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit:  (_) => setState(() => _hovered = false),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 100),
+        decoration: BoxDecoration(
+          color: _hovered ? AppColors.ctBg : AppColors.ctSurface,
+          borderRadius: borderRadius,
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        child: Row(
+          children: [
+            // Nombre
+            Expanded(
+              flex: 3,
+              child: Row(
+                children: [
+                  if (_isWelcome) ...[
+                    const Icon(Icons.star_rounded,
+                        size: 13, color: Color(0xFFF59E0B)),
+                    const SizedBox(width: 4),
+                  ],
+                  Flexible(
+                    child: Text(
+                      _name,
+                      style: const TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.ctText,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Categoría
+            Expanded(
+              flex: 2,
+              child: Text(
+                _category,
+                style: const TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 12,
+                  color: AppColors.ctText2,
+                ),
+              ),
+            ),
+
+            // Idioma
+            Expanded(
+              flex: 1,
+              child: Text(
+                _language,
+                style: const TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 12,
+                  color: AppColors.ctText2,
+                ),
+              ),
+            ),
+
+            // Variables
+            Expanded(
+              flex: 3,
+              child: _variables.isEmpty
+                  ? const Text(
+                      '—',
+                      style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 12,
+                          color: AppColors.ctText3),
+                    )
+                  : Text(
+                      _variables.join(', '),
+                      style: const TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 11,
+                        color: AppColors.ctText2,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+            ),
+
+            // Status badge
+            Expanded(
+              flex: 2,
+              child: _TemplateBadge(status: _status),
+            ),
+
+            // Acción eliminar
+            SizedBox(
+              width: 36,
+              child: _deleting
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: AppColors.ctTeal,
+                      ),
+                    )
+                  : IconButton(
+                      icon: const Icon(Icons.delete_outline_rounded,
+                          size: 16, color: AppColors.ctText3),
+                      splashRadius: 14,
+                      tooltip: 'Eliminar plantilla',
+                      onPressed: _delete,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Badge de status de plantilla ──────────────────────────────────────────────
+
+class _TemplateBadge extends StatelessWidget {
+  const _TemplateBadge({required this.status});
+  final String status;
+
+  @override
+  Widget build(BuildContext context) {
+    final Color bg;
+    final Color textColor;
+
+    switch (status) {
+      case 'APPROVED':
+        bg        = AppColors.ctOkBg;
+        textColor = AppColors.ctOkText;
+      case 'PENDING':
+        bg        = const Color(0xFFFEF3C7);
+        textColor = const Color(0xFF92400E);
+      case 'REJECTED':
+        bg        = AppColors.ctRedBg;
+        textColor = AppColors.ctRedText;
+      default:
+        bg        = AppColors.ctSurface2;
+        textColor = AppColors.ctText2;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        status.isEmpty ? '—' : status,
+        style: TextStyle(
+          fontFamily: 'Inter',
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+          color: textColor,
+        ),
+      ),
+    );
+  }
+}
+
+// ── Modal nueva plantilla ─────────────────────────────────────────────────────
+
+class _NewTemplateDialog extends StatefulWidget {
+  const _NewTemplateDialog({
+    required this.tenantId,
+    required this.onCreated,
+  });
+  final String tenantId;
+  final VoidCallback onCreated;
+
+  @override
+  State<_NewTemplateDialog> createState() => _NewTemplateDialogState();
+}
+
+class _NewTemplateDialogState extends State<_NewTemplateDialog> {
+  final _nameCtrl = TextEditingController();
+  final _bodyCtrl = TextEditingController();
+  String _category = 'UTILITY';
+  String _language = 'es';
+  final List<TextEditingController> _varCtrls = [];
+  bool _sending = false;
+  String? _error;
+
+  static const _categories = ['UTILITY', 'MARKETING', 'AUTHENTICATION'];
+  static const _languages = [
+    {'code': 'es', 'label': 'Español (es)'},
+    {'code': 'en', 'label': 'Inglés (en)'},
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _bodyCtrl.addListener(_syncVarsFromBody);
+  }
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _bodyCtrl.removeListener(_syncVarsFromBody);
+    _bodyCtrl.dispose();
+    for (final c in _varCtrls) { c.dispose(); }
+    super.dispose();
+  }
+
+  // ── Helpers ──────────────────────────────────────────────────────────────
+
+  static String _toSnakeCase(String input) {
+    return input
+        .trim()
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^\w\s]'), '')
+        .replaceAll(RegExp(r'\s+'), '_')
+        .replaceAll(RegExp(r'[^a-z0-9_]'), '')
+        .replaceAll(RegExp(r'_{2,}'), '_')
+        .replaceAll(RegExp(r'^_|_$'), '');
+  }
+
+  int _countVars(String body) {
+    final matches = RegExp(r'\{\{(\d+)\}\}').allMatches(body);
+    if (matches.isEmpty) return 0;
+    return matches
+        .map((m) => int.tryParse(m.group(1) ?? '0') ?? 0)
+        .reduce((a, b) => a > b ? a : b);
+  }
+
+  String _buildPreview() {
+    String preview = _bodyCtrl.text;
+    for (int i = 0; i < _varCtrls.length; i++) {
+      final val = _varCtrls[i].text.trim().isNotEmpty
+          ? _varCtrls[i].text.trim()
+          : '{{${i + 1}}}';
+      preview = preview.replaceAll('{{${i + 1}}}', val);
+    }
+    return preview;
+  }
+
+  void _syncVarsFromBody() {
+    final count = _countVars(_bodyCtrl.text);
+    if (count == _varCtrls.length) return;
+    setState(() {
+      while (_varCtrls.length < count) {
+        final ctrl = TextEditingController();
+        ctrl.addListener(() => setState(() {}));
+        _varCtrls.add(ctrl);
+      }
+      while (_varCtrls.length > count) {
+        _varCtrls.last.dispose();
+        _varCtrls.removeLast();
+      }
+    });
+  }
+
+  void _addVariable() {
+    setState(() {
+      final ctrl = TextEditingController();
+      ctrl.addListener(() => setState(() {}));
+      _varCtrls.add(ctrl);
+    });
+  }
+
+  // ── Submit ────────────────────────────────────────────────────────────────
+
+  Future<void> _send() async {
+    final name = _toSnakeCase(_nameCtrl.text);
+    final body = _bodyCtrl.text.trim();
+    if (name.isEmpty) {
+      setState(() => _error = 'Ingresa el nombre de la plantilla');
+      return;
+    }
+    if (body.isEmpty) {
+      setState(() => _error = 'Ingresa el cuerpo del mensaje');
+      return;
+    }
+    // Validate var count matches body
+    final expected = _countVars(body);
+    if (_varCtrls.length < expected) {
+      setState(() => _error =
+          'El cuerpo usa {{$expected}} pero solo tienes ${_varCtrls.length} variable(s) definidas');
+      return;
+    }
+    setState(() { _sending = true; _error = null; });
+    try {
+      await ApiClient.instance.post('/templates', data: {
+        'tenant_id': widget.tenantId,
+        'name':      name,
+        'category':  _category,
+        'language':  _language,
+        'body_text': body,
+        'variables': _varCtrls.map((c) => c.text.trim()).toList(),
+        'is_welcome': false,
+      });
+      if (!mounted) return;
+      widget.onCreated();
+      Navigator.pop(context);
+    } on DioException catch (e) {
+      if (!mounted) return;
+      final detail = e.response?.data is Map
+          ? e.response!.data['detail']?.toString()
+          : e.response?.data?.toString();
+      setState(() {
+        _sending = false;
+        _error   = detail ?? 'Error al crear la plantilla';
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() { _sending = false; _error = 'Error: $e'; });
+    }
+  }
+
+  // ── Build ─────────────────────────────────────────────────────────────────
+
+  @override
+  Widget build(BuildContext context) {
+    final preview = _buildPreview();
+
+    return Dialog(
+      backgroundColor: AppColors.ctSurface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: const BorderSide(color: AppColors.ctBorder),
+      ),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 560, maxHeight: 700),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header
+            Container(
+              padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
+              decoration: const BoxDecoration(
+                border: Border(bottom: BorderSide(color: AppColors.ctBorder)),
+              ),
+              child: const Row(
+                children: [
+                  Text(
+                    'Nueva plantilla',
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.ctText,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Body (scrollable)
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Nombre
+                    _TplField(
+                      label: 'Nombre',
+                      child: TextField(
+                        controller: _nameCtrl,
+                        onChanged: (_) => setState(() {}),
+                        style: const TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 13,
+                            color: AppColors.ctText),
+                        decoration: _tplInputDecoration(
+                          'ej: confirmacion_cita',
+                          hint: 'Se convierte automáticamente a snake_case',
+                        ),
+                      ),
+                    ),
+                    if (_nameCtrl.text.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        'Nombre final: ${_toSnakeCase(_nameCtrl.text)}',
+                        style: const TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 11,
+                          color: AppColors.ctTeal,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 14),
+
+                    // Categoría + Idioma
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: _TplField(
+                            label: 'Categoría',
+                            child: _tplDropdown<String>(
+                              value: _category,
+                              items: _categories.map((c) =>
+                                  DropdownMenuItem(value: c, child: Text(c))).toList(),
+                              onChanged: (v) {
+                                if (v != null) setState(() => _category = v);
+                              },
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _TplField(
+                            label: 'Idioma',
+                            child: _tplDropdown<String>(
+                              value: _language,
+                              items: _languages.map((l) => DropdownMenuItem(
+                                    value: l['code'],
+                                    child: Text(l['label']!),
+                                  )).toList(),
+                              onChanged: (v) {
+                                if (v != null) setState(() => _language = v);
+                              },
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Cuerpo
+                    _TplField(
+                      label: 'Cuerpo del mensaje',
+                      child: TextField(
+                        controller: _bodyCtrl,
+                        minLines: 3,
+                        maxLines: 6,
+                        style: const TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 13,
+                            color: AppColors.ctText),
+                        decoration: _tplInputDecoration(
+                          'Hola {{1}}, tu cita es el {{2}}.',
+                          hint: 'Usa {{1}}, {{2}}… para variables',
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Variables
+                    Row(
+                      children: [
+                        const Text(
+                          'Variables',
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.ctText,
+                          ),
+                        ),
+                        const Spacer(),
+                        GestureDetector(
+                          onTap: _addVariable,
+                          child: const Text(
+                            '+ Agregar variable',
+                            style: TextStyle(
+                              fontFamily: 'Inter',
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.ctTeal,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    if (_varCtrls.isEmpty)
+                      const Text(
+                        'Usa {{1}}, {{2}}… en el cuerpo para agregar variables.',
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 12,
+                          color: AppColors.ctText3,
+                        ),
+                      )
+                    else
+                      ...List.generate(_varCtrls.length, (i) {
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 24,
+                                alignment: Alignment.centerRight,
+                                padding: const EdgeInsets.only(right: 8),
+                                child: Text(
+                                  '{{${i + 1}}}',
+                                  style: const TextStyle(
+                                    fontFamily: 'Inter',
+                                    fontSize: 11,
+                                    color: AppColors.ctText3,
+                                  ),
+                                ),
+                              ),
+                              Expanded(
+                                child: TextField(
+                                  controller: _varCtrls[i],
+                                  style: const TextStyle(
+                                      fontFamily: 'Inter',
+                                      fontSize: 13,
+                                      color: AppColors.ctText),
+                                  decoration: _tplInputDecoration(
+                                      'ej: nombre_cliente'),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
+                    const SizedBox(height: 14),
+
+                    // Preview
+                    if (_bodyCtrl.text.isNotEmpty) ...[
+                      const Text(
+                        'Preview',
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.ctText,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFDCFCE7),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                              color: const Color(0xFFBBF7D0)),
+                        ),
+                        child: Text(
+                          preview,
+                          style: const TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 13,
+                            color: Color(0xFF065F46),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                    ],
+
+                    // Error
+                    if (_error != null) ...[
+                      _FeedbackBanner(message: _error!, isError: true),
+                      const SizedBox(height: 14),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+            // Footer
+            Container(
+              padding: const EdgeInsets.fromLTRB(24, 12, 24, 20),
+              decoration: const BoxDecoration(
+                border: Border(top: BorderSide(color: AppColors.ctBorder)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  _WaOutlineButton(
+                    label: 'Cancelar',
+                    onTap: () => Navigator.pop(context),
+                  ),
+                  const SizedBox(width: 10),
+                  _WaPrimaryButton(
+                    label: 'Crear plantilla',
+                    loading: _sending,
+                    onTap: _sending ? null : _send,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Helpers de formulario para plantillas ─────────────────────────────────────
+
+class _TplField extends StatelessWidget {
+  const _TplField({required this.label, required this.child});
+  final String label;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: AppColors.ctText,
+          ),
+        ),
+        const SizedBox(height: 6),
+        child,
+      ],
+    );
+  }
+}
+
+InputDecoration _tplInputDecoration(String placeholder, {String? hint}) {
+  return InputDecoration(
+    hintText: placeholder,
+    hintStyle: const TextStyle(
+        fontFamily: 'Inter', fontSize: 13, color: AppColors.ctText3),
+    helperText: hint,
+    helperStyle: const TextStyle(
+        fontFamily: 'Inter', fontSize: 11, color: AppColors.ctText3),
+    filled: true,
+    fillColor: AppColors.ctSurface2,
+    contentPadding:
+        const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(8),
+      borderSide: const BorderSide(color: AppColors.ctBorder2),
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(8),
+      borderSide: const BorderSide(color: AppColors.ctBorder2),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(8),
+      borderSide: const BorderSide(color: AppColors.ctTeal, width: 1.5),
+    ),
+  );
+}
+
+Widget _tplDropdown<T>({
+  required T value,
+  required List<DropdownMenuItem<T>> items,
+  required ValueChanged<T?> onChanged,
+}) {
+  return Container(
+    height: 40,
+    padding: const EdgeInsets.symmetric(horizontal: 12),
+    decoration: BoxDecoration(
+      color: AppColors.ctSurface2,
+      borderRadius: BorderRadius.circular(8),
+      border: Border.all(color: AppColors.ctBorder2),
+    ),
+    child: DropdownButtonHideUnderline(
+      child: DropdownButton<T>(
+        value: value,
+        isExpanded: true,
+        isDense: true,
+        style: const TextStyle(
+            fontFamily: 'Inter', fontSize: 13, color: AppColors.ctText),
+        icon: const Icon(
+          Icons.keyboard_arrow_down_rounded,
+          size: 16,
+          color: AppColors.ctText3,
+        ),
+        items: items,
+        onChanged: onChanged,
+      ),
+    ),
+  );
+}
+
+// ── Botones locales para este tab ─────────────────────────────────────────────
+
+class _WaPrimaryButton extends StatefulWidget {
+  const _WaPrimaryButton({
+    required this.label,
+    required this.onTap,
+    this.loading = false,
+  });
+  final String label;
+  final VoidCallback? onTap;
+  final bool loading;
+
+  @override
+  State<_WaPrimaryButton> createState() => _WaPrimaryButtonState();
+}
+
+class _WaPrimaryButtonState extends State<_WaPrimaryButton> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit:  (_) => setState(() => _hovered = false),
+      cursor: widget.onTap != null
+          ? SystemMouseCursors.click
+          : SystemMouseCursors.basic,
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 120),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            color: widget.onTap == null
+                ? AppColors.ctTeal.withValues(alpha: 0.5)
+                : _hovered ? AppColors.ctTealDark : AppColors.ctTeal,
+            borderRadius: BorderRadius.circular(7),
+          ),
+          child: widget.loading
+              ? const SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor:
+                        AlwaysStoppedAnimation<Color>(AppColors.ctNavy),
+                  ),
+                )
+              : Text(
+                  widget.label,
+                  style: const TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.ctNavy,
+                  ),
+                ),
+        ),
+      ),
+    );
+  }
+}
+
+class _WaOutlineButton extends StatefulWidget {
+  const _WaOutlineButton({
+    required this.label,
+    this.icon,
+    required this.onTap,
+    this.loading = false,
+  });
+  final String label;
+  final IconData? icon;
+  final VoidCallback? onTap;
+  final bool loading;
+
+  @override
+  State<_WaOutlineButton> createState() => _WaOutlineButtonState();
+}
+
+class _WaOutlineButtonState extends State<_WaOutlineButton> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit:  (_) => setState(() => _hovered = false),
+      cursor: widget.onTap != null
+          ? SystemMouseCursors.click
+          : SystemMouseCursors.basic,
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 120),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: _hovered ? AppColors.ctSurface2 : Colors.transparent,
+            borderRadius: BorderRadius.circular(7),
+            border: Border.all(color: AppColors.ctBorder2),
+          ),
+          child: widget.loading
+              ? const SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: AppColors.ctText2,
+                  ),
+                )
+              : Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (widget.icon != null) ...[
+                      Icon(widget.icon!, size: 13, color: AppColors.ctText2),
+                      const SizedBox(width: 5),
+                    ],
+                    Text(
+                      widget.label,
+                      style: const TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.ctText2,
+                      ),
+                    ),
+                  ],
+                ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── SnackBar helper local ─────────────────────────────────────────────────────
+
+SnackBar _waSnack(String msg) => SnackBar(
+      content:
+          Text(msg, style: const TextStyle(fontFamily: 'Inter', fontSize: 13)),
+      backgroundColor: AppColors.ctNavy,
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      margin: const EdgeInsets.all(16),
+    );
 
 // ── Tab placeholder ───────────────────────────────────────────────────────────
 
