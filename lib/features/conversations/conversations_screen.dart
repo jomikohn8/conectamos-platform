@@ -4,6 +4,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'dart:async';
 
+import 'package:url_launcher/url_launcher.dart';
+
 import '../../core/api/messages_api.dart';
 import '../../core/api/operators_api.dart';
 import '../../core/api/supabase_messages.dart';
@@ -337,20 +339,28 @@ bool _isToday(String? iso) {
   }
 }
 
+String _mediaFallback(String type) {
+  switch (type) {
+    case 'image': return '[📷 Imagen]';
+    case 'audio': return '[🎤 Nota de voz]';
+    case 'video': return '[🎥 Video]';
+    case 'document': return '[📄 Documento]';
+    case 'sticker': return '[😊 Sticker]';
+    case 'location': return '[📍 Ubicación]';
+    default: return '[📎 Archivo]';
+  }
+}
+
 String _previewText(Map<String, dynamic> msg) {
   final raw = msg['raw_body'] as String?;
   if (raw != null && raw.isNotEmpty) return raw;
-  final type = msg['message_type'] as String? ?? '';
-  if (type == 'image') return '[📷 Imagen]';
-  return '[📎 Archivo]';
+  return _mediaFallback(msg['message_type'] as String? ?? '');
 }
 
 String _msgBody(Map<String, dynamic> msg) {
   final raw = msg['raw_body'] as String?;
   if (raw != null && raw.isNotEmpty) return raw;
-  final type = msg['message_type'] as String? ?? '';
-  if (type == 'image') return '[📷 Imagen]';
-  return '[📎 Archivo]';
+  return _mediaFallback(msg['message_type'] as String? ?? '');
 }
 
 String _initials(String name) {
@@ -975,6 +985,8 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
               msg['from_phone'] as String? ?? ''),
       isOutbound: isOutbound,
       waStatus: msg['wa_status'] as String?,
+      messageType: msg['message_type'] as String?,
+      mediaUrl: msg['media_url'] as String?,
     );
   }
 
@@ -1227,12 +1239,183 @@ class _ApiMessageBubble extends StatelessWidget {
     required this.senderName,
     required this.isOutbound,
     this.waStatus,
+    this.messageType,
+    this.mediaUrl,
   });
   final String body;
   final String time;
   final String senderName;
   final bool isOutbound;
   final String? waStatus;
+  final String? messageType;
+  final String? mediaUrl;
+
+  Widget _fallback(String label) => Text(
+        label,
+        style: const TextStyle(
+            fontFamily: 'Inter', fontSize: 13, color: Color(0xFF667781)),
+      );
+
+  Widget _buildContent(BuildContext context) {
+    final mType = messageType ?? 'text';
+    final mUrl = (mediaUrl != null && mediaUrl!.isNotEmpty) ? mediaUrl : null;
+
+    Future<void> openUrl(String url) async {
+      final uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+    }
+
+    switch (mType) {
+      case 'image':
+        if (mUrl == null) return _fallback('[Imagen]');
+        return GestureDetector(
+          onTap: () => showDialog(
+            context: context,
+            builder: (_) => Dialog(
+              backgroundColor: Colors.transparent,
+              child: GestureDetector(
+                onTap: () => Navigator.of(context).pop(),
+                child: Image.network(mUrl,
+                    errorBuilder: (ctx, e, s) => _fallback('[Imagen]')),
+              ),
+            ),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Image.network(
+              mUrl,
+              width: 240,
+              fit: BoxFit.cover,
+              errorBuilder: (ctx, e, s) => _fallback('[Imagen]'),
+            ),
+          ),
+        );
+
+      case 'audio':
+        if (mUrl == null) return _fallback('[Audio]');
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.mic,
+                size: 20,
+                color: isOutbound
+                    ? AppColors.ctTeal
+                    : const Color(0xFF667781)),
+            const SizedBox(width: 8),
+            const Text('Nota de voz',
+                style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 13,
+                    color: Color(0xFF111B21))),
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: () => openUrl(mUrl),
+              child: const Icon(Icons.play_circle_filled,
+                  size: 28, color: Color(0xFF53BDEB)),
+            ),
+          ],
+        );
+
+      case 'video':
+        if (mUrl == null) return _fallback('[Video]');
+        return GestureDetector(
+          onTap: () => openUrl(mUrl),
+          child: Container(
+            width: 240,
+            height: 135,
+            decoration: BoxDecoration(
+              color: Colors.black,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Center(
+              child: Icon(Icons.play_circle_outline,
+                  color: Colors.white, size: 48),
+            ),
+          ),
+        );
+
+      case 'document':
+        if (mUrl == null) return _fallback('[Documento]');
+        final fileName =
+            Uri.parse(mUrl).pathSegments.lastOrNull ?? 'Documento';
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.insert_drive_file,
+                size: 24, color: Color(0xFF667781)),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(fileName,
+                  style: const TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 12,
+                      color: Color(0xFF111B21)),
+                  overflow: TextOverflow.ellipsis),
+            ),
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: () => openUrl(mUrl),
+              child: const Text('Abrir',
+                  style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 12,
+                      color: Color(0xFF53BDEB),
+                      fontWeight: FontWeight.w600)),
+            ),
+          ],
+        );
+
+      case 'sticker':
+        if (mUrl == null) return _fallback('[Sticker]');
+        return Image.network(
+          mUrl,
+          width: 120,
+          height: 120,
+          fit: BoxFit.contain,
+          errorBuilder: (ctx, e, s) => _fallback('[Sticker]'),
+        );
+
+      case 'location':
+        final coords = body.replaceAll('📍', '').trim();
+        final mapsUrl = 'https://maps.google.com/?q=$coords';
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.location_on, color: Colors.red, size: 20),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(body,
+                  style: const TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 13,
+                      color: Color(0xFF111B21))),
+            ),
+            const SizedBox(width: 6),
+            GestureDetector(
+              onTap: () => openUrl(mapsUrl),
+              child: const Text('Ver en mapa',
+                  style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 12,
+                      color: Color(0xFF53BDEB),
+                      fontWeight: FontWeight.w600)),
+            ),
+          ],
+        );
+
+      default:
+        return Text(
+          body,
+          style: const TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 13,
+              color: Color(0xFF111B21),
+              height: 1.4),
+        );
+    }
+  }
 
   Widget _statusIcon() {
     switch (waStatus) {
@@ -1256,10 +1439,13 @@ class _ApiMessageBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const textColor = Color(0xFF111B21);
     const timeColor = Color(0xFF667781);
-    final bubbleBg =
-        isOutbound ? const Color(0xFFD9FDD3) : Colors.white;
+    final isSticker = messageType == 'sticker';
+    final bubbleBg = isSticker
+        ? Colors.transparent
+        : isOutbound
+            ? const Color(0xFFD9FDD3)
+            : Colors.white;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
@@ -1309,15 +1495,7 @@ class _ApiMessageBubble extends StatelessWidget {
                         ),
                       ),
                     ),
-                  Text(
-                    body,
-                    style: TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 13,
-                      color: textColor,
-                      height: 1.4,
-                    ),
-                  ),
+                  _buildContent(context),
                   const SizedBox(height: 3),
                   if (isOutbound)
                     Row(
