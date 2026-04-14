@@ -196,6 +196,17 @@ class _TabState extends State<_Tab> {
   }
 }
 
+// ── FutureProvider para credenciales ─────────────────────────────────────────
+
+final _credentialsProvider =
+    FutureProvider.autoDispose.family<Map<String, dynamic>?, String>(
+  (ref, tenantId) async {
+    if (tenantId.isEmpty) return null;
+    final res = await ApiClient.instance.get('/tenants/$tenantId');
+    return Map<String, dynamic>.from(res.data as Map);
+  },
+);
+
 // ── Tab Credenciales ──────────────────────────────────────────────────────────
 
 class _CredentialsTab extends ConsumerStatefulWidget {
@@ -210,21 +221,10 @@ class _CredentialsTabState extends ConsumerState<_CredentialsTab> {
   final _wabaIdCtrl = TextEditingController();
   final _tokenCtrl = TextEditingController();
 
-  bool _loading = true;
   bool _saving = false;
-  bool _loaded = false;
   String? _error;
   String? _success;
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final tenantId = ref.read(activeTenantIdProvider);
-    if (!_loaded && tenantId.isNotEmpty) {
-      _loaded = true;
-      _loadCredentials();
-    }
-  }
+  String? _loadedForTenant;
 
   @override
   void dispose() {
@@ -234,46 +234,9 @@ class _CredentialsTabState extends ConsumerState<_CredentialsTab> {
     super.dispose();
   }
 
-  Future<void> _loadCredentials() async {
-    final tenantId = ref.read(activeTenantIdProvider);
-    if (tenantId.isEmpty) {
-      setState(() => _loading = false);
-      return;
-    }
-    try {
-      final res = await ApiClient.instance.get('/tenants/$tenantId');
-      final data = Map<String, dynamic>.from(res.data as Map);
-      if (!mounted) return;
-      _phoneIdCtrl.text = data['wa_phone_number_id']?.toString() ?? '';
-      _wabaIdCtrl.text = data['wa_waba_id']?.toString() ?? '';
-      _tokenCtrl.text = data['wa_token']?.toString() ?? '';
-      setState(() => _loading = false);
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _loading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error al cargar credenciales: $e'),
-          backgroundColor: AppColors.ctNavy,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8)),
-          margin: const EdgeInsets.all(16),
-        ),
-      );
-    }
-  }
-
-  Future<void> _save() async {
-    final tenantId = ref.read(activeTenantIdProvider);
+  Future<void> _save(String tenantId) async {
     if (tenantId.isEmpty) return;
-
-    setState(() {
-      _saving = true;
-      _error = null;
-      _success = null;
-    });
-
+    setState(() { _saving = true; _error = null; _success = null; });
     try {
       await ApiClient.instance.patch(
         '/tenants/$tenantId/credentials',
@@ -284,98 +247,102 @@ class _CredentialsTabState extends ConsumerState<_CredentialsTab> {
         },
       );
       if (!mounted) return;
-      setState(() {
-        _saving = false;
-        _success = 'Credenciales guardadas correctamente';
-      });
+      setState(() { _saving = false; _success = 'Credenciales guardadas correctamente'; });
     } on DioException catch (e) {
       if (!mounted) return;
       final detail = e.response?.data is Map
           ? e.response!.data['detail']?.toString()
           : e.response?.data?.toString();
-      setState(() {
-        _saving = false;
-        _error = detail ?? 'Error al guardar las credenciales';
-      });
+      setState(() { _saving = false; _error = detail ?? 'Error al guardar las credenciales'; });
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        _saving = false;
-        _error = 'Error al guardar: $e';
-      });
+      setState(() { _saving = false; _error = 'Error al guardar: $e'; });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
-      return const Center(
+    final tenantId = ref.watch(activeTenantIdProvider);
+
+    ref.listen<AsyncValue<Map<String, dynamic>?>>(
+      _credentialsProvider(tenantId),
+      (_, next) {
+        next.whenData((data) {
+          if (data != null && _loadedForTenant != tenantId) {
+            _loadedForTenant = tenantId;
+            _phoneIdCtrl.text = data['wa_phone_number_id']?.toString() ?? '';
+            _wabaIdCtrl.text = data['wa_waba_id']?.toString() ?? '';
+            _tokenCtrl.text = data['wa_token']?.toString() ?? '';
+          }
+        });
+      },
+    );
+
+    final credAsync = ref.watch(_credentialsProvider(tenantId));
+
+    return credAsync.when(
+      loading: () => const Center(
         child: CircularProgressIndicator(color: AppColors.ctTeal),
-      );
-    }
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(22),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _SectionCard(
-            title: 'Credenciales de Meta Cloud API',
-            subtitle:
-                'Configura los identificadores de tu cuenta de WhatsApp Business',
-            child: Column(
-              children: [
-                _FormField(
-                  label: 'Phone Number ID',
-                  controller: _phoneIdCtrl,
-                  placeholder: 'Ej: 1234567890123456',
-                  hint: 'Encuéntralo en Meta for Developers → WhatsApp → Configuración',
-                ),
-                const SizedBox(height: 16),
-                _FormField(
-                  label: 'WABA ID (WhatsApp Business Account)',
-                  controller: _wabaIdCtrl,
-                  placeholder: 'Ej: 9876543210987654',
-                  hint: 'ID de tu cuenta de WhatsApp Business en Meta',
-                ),
-                const SizedBox(height: 16),
-                _FormField(
-                  label: 'Token de acceso',
-                  controller: _tokenCtrl,
-                  placeholder: 'EAABsbCS0zC4BO...',
-                  obscureText: true,
-                  hint: 'Token permanente o de larga duración de tu app de Meta',
-                ),
-                const SizedBox(height: 24),
-
-                // Feedback
-                if (_error != null) ...[
-                  _FeedbackBanner(
-                    message: _error!,
-                    isError: true,
+      ),
+      error: (e, _) => Center(
+        child: Text(
+          'Error al cargar credenciales: $e',
+          style: const TextStyle(fontFamily: 'Inter', color: AppColors.ctText2),
+        ),
+      ),
+      data: (_) => SingleChildScrollView(
+        padding: const EdgeInsets.all(22),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _SectionCard(
+              title: 'Credenciales de Meta Cloud API',
+              subtitle:
+                  'Configura los identificadores de tu cuenta de WhatsApp Business',
+              child: Column(
+                children: [
+                  _FormField(
+                    label: 'Phone Number ID',
+                    controller: _phoneIdCtrl,
+                    placeholder: 'Ej: 1234567890123456',
+                    hint: 'Encuéntralo en Meta for Developers → WhatsApp → Configuración',
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 16),
+                  _FormField(
+                    label: 'WABA ID (WhatsApp Business Account)',
+                    controller: _wabaIdCtrl,
+                    placeholder: 'Ej: 9876543210987654',
+                    hint: 'ID de tu cuenta de WhatsApp Business en Meta',
+                  ),
+                  const SizedBox(height: 16),
+                  _FormField(
+                    label: 'Token de acceso',
+                    controller: _tokenCtrl,
+                    placeholder: 'EAABsbCS0zC4BO...',
+                    obscureText: true,
+                    hint: 'Token permanente o de larga duración de tu app de Meta',
+                  ),
+                  const SizedBox(height: 24),
+                  if (_error != null) ...[
+                    _FeedbackBanner(message: _error!, isError: true),
+                    const SizedBox(height: 12),
+                  ],
+                  if (_success != null) ...[
+                    _FeedbackBanner(message: _success!, isError: false),
+                    const SizedBox(height: 12),
+                  ],
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: _SaveButton(
+                      loading: _saving,
+                      onTap: _saving ? null : () => _save(tenantId),
+                    ),
+                  ),
                 ],
-                if (_success != null) ...[
-                  _FeedbackBanner(
-                    message: _success!,
-                    isError: false,
-                  ),
-                  const SizedBox(height: 12),
-                ],
-
-                // Botón guardar
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: _SaveButton(
-                    loading: _saving,
-                    onTap: _saving ? null : _save,
-                  ),
-                ),
-              ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
