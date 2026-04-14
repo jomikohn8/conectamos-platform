@@ -895,6 +895,14 @@ class _TemplateBadge extends StatelessWidget {
   }
 }
 
+// ── Modelo de configuración de variable ───────────────────────────────────────
+
+class _VarConfig {
+  String type; // 'system' | 'free'
+  String key;
+  _VarConfig({required this.type, required this.key});
+}
+
 // ── Modal nueva plantilla ─────────────────────────────────────────────────────
 
 class _NewTemplateDialog extends StatefulWidget {
@@ -914,7 +922,8 @@ class _NewTemplateDialogState extends State<_NewTemplateDialog> {
   final _bodyCtrl = TextEditingController();
   String _category = 'UTILITY';
   String _language = 'es';
-  final List<TextEditingController> _varCtrls = [];
+  final List<_VarConfig> _varConfigs = [];
+  final List<TextEditingController> _freeKeyCtrls = [];
   bool _sending = false;
   String? _error;
 
@@ -923,6 +932,22 @@ class _NewTemplateDialogState extends State<_NewTemplateDialog> {
     {'code': 'es', 'label': 'Español (es)'},
     {'code': 'en', 'label': 'Inglés (en)'},
   ];
+
+  // Catálogo: clave → [descripción, valor_ejemplo]
+  static const _sysVarDesc = <String, String>{
+    'nombre_operador':   'Nombre del operador',
+    'telefono_operador': 'Teléfono del operador',
+    'nombre_tenant':     'Nombre de la empresa',
+    'fecha_hoy':         'Fecha de hoy',
+    'hora_actual':       'Hora actual',
+  };
+  static const _sysVarExample = <String, String>{
+    'nombre_operador':   'José Miguel',
+    'telefono_operador': '5215559537449',
+    'nombre_tenant':     'TMR-Prixz',
+    'fecha_hoy':         '14/04/2026',
+    'hora_actual':       '10:30 AM',
+  };
 
   @override
   void initState() {
@@ -935,7 +960,7 @@ class _NewTemplateDialogState extends State<_NewTemplateDialog> {
     _nameCtrl.dispose();
     _bodyCtrl.removeListener(_syncVarsFromBody);
     _bodyCtrl.dispose();
-    for (final c in _varCtrls) { c.dispose(); }
+    for (final c in _freeKeyCtrls) { c.dispose(); }
     super.dispose();
   }
 
@@ -962,10 +987,15 @@ class _NewTemplateDialogState extends State<_NewTemplateDialog> {
 
   String _buildPreview() {
     String preview = _bodyCtrl.text;
-    for (int i = 0; i < _varCtrls.length; i++) {
-      final val = _varCtrls[i].text.trim().isNotEmpty
-          ? _varCtrls[i].text.trim()
-          : '{{${i + 1}}}';
+    for (int i = 0; i < _varConfigs.length; i++) {
+      final cfg = _varConfigs[i];
+      String val;
+      if (cfg.type == 'system') {
+        val = _sysVarExample[cfg.key] ?? '{{${i + 1}}}';
+      } else {
+        final freeKey = _freeKeyCtrls[i].text.trim();
+        val = freeKey.isNotEmpty ? '[$freeKey]' : '{{${i + 1}}}';
+      }
       preview = preview.replaceAll('{{${i + 1}}}', val);
     }
     return preview;
@@ -973,25 +1003,22 @@ class _NewTemplateDialogState extends State<_NewTemplateDialog> {
 
   void _syncVarsFromBody() {
     final count = _countVars(_bodyCtrl.text);
-    if (count == _varCtrls.length) return;
+    if (count == _varConfigs.length) return;
     setState(() {
-      while (_varCtrls.length < count) {
+      while (_varConfigs.length < count) {
+        _varConfigs.add(_VarConfig(
+          type: 'system',
+          key:  _sysVarDesc.keys.first,
+        ));
         final ctrl = TextEditingController();
         ctrl.addListener(() => setState(() {}));
-        _varCtrls.add(ctrl);
+        _freeKeyCtrls.add(ctrl);
       }
-      while (_varCtrls.length > count) {
-        _varCtrls.last.dispose();
-        _varCtrls.removeLast();
+      while (_varConfigs.length > count) {
+        _varConfigs.removeLast();
+        _freeKeyCtrls.last.dispose();
+        _freeKeyCtrls.removeLast();
       }
-    });
-  }
-
-  void _addVariable() {
-    setState(() {
-      final ctrl = TextEditingController();
-      ctrl.addListener(() => setState(() {}));
-      _varCtrls.add(ctrl);
     });
   }
 
@@ -1008,22 +1035,24 @@ class _NewTemplateDialogState extends State<_NewTemplateDialog> {
       setState(() => _error = 'Ingresa el cuerpo del mensaje');
       return;
     }
-    // Validate var count matches body
-    final expected = _countVars(body);
-    if (_varCtrls.length < expected) {
-      setState(() => _error =
-          'El cuerpo usa {{$expected}} pero solo tienes ${_varCtrls.length} variable(s) definidas');
-      return;
-    }
     setState(() { _sending = true; _error = null; });
     try {
       await ApiClient.instance.post('/templates', data: {
-        'tenant_id': widget.tenantId,
-        'name':      name,
-        'category':  _category,
-        'language':  _language,
-        'body_text': body,
-        'variables': _varCtrls.map((c) => c.text.trim()).toList(),
+        'tenant_id':  widget.tenantId,
+        'name':       name,
+        'category':   _category,
+        'language':   _language,
+        'body_text':  body,
+        'variables':  List.generate(_varConfigs.length, (i) {
+          final cfg = _varConfigs[i];
+          return {
+            'slot': i + 1,
+            'type': cfg.type,
+            'key':  cfg.type == 'system'
+                ? cfg.key
+                : _freeKeyCtrls[i].text.trim(),
+          };
+        }),
         'is_welcome': false,
       });
       if (!mounted) return;
@@ -1044,6 +1073,108 @@ class _NewTemplateDialogState extends State<_NewTemplateDialog> {
     }
   }
 
+  // ── Variable row ──────────────────────────────────────────────────────────
+
+  Widget _buildVarRow(int i) {
+    final cfg = _varConfigs[i];
+    final isSystem = cfg.type == 'system';
+    final chipVal = isSystem
+        ? (_sysVarExample[cfg.key] ?? '')
+        : (_freeKeyCtrls[i].text.trim().isNotEmpty
+            ? '[${_freeKeyCtrls[i].text.trim()}]'
+            : '');
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: AppColors.ctBg,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: AppColors.ctBorder),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text(
+                  'Variable {{${i + 1}}}',
+                  style: const TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.ctText,
+                  ),
+                ),
+                const Spacer(),
+                _VarTypeToggle(
+                  isSystem: isSystem,
+                  onChanged: (sys) => setState(() {
+                    _varConfigs[i] = _VarConfig(
+                      type: sys ? 'system' : 'free',
+                      key:  sys ? _sysVarDesc.keys.first : '',
+                    );
+                  }),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            if (isSystem)
+              _tplDropdown<String>(
+                value: _sysVarDesc.containsKey(cfg.key)
+                    ? cfg.key
+                    : _sysVarDesc.keys.first,
+                items: _sysVarDesc.entries
+                    .map((e) => DropdownMenuItem(
+                          value: e.key,
+                          child: Text(e.value),
+                        ))
+                    .toList(),
+                onChanged: (v) {
+                  if (v != null) setState(() => _varConfigs[i].key = v);
+                },
+              )
+            else
+              TextField(
+                controller: _freeKeyCtrls[i],
+                style: const TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 13,
+                    color: AppColors.ctText),
+                decoration: _tplInputDecoration(
+                    'Nombre descriptivo (ej: numero_pedido)'),
+              ),
+            if (chipVal.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: isSystem
+                      ? const Color(0xFFDCFCE7)
+                      : AppColors.ctSurface2,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  chipVal,
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: isSystem
+                        ? const Color(0xFF065F46)
+                        : AppColors.ctText2,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
   // ── Build ─────────────────────────────────────────────────────────────────
 
   @override
@@ -1057,7 +1188,7 @@ class _NewTemplateDialogState extends State<_NewTemplateDialog> {
         side: const BorderSide(color: AppColors.ctBorder),
       ),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 560, maxHeight: 700),
+        constraints: const BoxConstraints(maxWidth: 560, maxHeight: 740),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -1126,8 +1257,10 @@ class _NewTemplateDialogState extends State<_NewTemplateDialog> {
                             label: 'Categoría',
                             child: _tplDropdown<String>(
                               value: _category,
-                              items: _categories.map((c) =>
-                                  DropdownMenuItem(value: c, child: Text(c))).toList(),
+                              items: _categories
+                                  .map((c) => DropdownMenuItem(
+                                      value: c, child: Text(c)))
+                                  .toList(),
                               onChanged: (v) {
                                 if (v != null) setState(() => _category = v);
                               },
@@ -1140,10 +1273,12 @@ class _NewTemplateDialogState extends State<_NewTemplateDialog> {
                             label: 'Idioma',
                             child: _tplDropdown<String>(
                               value: _language,
-                              items: _languages.map((l) => DropdownMenuItem(
-                                    value: l['code'],
-                                    child: Text(l['label']!),
-                                  )).toList(),
+                              items: _languages
+                                  .map((l) => DropdownMenuItem(
+                                        value: l['code'],
+                                        child: Text(l['label']!),
+                                      ))
+                                  .toList(),
                               onChanged: (v) {
                                 if (v != null) setState(() => _language = v);
                               },
@@ -1174,34 +1309,7 @@ class _NewTemplateDialogState extends State<_NewTemplateDialog> {
                     const SizedBox(height: 14),
 
                     // Variables
-                    Row(
-                      children: [
-                        const Text(
-                          'Variables',
-                          style: TextStyle(
-                            fontFamily: 'Inter',
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.ctText,
-                          ),
-                        ),
-                        const Spacer(),
-                        GestureDetector(
-                          onTap: _addVariable,
-                          child: const Text(
-                            '+ Agregar variable',
-                            style: TextStyle(
-                              fontFamily: 'Inter',
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.ctTeal,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    if (_varCtrls.isEmpty)
+                    if (_varConfigs.isEmpty)
                       const Text(
                         'Usa {{1}}, {{2}}… en el cuerpo para agregar variables.',
                         style: TextStyle(
@@ -1210,40 +1318,29 @@ class _NewTemplateDialogState extends State<_NewTemplateDialog> {
                           color: AppColors.ctText3,
                         ),
                       )
-                    else
-                      ...List.generate(_varCtrls.length, (i) {
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 24,
-                                alignment: Alignment.centerRight,
-                                padding: const EdgeInsets.only(right: 8),
-                                child: Text(
-                                  '{{${i + 1}}}',
-                                  style: const TextStyle(
-                                    fontFamily: 'Inter',
-                                    fontSize: 11,
-                                    color: AppColors.ctText3,
-                                  ),
-                                ),
-                              ),
-                              Expanded(
-                                child: TextField(
-                                  controller: _varCtrls[i],
-                                  style: const TextStyle(
-                                      fontFamily: 'Inter',
-                                      fontSize: 13,
-                                      color: AppColors.ctText),
-                                  decoration: _tplInputDecoration(
-                                      'ej: nombre_cliente'),
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      }),
+                    else ...[
+                      const Text(
+                        'Variables',
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.ctText,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'Las variables del sistema se llenan automáticamente al enviar. '
+                        'Las variables libres las llena el supervisor al momento de enviar el mensaje.',
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 11,
+                          color: AppColors.ctText3,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      ...List.generate(_varConfigs.length, _buildVarRow),
+                    ],
                     const SizedBox(height: 14),
 
                     // Preview
@@ -1265,8 +1362,8 @@ class _NewTemplateDialogState extends State<_NewTemplateDialog> {
                         decoration: BoxDecoration(
                           color: const Color(0xFFDCFCE7),
                           borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                              color: const Color(0xFFBBF7D0)),
+                          border:
+                              Border.all(color: const Color(0xFFBBF7D0)),
                         ),
                         child: Text(
                           preview,
@@ -1312,6 +1409,78 @@ class _NewTemplateDialogState extends State<_NewTemplateDialog> {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Toggle sistema / libre ────────────────────────────────────────────────────
+
+class _VarTypeToggle extends StatelessWidget {
+  const _VarTypeToggle({
+    required this.isSystem,
+    required this.onChanged,
+  });
+  final bool isSystem;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.ctSurface2,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: AppColors.ctBorder),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _ToggleOption(
+            label: 'Del sistema',
+            active: isSystem,
+            onTap: () => onChanged(true),
+          ),
+          _ToggleOption(
+            label: 'Libre',
+            active: !isSystem,
+            onTap: () => onChanged(false),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ToggleOption extends StatelessWidget {
+  const _ToggleOption({
+    required this.label,
+    required this.active,
+    required this.onTap,
+  });
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 100),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: active ? AppColors.ctTeal : Colors.transparent,
+          borderRadius: BorderRadius.circular(5),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: active ? AppColors.ctNavy : AppColors.ctText2,
+          ),
         ),
       ),
     );
