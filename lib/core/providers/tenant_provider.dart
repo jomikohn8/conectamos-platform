@@ -1,0 +1,117 @@
+// ignore: avoid_web_libraries_in_flutter, deprecated_member_use
+import 'dart:html' as html;
+
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../api/tenants_api.dart';
+
+// ── Modelo ────────────────────────────────────────────────────────────────────
+
+class TenantInfo {
+  const TenantInfo({
+    required this.id,
+    required this.slug,
+    required this.displayName,
+    this.logoUrl,
+  });
+
+  final String id;
+  final String slug;
+  final String displayName;
+  final String? logoUrl;
+
+  factory TenantInfo.fromMap(Map<String, dynamic> m) => TenantInfo(
+        id: m['id'] as String? ?? '',
+        slug: m['slug'] as String? ?? '',
+        displayName: m['display_name'] as String? ??
+            m['name'] as String? ??
+            m['slug'] as String? ??
+            '',
+        logoUrl: m['logo_url'] as String?,
+      );
+}
+
+// ── State ─────────────────────────────────────────────────────────────────────
+
+class TenantState {
+  const TenantState({this.all = const [], this.active});
+  final List<TenantInfo> all;
+  final TenantInfo? active;
+
+  TenantState withActive(TenantInfo? t) => TenantState(all: all, active: t);
+  TenantState withAll(List<TenantInfo> list, TenantInfo? t) =>
+      TenantState(all: list, active: t);
+}
+
+// ── Notifier ──────────────────────────────────────────────────────────────────
+
+class TenantNotifier extends StateNotifier<TenantState> {
+  TenantNotifier() : super(const TenantState());
+
+  static const _kStorageKey = 'conectamos_active_tenant_id';
+
+  Future<void> load(String userEmail) async {
+    if (state.all.isNotEmpty) return; // already loaded
+    try {
+      final list = await TenantsApi.listTenants();
+      final tenants = list.map(TenantInfo.fromMap).toList();
+
+      TenantInfo? active;
+
+      // 1. Restore from localStorage if present and valid
+      final savedId = html.window.localStorage[_kStorageKey] ?? '';
+      if (savedId.isNotEmpty) {
+        final matches = tenants.where((t) => t.id == savedId);
+        if (matches.isNotEmpty) active = matches.first;
+      }
+
+      // 2. Fallback: default by email
+      if (active == null && tenants.isNotEmpty) {
+        if (userEmail == 'miguel@conectamos.mx') {
+          active = tenants.firstWhere(
+            (t) => t.slug == 'tmr-prixz',
+            orElse: () => tenants.first,
+          );
+        } else {
+          active = tenants.first;
+        }
+      }
+
+      state = state.withAll(tenants, active);
+    } catch (_) {
+      // silencioso — no bloquear la UI si falla la carga de tenants
+    }
+  }
+
+  void select(TenantInfo tenant) {
+    html.window.localStorage[_kStorageKey] = tenant.id;
+    state = state.withActive(tenant);
+  }
+}
+
+// ── Providers ─────────────────────────────────────────────────────────────────
+
+final tenantNotifierProvider =
+    StateNotifierProvider<TenantNotifier, TenantState>(
+  (ref) => TenantNotifier(),
+);
+
+/// Tenant activo completo.
+final activeTenantInfoProvider = Provider<TenantInfo?>((ref) {
+  return ref.watch(tenantNotifierProvider).active;
+});
+
+/// UUID del tenant activo — para filtrar queries en Supabase y API.
+final activeTenantIdProvider = Provider<String>((ref) {
+  return ref.watch(activeTenantInfoProvider)?.id ?? '';
+});
+
+/// Display name del tenant activo — para mostrar en UI.
+final activeTenantDisplayProvider = Provider<String>((ref) {
+  return ref.watch(activeTenantInfoProvider)?.displayName ?? '';
+});
+
+/// Lista completa de tenants cargados.
+final allTenantsProvider = Provider<List<TenantInfo>>((ref) {
+  return ref.watch(tenantNotifierProvider).all;
+});

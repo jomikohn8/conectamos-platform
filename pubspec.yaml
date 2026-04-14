@@ -1,0 +1,52 @@
+name: conectamos_platform
+description: "ConectamOS — Plataforma de operaciones internas."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.11.4
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # State management
+  flutter_riverpod: ^2.6.1
+  riverpod_annotation: ^2.6.1
+
+  # Router
+  go_router: ^14.6.3
+
+  # HTTP
+  dio: ^5.8.0+1
+
+  # Auth + DB
+  supabase_flutter: ^2.9.0
+
+  # Fonts
+  google_fonts: ^6.2.1
+
+  # SVG
+  flutter_svg: ^2.0.10+1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  build_runner: ^2.4.15
+  riverpod_generator: ^2.6.5
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/Conectamos-Imagotipo.svg
+    - assets/images/Conectamos-Isotipo.svg
+    - assets/images/Conectamos-Logotipo.svg
+    - assets/images/login_background.svg
+
+  fonts:
+    - family: Geist
+      fonts:
+        - asset: assets/fonts/GeistVF.woff
