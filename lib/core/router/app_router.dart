@@ -29,11 +29,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       }
 
       final user = Supabase.instance.client.auth.currentUser;
-      final isLoggingIn = state.matchedLocation == '/login';
-      final isActivating =
-          state.matchedLocation.startsWith('/activate');
+      final loc = state.matchedLocation;
+      final isLoggingIn = loc == '/login';
+      final isActivating = loc.startsWith('/activate');
 
-      if (user == null && !isLoggingIn && !isActivating) return '/login';
+      // /activate es siempre pública — nunca redirigir, logueado o no
+      if (isActivating) return null;
+
+      if (user == null && !isLoggingIn) return '/login';
       if (user != null && isLoggingIn) return '/';
       return null;
     },
