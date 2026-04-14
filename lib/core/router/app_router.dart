@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../config.dart';
+import '../../features/auth/activate_screen.dart';
 import '../../features/auth/login_screen.dart';
 import '../../features/config/meta_credentials_screen.dart';
 import '../../features/config/operators_screen.dart';
@@ -29,8 +30,10 @@ final routerProvider = Provider<GoRouter>((ref) {
 
       final user = Supabase.instance.client.auth.currentUser;
       final isLoggingIn = state.matchedLocation == '/login';
+      final isActivating =
+          state.matchedLocation.startsWith('/activate');
 
-      if (user == null && !isLoggingIn) return '/login';
+      if (user == null && !isLoggingIn && !isActivating) return '/login';
       if (user != null && isLoggingIn) return '/';
       return null;
     },
@@ -38,6 +41,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/login',
         builder: (context, state) => const LoginScreen(),
+      ),
+      GoRoute(
+        path: '/activate',
+        builder: (context, state) {
+          final token =
+              state.uri.queryParameters['token'] ?? '';
+          return ActivateScreen(token: token);
+        },
       ),
       ShellRoute(
         builder: (context, state, child) => AppShell(child: child),
