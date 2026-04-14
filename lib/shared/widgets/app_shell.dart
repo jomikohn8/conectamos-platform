@@ -584,14 +584,14 @@ class _Sidebar extends ConsumerWidget {
                         _NavItem(
                           icon: Icons.grid_view_rounded,
                           label: 'Vista general',
-                          route: '/',
+                          route: '/overview',
                           currentRoute: currentRoute,
                           collapsed: collapsed,
                         ),
                         _NavItem(
                           icon: Icons.chat_bubble_outline_rounded,
                           label: 'Conversaciones',
-                          route: '/conversaciones',
+                          route: '/conversations',
                           currentRoute: currentRoute,
                           collapsed: collapsed,
                         ),
@@ -604,41 +604,39 @@ class _Sidebar extends ConsumerWidget {
                         ),
                         const SizedBox(height: 4),
                         _NavSection(
-                          label: 'Configuración',
+                          label: 'Gestión',
                           collapsed: collapsed,
                         ),
                         _NavItem(
                           icon: Icons.people_outline_rounded,
                           label: 'Operadores',
-                          route: '/config/operadores',
+                          route: '/operators',
                           currentRoute: currentRoute,
                           collapsed: collapsed,
                         ),
                         _NavItem(
                           icon: Icons.account_tree_outlined,
                           label: 'Flujos de trabajo',
-                          route: '/config/flujos',
+                          route: '/flows',
                           currentRoute: currentRoute,
                           collapsed: collapsed,
                         ),
-                        _NavItem(
-                          icon: Icons.group_outlined,
-                          label: 'Grupos WhatsApp',
-                          route: '/config/grupos',
-                          currentRoute: currentRoute,
+                        const SizedBox(height: 4),
+                        _NavSection(
+                          label: 'Configuración',
                           collapsed: collapsed,
                         ),
                         _NavItem(
-                          icon: Icons.vpn_key_outlined,
-                          label: 'Credenciales Meta',
-                          route: '/config/meta',
+                          icon: Icons.cable_outlined,
+                          label: 'Conexiones',
+                          route: '/connections',
                           currentRoute: currentRoute,
                           collapsed: collapsed,
                         ),
                         _NavItem(
                           icon: Icons.settings_outlined,
-                          label: 'Configuración',
-                          route: '/configuracion',
+                          label: 'Ajustes',
+                          route: '/settings',
                           currentRoute: currentRoute,
                           collapsed: collapsed,
                         ),
@@ -710,7 +708,9 @@ class _NavItem extends StatefulWidget {
 class _NavItemState extends State<_NavItem> {
   bool _hovered = false;
 
-  bool get _isActive => widget.currentRoute == widget.route;
+  bool get _isActive =>
+      widget.currentRoute == widget.route ||
+      widget.currentRoute.startsWith('${widget.route}/');
 
   @override
   Widget build(BuildContext context) {

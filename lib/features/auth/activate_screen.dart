@@ -31,9 +31,13 @@ class _ActivateScreenState extends State<ActivateScreen> {
   String? _submitError;
   bool _success = false;
 
+  // Fallback for uncaught build errors
+  String? _renderFallbackMsg;
+
   @override
   void initState() {
     super.initState();
+    print('[Activate] token: ${widget.token}');
     _validateToken();
   }
 
@@ -47,26 +51,37 @@ class _ActivateScreenState extends State<ActivateScreen> {
 
   Future<void> _validateToken() async {
     try {
+      print('[Activate] calling GET /iam/invite/${widget.token}');
       final res =
           await ApiClient.instance.get('/iam/invite/${widget.token}');
+      print('[Activate] response: ${res.data}');
       if (!mounted) return;
+      Map<String, dynamic> data;
+      try {
+        data = Map<String, dynamic>.from(res.data as Map);
+      } catch (castErr) {
+        print('[Activate] cast error: $castErr');
+        data = {};
+      }
       setState(() {
-        _inviteData = Map<String, dynamic>.from(res.data as Map);
+        _inviteData = data;
         _loadingToken = false;
       });
     } on DioException catch (e) {
+      print('[Activate] DioException: $e — response: ${e.response?.data}');
       if (!mounted) return;
       final detail = e.response?.data is Map
-          ? e.response!.data['detail'] as String?
-          : null;
+          ? e.response!.data['detail']?.toString()
+          : e.response?.data?.toString();
       setState(() {
         _tokenError = detail ?? 'Este enlace no es válido o ha expirado';
         _loadingToken = false;
       });
-    } catch (_) {
+    } catch (e) {
+      print('[Activate] error: $e');
       if (!mounted) return;
       setState(() {
-        _tokenError = 'Este enlace no es válido o ha expirado';
+        _tokenError = 'Error al validar el enlace: $e';
         _loadingToken = false;
       });
     }
@@ -109,19 +124,21 @@ class _ActivateScreenState extends State<ActivateScreen> {
       await Future.delayed(const Duration(seconds: 2));
       if (mounted) context.go('/login');
     } on DioException catch (e) {
+      print('[Activate] submit DioException: $e — response: ${e.response?.data}');
       if (!mounted) return;
       final detail = e.response?.data is Map
-          ? e.response!.data['detail'] as String?
-          : null;
+          ? e.response!.data['detail']?.toString()
+          : e.response?.data?.toString();
       setState(() {
         _submitError =
             detail ?? 'Error al activar la cuenta. Intenta nuevamente.';
         _submitting = false;
       });
-    } catch (_) {
+    } catch (e) {
+      print('[Activate] submit error: $e');
       if (!mounted) return;
       setState(() {
-        _submitError = 'Error al activar la cuenta. Intenta nuevamente.';
+        _submitError = 'Error al activar la cuenta: $e';
         _submitting = false;
       });
     }
@@ -129,6 +146,39 @@ class _ActivateScreenState extends State<ActivateScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_renderFallbackMsg != null) {
+      return Scaffold(
+        backgroundColor: const Color(0xFF0B132B),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Text(
+              'Error de renderizado:\n$_renderFallbackMsg',
+              style: const TextStyle(color: Colors.white, fontSize: 13),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
+      );
+    }
+    try {
+      return _buildScaffold(context);
+    } catch (e) {
+      print('[Activate] build error: $e');
+      // Schedule setState after build to avoid setState-during-build
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _renderFallbackMsg = e.toString());
+      });
+      return const Scaffold(
+        backgroundColor: Color(0xFF0B132B),
+        body: Center(
+          child: CircularProgressIndicator(color: Color(0xFF2DD4BF)),
+        ),
+      );
+    }
+  }
+
+  Widget _buildScaffold(BuildContext context) {
     return Scaffold(
       body: Stack(
         children: [
@@ -261,7 +311,7 @@ class _ActivateScreenState extends State<ActivateScreen> {
               child: CircularProgressIndicator(),
             )
           else if (_tokenError != null)
-            _buildError(_tokenError!)
+            _buildCrashError(_tokenError!)
           else if (_success)
             _buildSuccess()
           else
@@ -271,7 +321,7 @@ class _ActivateScreenState extends State<ActivateScreen> {
     );
   }
 
-  Widget _buildError(String message) {
+  Widget _buildCrashError(String message) {
     return Column(
       children: [
         const Icon(Icons.link_off_rounded, size: 48, color: Color(0xFF9CA3AF)),
@@ -339,8 +389,8 @@ class _ActivateScreenState extends State<ActivateScreen> {
 
   Widget _buildForm() {
     final tenantName =
-        _inviteData?['tenant_name'] as String? ?? '';
-    final role = _inviteData?['role'] as String? ?? '';
+        _inviteData?['tenant_name']?.toString() ?? '';
+    final role = _inviteData?['role']?.toString() ?? '';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

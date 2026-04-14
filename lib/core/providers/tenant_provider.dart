@@ -2,6 +2,7 @@
 import 'dart:html' as html;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../api/tenants_api.dart';
 
@@ -53,7 +54,11 @@ class TenantNotifier extends StateNotifier<TenantState> {
   Future<void> load(String userEmail) async {
     if (state.all.isNotEmpty) return; // already loaded
     try {
-      final list = await TenantsApi.listTenants();
+      final userId = Supabase.instance.client.auth.currentUser?.id;
+      final isSuperAdmin = userEmail == 'miguel@conectamos.mx';
+      final list = await TenantsApi.getTenants(
+        userId: isSuperAdmin ? null : userId,
+      );
       final tenants = list.map(TenantInfo.fromMap).toList();
 
       TenantInfo? active;

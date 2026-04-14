@@ -6,9 +6,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../config.dart';
 import '../../features/auth/activate_screen.dart';
 import '../../features/auth/login_screen.dart';
-import '../../features/config/meta_credentials_screen.dart';
+import '../../features/config/connections_screen.dart';
 import '../../features/config/operators_screen.dart';
-import '../../features/config/whatsapp_groups_screen.dart';
+import '../../features/config/settings_screen.dart';
+import '../../features/config/whatsapp_config_screen.dart';
 import '../../features/config/workflows_screen.dart';
 import '../../features/conversations/conversations_screen.dart';
 import '../../features/dashboard/dashboard_screen.dart';
@@ -18,14 +19,13 @@ import '../../shared/widgets/app_shell.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
-    initialLocation: '/',
+    initialLocation: '/overview',
     redirect: (context, state) {
-      // En modo mock: /login y / son accesibles directamente;
-      // cualquier otra ruta va a /.
       if (kMockMode) {
         if (state.matchedLocation == '/login') return null;
-        if (state.matchedLocation == '/') return null;
-        return '/';
+        if (state.matchedLocation == '/overview') return null;
+        if (state.matchedLocation == '/') return '/overview';
+        return '/overview';
       }
 
       final user = Supabase.instance.client.auth.currentUser;
@@ -33,11 +33,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       final isLoggingIn = loc == '/login';
       final isActivating = loc.startsWith('/activate');
 
-      // /activate es siempre pública — nunca redirigir, logueado o no
+      // /activate es siempre pública
       if (isActivating) return null;
 
+      // Redirect bare / to /overview
+      if (loc == '/') return '/overview';
+
       if (user == null && !isLoggingIn) return '/login';
-      if (user != null && isLoggingIn) return '/';
+      if (user != null && isLoggingIn) return '/overview';
       return null;
     },
     routes: [
@@ -48,8 +51,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/activate',
         builder: (context, state) {
-          final token =
-              state.uri.queryParameters['token'] ?? '';
+          final token = state.uri.queryParameters['token'] ?? '';
           return ActivateScreen(token: token);
         },
       ),
@@ -57,11 +59,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state, child) => AppShell(child: child),
         routes: [
           GoRoute(
-            path: '/',
+            path: '/overview',
             builder: (context, state) => const OverviewScreen(),
           ),
           GoRoute(
-            path: '/conversaciones',
+            path: '/conversations',
             builder: (context, state) => const ConversationsScreen(),
           ),
           GoRoute(
@@ -69,20 +71,24 @@ final routerProvider = Provider<GoRouter>((ref) {
             builder: (context, state) => const DashboardScreen(),
           ),
           GoRoute(
-            path: '/config/meta',
-            builder: (context, state) => const MetaCredentialsScreen(),
-          ),
-          GoRoute(
-            path: '/config/operadores',
+            path: '/operators',
             builder: (context, state) => const OperatorsScreen(),
           ),
           GoRoute(
-            path: '/config/flujos',
+            path: '/flows',
             builder: (context, state) => const WorkflowsScreen(),
           ),
           GoRoute(
-            path: '/config/grupos',
-            builder: (context, state) => const WhatsAppGroupsScreen(),
+            path: '/connections',
+            builder: (context, state) => const ConnectionsScreen(),
+          ),
+          GoRoute(
+            path: '/connections/whatsapp',
+            builder: (context, state) => const WhatsAppConfigScreen(),
+          ),
+          GoRoute(
+            path: '/settings',
+            builder: (context, state) => const SettingsScreen(),
           ),
           GoRoute(
             path: '/sessions/:operatorName',
