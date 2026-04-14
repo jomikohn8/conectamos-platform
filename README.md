@@ -60,7 +60,7 @@ lib/
 │
 ├── core/
 │   ├── api/
-│   │   ├── api_client.dart          # Cliente Dio → poc-api-lilac.vercel.app
+│   │   ├── api_client.dart          # Cliente Dio → conectamos-meta-api.vercel.app
 │   │   ├── messages_api.dart        # Envío de mensajes, typing, read receipts
 │   │   ├── operators_api.dart       # CRUD de operadores
 │   │   ├── sessions_api.dart        # Gestión de sesiones
@@ -146,7 +146,7 @@ flutter pub get
 flutter run -d chrome
 ```
 
-> **Nota:** El backend API (`poc-api-lilac.vercel.app`) está configurado en `lib/core/api/api_client.dart`. Para apuntar a un entorno local, reemplaza `baseUrl` por `http://localhost:8000`.
+> **Nota:** El backend API (`conectamos-meta-api.vercel.app`) está configurado en `lib/core/api/api_client.dart`. Para apuntar a un entorno local, reemplaza `baseUrl` por `http://localhost:8000`.
 
 ---
 
@@ -210,7 +210,7 @@ await Supabase.initialize(
 ### Backend API (`lib/core/api/api_client.dart`)
 
 ```dart
-static const String baseUrl = 'https://poc-api-lilac.vercel.app';
+static const String baseUrl = 'https://conectamos-meta-api.vercel.app';
 ```
 
 ### Credenciales Meta (WhatsApp)

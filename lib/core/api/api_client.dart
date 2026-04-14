@@ -1,7 +1,7 @@
 import 'package:dio/dio.dart';
 
 class ApiClient {
-  static const String baseUrl = 'https://poc-api-lilac.vercel.app';
+  static const String baseUrl = 'https://conectamos-meta-api.vercel.app';
 
   static final Dio _dio = Dio(BaseOptions(
     baseUrl: baseUrl,
