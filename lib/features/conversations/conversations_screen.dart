@@ -3,6 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'dart:async';
+// ignore: avoid_web_libraries_in_flutter, deprecated_member_use
+import 'dart:html' as html;
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:ui_web' as ui_web;
 
 import 'package:url_launcher/url_launcher.dart';
 
@@ -1250,6 +1254,8 @@ class _ApiMessageBubble extends StatelessWidget {
   final String? messageType;
   final String? mediaUrl;
 
+  static final Set<String> _registeredMediaViews = {};
+
   Widget _fallback(String label) => Text(
         label,
         style: const TextStyle(
@@ -1295,45 +1301,62 @@ class _ApiMessageBubble extends StatelessWidget {
 
       case 'audio':
         if (mUrl == null) return _fallback('[Audio]');
-        return Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.mic,
-                size: 20,
-                color: isOutbound
-                    ? AppColors.ctTeal
-                    : const Color(0xFF667781)),
-            const SizedBox(width: 8),
-            const Text('Nota de voz',
-                style: TextStyle(
-                    fontFamily: 'Inter',
-                    fontSize: 13,
-                    color: Color(0xFF111B21))),
-            const SizedBox(width: 8),
-            GestureDetector(
-              onTap: () => openUrl(mUrl),
-              child: const Icon(Icons.play_circle_filled,
-                  size: 28, color: Color(0xFF53BDEB)),
-            ),
-          ],
+        final audioUrl = mUrl;
+        final audioViewId = 'audio-${audioUrl.hashCode}';
+        if (!_registeredMediaViews.contains(audioViewId)) {
+          _registeredMediaViews.add(audioViewId);
+          ui_web.platformViewRegistry.registerViewFactory(
+            audioViewId,
+            (int id) {
+              final audio = html.AudioElement()
+                ..controls = true
+                ..style.width = '220px'
+                ..style.outline = 'none'
+                ..style.display = 'block';
+              audio.append(html.SourceElement()
+                ..src = audioUrl
+                ..type = 'audio/ogg');
+              audio.append(html.SourceElement()
+                ..src = audioUrl
+                ..type = 'audio/mpeg');
+              return audio;
+            },
+          );
+        }
+        return SizedBox(
+          width: 220,
+          height: 54,
+          child: HtmlElementView(viewType: audioViewId),
         );
 
       case 'video':
         if (mUrl == null) return _fallback('[Video]');
-        return GestureDetector(
-          onTap: () => openUrl(mUrl),
-          child: Container(
-            width: 240,
-            height: 135,
-            decoration: BoxDecoration(
-              color: Colors.black,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Center(
-              child: Icon(Icons.play_circle_outline,
-                  color: Colors.white, size: 48),
-            ),
-          ),
+        final videoUrl = mUrl;
+        final videoViewId = 'video-${videoUrl.hashCode}';
+        if (!_registeredMediaViews.contains(videoViewId)) {
+          _registeredMediaViews.add(videoViewId);
+          ui_web.platformViewRegistry.registerViewFactory(
+            videoViewId,
+            (int id) {
+              final video = html.VideoElement()
+                ..controls = true
+                ..style.width = '240px'
+                ..style.height = '135px'
+                ..style.borderRadius = '8px'
+                ..style.background = '#000'
+                ..style.outline = 'none'
+                ..style.display = 'block';
+              video.append(html.SourceElement()
+                ..src = videoUrl
+                ..type = 'video/mp4');
+              return video;
+            },
+          );
+        }
+        return SizedBox(
+          width: 240,
+          height: 135,
+          child: HtmlElementView(viewType: videoViewId),
         );
 
       case 'document':
