@@ -76,40 +76,45 @@ class _ActionBar extends StatelessWidget {
 
 // ── Cuerpo ────────────────────────────────────────────────────────────────────
 
-class _SettingsBody extends ConsumerWidget {
+class _SettingsBody extends StatelessWidget {
   const _SettingsBody();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     return const Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _TenantInfoSection(),
-        SizedBox(height: 22),
-        _UsersSection(),
+        _GeneralInfoCard(),
+        SizedBox(height: 20),
+        _AddressCard(),
+        SizedBox(height: 20),
+        _BillingCard(),
+        SizedBox(height: 20),
+        _UsersCard(),
       ],
     );
   }
 }
 
-// ── Sección: Información del tenant ──────────────────────────────────────────
+// ── Sección 1 — Información general ──────────────────────────────────────────
 
-class _TenantInfoSection extends ConsumerStatefulWidget {
-  const _TenantInfoSection();
+class _GeneralInfoCard extends ConsumerStatefulWidget {
+  const _GeneralInfoCard();
 
   @override
-  ConsumerState<_TenantInfoSection> createState() =>
-      _TenantInfoSectionState();
+  ConsumerState<_GeneralInfoCard> createState() => _GeneralInfoCardState();
 }
 
-class _TenantInfoSectionState extends ConsumerState<_TenantInfoSection> {
-  final _nameCtrl = TextEditingController();
-  final _legalCtrl = TextEditingController();
-  final _addressCtrl = TextEditingController();
+class _GeneralInfoCardState extends ConsumerState<_GeneralInfoCard> {
+  final _displayNameCtrl = TextEditingController();
+  final _legalNameCtrl   = TextEditingController();
+  final _rfcCtrl         = TextEditingController();
+  final _emailCtrl       = TextEditingController();
+  final _telefonoCtrl    = TextEditingController();
 
   bool _loading = true;
-  bool _saving = false;
-  bool _loaded = false;
+  bool _saving  = false;
+  String _currentTenantId = '';
   String? _error;
   String? _success;
 
@@ -117,186 +122,396 @@ class _TenantInfoSectionState extends ConsumerState<_TenantInfoSection> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     final tenantId = ref.read(activeTenantIdProvider);
-    if (!_loaded && tenantId.isNotEmpty) {
-      _loaded = true;
-      _loadTenant();
+    if (tenantId.isNotEmpty && tenantId != _currentTenantId) {
+      _currentTenantId = tenantId;
+      _load();
     }
   }
 
   @override
   void dispose() {
-    _nameCtrl.dispose();
-    _legalCtrl.dispose();
-    _addressCtrl.dispose();
+    _displayNameCtrl.dispose();
+    _legalNameCtrl.dispose();
+    _rfcCtrl.dispose();
+    _emailCtrl.dispose();
+    _telefonoCtrl.dispose();
     super.dispose();
   }
 
-  Future<void> _loadTenant() async {
-    final tenantId = ref.read(activeTenantIdProvider);
-    if (tenantId.isEmpty) {
-      setState(() => _loading = false);
-      return;
-    }
+  Future<void> _load() async {
+    setState(() { _loading = true; _error = null; });
     try {
-      final res = await ApiClient.instance.get('/tenants/$tenantId');
-      final data = Map<String, dynamic>.from(res.data as Map);
+      final res = await ApiClient.instance.get('/tenants/$_currentTenantId');
+      final d = Map<String, dynamic>.from(res.data as Map);
       if (!mounted) return;
-      _nameCtrl.text = data['display_name']?.toString() ??
-          data['name']?.toString() ??
-          '';
-      _legalCtrl.text = data['legal_name']?.toString() ?? '';
-      _addressCtrl.text = data['address']?.toString() ?? '';
+      _displayNameCtrl.text = d['display_name']?.toString() ?? d['name']?.toString() ?? '';
+      _legalNameCtrl.text   = d['legal_name']?.toString() ?? '';
+      _rfcCtrl.text         = d['rfc']?.toString() ?? '';
+      _emailCtrl.text       = d['email_contacto']?.toString() ?? '';
+      _telefonoCtrl.text    = d['telefono']?.toString() ?? '';
       setState(() => _loading = false);
     } catch (e) {
       if (!mounted) return;
       setState(() => _loading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error al cargar datos del tenant: $e'),
-          backgroundColor: AppColors.ctNavy,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8)),
-          margin: const EdgeInsets.all(16),
-        ),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(_errorSnack('Error al cargar: $e'));
     }
   }
 
   Future<void> _save() async {
-    final tenantId = ref.read(activeTenantIdProvider);
-    if (tenantId.isEmpty) return;
-
-    setState(() {
-      _saving = true;
-      _error = null;
-      _success = null;
-    });
-
+    setState(() { _saving = true; _error = null; _success = null; });
     try {
-      await ApiClient.instance.put(
-        '/tenants/$tenantId',
-        data: {
-          'display_name': _nameCtrl.text.trim(),
-          'legal_name': _legalCtrl.text.trim(),
-          'address': _addressCtrl.text.trim(),
-        },
-      );
-      if (!mounted) return;
-      setState(() {
-        _saving = false;
-        _success = 'Información guardada correctamente';
+      await ApiClient.instance.put('/tenants/$_currentTenantId', data: {
+        'display_name':   _displayNameCtrl.text.trim(),
+        'legal_name':     _legalNameCtrl.text.trim(),
+        'rfc':            _rfcCtrl.text.trim(),
+        'email_contacto': _emailCtrl.text.trim(),
+        'telefono':       _telefonoCtrl.text.trim(),
       });
+      if (!mounted) return;
+      setState(() { _saving = false; _success = 'Información guardada'; });
     } on DioException catch (e) {
       if (!mounted) return;
-      final detail = e.response?.data is Map
+      final msg = e.response?.data is Map
           ? e.response!.data['detail']?.toString()
           : e.response?.data?.toString();
-      setState(() {
-        _saving = false;
-        _error = detail ?? 'Error al guardar la información';
-      });
+      setState(() { _saving = false; _error = msg ?? 'Error al guardar'; });
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        _saving = false;
-        _error = 'Error: $e';
-      });
+      setState(() { _saving = false; _error = 'Error: $e'; });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return _Card(
-      title: 'Información del tenant',
-      child: _loading
-          ? const Center(
-              child: Padding(
-                padding: EdgeInsets.symmetric(vertical: 24),
-                child: CircularProgressIndicator(color: AppColors.ctTeal),
-              ),
-            )
-          : Column(
-              children: [
-                _Field(
-                  label: 'Nombre comercial',
-                  controller: _nameCtrl,
-                  placeholder: 'Ej: Mi Empresa',
-                ),
-                const SizedBox(height: 14),
-                _Field(
-                  label: 'Nombre legal',
-                  controller: _legalCtrl,
-                  placeholder: 'Razón social completa',
-                ),
-                const SizedBox(height: 14),
-                _Field(
-                  label: 'Dirección',
-                  controller: _addressCtrl,
-                  placeholder: 'Calle, ciudad, país',
-                ),
-                const SizedBox(height: 20),
-                if (_error != null) ...[
-                  _FeedbackBanner(message: _error!, isError: true),
-                  const SizedBox(height: 12),
-                ],
-                if (_success != null) ...[
-                  _FeedbackBanner(message: _success!, isError: false),
-                  const SizedBox(height: 12),
-                ],
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: _PrimaryButton(
-                    label: 'Guardar',
-                    loading: _saving,
-                    onTap: _saving ? null : _save,
-                  ),
-                ),
-              ],
-            ),
+    return _SectionCard(
+      title: 'Información general',
+      loading: _loading,
+      error: _error,
+      success: _success,
+      onSave: _saving ? null : _save,
+      saving: _saving,
+      child: Column(
+        children: [
+          _Row2(
+            left: _Field(label: 'Nombre comercial', ctrl: _displayNameCtrl, placeholder: 'Ej: Mi Empresa'),
+            right: _Field(label: 'Razón social', ctrl: _legalNameCtrl, placeholder: 'Nombre legal completo'),
+          ),
+          const SizedBox(height: 14),
+          _Row2(
+            left: _Field(label: 'RFC', ctrl: _rfcCtrl, placeholder: 'XAXX010101000'),
+            right: _Field(label: 'Teléfono', ctrl: _telefonoCtrl, placeholder: '+52 55 1234 5678'),
+          ),
+          const SizedBox(height: 14),
+          _Field(label: 'Email de contacto', ctrl: _emailCtrl, placeholder: 'contacto@empresa.com'),
+        ],
+      ),
     );
   }
 }
 
-// ── Sección: Usuarios ─────────────────────────────────────────────────────────
+// ── Sección 2 — Dirección ─────────────────────────────────────────────────────
 
-class _UsersSection extends ConsumerStatefulWidget {
-  const _UsersSection();
+class _AddressCard extends ConsumerStatefulWidget {
+  const _AddressCard();
 
   @override
-  ConsumerState<_UsersSection> createState() => _UsersSectionState();
+  ConsumerState<_AddressCard> createState() => _AddressCardState();
 }
 
-class _UsersSectionState extends ConsumerState<_UsersSection> {
+class _AddressCardState extends ConsumerState<_AddressCard> {
+  final _calleCtrl          = TextEditingController();
+  final _numExtCtrl         = TextEditingController();
+  final _numIntCtrl         = TextEditingController();
+  final _coloniaCtrl        = TextEditingController();
+  final _ciudadCtrl         = TextEditingController();
+  final _estadoCtrl         = TextEditingController();
+  final _cpCtrl             = TextEditingController();
+
+  bool _loading = true;
+  bool _saving  = false;
+  String _currentTenantId = '';
+  String? _error;
+  String? _success;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final tenantId = ref.read(activeTenantIdProvider);
+    if (tenantId.isNotEmpty && tenantId != _currentTenantId) {
+      _currentTenantId = tenantId;
+      _load();
+    }
+  }
+
+  @override
+  void dispose() {
+    _calleCtrl.dispose();
+    _numExtCtrl.dispose();
+    _numIntCtrl.dispose();
+    _coloniaCtrl.dispose();
+    _ciudadCtrl.dispose();
+    _estadoCtrl.dispose();
+    _cpCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    setState(() { _loading = true; _error = null; });
+    try {
+      final res = await ApiClient.instance.get('/tenants/$_currentTenantId');
+      final d = Map<String, dynamic>.from(res.data as Map);
+      if (!mounted) return;
+      _calleCtrl.text   = d['calle']?.toString() ?? '';
+      _numExtCtrl.text  = d['numero_exterior']?.toString() ?? '';
+      _numIntCtrl.text  = d['numero_interior']?.toString() ?? '';
+      _coloniaCtrl.text = d['colonia']?.toString() ?? '';
+      _ciudadCtrl.text  = d['ciudad']?.toString() ?? '';
+      _estadoCtrl.text  = d['estado_cliente']?.toString() ?? '';
+      _cpCtrl.text      = d['codigo_postal']?.toString() ?? '';
+      setState(() => _loading = false);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+      ScaffoldMessenger.of(context).showSnackBar(_errorSnack('Error al cargar: $e'));
+    }
+  }
+
+  Future<void> _save() async {
+    setState(() { _saving = true; _error = null; _success = null; });
+    try {
+      await ApiClient.instance.put('/tenants/$_currentTenantId', data: {
+        'calle':            _calleCtrl.text.trim(),
+        'numero_exterior':  _numExtCtrl.text.trim(),
+        'numero_interior':  _numIntCtrl.text.trim(),
+        'colonia':          _coloniaCtrl.text.trim(),
+        'ciudad':           _ciudadCtrl.text.trim(),
+        'estado_cliente':   _estadoCtrl.text.trim(),
+        'codigo_postal':    _cpCtrl.text.trim(),
+      });
+      if (!mounted) return;
+      setState(() { _saving = false; _success = 'Dirección guardada'; });
+    } on DioException catch (e) {
+      if (!mounted) return;
+      final msg = e.response?.data is Map
+          ? e.response!.data['detail']?.toString()
+          : e.response?.data?.toString();
+      setState(() { _saving = false; _error = msg ?? 'Error al guardar'; });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() { _saving = false; _error = 'Error: $e'; });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _SectionCard(
+      title: 'Dirección',
+      loading: _loading,
+      error: _error,
+      success: _success,
+      onSave: _saving ? null : _save,
+      saving: _saving,
+      child: Column(
+        children: [
+          _Row2(
+            left: _Field(label: 'Calle', ctrl: _calleCtrl, placeholder: 'Nombre de la calle'),
+            right: _Row2(
+              left: _Field(label: 'Núm. exterior', ctrl: _numExtCtrl, placeholder: '123'),
+              right: _Field(label: 'Núm. interior', ctrl: _numIntCtrl, placeholder: 'Opcional'),
+            ),
+          ),
+          const SizedBox(height: 14),
+          _Row2(
+            left: _Field(label: 'Colonia', ctrl: _coloniaCtrl, placeholder: 'Col. Centro'),
+            right: _Field(label: 'Ciudad', ctrl: _ciudadCtrl, placeholder: 'Ciudad de México'),
+          ),
+          const SizedBox(height: 14),
+          _Row2(
+            left: _Field(label: 'Estado', ctrl: _estadoCtrl, placeholder: 'CDMX'),
+            right: _Field(label: 'Código postal', ctrl: _cpCtrl, placeholder: '06600'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Sección 3 — Facturación ───────────────────────────────────────────────────
+
+class _BillingCard extends ConsumerStatefulWidget {
+  const _BillingCard();
+
+  @override
+  ConsumerState<_BillingCard> createState() => _BillingCardState();
+}
+
+class _BillingCardState extends ConsumerState<_BillingCard> {
+  final _regimenCtrl = TextEditingController();
+  final _usoCfdiCtrl = TextEditingController();
+
+  bool _loading = true;
+  bool _saving  = false;
+  bool _requiereCfdi = false;
+  String _currentTenantId = '';
+  String? _error;
+  String? _success;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final tenantId = ref.read(activeTenantIdProvider);
+    if (tenantId.isNotEmpty && tenantId != _currentTenantId) {
+      _currentTenantId = tenantId;
+      _load();
+    }
+  }
+
+  @override
+  void dispose() {
+    _regimenCtrl.dispose();
+    _usoCfdiCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    setState(() { _loading = true; _error = null; });
+    try {
+      final res = await ApiClient.instance.get('/tenants/$_currentTenantId');
+      final d = Map<String, dynamic>.from(res.data as Map);
+      if (!mounted) return;
+      _requiereCfdi    = d['requiere_cfdi'] == true;
+      _regimenCtrl.text = d['regimen_fiscal']?.toString() ?? '';
+      _usoCfdiCtrl.text = d['uso_cfdi']?.toString() ?? '';
+      setState(() => _loading = false);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+      ScaffoldMessenger.of(context).showSnackBar(_errorSnack('Error al cargar: $e'));
+    }
+  }
+
+  Future<void> _save() async {
+    setState(() { _saving = true; _error = null; _success = null; });
+    try {
+      await ApiClient.instance.put('/tenants/$_currentTenantId', data: {
+        'requiere_cfdi':  _requiereCfdi,
+        'regimen_fiscal': _regimenCtrl.text.trim(),
+        'uso_cfdi':       _usoCfdiCtrl.text.trim(),
+      });
+      if (!mounted) return;
+      setState(() { _saving = false; _success = 'Facturación guardada'; });
+    } on DioException catch (e) {
+      if (!mounted) return;
+      final msg = e.response?.data is Map
+          ? e.response!.data['detail']?.toString()
+          : e.response?.data?.toString();
+      setState(() { _saving = false; _error = msg ?? 'Error al guardar'; });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() { _saving = false; _error = 'Error: $e'; });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _SectionCard(
+      title: 'Facturación',
+      loading: _loading,
+      error: _error,
+      success: _success,
+      onSave: _saving ? null : _save,
+      saving: _saving,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Toggle CFDI
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      '¿Requiere CFDI?',
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.ctText,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      _requiereCfdi ? 'Sí, requiere factura' : 'No requiere factura',
+                      style: const TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 11,
+                        color: AppColors.ctText2,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Switch(
+                value: _requiereCfdi,
+                onChanged: (v) => setState(() => _requiereCfdi = v),
+                activeThumbColor: AppColors.ctTeal,
+              ),
+            ],
+          ),
+          // Campos condicionales
+          if (_requiereCfdi) ...[
+            const SizedBox(height: 16),
+            _Row2(
+              left: _Field(
+                label: 'Régimen fiscal',
+                ctrl: _regimenCtrl,
+                placeholder: 'Ej: 601 - General de Ley',
+              ),
+              right: _Field(
+                label: 'Uso de CFDI',
+                ctrl: _usoCfdiCtrl,
+                placeholder: 'Ej: G03 - Gastos en general',
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// ── Sección 4 — Usuarios ──────────────────────────────────────────────────────
+
+class _UsersCard extends ConsumerStatefulWidget {
+  const _UsersCard();
+
+  @override
+  ConsumerState<_UsersCard> createState() => _UsersCardState();
+}
+
+class _UsersCardState extends ConsumerState<_UsersCard> {
   List<Map<String, dynamic>> _users = [];
   bool _loading = true;
-  bool _loaded = false;
+  String _currentTenantId = '';
   String? _error;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     final tenantId = ref.read(activeTenantIdProvider);
-    if (!_loaded && tenantId.isNotEmpty) {
-      _loaded = true;
+    if (tenantId.isNotEmpty && tenantId != _currentTenantId) {
+      _currentTenantId = tenantId;
       _loadUsers();
     }
   }
 
   Future<void> _loadUsers() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-    final tenantId = ref.read(activeTenantIdProvider);
-    if (tenantId.isEmpty) {
-      setState(() => _loading = false);
-      return;
-    }
+    setState(() { _loading = true; _error = null; });
     try {
       final res = await ApiClient.instance.get(
         '/iam/users',
-        queryParameters: {'tenant_id': tenantId},
+        queryParameters: {'tenant_id': _currentTenantId},
       );
       if (!mounted) return;
       final data = res.data;
@@ -304,17 +519,12 @@ class _UsersSectionState extends ConsumerState<_UsersSection> {
           ? data
           : (data['users'] ?? data['items'] ?? []) as List;
       setState(() {
-        _users = raw
-            .map((e) => Map<String, dynamic>.from(e as Map))
-            .toList();
+        _users = raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
         _loading = false;
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        _error = 'Error al cargar usuarios: $e';
-        _loading = false;
-      });
+      setState(() { _error = 'Error al cargar usuarios: $e'; _loading = false; });
     }
   }
 
@@ -322,6 +532,7 @@ class _UsersSectionState extends ConsumerState<_UsersSection> {
     showDialog(
       context: context,
       builder: (_) => _InviteUserDialog(
+        tenantId: _currentTenantId,
         onInvited: _loadUsers,
       ),
     );
@@ -329,52 +540,71 @@ class _UsersSectionState extends ConsumerState<_UsersSection> {
 
   @override
   Widget build(BuildContext context) {
-    return _Card(
-      title: 'Usuarios',
-      trailing: _SmallButton(
-        label: '+ Invitar usuario',
-        onTap: _showInviteModal,
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.ctSurface,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.ctBorder),
       ),
-      child: _loading
-          ? const Center(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Usuarios',
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.ctText,
+                  ),
+                ),
+              ),
+              _SmallButton(label: '+ Invitar usuario', onTap: _showInviteModal),
+            ],
+          ),
+          const SizedBox(height: 16),
+          if (_loading)
+            const Center(
               child: Padding(
                 padding: EdgeInsets.symmetric(vertical: 24),
                 child: CircularProgressIndicator(color: AppColors.ctTeal),
               ),
             )
-          : _error != null
-              ? _FeedbackBanner(message: _error!, isError: true)
-              : _users.isEmpty
-                  ? const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 16),
-                      child: Text(
-                        'No hay usuarios registrados en este tenant.',
-                        style: TextStyle(
-                          fontFamily: 'Inter',
-                          fontSize: 13,
-                          color: AppColors.ctText2,
-                        ),
-                      ),
-                    )
-                  : _UsersTable(
-                      users: _users,
-                      onRefresh: _loadUsers,
-                    ),
+          else if (_error != null)
+            _FeedbackBanner(message: _error!, isError: true)
+          else if (_users.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: Text(
+                'No hay usuarios registrados en este tenant.',
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 13,
+                  color: AppColors.ctText2,
+                ),
+              ),
+            )
+          else
+            _UsersTable(users: _users, onRefresh: _loadUsers),
+        ],
+      ),
     );
   }
 }
 
 // ── Tabla de usuarios ─────────────────────────────────────────────────────────
 
-class _UsersTable extends ConsumerWidget {
-  const _UsersTable({
-    required this.users,
-    required this.onRefresh,
-  });
+class _UsersTable extends StatelessWidget {
+  const _UsersTable({required this.users, required this.onRefresh});
   final List<Map<String, dynamic>> users;
   final VoidCallback onRefresh;
 
-  static const _headerStyle = TextStyle(
+  static const _h = TextStyle(
     fontFamily: 'Inter',
     fontSize: 10,
     fontWeight: FontWeight.w600,
@@ -383,7 +613,7 @@ class _UsersTable extends ConsumerWidget {
   );
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
         border: Border.all(color: AppColors.ctBorder),
@@ -393,8 +623,7 @@ class _UsersTable extends ConsumerWidget {
         children: [
           // Header
           Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: const BoxDecoration(
               color: AppColors.ctSurface2,
               borderRadius: BorderRadius.only(
@@ -404,11 +633,10 @@ class _UsersTable extends ConsumerWidget {
             ),
             child: const Row(
               children: [
-                Expanded(flex: 3, child: Text('USUARIO', style: _headerStyle)),
-                Expanded(flex: 2, child: Text('ROL', style: _headerStyle)),
-                Expanded(flex: 2, child: Text('STATUS', style: _headerStyle)),
-                Expanded(flex: 2, child: Text('ALTA', style: _headerStyle)),
-                Expanded(flex: 2, child: Text('ACCIONES', style: _headerStyle)),
+                Expanded(flex: 3, child: Text('USUARIO', style: _h)),
+                Expanded(flex: 2, child: Text('CAMBIAR ROL', style: _h)),
+                Expanded(flex: 2, child: Text('STATUS', style: _h)),
+                Expanded(flex: 2, child: Text('ACCIONES', style: _h)),
               ],
             ),
           ),
@@ -416,14 +644,12 @@ class _UsersTable extends ConsumerWidget {
           ...users.asMap().entries.map((entry) {
             final i = entry.key;
             final u = entry.value;
-            final isLast = i == users.length - 1;
             return Column(
               children: [
-                if (i > 0)
-                  const Divider(height: 1, color: AppColors.ctBorder),
+                if (i > 0) const Divider(height: 1, color: AppColors.ctBorder),
                 _UserRow(
                   user: u,
-                  isLast: isLast,
+                  isLast: i == users.length - 1,
                   onRefresh: onRefresh,
                 ),
               ],
@@ -434,6 +660,8 @@ class _UsersTable extends ConsumerWidget {
     );
   }
 }
+
+// ── Fila de usuario ───────────────────────────────────────────────────────────
 
 class _UserRow extends ConsumerStatefulWidget {
   const _UserRow({
@@ -450,43 +678,45 @@ class _UserRow extends ConsumerStatefulWidget {
 }
 
 class _UserRowState extends ConsumerState<_UserRow> {
-  bool _hovered = false;
-  bool _acting = false;
+  bool _hovered    = false;
+  bool _actingRole = false;
+  bool _actingStatus = false;
 
-  String get _name =>
-      widget.user['name']?.toString() ??
-      widget.user['display_name']?.toString() ??
-      '';
-  String get _email => widget.user['email']?.toString() ?? '';
-  String get _role => widget.user['role']?.toString() ?? '—';
+  static const _roles = ['operator', 'supervisor', 'admin'];
+
+  String get _id     => widget.user['id']?.toString() ?? '';
+  String get _name   => widget.user['name']?.toString() ?? widget.user['display_name']?.toString() ?? '';
+  String get _email  => widget.user['email']?.toString() ?? '';
+  String get _role   => widget.user['role']?.toString() ?? 'operator';
   String get _status => widget.user['status']?.toString() ?? 'active';
-  String get _createdAt {
-    final raw = widget.user['created_at']?.toString() ?? '';
-    if (raw.isEmpty) return '—';
-    try {
-      final dt = DateTime.parse(raw);
-      return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
-    } catch (_) {
-      return raw;
-    }
-  }
+  bool   get _isActive => _status == 'active';
 
-  bool get _isActive => _status == 'active';
-
-  Future<void> _toggleStatus() async {
-    final userId = widget.user['id']?.toString() ?? '';
-    final tenantId = ref.read(activeTenantIdProvider);
-    if (userId.isEmpty) return;
-    setState(() => _acting = true);
+  Future<void> _changeRole(String newRole) async {
+    if (_id.isEmpty) return;
+    setState(() => _actingRole = true);
     try {
-      final newStatus = _isActive ? 'suspended' : 'active';
       await ApiClient.instance.patch(
-        '/iam/users/$userId',
-        data: {'status': newStatus, 'tenant_id': tenantId},
+        '/iam/users/$_id/role',
+        data: {'role': newRole},
       );
       widget.onRefresh();
     } catch (_) {
-      if (mounted) setState(() => _acting = false);
+      if (mounted) setState(() => _actingRole = false);
+    }
+  }
+
+  Future<void> _toggleStatus() async {
+    if (_id.isEmpty) return;
+    final tenantId = ref.read(activeTenantIdProvider);
+    setState(() => _actingStatus = true);
+    try {
+      await ApiClient.instance.patch(
+        '/iam/users/$_id',
+        data: {'status': _isActive ? 'suspended' : 'active', 'tenant_id': tenantId},
+      );
+      widget.onRefresh();
+    } catch (_) {
+      if (mounted) setState(() => _actingStatus = false);
     }
   }
 
@@ -501,17 +731,17 @@ class _UserRowState extends ConsumerState<_UserRow> {
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
+      onExit:  (_) => setState(() => _hovered = false),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 100),
         decoration: BoxDecoration(
           color: _hovered ? AppColors.ctBg : AppColors.ctSurface,
           borderRadius: radius,
         ),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         child: Row(
           children: [
-            // Usuario (nombre + email)
+            // Usuario
             Expanded(
               flex: 3,
               child: Column(
@@ -532,48 +762,73 @@ class _UserRowState extends ConsumerState<_UserRow> {
                     style: TextStyle(
                       fontFamily: 'Inter',
                       fontSize: _name.isNotEmpty ? 11 : 13,
-                      color: _name.isNotEmpty
-                          ? AppColors.ctText2
-                          : AppColors.ctText,
+                      color: _name.isNotEmpty ? AppColors.ctText2 : AppColors.ctText,
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
             ),
-            // Rol
+
+            // Cambiar rol
             Expanded(
               flex: 2,
-              child: Text(
-                _role,
-                style: const TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 13,
-                  color: AppColors.ctText,
-                ),
-              ),
+              child: _actingRole
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: AppColors.ctTeal,
+                      ),
+                    )
+                  : Container(
+                      height: 32,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      decoration: BoxDecoration(
+                        color: AppColors.ctSurface2,
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: AppColors.ctBorder),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: _roles.contains(_role) ? _role : 'operator',
+                          isDense: true,
+                          isExpanded: true,
+                          style: const TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 12,
+                            color: AppColors.ctText,
+                          ),
+                          icon: const Icon(
+                            Icons.keyboard_arrow_down_rounded,
+                            size: 14,
+                            color: AppColors.ctText3,
+                          ),
+                          items: _roles
+                              .map((r) => DropdownMenuItem(
+                                    value: r,
+                                    child: Text(r),
+                                  ))
+                              .toList(),
+                          onChanged: (v) {
+                            if (v != null && v != _role) _changeRole(v);
+                          },
+                        ),
+                      ),
+                    ),
             ),
-            // Status
+
+            // Status badge
             Expanded(
               flex: 2,
               child: _StatusBadge(status: _status),
             ),
-            // Alta
+
+            // Acción suspender / reactivar
             Expanded(
               flex: 2,
-              child: Text(
-                _createdAt,
-                style: const TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 12,
-                  color: AppColors.ctText2,
-                ),
-              ),
-            ),
-            // Acciones
-            Expanded(
-              flex: 2,
-              child: _acting
+              child: _actingStatus
                   ? const SizedBox(
                       width: 16,
                       height: 16,
@@ -584,9 +839,7 @@ class _UserRowState extends ConsumerState<_UserRow> {
                     )
                   : _GhostButton(
                       label: _isActive ? 'Suspender' : 'Reactivar',
-                      color: _isActive
-                          ? AppColors.ctDanger
-                          : AppColors.ctOk,
+                      color: _isActive ? AppColors.ctDanger : AppColors.ctOk,
                       onTap: _toggleStatus,
                     ),
             ),
@@ -626,12 +879,12 @@ class _StatusBadge extends StatelessWidget {
 // ── Modal invitar usuario ─────────────────────────────────────────────────────
 
 class _InviteUserDialog extends ConsumerStatefulWidget {
-  const _InviteUserDialog({required this.onInvited});
+  const _InviteUserDialog({required this.tenantId, required this.onInvited});
+  final String tenantId;
   final VoidCallback onInvited;
 
   @override
-  ConsumerState<_InviteUserDialog> createState() =>
-      _InviteUserDialogState();
+  ConsumerState<_InviteUserDialog> createState() => _InviteUserDialogState();
 }
 
 class _InviteUserDialogState extends ConsumerState<_InviteUserDialog> {
@@ -654,20 +907,13 @@ class _InviteUserDialogState extends ConsumerState<_InviteUserDialog> {
       setState(() => _error = 'Ingresa un email');
       return;
     }
-    final tenantId = ref.read(activeTenantIdProvider);
-    setState(() {
-      _sending = true;
-      _error = null;
-    });
+    setState(() { _sending = true; _error = null; });
     try {
-      await ApiClient.instance.post(
-        '/iam/invite',
-        data: {
-          'email': email,
-          'role': _role,
-          'tenant_id': tenantId,
-        },
-      );
+      await ApiClient.instance.post('/iam/invite', data: {
+        'email': email,
+        'role': _role,
+        'tenant_id': widget.tenantId,
+      });
       if (!mounted) return;
       widget.onInvited();
       Navigator.pop(context);
@@ -676,16 +922,10 @@ class _InviteUserDialogState extends ConsumerState<_InviteUserDialog> {
       final detail = e.response?.data is Map
           ? e.response!.data['detail']?.toString()
           : e.response?.data?.toString();
-      setState(() {
-        _sending = false;
-        _error = detail ?? 'Error al enviar la invitación';
-      });
+      setState(() { _sending = false; _error = detail ?? 'Error al enviar la invitación'; });
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        _sending = false;
-        _error = 'Error: $e';
-      });
+      setState(() { _sending = false; _error = 'Error: $e'; });
     }
   }
 
@@ -715,16 +955,8 @@ class _InviteUserDialogState extends ConsumerState<_InviteUserDialog> {
                 ),
               ),
               const SizedBox(height: 20),
-
-              // Email
-              _Field(
-                label: 'Email',
-                controller: _emailCtrl,
-                placeholder: 'usuario@empresa.com',
-              ),
+              _Field(label: 'Email', ctrl: _emailCtrl, placeholder: 'usuario@empresa.com'),
               const SizedBox(height: 14),
-
-              // Rol
               const Text(
                 'Rol',
                 style: TextStyle(
@@ -759,31 +991,21 @@ class _InviteUserDialogState extends ConsumerState<_InviteUserDialog> {
                       color: AppColors.ctText3,
                     ),
                     items: _roles
-                        .map((r) => DropdownMenuItem(
-                              value: r,
-                              child: Text(r),
-                            ))
+                        .map((r) => DropdownMenuItem(value: r, child: Text(r)))
                         .toList(),
-                    onChanged: (v) {
-                      if (v != null) setState(() => _role = v);
-                    },
+                    onChanged: (v) { if (v != null) setState(() => _role = v); },
                   ),
                 ),
               ),
-
               if (_error != null) ...[
                 const SizedBox(height: 14),
                 _FeedbackBanner(message: _error!, isError: true),
               ],
-
               const SizedBox(height: 24),
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  _OutlineButton(
-                    label: 'Cancelar',
-                    onTap: () => Navigator.pop(context),
-                  ),
+                  _OutlineButton(label: 'Cancelar', onTap: () => Navigator.pop(context)),
                   const SizedBox(width: 10),
                   _PrimaryButton(
                     label: 'Enviar invitación',
@@ -800,17 +1022,25 @@ class _InviteUserDialogState extends ConsumerState<_InviteUserDialog> {
   }
 }
 
-// ── Widgets reutilizables ─────────────────────────────────────────────────────
+// ── Shared: SectionCard ───────────────────────────────────────────────────────
 
-class _Card extends StatelessWidget {
-  const _Card({
+class _SectionCard extends StatelessWidget {
+  const _SectionCard({
     required this.title,
     required this.child,
-    this.trailing,
+    required this.loading,
+    required this.saving,
+    required this.onSave,
+    this.error,
+    this.success,
   });
   final String title;
   final Widget child;
-  final Widget? trailing;
+  final bool loading;
+  final bool saving;
+  final VoidCallback? onSave;
+  final String? error;
+  final String? success;
 
   @override
   Widget build(BuildContext context) {
@@ -825,38 +1055,75 @@ class _Card extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  title,
-                  style: const TextStyle(
-                    fontFamily: 'Inter',
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.ctText,
-                  ),
-                ),
-              ),
-              ?trailing,
-            ],
+          Text(
+            title,
+            style: const TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: AppColors.ctText,
+            ),
           ),
           const SizedBox(height: 16),
-          child,
+          if (loading)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 24),
+                child: CircularProgressIndicator(color: AppColors.ctTeal),
+              ),
+            )
+          else ...[
+            child,
+            const SizedBox(height: 20),
+            if (error != null) ...[
+              _FeedbackBanner(message: error!, isError: true),
+              const SizedBox(height: 12),
+            ],
+            if (success != null) ...[
+              _FeedbackBanner(message: success!, isError: false),
+              const SizedBox(height: 12),
+            ],
+            Align(
+              alignment: Alignment.centerRight,
+              child: _PrimaryButton(label: 'Guardar', loading: saving, onTap: onSave),
+            ),
+          ],
         ],
       ),
     );
   }
 }
 
+// ── Shared: _Row2 (dos columnas iguales) ──────────────────────────────────────
+
+class _Row2 extends StatelessWidget {
+  const _Row2({required this.left, required this.right});
+  final Widget left;
+  final Widget right;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(child: left),
+        const SizedBox(width: 14),
+        Expanded(child: right),
+      ],
+    );
+  }
+}
+
+// ── Shared: widgets reutilizables ─────────────────────────────────────────────
+
 class _Field extends StatelessWidget {
   const _Field({
     required this.label,
-    required this.controller,
+    required this.ctrl,
     required this.placeholder,
   });
   final String label;
-  final TextEditingController controller;
+  final TextEditingController ctrl;
   final String placeholder;
 
   @override
@@ -875,23 +1142,14 @@ class _Field extends StatelessWidget {
         ),
         const SizedBox(height: 6),
         TextField(
-          controller: controller,
-          style: const TextStyle(
-            fontFamily: 'Inter',
-            fontSize: 13,
-            color: AppColors.ctText,
-          ),
+          controller: ctrl,
+          style: const TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppColors.ctText),
           decoration: InputDecoration(
             hintText: placeholder,
-            hintStyle: const TextStyle(
-              fontFamily: 'Inter',
-              fontSize: 13,
-              color: AppColors.ctText3,
-            ),
+            hintStyle: const TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppColors.ctText3),
             filled: true,
             fillColor: AppColors.ctSurface2,
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
               borderSide: const BorderSide(color: AppColors.ctBorder2),
@@ -902,8 +1160,7 @@ class _Field extends StatelessWidget {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide:
-                  const BorderSide(color: AppColors.ctTeal, width: 1.5),
+              borderSide: const BorderSide(color: AppColors.ctTeal, width: 1.5),
             ),
           ),
         ),
@@ -919,13 +1176,12 @@ class _FeedbackBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bg = isError ? AppColors.ctRedBg : AppColors.ctOkBg;
-    final border = isError ? const Color(0xFFFECACA) : AppColors.ctOk;
+    final bg        = isError ? AppColors.ctRedBg  : AppColors.ctOkBg;
+    final border    = isError ? const Color(0xFFFECACA) : AppColors.ctOk;
     final textColor = isError ? AppColors.ctRedText : AppColors.ctOkText;
-    final icon = isError
+    final icon      = isError
         ? Icons.error_outline_rounded
         : Icons.check_circle_outline_rounded;
-
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -941,11 +1197,7 @@ class _FeedbackBanner extends StatelessWidget {
           Expanded(
             child: Text(
               message,
-              style: TextStyle(
-                fontFamily: 'Inter',
-                fontSize: 13,
-                color: textColor,
-              ),
+              style: TextStyle(fontFamily: 'Inter', fontSize: 13, color: textColor),
             ),
           ),
         ],
@@ -955,11 +1207,7 @@ class _FeedbackBanner extends StatelessWidget {
 }
 
 class _PrimaryButton extends StatefulWidget {
-  const _PrimaryButton({
-    required this.label,
-    required this.onTap,
-    this.loading = false,
-  });
+  const _PrimaryButton({required this.label, required this.onTap, this.loading = false});
   final String label;
   final VoidCallback? onTap;
   final bool loading;
@@ -975,41 +1223,32 @@ class _PrimaryButtonState extends State<_PrimaryButton> {
   Widget build(BuildContext context) {
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      cursor: widget.onTap != null
-          ? SystemMouseCursors.click
-          : SystemMouseCursors.basic,
+      onExit:  (_) => setState(() => _hovered = false),
+      cursor: widget.onTap != null ? SystemMouseCursors.click : SystemMouseCursors.basic,
       child: GestureDetector(
         onTap: widget.onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 120),
-          padding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           decoration: BoxDecoration(
             color: widget.onTap == null
                 ? AppColors.ctTeal.withValues(alpha: 0.5)
-                : _hovered
-                    ? AppColors.ctTealDark
-                    : AppColors.ctTeal,
+                : _hovered ? AppColors.ctTealDark : AppColors.ctTeal,
             borderRadius: BorderRadius.circular(8),
           ),
           child: widget.loading
               ? const SizedBox(
-                  width: 16,
-                  height: 16,
+                  width: 16, height: 16,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                        AppColors.ctNavy),
+                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.ctNavy),
                   ),
                 )
               : Text(
                   widget.label,
                   style: const TextStyle(
-                    fontFamily: 'Inter',
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.ctNavy,
+                    fontFamily: 'Inter', fontSize: 13,
+                    fontWeight: FontWeight.w600, color: AppColors.ctNavy,
                   ),
                 ),
         ),
@@ -1034,14 +1273,13 @@ class _OutlineButtonState extends State<_OutlineButton> {
   Widget build(BuildContext context) {
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
+      onExit:  (_) => setState(() => _hovered = false),
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
         onTap: widget.onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 120),
-          padding:
-              const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
           decoration: BoxDecoration(
             color: _hovered ? AppColors.ctSurface2 : Colors.transparent,
             borderRadius: BorderRadius.circular(8),
@@ -1050,10 +1288,8 @@ class _OutlineButtonState extends State<_OutlineButton> {
           child: Text(
             widget.label,
             style: const TextStyle(
-              fontFamily: 'Inter',
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-              color: AppColors.ctText2,
+              fontFamily: 'Inter', fontSize: 13,
+              fontWeight: FontWeight.w500, color: AppColors.ctText2,
             ),
           ),
         ),
@@ -1078,14 +1314,13 @@ class _SmallButtonState extends State<_SmallButton> {
   Widget build(BuildContext context) {
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
+      onExit:  (_) => setState(() => _hovered = false),
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
         onTap: widget.onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 120),
-          padding:
-              const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
           decoration: BoxDecoration(
             color: _hovered ? AppColors.ctTealDark : AppColors.ctTeal,
             borderRadius: BorderRadius.circular(7),
@@ -1093,10 +1328,8 @@ class _SmallButtonState extends State<_SmallButton> {
           child: Text(
             widget.label,
             style: const TextStyle(
-              fontFamily: 'Inter',
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: AppColors.ctNavy,
+              fontFamily: 'Inter', fontSize: 12,
+              fontWeight: FontWeight.w600, color: AppColors.ctNavy,
             ),
           ),
         ),
@@ -1106,11 +1339,7 @@ class _SmallButtonState extends State<_SmallButton> {
 }
 
 class _GhostButton extends StatefulWidget {
-  const _GhostButton({
-    required this.label,
-    required this.color,
-    required this.onTap,
-  });
+  const _GhostButton({required this.label, required this.color, required this.onTap});
   final String label;
   final Color color;
   final VoidCallback onTap;
@@ -1126,30 +1355,24 @@ class _GhostButtonState extends State<_GhostButton> {
   Widget build(BuildContext context) {
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
+      onExit:  (_) => setState(() => _hovered = false),
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
         onTap: widget.onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 120),
-          padding:
-              const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
           decoration: BoxDecoration(
-            color: _hovered
-                ? widget.color.withValues(alpha: 0.08)
-                : Colors.transparent,
+            color: _hovered ? widget.color.withValues(alpha: 0.08) : Colors.transparent,
             borderRadius: BorderRadius.circular(6),
             border: Border.all(
-              color: _hovered
-                  ? widget.color.withValues(alpha: 0.4)
-                  : AppColors.ctBorder,
+              color: _hovered ? widget.color.withValues(alpha: 0.4) : AppColors.ctBorder,
             ),
           ),
           child: Text(
             widget.label,
             style: TextStyle(
-              fontFamily: 'Inter',
-              fontSize: 11,
+              fontFamily: 'Inter', fontSize: 11,
               fontWeight: FontWeight.w500,
               color: _hovered ? widget.color : AppColors.ctText2,
             ),
@@ -1159,3 +1382,13 @@ class _GhostButtonState extends State<_GhostButton> {
     );
   }
 }
+
+// ── Helper global ─────────────────────────────────────────────────────────────
+
+SnackBar _errorSnack(String msg) => SnackBar(
+      content: Text(msg, style: const TextStyle(fontFamily: 'Inter', fontSize: 13)),
+      backgroundColor: AppColors.ctNavy,
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      margin: const EdgeInsets.all(16),
+    );
