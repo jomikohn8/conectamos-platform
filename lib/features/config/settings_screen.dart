@@ -219,13 +219,13 @@ class _AddressCard extends ConsumerStatefulWidget {
 }
 
 class _AddressCardState extends ConsumerState<_AddressCard> {
-  final _calleCtrl          = TextEditingController();
-  final _numExtCtrl         = TextEditingController();
-  final _numIntCtrl         = TextEditingController();
-  final _coloniaCtrl        = TextEditingController();
-  final _ciudadCtrl         = TextEditingController();
-  final _estadoCtrl         = TextEditingController();
-  final _cpCtrl             = TextEditingController();
+  final _calleCtrl   = TextEditingController();
+  final _numExtCtrl  = TextEditingController();
+  final _numIntCtrl  = TextEditingController();
+  final _coloniaCtrl = TextEditingController();
+  final _ciudadCtrl  = TextEditingController();
+  final _estadoCtrl  = TextEditingController();
+  final _cpCtrl      = TextEditingController();
 
   bool _loading = true;
   bool _saving  = false;
@@ -280,13 +280,13 @@ class _AddressCardState extends ConsumerState<_AddressCard> {
     setState(() { _saving = true; _error = null; _success = null; });
     try {
       await ApiClient.instance.put('/tenants/$_currentTenantId', data: {
-        'calle':            _calleCtrl.text.trim(),
-        'numero_exterior':  _numExtCtrl.text.trim(),
-        'numero_interior':  _numIntCtrl.text.trim(),
-        'colonia':          _coloniaCtrl.text.trim(),
-        'ciudad':           _ciudadCtrl.text.trim(),
-        'estado_cliente':   _estadoCtrl.text.trim(),
-        'codigo_postal':    _cpCtrl.text.trim(),
+        'calle':           _calleCtrl.text.trim(),
+        'numero_exterior': _numExtCtrl.text.trim(),
+        'numero_interior': _numIntCtrl.text.trim(),
+        'colonia':         _coloniaCtrl.text.trim(),
+        'ciudad':          _ciudadCtrl.text.trim(),
+        'estado_cliente':  _estadoCtrl.text.trim(),
+        'codigo_postal':   _cpCtrl.text.trim(),
       });
       if (!mounted) return;
       setState(() { _saving = false; _success = 'Dirección guardada'; });
@@ -379,7 +379,7 @@ class _BillingCardState extends ConsumerState<_BillingCard> {
       final res = await ApiClient.instance.get('/tenants/$_currentTenantId');
       final d = Map<String, dynamic>.from(res.data as Map);
       if (!mounted) return;
-      _requiereCfdi    = d['requiere_cfdi'] == true;
+      _requiereCfdi     = d['requiere_cfdi'] == true;
       _regimenCtrl.text = d['regimen_fiscal']?.toString() ?? '';
       _usoCfdiCtrl.text = d['uso_cfdi']?.toString() ?? '';
       setState(() => _loading = false);
@@ -424,7 +424,6 @@ class _BillingCardState extends ConsumerState<_BillingCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Toggle CFDI
           Row(
             children: [
               Expanded(
@@ -459,7 +458,6 @@ class _BillingCardState extends ConsumerState<_BillingCard> {
               ),
             ],
           ),
-          // Campos condicionales
           if (_requiereCfdi) ...[
             const SizedBox(height: 16),
             _Row2(
@@ -481,65 +479,34 @@ class _BillingCardState extends ConsumerState<_BillingCard> {
   }
 }
 
+// ── FutureProvider para usuarios ──────────────────────────────────────────────
+
+final _usersListProvider =
+    FutureProvider.autoDispose.family<List<Map<String, dynamic>>, String>(
+  (ref, tenantId) async {
+    if (tenantId.isEmpty) return [];
+    final res = await ApiClient.instance.get(
+      '/iam/users',
+      queryParameters: {'tenant_id': tenantId},
+    );
+    final data = res.data;
+    final List raw = data is List
+        ? data
+        : (data['users'] ?? data['items'] ?? []) as List;
+    return raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+  },
+);
+
 // ── Sección 4 — Usuarios ──────────────────────────────────────────────────────
 
-class _UsersCard extends ConsumerStatefulWidget {
+class _UsersCard extends ConsumerWidget {
   const _UsersCard();
 
   @override
-  ConsumerState<_UsersCard> createState() => _UsersCardState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    final tenantId   = ref.watch(activeTenantIdProvider);
+    final usersAsync = ref.watch(_usersListProvider(tenantId));
 
-class _UsersCardState extends ConsumerState<_UsersCard> {
-  List<Map<String, dynamic>> _users = [];
-  bool _loading = true;
-  String _currentTenantId = '';
-  String? _error;
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final tenantId = ref.read(activeTenantIdProvider);
-    if (tenantId.isNotEmpty && tenantId != _currentTenantId) {
-      _currentTenantId = tenantId;
-      _loadUsers();
-    }
-  }
-
-  Future<void> _loadUsers() async {
-    setState(() { _loading = true; _error = null; });
-    try {
-      final res = await ApiClient.instance.get(
-        '/iam/users',
-        queryParameters: {'tenant_id': _currentTenantId},
-      );
-      if (!mounted) return;
-      final data = res.data;
-      final List raw = data is List
-          ? data
-          : (data['users'] ?? data['items'] ?? []) as List;
-      setState(() {
-        _users = raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
-        _loading = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() { _error = 'Error al cargar usuarios: $e'; _loading = false; });
-    }
-  }
-
-  void _showInviteModal() {
-    showDialog(
-      context: context,
-      builder: (_) => _InviteUserDialog(
-        tenantId: _currentTenantId,
-        onInvited: _loadUsers,
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
@@ -564,33 +531,68 @@ class _UsersCardState extends ConsumerState<_UsersCard> {
                   ),
                 ),
               ),
-              _SmallButton(label: '+ Invitar usuario', onTap: _showInviteModal),
+              _SmallButton(
+                label: '+ Invitar usuario',
+                onTap: () => showDialog(
+                  context: context,
+                  builder: (_) => _InviteUserDialog(
+                    tenantId: tenantId,
+                    onInvited: () =>
+                        ref.invalidate(_usersListProvider(tenantId)),
+                  ),
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 16),
-          if (_loading)
-            const Center(
+          usersAsync.when(
+            loading: () => const Center(
               child: Padding(
                 padding: EdgeInsets.symmetric(vertical: 24),
                 child: CircularProgressIndicator(color: AppColors.ctTeal),
               ),
-            )
-          else if (_error != null)
-            _FeedbackBanner(message: _error!, isError: true)
-          else if (_users.isEmpty)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 16),
-              child: Text(
-                'No hay usuarios registrados en este tenant.',
-                style: TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 13,
-                  color: AppColors.ctText2,
+            ),
+            error: (e, _) => Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _FeedbackBanner(
+                  message: 'Error al cargar usuarios: $e',
+                  isError: true,
                 ),
-              ),
-            )
-          else
-            _UsersTable(users: _users, onRefresh: _loadUsers),
+                const SizedBox(height: 8),
+                TextButton(
+                  onPressed: () =>
+                      ref.invalidate(_usersListProvider(tenantId)),
+                  child: const Text(
+                    'Reintentar',
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 12,
+                      color: AppColors.ctTeal,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            data: (users) => users.isEmpty
+                ? const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8),
+                    child: Text(
+                      'No hay usuarios registrados en este tenant.',
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 13,
+                        color: AppColors.ctText2,
+                      ),
+                    ),
+                  )
+                : _UsersTable(
+                    users: users,
+                    tenantId: tenantId,
+                    onRefresh: () =>
+                        ref.invalidate(_usersListProvider(tenantId)),
+                  ),
+          ),
         ],
       ),
     );
@@ -600,8 +602,13 @@ class _UsersCardState extends ConsumerState<_UsersCard> {
 // ── Tabla de usuarios ─────────────────────────────────────────────────────────
 
 class _UsersTable extends StatelessWidget {
-  const _UsersTable({required this.users, required this.onRefresh});
+  const _UsersTable({
+    required this.users,
+    required this.tenantId,
+    required this.onRefresh,
+  });
   final List<Map<String, dynamic>> users;
+  final String tenantId;
   final VoidCallback onRefresh;
 
   static const _h = TextStyle(
@@ -634,9 +641,10 @@ class _UsersTable extends StatelessWidget {
             child: const Row(
               children: [
                 Expanded(flex: 3, child: Text('USUARIO', style: _h)),
-                Expanded(flex: 2, child: Text('CAMBIAR ROL', style: _h)),
+                Expanded(flex: 2, child: Text('TELÉFONO', style: _h)),
+                Expanded(flex: 2, child: Text('ROL', style: _h)),
                 Expanded(flex: 2, child: Text('STATUS', style: _h)),
-                Expanded(flex: 2, child: Text('ACCIONES', style: _h)),
+                SizedBox(width: 36),
               ],
             ),
           ),
@@ -649,6 +657,7 @@ class _UsersTable extends StatelessWidget {
                 if (i > 0) const Divider(height: 1, color: AppColors.ctBorder),
                 _UserRow(
                   user: u,
+                  tenantId: tenantId,
                   isLast: i == users.length - 1,
                   onRefresh: onRefresh,
                 ),
@@ -666,10 +675,12 @@ class _UsersTable extends StatelessWidget {
 class _UserRow extends ConsumerStatefulWidget {
   const _UserRow({
     required this.user,
+    required this.tenantId,
     required this.isLast,
     required this.onRefresh,
   });
   final Map<String, dynamic> user;
+  final String tenantId;
   final bool isLast;
   final VoidCallback onRefresh;
 
@@ -678,53 +689,65 @@ class _UserRow extends ConsumerStatefulWidget {
 }
 
 class _UserRowState extends ConsumerState<_UserRow> {
-  bool _hovered    = false;
-  bool _actingRole = false;
-  bool _actingStatus = false;
+  bool _hovered = false;
+  bool _acting  = false;
 
-  static const _roles = ['operator', 'supervisor', 'admin'];
-
-  String get _id     => widget.user['id']?.toString() ?? '';
-  String get _name   => widget.user['name']?.toString() ?? widget.user['display_name']?.toString() ?? '';
-  String get _email  => widget.user['email']?.toString() ??
-                        widget.user['user_email']?.toString() ??
-                        widget.user['email_address']?.toString() ?? '';
-  String get _role   => widget.user['role']?.toString() ?? 'operator';
+  String get _id => widget.user['id']?.toString() ?? '';
+  String get _name =>
+      widget.user['name']?.toString() ??
+      widget.user['nombre']?.toString() ??
+      widget.user['display_name']?.toString() ?? '';
+  String get _email =>
+      widget.user['email']?.toString() ??
+      widget.user['user_email']?.toString() ?? '';
+  String get _phone =>
+      widget.user['phone']?.toString() ??
+      widget.user['telefono']?.toString() ??
+      widget.user['phone_number']?.toString() ?? '';
+  String get _role =>
+      widget.user['role']?.toString() ??
+      widget.user['role_name']?.toString() ?? '';
   String get _status => widget.user['status']?.toString() ?? 'active';
-  bool   get _isActive => _status == 'active';
 
-  Future<void> _changeRole(String newRole) async {
+  Future<void> _patch(Map<String, dynamic> body) async {
     if (_id.isEmpty) return;
-    setState(() => _actingRole = true);
+    setState(() => _acting = true);
     try {
-      await ApiClient.instance.patch(
-        '/iam/users/$_id/role',
-        data: {'role': newRole},
-      );
+      await ApiClient.instance.patch('/iam/users/$_id', data: body);
       widget.onRefresh();
     } catch (_) {
-      if (mounted) setState(() => _actingRole = false);
+      if (mounted) setState(() => _acting = false);
     }
   }
 
-  Future<void> _toggleStatus() async {
+  Future<void> _resendInvitation() async {
     if (_id.isEmpty) return;
-    final tenantId = ref.read(activeTenantIdProvider);
-    setState(() => _actingStatus = true);
+    setState(() => _acting = true);
     try {
-      await ApiClient.instance.patch(
-        '/iam/users/$_id',
-        data: {'status': _isActive ? 'suspended' : 'active', 'tenant_id': tenantId},
+      await ApiClient.instance.post(
+        '/iam/users/$_id/resend-invite',
+        data: {'tenant_id': widget.tenantId},
       );
-      widget.onRefresh();
+      if (mounted) setState(() => _acting = false);
     } catch (_) {
-      if (mounted) setState(() => _actingStatus = false);
+      if (mounted) setState(() => _acting = false);
     }
+  }
+
+  void _showChangeRoleDialog() {
+    showDialog(
+      context: context,
+      builder: (_) => _ChangeRoleDialog(
+        userId: _id,
+        tenantId: widget.tenantId,
+        onChanged: widget.onRefresh,
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final radius = widget.isLast
+    final borderRadius = widget.isLast
         ? const BorderRadius.only(
             bottomLeft: Radius.circular(7),
             bottomRight: Radius.circular(7),
@@ -738,7 +761,7 @@ class _UserRowState extends ConsumerState<_UserRow> {
         duration: const Duration(milliseconds: 100),
         decoration: BoxDecoration(
           color: _hovered ? AppColors.ctBg : AppColors.ctSurface,
-          borderRadius: radius,
+          borderRadius: borderRadius,
         ),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         child: Row(
@@ -764,7 +787,9 @@ class _UserRowState extends ConsumerState<_UserRow> {
                     style: TextStyle(
                       fontFamily: 'Inter',
                       fontSize: _name.isNotEmpty ? 11 : 13,
-                      color: _name.isNotEmpty ? AppColors.ctText2 : AppColors.ctText,
+                      color: _name.isNotEmpty
+                          ? AppColors.ctText2
+                          : AppColors.ctText,
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -772,65 +797,35 @@ class _UserRowState extends ConsumerState<_UserRow> {
               ),
             ),
 
-            // Cambiar rol
+            // Teléfono
             Expanded(
               flex: 2,
-              child: _actingRole
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: AppColors.ctTeal,
-                      ),
-                    )
-                  : Container(
-                      height: 32,
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      decoration: BoxDecoration(
-                        color: AppColors.ctSurface2,
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: AppColors.ctBorder),
-                      ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          value: _roles.contains(_role) ? _role : 'operator',
-                          isDense: true,
-                          isExpanded: true,
-                          style: const TextStyle(
-                            fontFamily: 'Inter',
-                            fontSize: 12,
-                            color: AppColors.ctText,
-                          ),
-                          icon: const Icon(
-                            Icons.keyboard_arrow_down_rounded,
-                            size: 14,
-                            color: AppColors.ctText3,
-                          ),
-                          items: _roles
-                              .map((r) => DropdownMenuItem(
-                                    value: r,
-                                    child: Text(r),
-                                  ))
-                              .toList(),
-                          onChanged: (v) {
-                            if (v != null && v != _role) _changeRole(v);
-                          },
-                        ),
-                      ),
-                    ),
+              child: Text(
+                _phone.isNotEmpty ? _phone : '—',
+                style: const TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 12,
+                  color: AppColors.ctText2,
+                ),
+              ),
             ),
 
-            // Status badge
+            // Rol
+            Expanded(
+              flex: 2,
+              child: _RoleBadge(role: _role),
+            ),
+
+            // Status
             Expanded(
               flex: 2,
               child: _StatusBadge(status: _status),
             ),
 
-            // Acción suspender / reactivar
-            Expanded(
-              flex: 2,
-              child: _actingStatus
+            // Acciones
+            SizedBox(
+              width: 36,
+              child: _acting
                   ? const SizedBox(
                       width: 16,
                       height: 16,
@@ -839,13 +834,115 @@ class _UserRowState extends ConsumerState<_UserRow> {
                         color: AppColors.ctTeal,
                       ),
                     )
-                  : _GhostButton(
-                      label: _isActive ? 'Suspender' : 'Reactivar',
-                      color: _isActive ? AppColors.ctDanger : AppColors.ctOk,
-                      onTap: _toggleStatus,
+                  : PopupMenuButton<String>(
+                      padding: EdgeInsets.zero,
+                      icon: const Icon(
+                        Icons.more_vert_rounded,
+                        size: 18,
+                        color: AppColors.ctText3,
+                      ),
+                      color: AppColors.ctSurface,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        side: const BorderSide(color: AppColors.ctBorder),
+                      ),
+                      itemBuilder: (_) {
+                        final items = <PopupMenuEntry<String>>[];
+                        if (_status == 'active') {
+                          items.add(const PopupMenuItem(
+                            value: 'suspend',
+                            child: Text(
+                              'Suspender',
+                              style: TextStyle(
+                                fontFamily: 'Inter',
+                                fontSize: 13,
+                              ),
+                            ),
+                          ));
+                        } else if (_status == 'suspended') {
+                          items.add(const PopupMenuItem(
+                            value: 'reactivate',
+                            child: Text(
+                              'Reactivar',
+                              style: TextStyle(
+                                fontFamily: 'Inter',
+                                fontSize: 13,
+                              ),
+                            ),
+                          ));
+                        } else if (_status == 'invited') {
+                          items.add(const PopupMenuItem(
+                            value: 'resend',
+                            child: Text(
+                              'Reenviar invitación',
+                              style: TextStyle(
+                                fontFamily: 'Inter',
+                                fontSize: 13,
+                              ),
+                            ),
+                          ));
+                        }
+                        items.add(const PopupMenuItem(
+                          value: 'role',
+                          child: Text(
+                            'Cambiar rol',
+                            style: TextStyle(
+                              fontFamily: 'Inter',
+                              fontSize: 13,
+                            ),
+                          ),
+                        ));
+                        return items;
+                      },
+                      onSelected: (v) {
+                        if (v == 'suspend') {
+                          _patch({
+                            'status': 'suspended',
+                            'tenant_id': widget.tenantId,
+                          });
+                        } else if (v == 'reactivate') {
+                          _patch({
+                            'status': 'active',
+                            'tenant_id': widget.tenantId,
+                          });
+                        } else if (v == 'resend') {
+                          _resendInvitation();
+                        } else if (v == 'role') {
+                          _showChangeRoleDialog();
+                        }
+                      },
                     ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Badges ────────────────────────────────────────────────────────────────────
+
+class _RoleBadge extends StatelessWidget {
+  const _RoleBadge({required this.role});
+  final String role;
+
+  @override
+  Widget build(BuildContext context) {
+    if (role.isEmpty) return const SizedBox.shrink();
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: AppColors.ctSurface2,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.ctBorder),
+      ),
+      child: Text(
+        role,
+        style: const TextStyle(
+          fontFamily: 'Inter',
+          fontSize: 11,
+          fontWeight: FontWeight.w500,
+          color: AppColors.ctText2,
         ),
       ),
     );
@@ -858,20 +955,214 @@ class _StatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isActive = status == 'active';
+    final Color bg;
+    final Color textColor;
+    final String label;
+
+    if (status == 'invited') {
+      bg        = const Color(0xFFFEF3C7);
+      textColor = const Color(0xFF92400E);
+      label     = 'Invitado';
+    } else if (status == 'suspended') {
+      bg        = AppColors.ctRedBg;
+      textColor = AppColors.ctRedText;
+      label     = 'Suspendido';
+    } else {
+      bg        = AppColors.ctOkBg;
+      textColor = AppColors.ctOkText;
+      label     = 'Activo';
+    }
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: isActive ? AppColors.ctOkBg : AppColors.ctSurface2,
+        color: bg,
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
-        isActive ? 'Activo' : 'Suspendido',
+        label,
         style: TextStyle(
           fontFamily: 'Inter',
           fontSize: 11,
           fontWeight: FontWeight.w600,
-          color: isActive ? AppColors.ctOkText : AppColors.ctText2,
+          color: textColor,
+        ),
+      ),
+    );
+  }
+}
+
+// ── Dialog: Cambiar rol ───────────────────────────────────────────────────────
+
+class _ChangeRoleDialog extends ConsumerStatefulWidget {
+  const _ChangeRoleDialog({
+    required this.userId,
+    required this.tenantId,
+    required this.onChanged,
+  });
+  final String userId;
+  final String tenantId;
+  final VoidCallback onChanged;
+
+  @override
+  ConsumerState<_ChangeRoleDialog> createState() => _ChangeRoleDialogState();
+}
+
+class _ChangeRoleDialogState extends ConsumerState<_ChangeRoleDialog> {
+  List<Map<String, dynamic>> _roles = [];
+  String? _roleId;
+  bool _rolesLoading = true;
+  bool _saving = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRoles();
+  }
+
+  Future<void> _loadRoles() async {
+    try {
+      final res = await ApiClient.instance.get(
+        '/iam/roles',
+        queryParameters: {'tenant_id': widget.tenantId},
+      );
+      if (!mounted) return;
+      final data = res.data;
+      final List raw = data is List
+          ? data
+          : (data['roles'] ?? data['items'] ?? []) as List;
+      final roles =
+          raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      setState(() {
+        _roles       = roles;
+        _roleId      = roles.isNotEmpty ? roles.first['id']?.toString() : null;
+        _rolesLoading = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _rolesLoading = false);
+    }
+  }
+
+  Future<void> _save() async {
+    if (_roleId == null || _roleId!.isEmpty) return;
+    setState(() { _saving = true; _error = null; });
+    try {
+      await ApiClient.instance.patch(
+        '/iam/users/${widget.userId}/role',
+        data: {'role_id': _roleId},
+      );
+      if (!mounted) return;
+      widget.onChanged();
+      Navigator.pop(context);
+    } on DioException catch (e) {
+      if (!mounted) return;
+      final detail = e.response?.data is Map
+          ? e.response!.data['detail']?.toString()
+          : e.response?.data?.toString();
+      setState(() { _saving = false; _error = detail ?? 'Error al cambiar rol'; });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() { _saving = false; _error = 'Error: $e'; });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: AppColors.ctSurface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: const BorderSide(color: AppColors.ctBorder),
+      ),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 360),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Cambiar rol',
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.ctText,
+                ),
+              ),
+              const SizedBox(height: 16),
+              if (_rolesLoading)
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(vertical: 16),
+                    child: CircularProgressIndicator(color: AppColors.ctTeal),
+                  ),
+                )
+              else
+                Container(
+                  height: 40,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: AppColors.ctSurface2,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.ctBorder2),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      value: _roles.any(
+                              (r) => r['id']?.toString() == _roleId)
+                          ? _roleId
+                          : null,
+                      isExpanded: true,
+                      isDense: true,
+                      style: const TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 13,
+                        color: AppColors.ctText,
+                      ),
+                      icon: const Icon(
+                        Icons.keyboard_arrow_down_rounded,
+                        size: 16,
+                        color: AppColors.ctText3,
+                      ),
+                      items: _roles.map((r) {
+                        final id   = r['id']?.toString() ?? '';
+                        final name = r['name']?.toString() ?? id;
+                        return DropdownMenuItem<String>(
+                          value: id,
+                          child: Text(name),
+                        );
+                      }).toList(),
+                      onChanged: (v) {
+                        if (v != null) setState(() => _roleId = v);
+                      },
+                    ),
+                  ),
+                ),
+              if (_error != null) ...[
+                const SizedBox(height: 12),
+                _FeedbackBanner(message: _error!, isError: true),
+              ],
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  _OutlineButton(
+                    label: 'Cancelar',
+                    onTap: () => Navigator.pop(context),
+                  ),
+                  const SizedBox(width: 10),
+                  _PrimaryButton(
+                    label: 'Guardar',
+                    loading: _saving,
+                    onTap: (_saving || _rolesLoading) ? null : _save,
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -890,10 +1181,11 @@ class _InviteUserDialog extends ConsumerStatefulWidget {
 }
 
 class _InviteUserDialogState extends ConsumerState<_InviteUserDialog> {
-  final _emailCtrl = TextEditingController();
-  // Roles loaded from API: [{id, name}, ...]
+  final _nombreCtrl   = TextEditingController();
+  final _telefonoCtrl = TextEditingController();
+  final _emailCtrl    = TextEditingController();
   List<Map<String, dynamic>> _availableRoles = [];
-  String? _roleId;   // UUID del rol seleccionado
+  String? _roleId;
   bool _rolesLoading = true;
   bool _sending = false;
   String? _error;
@@ -906,6 +1198,8 @@ class _InviteUserDialogState extends ConsumerState<_InviteUserDialog> {
 
   @override
   void dispose() {
+    _nombreCtrl.dispose();
+    _telefonoCtrl.dispose();
     _emailCtrl.dispose();
     super.dispose();
   }
@@ -918,21 +1212,28 @@ class _InviteUserDialogState extends ConsumerState<_InviteUserDialog> {
       );
       if (!mounted) return;
       final data = res.data;
-      final List raw = data is List ? data : (data['roles'] ?? data['items'] ?? []) as List;
-      final roles = raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      final List raw = data is List
+          ? data
+          : (data['roles'] ?? data['items'] ?? []) as List;
+      final roles =
+          raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
       setState(() {
         _availableRoles = roles;
-        _roleId = roles.isNotEmpty ? roles.first['id']?.toString() : null;
-        _rolesLoading = false;
+        _roleId         = roles.isNotEmpty ? roles.first['id']?.toString() : null;
+        _rolesLoading   = false;
       });
     } catch (_) {
-      if (!mounted) return;
-      setState(() => _rolesLoading = false);
+      if (mounted) setState(() => _rolesLoading = false);
     }
   }
 
   Future<void> _send() async {
-    final email = _emailCtrl.text.trim();
+    final nombre = _nombreCtrl.text.trim();
+    final email  = _emailCtrl.text.trim();
+    if (nombre.isEmpty) {
+      setState(() => _error = 'Ingresa el nombre completo');
+      return;
+    }
     if (email.isEmpty) {
       setState(() => _error = 'Ingresa un email');
       return;
@@ -944,8 +1245,10 @@ class _InviteUserDialogState extends ConsumerState<_InviteUserDialog> {
     setState(() { _sending = true; _error = null; });
     try {
       await ApiClient.instance.post('/iam/invite', data: {
-        'email': email,
-        'role_id': _roleId,
+        'nombre':    nombre,
+        'telefono':  _telefonoCtrl.text.trim(),
+        'email':     email,
+        'role_id':   _roleId,
         'tenant_id': widget.tenantId,
       });
       if (!mounted) return;
@@ -956,7 +1259,10 @@ class _InviteUserDialogState extends ConsumerState<_InviteUserDialog> {
       final detail = e.response?.data is Map
           ? e.response!.data['detail']?.toString()
           : e.response?.data?.toString();
-      setState(() { _sending = false; _error = detail ?? 'Error al enviar la invitación'; });
+      setState(() {
+        _sending = false;
+        _error   = detail ?? 'Error al enviar la invitación';
+      });
     } catch (e) {
       if (!mounted) return;
       setState(() { _sending = false; _error = 'Error: $e'; });
@@ -989,8 +1295,25 @@ class _InviteUserDialogState extends ConsumerState<_InviteUserDialog> {
                 ),
               ),
               const SizedBox(height: 20),
-              _Field(label: 'Email', ctrl: _emailCtrl, placeholder: 'usuario@empresa.com'),
-              const SizedBox(height: 14),
+              _Field(
+                label: 'Nombre completo',
+                ctrl: _nombreCtrl,
+                placeholder: 'Juan García',
+              ),
+              const SizedBox(height: 12),
+              _Row2(
+                left: _Field(
+                  label: 'Email',
+                  ctrl: _emailCtrl,
+                  placeholder: 'usuario@empresa.com',
+                ),
+                right: _Field(
+                  label: 'Teléfono (opcional)',
+                  ctrl: _telefonoCtrl,
+                  placeholder: '+52 55 1234 5678',
+                ),
+              ),
+              const SizedBox(height: 12),
               const Text(
                 'Rol',
                 style: TextStyle(
@@ -1025,7 +1348,8 @@ class _InviteUserDialogState extends ConsumerState<_InviteUserDialog> {
                       ),
                       child: DropdownButtonHideUnderline(
                         child: DropdownButton<String>(
-                          value: _availableRoles.any((r) => r['id']?.toString() == _roleId)
+                          value: _availableRoles.any(
+                                  (r) => r['id']?.toString() == _roleId)
                               ? _roleId
                               : null,
                           isExpanded: true,
@@ -1048,7 +1372,9 @@ class _InviteUserDialogState extends ConsumerState<_InviteUserDialog> {
                               child: Text(name),
                             );
                           }).toList(),
-                          onChanged: (v) { if (v != null) setState(() => _roleId = v); },
+                          onChanged: (v) {
+                            if (v != null) setState(() => _roleId = v);
+                          },
                         ),
                       ),
                     ),
@@ -1060,7 +1386,10 @@ class _InviteUserDialogState extends ConsumerState<_InviteUserDialog> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  _OutlineButton(label: 'Cancelar', onTap: () => Navigator.pop(context)),
+                  _OutlineButton(
+                    label: 'Cancelar',
+                    onTap: () => Navigator.pop(context),
+                  ),
                   const SizedBox(width: 10),
                   _PrimaryButton(
                     label: 'Enviar invitación',
@@ -1385,51 +1714,6 @@ class _SmallButtonState extends State<_SmallButton> {
             style: const TextStyle(
               fontFamily: 'Inter', fontSize: 12,
               fontWeight: FontWeight.w600, color: AppColors.ctNavy,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _GhostButton extends StatefulWidget {
-  const _GhostButton({required this.label, required this.color, required this.onTap});
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
-
-  @override
-  State<_GhostButton> createState() => _GhostButtonState();
-}
-
-class _GhostButtonState extends State<_GhostButton> {
-  bool _hovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit:  (_) => setState(() => _hovered = false),
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-          decoration: BoxDecoration(
-            color: _hovered ? widget.color.withValues(alpha: 0.08) : Colors.transparent,
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(
-              color: _hovered ? widget.color.withValues(alpha: 0.4) : AppColors.ctBorder,
-            ),
-          ),
-          child: Text(
-            widget.label,
-            style: TextStyle(
-              fontFamily: 'Inter', fontSize: 11,
-              fontWeight: FontWeight.w500,
-              color: _hovered ? widget.color : AppColors.ctText2,
             ),
           ),
         ),

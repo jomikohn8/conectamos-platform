@@ -22,8 +22,9 @@ class _ActivateScreenState extends State<ActivateScreen> {
   String? _tokenError;
   Map<String, dynamic>? _inviteData;
 
-  final _nameCtrl = TextEditingController();
-  final _passCtrl = TextEditingController();
+  final _nameCtrl    = TextEditingController();
+  final _phoneCtrl   = TextEditingController();
+  final _passCtrl    = TextEditingController();
   final _confirmCtrl = TextEditingController();
   bool _showPass = false;
   bool _showConfirm = false;
@@ -44,6 +45,7 @@ class _ActivateScreenState extends State<ActivateScreen> {
   @override
   void dispose() {
     _nameCtrl.dispose();
+    _phoneCtrl.dispose();
     _passCtrl.dispose();
     _confirmCtrl.dispose();
     super.dispose();
@@ -114,7 +116,11 @@ class _ActivateScreenState extends State<ActivateScreen> {
     try {
       await ApiClient.instance.post(
         '/iam/invite/${widget.token}/accept',
-        data: {'password': pass},
+        data: {
+          'password': pass,
+          'nombre':   _nameCtrl.text.trim(),
+          'telefono': _phoneCtrl.text.trim(),
+        },
       );
       if (!mounted) return;
       setState(() {
@@ -432,6 +438,14 @@ class _ActivateScreenState extends State<ActivateScreen> {
           label: 'Nombre completo',
           controller: _nameCtrl,
           placeholder: 'Juan García',
+        ),
+        const SizedBox(height: 16),
+
+        // Teléfono
+        _Field(
+          label: 'Teléfono (opcional)',
+          controller: _phoneCtrl,
+          placeholder: '+52 55 1234 5678',
         ),
         const SizedBox(height: 16),
 
