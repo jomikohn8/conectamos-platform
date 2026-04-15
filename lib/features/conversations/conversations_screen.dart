@@ -867,7 +867,7 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
     for (final msg in messages) {
       if ((msg['direction'] as String?) == 'outbound') continue;
       final waId = msg['wa_message_id'] as String?;
-      if (waId == null || waId.isEmpty) continue;
+      if (waId == null || waId.isEmpty || waId == 'null') continue;
       if (_processedReadIds.contains(waId)) continue;
       _processedReadIds.add(waId);
       MessagesApi.markRead(waId); // fire-and-forget

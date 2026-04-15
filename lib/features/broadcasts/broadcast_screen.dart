@@ -205,15 +205,19 @@ class _BroadcastScreenState extends ConsumerState<BroadcastScreen> {
             validateStatus: (s) => s != null && s >= 200 && s < 300),
       );
 
-      final d = res.data is Map ? res.data as Map : {};
-      final sent   = d['sent']    ?? d['total_sent']    ?? filtered.length;
-      final failed = d['failed']  ?? d['total_failed']  ?? 0;
+      final d          = res.data is Map ? res.data as Map : {};
+      final sentCount  = d['sent_count']      ?? d['sent']       ?? 0;
+      final failedCount = d['failed_count']   ?? d['failed']     ?? 0;
+      final total      = d['recipient_count'] ?? d['total']      ?? filtered.length;
 
       if (!mounted) return;
+      final resultMsg = failedCount > 0
+          ? 'Enviado a $sentCount de $total operadores. $failedCount fallaron.'
+          : 'Enviado a $sentCount de $total operadores.';
       setState(() {
         _sending    = false;
         _confirming = false;
-        _result     = 'Broadcast enviado a $sent operadores. $failed fallaron.';
+        _result     = resultMsg;
       });
       ref.invalidate(_bcastHistoryProvider(tenantId));
     } on DioException catch (e) {
