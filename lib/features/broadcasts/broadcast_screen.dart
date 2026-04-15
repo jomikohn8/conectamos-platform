@@ -222,17 +222,32 @@ class _BroadcastScreenState extends ConsumerState<BroadcastScreen> {
       ref.invalidate(_bcastHistoryProvider(tenantId));
     } on DioException catch (e) {
       if (!mounted) return;
-      final detail = e.response?.data is Map
+      final raw = e.response?.data is Map
           ? e.response!.data['detail']?.toString()
           : e.response?.data?.toString();
       setState(() {
         _sending    = false;
         _confirming = false;
-        _result     = 'Error: ${detail ?? e.message}';
+        _result     = _parseErrorMessage(raw ?? e.message ?? '');
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() { _sending = false; _confirming = false; _result = 'Error: $e'; });
+      setState(() { _sending = false; _confirming = false; _result = _parseErrorMessage(e.toString()); });
+    }
+  }
+
+  String _parseErrorMessage(dynamic error) {
+    try {
+      final detail = error.toString();
+      if (detail.contains('131037') || detail.contains('display name')) {
+        return 'El número aún no tiene el nombre de perfil aprobado por Meta. Por favor espera la aprobación antes de iniciar nuevas conversaciones.';
+      }
+      if (detail.contains('131026') || detail.contains('not in whitelist')) {
+        return 'Este número no está registrado como destinatario de prueba.';
+      }
+      return 'Error al enviar el mensaje. Intenta de nuevo.';
+    } catch (_) {
+      return 'Error al enviar el mensaje. Intenta de nuevo.';
     }
   }
 

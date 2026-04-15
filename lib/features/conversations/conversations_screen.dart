@@ -1,15 +1,17 @@
-import 'package:dio/dio.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-
 import 'dart:async';
+import 'dart:typed_data';
 // ignore: avoid_web_libraries_in_flutter, deprecated_member_use
 import 'dart:html' as html;
 // ignore: avoid_web_libraries_in_flutter
 import 'dart:ui_web' as ui_web;
 
+import 'package:desktop_drop/desktop_drop.dart';
+import 'package:dio/dio.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/api/api_client.dart';
@@ -806,10 +808,15 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
   final _firstUnreadKey = GlobalKey();
   final Set<String> _processedReadIds = {};
 
+  // Multimedia
+  bool _isDragOver = false;
+  StreamSubscription? _pasteSub;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _pasteSub = html.document.onPaste.listen(_handleDocumentPaste);
   }
 
   @override
@@ -833,6 +840,7 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _subscription?.cancel();
+    _pasteSub?.cancel();
     _msgCtrl.dispose();
     _scrollCtrl.dispose();
     super.dispose();
@@ -890,6 +898,215 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
     final waId = lastInbound['wa_message_id'] as String?;
     if (waId == null || waId.isEmpty) return;
     MessagesApi.sendTyping(waId); // fire-and-forget
+  }
+
+  // ── Multimedia ──────────────────────────────────────────────────────────────
+
+  void _handleDocumentPaste(html.ClipboardEvent event) {
+    try {
+      final items = event.clipboardData?.items;
+      if (items == null) return;
+      final len = items.length ?? 0;
+      for (var i = 0; i < len; i++) {
+        final item = items[i];
+        final type = item.type ?? '';
+        if (type.startsWith('image/')) {
+          final file = item.getAsFile();
+          if (file == null) return;
+          event.preventDefault();
+          final reader = html.FileReader();
+          reader.readAsArrayBuffer(file);
+          reader.onLoadEnd.listen((_) {
+            try {
+              final result = reader.result;
+              Uint8List? bytes;
+              if (result is Uint8List) {
+                bytes = result;
+              } else if (result is ByteBuffer) {
+                bytes = result.asUint8List();
+              }
+              if (bytes != null && mounted) {
+                final name = 'clipboard_image_${DateTime.now().millisecondsSinceEpoch}.png';
+                _openPreviewModal(bytes, name);
+              }
+            } catch (_) {}
+          });
+          break;
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _pickFile(String type) async {
+    try {
+      FilePickerResult? result;
+      if (type == 'image') {
+        result = await FilePicker.platform.pickFiles(type: FileType.image, withData: true);
+      } else if (type == 'audio') {
+        result = await FilePicker.platform.pickFiles(type: FileType.audio, withData: true);
+      } else {
+        result = await FilePicker.platform.pickFiles(
+          type: FileType.custom,
+          allowedExtensions: ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt'],
+          withData: true,
+        );
+      }
+      if (result == null) return;
+      final file = result.files.first;
+      final bytes = file.bytes;
+      if (bytes == null) return;
+      if (mounted) _openPreviewModal(bytes, file.name);
+    } catch (_) {}
+  }
+
+  void _openPreviewModal(Uint8List bytes, String filename) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black54,
+      builder: (_) => _MediaPreviewDialog(
+        bytes: bytes,
+        filename: filename,
+        onSend: (caption) {
+          Navigator.of(context).pop();
+          _sendMedia(bytes, filename, caption);
+        },
+      ),
+    );
+  }
+
+  Future<void> _sendMedia(Uint8List bytes, String filename, String? caption) async {
+    final chatId = ref.read(selectedChatIdProvider) ?? '';
+    if (chatId.isEmpty) return;
+    final tenantId = ref.read(activeTenantIdProvider);
+    final userId = Supabase.instance.client.auth.currentUser?.id;
+
+    setState(() => _sending = true);
+    try {
+      await MessagesApi.sendMedia(
+        to: chatId,
+        fileBytes: bytes,
+        filename: filename,
+        tenantId: tenantId,
+        caption: caption,
+        sentByUserId: userId,
+      );
+      if (mounted) setState(() => _sending = false);
+    } catch (e) {
+      if (mounted) {
+        setState(() => _sending = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Error al enviar archivo: $e'),
+          backgroundColor: const Color(0xFFEF4444),
+        ));
+      }
+    }
+  }
+
+  void _handleAttach(String type) {
+    switch (type) {
+      case 'image':
+      case 'audio':
+      case 'doc':
+        _pickFile(type);
+        break;
+      case 'location':
+        _showLocationDialog();
+        break;
+      case 'location-request':
+        _sendLocationRequest();
+        break;
+    }
+  }
+
+  void _showLocationDialog() {
+    showDialog(
+      context: context,
+      builder: (_) => _LocationDialog(
+        onSend: (url) async {
+          Navigator.of(context).pop();
+          final chatId = ref.read(selectedChatIdProvider) ?? '';
+          final tenantId = ref.read(activeTenantIdProvider);
+          final userId = Supabase.instance.client.auth.currentUser?.id;
+          try {
+            await MessagesApi.sendLocation(
+              to: chatId,
+              tenantId: tenantId,
+              googleMapsUrl: url,
+              sentByUserId: userId,
+            );
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                content: Text('✅ Ubicación enviada'),
+                backgroundColor: Color(0xFF10B981),
+              ));
+            }
+          } on DioException catch (e) {
+            if (mounted) {
+              final isInvalid = e.response?.statusCode == 400;
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                content: Text(isInvalid ? '❌ URL de Google Maps no válida' : '❌ Error al enviar ubicación'),
+                backgroundColor: const Color(0xFFEF4444),
+              ));
+            }
+          } catch (_) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                content: Text('❌ Error al enviar ubicación'),
+                backgroundColor: Color(0xFFEF4444),
+              ));
+            }
+          }
+        },
+      ),
+    );
+  }
+
+  Future<void> _sendLocationRequest() async {
+    final chatId = ref.read(selectedChatIdProvider) ?? '';
+    if (chatId.isEmpty) return;
+    final tenantId = ref.read(activeTenantIdProvider);
+    final userId = Supabase.instance.client.auth.currentUser?.id;
+    try {
+      await MessagesApi.sendLocationRequest(
+        to: chatId,
+        tenantId: tenantId,
+        sentByUserId: userId,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('✅ Solicitud de ubicación enviada'),
+          backgroundColor: Color(0xFF10B981),
+        ));
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('❌ Error al enviar solicitud'),
+          backgroundColor: Color(0xFFEF4444),
+        ));
+      }
+    }
+  }
+
+  Widget _buildDragOverlay() {
+    return Positioned.fill(
+      child: IgnorePointer(
+        child: Container(
+          color: AppColors.ctTeal.withValues(alpha: 0.2),
+          child: const Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.arrow_downward_rounded, size: 52, color: AppColors.ctTeal),
+              SizedBox(height: 12),
+              Text(
+                'Suelta para adjuntar',
+                style: TextStyle(fontFamily: 'Inter', fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.ctTeal),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   void _subscribeToMessages(String chatId) {
@@ -1039,114 +1256,134 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
 
     if (chatId == null) return _emptyState();
 
-      return Column(
-        children: [
-          // Header
-          _ApiChatHeader(
-            name: chatName ?? chatId,
-            windowOpen: _windowOpen,
+    final body = Column(
+      children: [
+        // Header
+        _ApiChatHeader(
+          name: chatName ?? chatId,
+          windowOpen: _windowOpen,
+        ),
+
+        // Mensajes
+        if (_msgLoading)
+          const Expanded(
+            child: Center(child: CircularProgressIndicator()),
+          )
+        else
+          Expanded(
+            child: ColoredBox(
+              color: const Color(0xFFEBEBE9),
+              child: ListView.builder(
+              controller: _scrollCtrl,
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 20, vertical: 16),
+              itemCount: _apiMessages.length,
+              itemBuilder: (context, i) {
+                final msg = _apiMessages[i];
+                final msgId = msg['id'] as String?;
+                final isFirstUnread = msgId != null &&
+                    msgId == _firstUnreadMessageId;
+
+                if (isFirstUnread) {
+                  return Column(
+                    key: _firstUnreadKey,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        child: Row(
+                          children: [
+                            const Expanded(
+                              child: Divider(
+                                color: Color(0xFF2DD4BF),
+                                thickness: 0.5,
+                              ),
+                            ),
+                            const Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 10),
+                              child: Text(
+                                'Mensajes nuevos',
+                                style: TextStyle(
+                                  fontFamily: 'Inter',
+                                  fontSize: 11,
+                                  color: Color(0xFF2DD4BF),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                            const Expanded(
+                              child: Divider(
+                                color: Color(0xFF2DD4BF),
+                                thickness: 0.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      _buildMessageBubble(msg),
+                    ],
+                  );
+                }
+                return _buildMessageBubble(msg);
+              },
+            ),
+            ),
           ),
 
-          // Mensajes
-          if (_msgLoading)
-            const Expanded(
-              child: Center(child: CircularProgressIndicator()),
-            )
-          else
-            Expanded(
-              child: ColoredBox(
-                color: const Color(0xFFEBEBE9),
-                child: ListView.builder(
-                controller: _scrollCtrl,
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 20, vertical: 16),
-                itemCount: _apiMessages.length,
-                itemBuilder: (context, i) {
-                  final msg = _apiMessages[i];
-                  final msgId = msg['id'] as String?;
-                  final isFirstUnread = msgId != null &&
-                      msgId == _firstUnreadMessageId;
-
-                  if (isFirstUnread) {
-                    return Column(
-                      key: _firstUnreadKey,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          child: Row(
-                            children: [
-                              const Expanded(
-                                child: Divider(
-                                  color: Color(0xFF2DD4BF),
-                                  thickness: 0.5,
-                                ),
-                              ),
-                              const Padding(
-                                padding: EdgeInsets.symmetric(horizontal: 10),
-                                child: Text(
-                                  'Mensajes nuevos',
-                                  style: TextStyle(
-                                    fontFamily: 'Inter',
-                                    fontSize: 11,
-                                    color: Color(0xFF2DD4BF),
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                              const Expanded(
-                                child: Divider(
-                                  color: Color(0xFF2DD4BF),
-                                  thickness: 0.5,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        _buildMessageBubble(msg),
-                      ],
-                    );
-                  }
-                  return _buildMessageBubble(msg);
-                },
-              ),
-              ),
-            ),
-
-          // Banner ventana cerrada
-          if (!_windowOpen)
-            Container(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 16, vertical: 8),
-              color: const Color(0xFFFEF3C7),
-              child: const Row(
-                children: [
-                  Icon(Icons.warning_amber_rounded,
-                      size: 16, color: Color(0xFF92400E)),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Ventana de 24hrs cerrada. Solo puedes enviar plantillas aprobadas.',
-                      style: TextStyle(
-                        fontFamily: 'Inter',
-                        fontSize: 11,
-                        color: Color(0xFF92400E),
-                      ),
+        // Banner ventana cerrada
+        if (!_windowOpen)
+          Container(
+            padding: const EdgeInsets.symmetric(
+                horizontal: 16, vertical: 8),
+            color: const Color(0xFFFEF3C7),
+            child: const Row(
+              children: [
+                Icon(Icons.warning_amber_rounded,
+                    size: 16, color: Color(0xFF92400E)),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Ventana de 24hrs cerrada. Solo puedes enviar plantillas aprobadas.',
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 11,
+                      color: Color(0xFF92400E),
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-
-          // Input
-          _ChatInput(
-            controller: _msgCtrl,
-            onSend: _windowOpen ? _sendMessage : null,
-            onTyping: _windowOpen ? _handleTyping : null,
-            sending: _sending,
-            enabled: _windowOpen,
           ),
+
+        // Input
+        _ChatInput(
+          controller: _msgCtrl,
+          onSend: _windowOpen ? _sendMessage : null,
+          onTyping: _windowOpen ? _handleTyping : null,
+          sending: _sending,
+          enabled: _windowOpen,
+          onAttach: _handleAttach,
+        ),
+      ],
+    );
+
+    return DropTarget(
+      onDragDone: (details) {
+        if (details.files.isEmpty) return;
+        final file = details.files.first;
+        file.readAsBytes().then((bytes) {
+          if (mounted) _openPreviewModal(bytes, file.name);
+        });
+        setState(() => _isDragOver = false);
+      },
+      onDragEntered: (_) => setState(() => _isDragOver = true),
+      onDragExited: (_) => setState(() => _isDragOver = false),
+      child: Stack(
+        children: [
+          body,
+          if (_isDragOver) _buildDragOverlay(),
         ],
-      );
+      ),
+    );
   }
 }
 
@@ -1575,12 +1812,14 @@ class _ChatInput extends StatefulWidget {
     this.onTyping,
     this.sending = false,
     this.enabled = true,
+    this.onAttach,
   });
   final TextEditingController controller;
   final Future<void> Function()? onSend;
   final VoidCallback? onTyping;
   final bool sending;
   final bool enabled;
+  final void Function(String type)? onAttach;
 
   @override
   State<_ChatInput> createState() => _ChatInputState();
@@ -1602,6 +1841,20 @@ class _ChatInputState extends State<_ChatInput> {
     _typingTimer = Timer(const Duration(milliseconds: 800), widget.onTyping!);
   }
 
+  PopupMenuItem<String> _buildAttachItem(String value, IconData icon, Color color, String label) {
+    return PopupMenuItem(
+      value: value,
+      height: 40,
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: color),
+          const SizedBox(width: 10),
+          Text(label, style: const TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppColors.ctNavy)),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final canSend = widget.onSend != null && !widget.sending && widget.enabled;
@@ -1614,6 +1867,30 @@ class _ChatInputState extends State<_ChatInput> {
       ),
       child: Row(
         children: [
+          // Attach button
+          if (widget.onAttach != null) ...[
+            PopupMenuButton<String>(
+              onSelected: widget.onAttach,
+              tooltip: 'Adjuntar',
+              color: AppColors.ctSurface,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              offset: const Offset(0, -220),
+              itemBuilder: (context) => [
+                _buildAttachItem('image', Icons.image_rounded, const Color(0xFF3B82F6), 'Imagen'),
+                _buildAttachItem('audio', Icons.music_note_rounded, const Color(0xFFF97316), 'Audio'),
+                _buildAttachItem('doc', Icons.description_rounded, const Color(0xFFEF4444), 'Documento'),
+                _buildAttachItem('location', Icons.location_on_rounded, const Color(0xFF22C55E), 'Ubicación (Google Maps)'),
+                _buildAttachItem('location-request', Icons.location_searching_rounded, AppColors.ctTeal, 'Solicitar ubicación'),
+              ],
+              child: Container(
+                width: 34,
+                height: 34,
+                alignment: Alignment.center,
+                child: const Icon(Icons.attach_file_rounded, size: 20, color: AppColors.ctText3),
+              ),
+            ),
+            const SizedBox(width: 6),
+          ],
           Expanded(
             child: TextField(
               controller: widget.controller,
@@ -3253,9 +3530,25 @@ class _NewMessageDialogState extends ConsumerState<_NewMessageDialog> {
         ref.read(selectedChatNameProvider.notifier).state = name;
       }
     } on DioException catch (e) {
-      if (mounted) setState(() { _sending = false; _sendError = e.response?.data?.toString() ?? e.message ?? 'Error al enviar.'; });
+      final raw = e.response?.data?.toString() ?? e.message ?? '';
+      if (mounted) setState(() { _sending = false; _sendError = _parseErrorMessage(raw); });
     } catch (e) {
-      if (mounted) setState(() { _sending = false; _sendError = e.toString(); });
+      if (mounted) setState(() { _sending = false; _sendError = _parseErrorMessage(e.toString()); });
+    }
+  }
+
+  String _parseErrorMessage(dynamic error) {
+    try {
+      final detail = error.toString();
+      if (detail.contains('131037') || detail.contains('display name')) {
+        return 'El número aún no tiene el nombre de perfil aprobado por Meta. Por favor espera la aprobación antes de iniciar nuevas conversaciones.';
+      }
+      if (detail.contains('131026') || detail.contains('not in whitelist')) {
+        return 'Este número no está registrado como destinatario de prueba.';
+      }
+      return 'Error al enviar el mensaje. Intenta de nuevo.';
+    } catch (_) {
+      return 'Error al enviar el mensaje. Intenta de nuevo.';
     }
   }
 
@@ -3736,6 +4029,250 @@ class _NmTemplateDropdown extends StatelessWidget {
       onChanged: onChanged,
       dropdownColor: AppColors.ctSurface,
       style: const TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppColors.ctNavy),
+    );
+  }
+}
+
+// ── Media Preview Dialog ──────────────────────────────────────────────────────
+
+class _MediaPreviewDialog extends StatefulWidget {
+  const _MediaPreviewDialog({
+    required this.bytes,
+    required this.filename,
+    required this.onSend,
+  });
+  final Uint8List bytes;
+  final String filename;
+  final void Function(String? caption) onSend;
+
+  @override
+  State<_MediaPreviewDialog> createState() => _MediaPreviewDialogState();
+}
+
+class _MediaPreviewDialogState extends State<_MediaPreviewDialog> {
+  final _captionCtrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _captionCtrl.dispose();
+    super.dispose();
+  }
+
+  String get _ext => widget.filename.contains('.')
+      ? widget.filename.split('.').last.toLowerCase()
+      : '';
+
+  bool get _isImage => ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'].contains(_ext);
+  bool get _isAudio => ['mp3', 'wav', 'ogg', 'aac', 'm4a', 'opus'].contains(_ext);
+
+  String get _sizeLabel {
+    final kb = widget.bytes.length / 1024;
+    if (kb < 1024) return '${kb.toStringAsFixed(1)} KB';
+    return '${(kb / 1024).toStringAsFixed(1)} MB';
+  }
+
+  IconData get _docIcon {
+    if (_ext == 'pdf') return Icons.picture_as_pdf_rounded;
+    if (['doc', 'docx'].contains(_ext)) return Icons.article_rounded;
+    if (['xls', 'xlsx'].contains(_ext)) return Icons.table_chart_rounded;
+    if (['ppt', 'pptx'].contains(_ext)) return Icons.slideshow_rounded;
+    return Icons.description_rounded;
+  }
+
+  Color get _docColor {
+    if (_ext == 'pdf') return const Color(0xFFEF4444);
+    if (['doc', 'docx'].contains(_ext)) return const Color(0xFF3B82F6);
+    if (['xls', 'xlsx'].contains(_ext)) return const Color(0xFF22C55E);
+    if (['ppt', 'pptx'].contains(_ext)) return const Color(0xFFF97316);
+    return AppColors.ctText3;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: AppColors.ctSurface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 40, vertical: 40),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 480),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Vista previa',
+                style: TextStyle(fontFamily: 'Inter', fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.ctNavy),
+              ),
+              const SizedBox(height: 16),
+              // Preview area
+              if (_isImage)
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxHeight: 300),
+                    child: Image.memory(widget.bytes, fit: BoxFit.contain),
+                  ),
+                )
+              else if (_isAudio)
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.ctSurface2,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.music_note_rounded, size: 32, color: AppColors.ctTeal),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          widget.filename,
+                          style: const TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppColors.ctNavy),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              else
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.ctSurface2,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(_docIcon, size: 32, color: _docColor),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              widget.filename,
+                              style: const TextStyle(fontFamily: 'Inter', fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.ctNavy),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            Text(
+                              _sizeLabel,
+                              style: const TextStyle(fontFamily: 'Inter', fontSize: 11, color: AppColors.ctText3),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              // Caption (not for audio)
+              if (!_isAudio) ...[
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _captionCtrl,
+                  style: const TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppColors.ctNavy),
+                  decoration: InputDecoration(
+                    hintText: 'Agregar caption…',
+                    hintStyle: const TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppColors.ctText3),
+                    filled: true,
+                    fillColor: AppColors.ctSurface2,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 16),
+              // Buttons
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Cancelar', style: TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppColors.ctText3)),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton.icon(
+                    onPressed: () => widget.onSend(_isAudio ? null : _captionCtrl.text.trim()),
+                    style: FilledButton.styleFrom(backgroundColor: AppColors.ctTeal),
+                    icon: const Icon(Icons.send_rounded, size: 16, color: AppColors.ctNavy),
+                    label: const Text('Enviar', style: TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppColors.ctNavy, fontWeight: FontWeight.w600)),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Location Dialog ───────────────────────────────────────────────────────────
+
+class _LocationDialog extends StatefulWidget {
+  const _LocationDialog({required this.onSend});
+  final void Function(String url) onSend;
+
+  @override
+  State<_LocationDialog> createState() => _LocationDialogState();
+}
+
+class _LocationDialogState extends State<_LocationDialog> {
+  final _urlCtrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _urlCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final canSend = _urlCtrl.text.trim().isNotEmpty;
+
+    return AlertDialog(
+      backgroundColor: AppColors.ctSurface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      title: const Text(
+        'Enviar ubicación',
+        style: TextStyle(fontFamily: 'Inter', fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.ctNavy),
+      ),
+      content: SizedBox(
+        width: 380,
+        child: TextField(
+          controller: _urlCtrl,
+          onChanged: (_) => setState(() {}),
+          autofocus: true,
+          style: const TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppColors.ctNavy),
+          decoration: InputDecoration(
+            hintText: 'Pega una URL de Google Maps…',
+            hintStyle: const TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppColors.ctText3),
+            prefixIcon: const Icon(Icons.location_on_rounded, size: 18, color: AppColors.ctText3),
+            filled: true,
+            fillColor: AppColors.ctSurface2,
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancelar', style: TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppColors.ctText3)),
+        ),
+        FilledButton(
+          onPressed: canSend ? () => widget.onSend(_urlCtrl.text.trim()) : null,
+          style: FilledButton.styleFrom(
+            backgroundColor: AppColors.ctTeal,
+            disabledBackgroundColor: AppColors.ctSurface2,
+          ),
+          child: const Text(
+            'Enviar',
+            style: TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppColors.ctNavy, fontWeight: FontWeight.w600),
+          ),
+        ),
+      ],
     );
   }
 }

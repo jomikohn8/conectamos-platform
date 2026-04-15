@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+import 'package:dio/dio.dart';
 import 'package:conectamos_platform/core/api/api_client.dart';
 
 class MessagesApi {
@@ -80,6 +82,59 @@ class MessagesApi {
         'to':               to,
         'message':          text,
         'tenant_id':        tenantId,
+        'sent_by_user_id': ?sentByUserId,
+      },
+    );
+  }
+
+  /// Envía un archivo multimedia (imagen, audio, documento) vía multipart.
+  static Future<void> sendMedia({
+    required String to,
+    required Uint8List fileBytes,
+    required String filename,
+    required String tenantId,
+    String? caption,
+    String? sentByUserId,
+  }) async {
+    final formData = FormData.fromMap({
+      'to': to,
+      'tenant_id': tenantId,
+      'file': MultipartFile.fromBytes(fileBytes, filename: filename),
+      if (caption != null && caption.isNotEmpty) 'caption': caption,
+      'sent_by_user_id': ?sentByUserId,
+    });
+    await ApiClient.instance.post('/messages/send/media', data: formData);
+  }
+
+  /// Envía una ubicación de Google Maps parseando la URL.
+  static Future<void> sendLocation({
+    required String to,
+    required String tenantId,
+    required String googleMapsUrl,
+    String? sentByUserId,
+  }) async {
+    await ApiClient.instance.post(
+      '/messages/send/location',
+      data: {
+        'to':              to,
+        'tenant_id':       tenantId,
+        'google_maps_url': googleMapsUrl,
+        'sent_by_user_id': ?sentByUserId,
+      },
+    );
+  }
+
+  /// Envía una solicitud de ubicación interactiva.
+  static Future<void> sendLocationRequest({
+    required String to,
+    required String tenantId,
+    String? sentByUserId,
+  }) async {
+    await ApiClient.instance.post(
+      '/messages/send/location-request',
+      data: {
+        'to':              to,
+        'tenant_id':       tenantId,
         'sent_by_user_id': ?sentByUserId,
       },
     );
