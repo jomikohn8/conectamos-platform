@@ -46,57 +46,77 @@ final routerProvider = Provider<GoRouter>((ref) {
     routes: [
       GoRoute(
         path: '/login',
-        builder: (context, state) => const LoginScreen(),
+        pageBuilder: (context, state) => const NoTransitionPage(
+          child: LoginScreen(),
+        ),
       ),
       GoRoute(
         path: '/activate',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final token = state.uri.queryParameters['token'] ?? '';
-          return ActivateScreen(token: token);
+          return NoTransitionPage(child: ActivateScreen(token: token));
         },
       ),
       ShellRoute(
-        builder: (context, state, child) => AppShell(child: child),
+        pageBuilder: (context, state, child) => NoTransitionPage(
+          child: AppShell(child: child),
+        ),
         routes: [
           GoRoute(
             path: '/overview',
-            builder: (context, state) => const OverviewScreen(),
+            pageBuilder: (context, state) => const NoTransitionPage(
+              child: OverviewScreen(),
+            ),
           ),
           GoRoute(
             path: '/conversations',
-            builder: (context, state) => const ConversationsScreen(),
+            pageBuilder: (context, state) => const NoTransitionPage(
+              child: ConversationsScreen(),
+            ),
           ),
           GoRoute(
             path: '/dashboard',
-            builder: (context, state) => const DashboardScreen(),
+            pageBuilder: (context, state) => const NoTransitionPage(
+              child: DashboardScreen(),
+            ),
           ),
           GoRoute(
             path: '/operators',
-            builder: (context, state) => const OperatorsScreen(),
+            pageBuilder: (context, state) => const NoTransitionPage(
+              child: OperatorsScreen(),
+            ),
           ),
           GoRoute(
             path: '/flows',
-            builder: (context, state) => const WorkflowsScreen(),
+            pageBuilder: (context, state) => const NoTransitionPage(
+              child: WorkflowsScreen(),
+            ),
           ),
           GoRoute(
             path: '/connections',
-            builder: (context, state) => const ConnectionsScreen(),
+            pageBuilder: (context, state) => const NoTransitionPage(
+              child: ConnectionsScreen(),
+            ),
           ),
           GoRoute(
             path: '/connections/whatsapp',
-            builder: (context, state) => const WhatsAppConfigScreen(),
+            pageBuilder: (context, state) => const NoTransitionPage(
+              child: WhatsAppConfigScreen(),
+            ),
           ),
           GoRoute(
             path: '/settings',
-            builder: (context, state) => const SettingsScreen(),
+            pageBuilder: (context, state) => const NoTransitionPage(
+              child: SettingsScreen(),
+            ),
           ),
           GoRoute(
             path: '/sessions/:operatorName',
-            builder: (context, state) {
+            pageBuilder: (context, state) {
               final name = Uri.decodeComponent(
                 state.pathParameters['operatorName'] ?? '',
               );
-              return SessionsScreen(operatorName: name);
+              return NoTransitionPage(child: SessionsScreen(operatorName: name));
             },
           ),
         ],
