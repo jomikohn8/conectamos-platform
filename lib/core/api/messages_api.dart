@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:http_parser/http_parser.dart';
 import 'package:conectamos_platform/core/api/api_client.dart';
 
 class MessagesApi {
@@ -115,7 +116,11 @@ class MessagesApi {
     final formData = FormData.fromMap({
       'to': to,
       'tenant_id': tenantId,
-      'file': MultipartFile.fromBytes(fileBytes, filename: filename),
+      'file': MultipartFile.fromBytes(
+        fileBytes,
+        filename: filename,
+        contentType: MediaType.parse(_contentTypeForFilename(filename)),
+      ),
       if (caption != null && caption.isNotEmpty) 'caption': caption,
       'sent_by_user_id': ?sentByUserId,
     });
@@ -154,5 +159,22 @@ class MessagesApi {
         'sent_by_user_id': ?sentByUserId,
       },
     );
+  }
+
+  static String _contentTypeForFilename(String filename) {
+    final lower = filename.toLowerCase();
+    if (lower.endsWith('.mp4'))  return 'audio/mp4';
+    if (lower.endsWith('.ogg'))  return 'audio/ogg';
+    if (lower.endsWith('.webm')) return 'audio/webm';
+    if (lower.endsWith('.aac'))  return 'audio/aac';
+    if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
+    if (lower.endsWith('.png'))  return 'image/png';
+    if (lower.endsWith('.webp')) return 'image/webp';
+    if (lower.endsWith('.pdf'))  return 'application/pdf';
+    if (lower.endsWith('.doc'))  return 'application/msword';
+    if (lower.endsWith('.docx')) return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    if (lower.endsWith('.xls'))  return 'application/vnd.ms-excel';
+    if (lower.endsWith('.xlsx')) return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    return 'application/octet-stream';
   }
 }
