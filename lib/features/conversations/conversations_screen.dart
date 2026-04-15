@@ -812,6 +812,14 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
   bool _isDragOver = false;
   StreamSubscription? _pasteSub;
 
+  // Voice recording
+  bool _isRecording = false;
+  int _recordingSeconds = 0;
+  Timer? _recordingTimer;
+  html.MediaRecorder? _mediaRecorder;
+  html.MediaStream? _micStream;
+  final List<html.Blob> _recordingChunks = [];
+
   // Track current subscribed chatId to avoid re-subscribing on web tab focus
   String? _subscribedChatId;
 
@@ -970,15 +978,17 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
     } catch (_) {}
   }
 
-  void _openPreviewModal(Uint8List bytes, String filename) {
+  void _openPreviewModal(Uint8List bytes, String filename, {int? audioDuration}) {
     showDialog(
       context: context,
       barrierColor: Colors.black54,
-      builder: (_) => _MediaPreviewDialog(
+      builder: (dialogContext) => _MediaPreviewDialog(
         bytes: bytes,
         filename: filename,
+        audioDuration: audioDuration,
         onSend: (caption) {
-          Navigator.of(context).pop();
+          // Use dialog's own context so the barrier closes immediately
+          Navigator.of(dialogContext).pop();
           _sendMedia(bytes, filename, caption);
         },
       ),
@@ -991,7 +1001,7 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
     final tenantId = ref.read(activeTenantIdProvider);
     final userId = Supabase.instance.client.auth.currentUser?.id;
 
-    setState(() => _sending = true);
+    setState(() { _sending = true; _isDragOver = false; });
     try {
       await MessagesApi.sendMedia(
         to: chatId,
@@ -1001,10 +1011,10 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
         caption: caption,
         sentByUserId: userId,
       );
-      if (mounted) setState(() => _sending = false);
+      if (mounted) setState(() { _sending = false; _isDragOver = false; });
     } catch (e) {
       if (mounted) {
-        setState(() => _sending = false);
+        setState(() { _sending = false; _isDragOver = false; });
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text('Error al enviar archivo: $e'),
           backgroundColor: const Color(0xFFEF4444),
@@ -1016,60 +1026,16 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
   void _handleAttach(String type) {
     switch (type) {
       case 'image':
-      case 'audio':
       case 'doc':
         _pickFile(type);
         break;
-      case 'location':
-        _showLocationDialog();
+      case 'voice':
+        _startVoiceRecording();
         break;
       case 'location-request':
         _sendLocationRequest();
         break;
     }
-  }
-
-  void _showLocationDialog() {
-    showDialog(
-      context: context,
-      builder: (_) => _LocationDialog(
-        onSend: (url) async {
-          Navigator.of(context).pop();
-          final chatId = ref.read(selectedChatIdProvider) ?? '';
-          final tenantId = ref.read(activeTenantIdProvider);
-          final userId = Supabase.instance.client.auth.currentUser?.id;
-          try {
-            await MessagesApi.sendLocation(
-              to: chatId,
-              tenantId: tenantId,
-              googleMapsUrl: url,
-              sentByUserId: userId,
-            );
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                content: Text('✅ Ubicación enviada'),
-                backgroundColor: Color(0xFF10B981),
-              ));
-            }
-          } on DioException catch (e) {
-            if (mounted) {
-              final isInvalid = e.response?.statusCode == 400;
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                content: Text(isInvalid ? '❌ URL de Google Maps no válida' : '❌ Error al enviar ubicación'),
-                backgroundColor: const Color(0xFFEF4444),
-              ));
-            }
-          } catch (_) {
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                content: Text('❌ Error al enviar ubicación'),
-                backgroundColor: Color(0xFFEF4444),
-              ));
-            }
-          }
-        },
-      ),
-    );
   }
 
   Future<void> _sendLocationRequest() async {
@@ -1097,6 +1063,78 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
         ));
       }
     }
+  }
+
+  Future<void> _startVoiceRecording() async {
+    try {
+      final stream = await html.window.navigator.mediaDevices!
+          .getUserMedia({'audio': true, 'video': false});
+      _micStream = stream;
+      _recordingChunks.clear();
+      final recorder = html.MediaRecorder(stream);
+      _mediaRecorder = recorder;
+      recorder.addEventListener('dataavailable', (html.Event event) {
+        // ignore: avoid_dynamic_calls
+        final blob = (event as dynamic).data as html.Blob?;
+        if (blob != null && blob.size > 0) _recordingChunks.add(blob);
+      });
+      recorder.start();
+      if (mounted) {
+        setState(() {
+          _isRecording = true;
+          _recordingSeconds = 0;
+        });
+      }
+      _recordingTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (mounted) setState(() => _recordingSeconds++);
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('No se pudo acceder al micrófono: $e'),
+          backgroundColor: const Color(0xFFEF4444),
+        ));
+      }
+    }
+  }
+
+  Future<void> _stopVoiceRecording() async {
+    _recordingTimer?.cancel();
+    _recordingTimer = null;
+    final recorder = _mediaRecorder;
+    final duration = _recordingSeconds;
+    if (recorder == null) return;
+
+    final stopCompleter = Completer<void>();
+    recorder.addEventListener('stop', (html.Event _) {
+      if (!stopCompleter.isCompleted) stopCompleter.complete();
+    });
+    recorder.stop();
+    _micStream?.getTracks().forEach((t) => t.stop());
+    if (mounted) setState(() => _isRecording = false);
+
+    await stopCompleter.future;
+
+    if (_recordingChunks.isEmpty) return;
+    final blob = html.Blob(_recordingChunks, 'audio/ogg');
+    final fileReader = html.FileReader();
+    final readCompleter = Completer<Uint8List>();
+    fileReader.onLoad.listen((_) {
+      final buffer = fileReader.result as ByteBuffer;
+      readCompleter.complete(buffer.asUint8List());
+    });
+    fileReader.readAsArrayBuffer(blob);
+    final bytes = await readCompleter.future;
+    if (mounted) _openPreviewModal(bytes, 'voice_note.ogg', audioDuration: duration);
+  }
+
+  void _cancelVoiceRecording() {
+    _recordingTimer?.cancel();
+    _recordingTimer = null;
+    _mediaRecorder?.stop();
+    _micStream?.getTracks().forEach((t) => t.stop());
+    _recordingChunks.clear();
+    if (mounted) setState(() => _isRecording = false);
   }
 
   Widget _buildDragOverlay() {
@@ -1172,6 +1210,14 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
     });
   }
 
+  bool _isGoogleMapsUrl(String text) {
+    final lower = text.toLowerCase();
+    return lower.contains('maps.google.com') ||
+        lower.contains('google.com/maps') ||
+        lower.contains('goo.gl/maps') ||
+        lower.contains('maps.app.goo.gl');
+  }
+
   Future<void> _sendMessage() async {
     final text = _msgCtrl.text.trim();
     if (text.isEmpty) return;
@@ -1181,6 +1227,45 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
 
     final tenantId = ref.read(activeTenantIdProvider);
     if (tenantId.isEmpty) return;
+
+    // Auto-detect Google Maps URLs
+    if (_isGoogleMapsUrl(text)) {
+      _msgCtrl.clear();
+      setState(() => _sending = true);
+      try {
+        await MessagesApi.sendLocation(
+          to: chatId,
+          tenantId: tenantId,
+          googleMapsUrl: text,
+          sentByUserId: Supabase.instance.client.auth.currentUser?.id,
+        );
+        if (mounted) {
+          setState(() => _sending = false);
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('✅ Ubicación enviada'),
+            backgroundColor: Color(0xFF10B981),
+          ));
+        }
+      } on DioException catch (e) {
+        if (mounted) {
+          setState(() => _sending = false);
+          final isInvalid = e.response?.statusCode == 400;
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(isInvalid ? '❌ URL de Google Maps no válida' : '❌ Error al enviar ubicación'),
+            backgroundColor: const Color(0xFFEF4444),
+          ));
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() => _sending = false);
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('❌ Error al enviar ubicación'),
+            backgroundColor: Color(0xFFEF4444),
+          ));
+        }
+      }
+      return;
+    }
 
     _msgCtrl.clear();
     setState(() => _sending = true);
@@ -1368,14 +1453,21 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
           ),
 
         // Input
-        _ChatInput(
-          controller: _msgCtrl,
-          onSend: _windowOpen ? _sendMessage : null,
-          onTyping: _windowOpen ? _handleTyping : null,
-          sending: _sending,
-          enabled: _windowOpen,
-          onAttach: _handleAttach,
-        ),
+        if (_isRecording)
+          _RecordingBar(
+            seconds: _recordingSeconds,
+            onStop: _stopVoiceRecording,
+            onCancel: _cancelVoiceRecording,
+          )
+        else
+          _ChatInput(
+            controller: _msgCtrl,
+            onSend: _windowOpen ? _sendMessage : null,
+            onTyping: _windowOpen ? _handleTyping : null,
+            sending: _sending,
+            enabled: _windowOpen,
+            onAttach: _handleAttach,
+          ),
       ],
     );
 
@@ -1890,9 +1982,8 @@ class _ChatInputState extends State<_ChatInput> {
               offset: const Offset(0, -220),
               itemBuilder: (context) => [
                 _buildAttachItem('image', Icons.image_rounded, const Color(0xFF3B82F6), 'Imagen'),
-                _buildAttachItem('audio', Icons.music_note_rounded, const Color(0xFFF97316), 'Audio'),
+                _buildAttachItem('voice', Icons.mic_rounded, const Color(0xFFF97316), 'Voice note'),
                 _buildAttachItem('doc', Icons.description_rounded, const Color(0xFFEF4444), 'Documento'),
-                _buildAttachItem('location', Icons.location_on_rounded, const Color(0xFF22C55E), 'Ubicación (Google Maps)'),
                 _buildAttachItem('location-request', Icons.location_searching_rounded, AppColors.ctTeal, 'Solicitar ubicación'),
               ],
               child: Container(
@@ -4053,10 +4144,12 @@ class _MediaPreviewDialog extends StatefulWidget {
     required this.bytes,
     required this.filename,
     required this.onSend,
+    this.audioDuration,
   });
   final Uint8List bytes;
   final String filename;
   final void Function(String? caption) onSend;
+  final int? audioDuration;
 
   @override
   State<_MediaPreviewDialog> createState() => _MediaPreviewDialogState();
@@ -4069,6 +4162,10 @@ class _MediaPreviewDialogState extends State<_MediaPreviewDialog> {
   void dispose() {
     _captionCtrl.dispose();
     super.dispose();
+  }
+
+  void _handleSend() {
+    widget.onSend(_isAudio ? null : _captionCtrl.text.trim());
   }
 
   String get _ext => widget.filename.contains('.')
@@ -4137,13 +4234,23 @@ class _MediaPreviewDialogState extends State<_MediaPreviewDialog> {
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.music_note_rounded, size: 32, color: AppColors.ctTeal),
+                      const Icon(Icons.mic_rounded, size: 32, color: AppColors.ctTeal),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: Text(
-                          widget.filename,
-                          style: const TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppColors.ctNavy),
-                          overflow: TextOverflow.ellipsis,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              widget.filename,
+                              style: const TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppColors.ctNavy),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            if (widget.audioDuration != null)
+                              Text(
+                                '${widget.audioDuration! ~/ 60}:${(widget.audioDuration! % 60).toString().padLeft(2, '0')}',
+                                style: const TextStyle(fontFamily: 'Inter', fontSize: 11, color: AppColors.ctText3),
+                              ),
+                          ],
                         ),
                       ),
                     ],
@@ -4185,6 +4292,8 @@ class _MediaPreviewDialogState extends State<_MediaPreviewDialog> {
                 TextField(
                   controller: _captionCtrl,
                   style: const TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppColors.ctNavy),
+                  textInputAction: TextInputAction.send,
+                  onSubmitted: (_) => _handleSend(),
                   decoration: InputDecoration(
                     hintText: 'Agregar caption…',
                     hintStyle: const TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppColors.ctText3),
@@ -4206,7 +4315,7 @@ class _MediaPreviewDialogState extends State<_MediaPreviewDialog> {
                   ),
                   const SizedBox(width: 8),
                   FilledButton.icon(
-                    onPressed: () => widget.onSend(_isAudio ? null : _captionCtrl.text.trim()),
+                    onPressed: _handleSend,
                     style: FilledButton.styleFrom(backgroundColor: AppColors.ctTeal),
                     icon: const Icon(Icons.send_rounded, size: 16, color: AppColors.ctNavy),
                     label: const Text('Enviar', style: TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppColors.ctNavy, fontWeight: FontWeight.w600)),
@@ -4286,6 +4395,106 @@ class _LocationDialogState extends State<_LocationDialog> {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ── Recording Bar ─────────────────────────────────────────────────────────────
+
+class _RecordingBar extends StatefulWidget {
+  const _RecordingBar({
+    required this.seconds,
+    required this.onStop,
+    required this.onCancel,
+  });
+  final int seconds;
+  final Future<void> Function() onStop;
+  final VoidCallback onCancel;
+
+  @override
+  State<_RecordingBar> createState() => _RecordingBarState();
+}
+
+class _RecordingBarState extends State<_RecordingBar>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pulse;
+  bool _stopping = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulse = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    super.dispose();
+  }
+
+  String _formatDuration(int secs) {
+    final m = secs ~/ 60;
+    final s = secs % 60;
+    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 56,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: const BoxDecoration(
+        color: AppColors.ctSurface,
+        border: Border(top: BorderSide(color: AppColors.ctBorder)),
+      ),
+      child: Row(
+        children: [
+          FadeTransition(
+            opacity: _pulse,
+            child: Container(
+              width: 10,
+              height: 10,
+              decoration: const BoxDecoration(
+                color: Color(0xFFEF4444),
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Text(
+            'Grabando… ${_formatDuration(widget.seconds)}',
+            style: const TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 13,
+              color: AppColors.ctText,
+            ),
+          ),
+          const Spacer(),
+          TextButton(
+            onPressed: widget.onCancel,
+            child: const Text(
+              'Cancelar',
+              style: TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppColors.ctText3),
+            ),
+          ),
+          const SizedBox(width: 8),
+          FilledButton.icon(
+            onPressed: _stopping ? null : () async {
+              setState(() => _stopping = true);
+              await widget.onStop();
+            },
+            style: FilledButton.styleFrom(backgroundColor: AppColors.ctTeal),
+            icon: const Icon(Icons.stop_rounded, size: 16, color: AppColors.ctNavy),
+            label: const Text(
+              'Detener',
+              style: TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppColors.ctNavy, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
