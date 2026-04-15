@@ -8,7 +8,7 @@ import '../../core/theme/app_theme.dart';
 
 // ── Enum de secciones ─────────────────────────────────────────────────────────
 
-enum _Section { general, address, billing, users, communication }
+enum _Section { general, billing, users, communication }
 
 // ── Pantalla principal ────────────────────────────────────────────────────────
 
@@ -24,7 +24,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   static const _items = [
     (section: _Section.general,       label: 'Información general', icon: Icons.business_outlined),
-    (section: _Section.address,       label: 'Dirección',           icon: Icons.location_on_outlined),
     (section: _Section.billing,       label: 'Facturación',         icon: Icons.receipt_long_outlined),
     (section: _Section.users,         label: 'Usuarios',            icon: Icons.group_outlined),
     (section: _Section.communication, label: 'Comunicación',        icon: Icons.chat_bubble_outline_rounded),
@@ -163,8 +162,6 @@ class _SectionPanel extends StatelessWidget {
     switch (active) {
       case _Section.general:
         content = const _GeneralInfoCard();
-      case _Section.address:
-        content = const _AddressCard();
       case _Section.billing:
         content = const _BillingCard();
       case _Section.users:
@@ -174,8 +171,11 @@ class _SectionPanel extends StatelessWidget {
     }
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(22),
-      child: content,
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [content],
+      ),
     );
   }
 }
@@ -225,7 +225,7 @@ class _ActionBar extends StatelessWidget {
   }
 }
 
-// ── Sección 1 — Información general ──────────────────────────────────────────
+// ── Sección 1 — Información general (incluye dirección) ──────────────────────
 
 class _GeneralInfoCard extends ConsumerStatefulWidget {
   const _GeneralInfoCard();
@@ -240,6 +240,13 @@ class _GeneralInfoCardState extends ConsumerState<_GeneralInfoCard> {
   final _rfcCtrl         = TextEditingController();
   final _emailCtrl       = TextEditingController();
   final _telefonoCtrl    = TextEditingController();
+  final _calleCtrl       = TextEditingController();
+  final _numExtCtrl      = TextEditingController();
+  final _numIntCtrl      = TextEditingController();
+  final _coloniaCtrl     = TextEditingController();
+  final _ciudadCtrl      = TextEditingController();
+  final _estadoCtrl      = TextEditingController();
+  final _cpCtrl          = TextEditingController();
 
   bool _loading = true;
   bool _saving  = false;
@@ -264,6 +271,13 @@ class _GeneralInfoCardState extends ConsumerState<_GeneralInfoCard> {
     _rfcCtrl.dispose();
     _emailCtrl.dispose();
     _telefonoCtrl.dispose();
+    _calleCtrl.dispose();
+    _numExtCtrl.dispose();
+    _numIntCtrl.dispose();
+    _coloniaCtrl.dispose();
+    _ciudadCtrl.dispose();
+    _estadoCtrl.dispose();
+    _cpCtrl.dispose();
     super.dispose();
   }
 
@@ -278,6 +292,13 @@ class _GeneralInfoCardState extends ConsumerState<_GeneralInfoCard> {
       _rfcCtrl.text         = d['rfc']?.toString() ?? '';
       _emailCtrl.text       = d['email_contacto']?.toString() ?? '';
       _telefonoCtrl.text    = d['telefono']?.toString() ?? '';
+      _calleCtrl.text       = d['calle']?.toString() ?? '';
+      _numExtCtrl.text      = d['numero_exterior']?.toString() ?? '';
+      _numIntCtrl.text      = d['numero_interior']?.toString() ?? '';
+      _coloniaCtrl.text     = d['colonia']?.toString() ?? '';
+      _ciudadCtrl.text      = d['ciudad']?.toString() ?? '';
+      _estadoCtrl.text      = d['estado_cliente']?.toString() ?? '';
+      _cpCtrl.text          = d['codigo_postal']?.toString() ?? '';
       setState(() => _loading = false);
     } catch (e) {
       if (!mounted) return;
@@ -290,11 +311,18 @@ class _GeneralInfoCardState extends ConsumerState<_GeneralInfoCard> {
     setState(() { _saving = true; _error = null; _success = null; });
     try {
       await ApiClient.instance.put('/tenants/$_currentTenantId', data: {
-        'display_name':   _displayNameCtrl.text.trim(),
-        'legal_name':     _legalNameCtrl.text.trim(),
-        'rfc':            _rfcCtrl.text.trim(),
-        'email_contacto': _emailCtrl.text.trim(),
-        'telefono':       _telefonoCtrl.text.trim(),
+        'display_name':    _displayNameCtrl.text.trim(),
+        'legal_name':      _legalNameCtrl.text.trim(),
+        'rfc':             _rfcCtrl.text.trim(),
+        'email_contacto':  _emailCtrl.text.trim(),
+        'telefono':        _telefonoCtrl.text.trim(),
+        'calle':           _calleCtrl.text.trim(),
+        'numero_exterior': _numExtCtrl.text.trim(),
+        'numero_interior': _numIntCtrl.text.trim(),
+        'colonia':         _coloniaCtrl.text.trim(),
+        'ciudad':          _ciudadCtrl.text.trim(),
+        'estado_cliente':  _estadoCtrl.text.trim(),
+        'codigo_postal':   _cpCtrl.text.trim(),
       });
       if (!mounted) return;
       setState(() { _saving = false; _success = 'Información guardada'; });
@@ -332,116 +360,9 @@ class _GeneralInfoCardState extends ConsumerState<_GeneralInfoCard> {
           ),
           const SizedBox(height: 14),
           _Field(label: 'Email de contacto', ctrl: _emailCtrl, placeholder: 'contacto@empresa.com'),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Sección 2 — Dirección ─────────────────────────────────────────────────────
-
-class _AddressCard extends ConsumerStatefulWidget {
-  const _AddressCard();
-
-  @override
-  ConsumerState<_AddressCard> createState() => _AddressCardState();
-}
-
-class _AddressCardState extends ConsumerState<_AddressCard> {
-  final _calleCtrl   = TextEditingController();
-  final _numExtCtrl  = TextEditingController();
-  final _numIntCtrl  = TextEditingController();
-  final _coloniaCtrl = TextEditingController();
-  final _ciudadCtrl  = TextEditingController();
-  final _estadoCtrl  = TextEditingController();
-  final _cpCtrl      = TextEditingController();
-
-  bool _loading = true;
-  bool _saving  = false;
-  String _currentTenantId = '';
-  String? _error;
-  String? _success;
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final tenantId = ref.read(activeTenantIdProvider);
-    if (tenantId.isNotEmpty && tenantId != _currentTenantId) {
-      _currentTenantId = tenantId;
-      _load();
-    }
-  }
-
-  @override
-  void dispose() {
-    _calleCtrl.dispose();
-    _numExtCtrl.dispose();
-    _numIntCtrl.dispose();
-    _coloniaCtrl.dispose();
-    _ciudadCtrl.dispose();
-    _estadoCtrl.dispose();
-    _cpCtrl.dispose();
-    super.dispose();
-  }
-
-  Future<void> _load() async {
-    setState(() { _loading = true; _error = null; });
-    try {
-      final res = await ApiClient.instance.get('/tenants/$_currentTenantId');
-      final d = Map<String, dynamic>.from(res.data as Map);
-      if (!mounted) return;
-      _calleCtrl.text   = d['calle']?.toString() ?? '';
-      _numExtCtrl.text  = d['numero_exterior']?.toString() ?? '';
-      _numIntCtrl.text  = d['numero_interior']?.toString() ?? '';
-      _coloniaCtrl.text = d['colonia']?.toString() ?? '';
-      _ciudadCtrl.text  = d['ciudad']?.toString() ?? '';
-      _estadoCtrl.text  = d['estado_cliente']?.toString() ?? '';
-      _cpCtrl.text      = d['codigo_postal']?.toString() ?? '';
-      setState(() => _loading = false);
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _loading = false);
-      ScaffoldMessenger.of(context).showSnackBar(_errorSnack('Error al cargar: $e'));
-    }
-  }
-
-  Future<void> _save() async {
-    setState(() { _saving = true; _error = null; _success = null; });
-    try {
-      await ApiClient.instance.put('/tenants/$_currentTenantId', data: {
-        'calle':           _calleCtrl.text.trim(),
-        'numero_exterior': _numExtCtrl.text.trim(),
-        'numero_interior': _numIntCtrl.text.trim(),
-        'colonia':         _coloniaCtrl.text.trim(),
-        'ciudad':          _ciudadCtrl.text.trim(),
-        'estado_cliente':  _estadoCtrl.text.trim(),
-        'codigo_postal':   _cpCtrl.text.trim(),
-      });
-      if (!mounted) return;
-      setState(() { _saving = false; _success = 'Dirección guardada'; });
-    } on DioException catch (e) {
-      if (!mounted) return;
-      final msg = e.response?.data is Map
-          ? e.response!.data['detail']?.toString()
-          : e.response?.data?.toString();
-      setState(() { _saving = false; _error = msg ?? 'Error al guardar'; });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() { _saving = false; _error = 'Error: $e'; });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return _SectionCard(
-      title: 'Dirección',
-      loading: _loading,
-      error: _error,
-      success: _success,
-      onSave: _saving ? null : _save,
-      saving: _saving,
-      child: Column(
-        children: [
+          const SizedBox(height: 20),
+          const Divider(color: AppColors.ctBorder),
+          const SizedBox(height: 16),
           _Row2(
             left: _Field(label: 'Calle', ctrl: _calleCtrl, placeholder: 'Nombre de la calle'),
             right: _Row2(
@@ -465,7 +386,7 @@ class _AddressCardState extends ConsumerState<_AddressCard> {
   }
 }
 
-// ── Sección 3 — Facturación ───────────────────────────────────────────────────
+// ── Sección 2 — Facturación ───────────────────────────────────────────────────
 
 class _BillingCard extends ConsumerStatefulWidget {
   const _BillingCard();
