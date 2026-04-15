@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api/api_client.dart';
+import '../../core/providers/auth_provider.dart';
 import '../../core/providers/tenant_provider.dart';
 import '../../core/theme/app_theme.dart';
 import 'whatsapp_groups_screen.dart';
@@ -46,11 +47,7 @@ class _WhatsAppConfigScreenState extends ConsumerState<WhatsAppConfigScreen> {
       case _WaTab.templates:
         return const _TemplatesTab();
       case _WaTab.welcome:
-        return const _PlaceholderTab(
-          icon: Icons.waving_hand_rounded,
-          title: 'Próximamente',
-          subtitle: 'Configura el mensaje de bienvenida automático',
-        );
+        return const _WelcomeTab();
       case _WaTab.groups:
         return const WhatsAppGroupsScreen();
     }
@@ -366,6 +363,47 @@ final _templatesProvider =
   },
 );
 
+// ── FutureProvider para plantilla default del sistema ─────────────────────────
+
+final _defaultTemplateProvider =
+    FutureProvider.autoDispose<Map<String, dynamic>?>(
+  (ref) async {
+    try {
+      final res = await ApiClient.instance.get('/templates/default');
+      return Map<String, dynamic>.from(res.data as Map);
+    } catch (_) {
+      return null;
+    }
+  },
+);
+
+// ── Helper: resuelve preview con valores de ejemplo ───────────────────────────
+
+String _resolveTemplatePreview(Map<String, dynamic> template) {
+  const examples = <String, String>{
+    'nombre_operador':   'José Miguel',
+    'telefono_operador': '5215559537449',
+    'nombre_tenant':     'TMR-Prixz',
+    'fecha_hoy':         '14/04/2026',
+    'hora_actual':       '10:30 AM',
+  };
+  String preview = template['body_text']?.toString() ?? '';
+  final vars = template['variables'];
+  if (vars is List) {
+    for (final v in vars) {
+      if (v is! Map) continue;
+      final slot = v['slot'] as int? ?? 0;
+      final type = v['type'] as String? ?? 'free';
+      final key  = v['key']  as String? ?? '';
+      final val  = type == 'system'
+          ? (examples[key] ?? '[$key]')
+          : (key.isNotEmpty ? '[$key]' : '{{$slot}}');
+      if (slot > 0) preview = preview.replaceAll('{{$slot}}', val);
+    }
+  }
+  return preview;
+}
+
 // ── Tab Plantillas ────────────────────────────────────────────────────────────
 
 class _TemplatesTab extends ConsumerStatefulWidget {
@@ -598,7 +636,7 @@ class _TemplatesTable extends StatelessWidget {
                 Expanded(flex: 1, child: Text('IDIOMA', style: _h)),
                 Expanded(flex: 3, child: Text('VARIABLES', style: _h)),
                 Expanded(flex: 2, child: Text('STATUS', style: _h)),
-                SizedBox(width: 36),
+                SizedBox(width: 120),
               ],
             ),
           ),
@@ -674,6 +712,39 @@ class _TemplateRowState extends State<_TemplateRow> {
     final key  = v['key']  as String? ?? '';
     if (type == 'system') return _sysVarDesc[key] ?? key;
     return key.isNotEmpty ? '[$key]' : '[variable]';
+  }
+
+  void _showDetail() {
+    showDialog(
+      context: context,
+      builder: (_) => _TemplateDetailDialog(template: widget.template),
+    );
+  }
+
+  void _copy() {
+    final origName = _name;
+    showDialog(
+      context: context,
+      builder: (_) => _NewTemplateDialog(
+        tenantId:         widget.tenantId,
+        onCreated:        widget.onRefresh,
+        initialName:      '${origName}_v2',
+        initialBody:      widget.template['body_text']?.toString(),
+        initialCategory:  _category,
+        initialLanguage:  _language,
+        isCopy:           true,
+      ),
+    );
+  }
+
+  void _sendTest() {
+    showDialog(
+      context: context,
+      builder: (_) => _SendTestDialog(
+        template: widget.template,
+        tenantId: widget.tenantId,
+      ),
+    );
   }
 
   Future<void> _delete() async {
@@ -885,9 +956,9 @@ class _TemplateRowState extends State<_TemplateRow> {
               child: _TemplateBadge(status: _status),
             ),
 
-            // Acción eliminar
+            // Acciones
             SizedBox(
-              width: 36,
+              width: 120,
               child: _deleting
                   ? const SizedBox(
                       width: 16,
@@ -897,14 +968,30 @@ class _TemplateRowState extends State<_TemplateRow> {
                         color: AppColors.ctTeal,
                       ),
                     )
-                  : IconButton(
-                      icon: const Icon(Icons.delete_outline_rounded,
-                          size: 16, color: AppColors.ctText3),
-                      splashRadius: 14,
-                      tooltip: 'Eliminar plantilla',
-                      onPressed: _delete,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
+                  : Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _RowActionIcon(
+                          icon: Icons.visibility_outlined,
+                          tooltip: 'Ver detalle',
+                          onTap: _showDetail,
+                        ),
+                        _RowActionIcon(
+                          icon: Icons.copy_outlined,
+                          tooltip: 'Duplicar y editar',
+                          onTap: _copy,
+                        ),
+                        _RowActionIcon(
+                          icon: Icons.send_rounded,
+                          tooltip: 'Enviar prueba',
+                          onTap: _sendTest,
+                        ),
+                        _RowActionIcon(
+                          icon: Icons.delete_outline_rounded,
+                          tooltip: 'Eliminar',
+                          onTap: _delete,
+                        ),
+                      ],
                     ),
             ),
           ],
@@ -974,9 +1061,19 @@ class _NewTemplateDialog extends StatefulWidget {
   const _NewTemplateDialog({
     required this.tenantId,
     required this.onCreated,
+    this.initialName,
+    this.initialBody,
+    this.initialCategory,
+    this.initialLanguage,
+    this.isCopy = false,
   });
   final String tenantId;
   final VoidCallback onCreated;
+  final String? initialName;
+  final String? initialBody;
+  final String? initialCategory;
+  final String? initialLanguage;
+  final bool isCopy;
 
   @override
   State<_NewTemplateDialog> createState() => _NewTemplateDialogState();
@@ -1018,6 +1115,23 @@ class _NewTemplateDialogState extends State<_NewTemplateDialog> {
   void initState() {
     super.initState();
     _bodyCtrl.addListener(_syncVarsFromBody);
+    if (widget.initialBody != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        if (widget.initialName != null) {
+          _nameCtrl.text = widget.initialName!;
+          setState(() {});
+        }
+        if (widget.initialCategory != null) {
+          setState(() => _category = widget.initialCategory!);
+        }
+        if (widget.initialLanguage != null) {
+          setState(() => _language = widget.initialLanguage!);
+        }
+        // Setting body triggers _syncVarsFromBody via listener
+        _bodyCtrl.text = widget.initialBody!;
+      });
+    }
   }
 
   @override
@@ -1294,11 +1408,11 @@ class _NewTemplateDialogState extends State<_NewTemplateDialog> {
               decoration: const BoxDecoration(
                 border: Border(bottom: BorderSide(color: AppColors.ctBorder)),
               ),
-              child: const Row(
+              child: Row(
                 children: [
                   Text(
-                    'Nueva plantilla',
-                    style: TextStyle(
+                    widget.isCopy ? 'Duplicar plantilla' : 'Nueva plantilla',
+                    style: const TextStyle(
                       fontFamily: 'Inter',
                       fontSize: 15,
                       fontWeight: FontWeight.w700,
@@ -1315,6 +1429,35 @@ class _NewTemplateDialogState extends State<_NewTemplateDialog> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Nota de copia
+                    if (widget.isCopy) ...[
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEFF6FF),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFFBFDBFE)),
+                        ),
+                        child: const Row(
+                          children: [
+                            Icon(Icons.info_outline_rounded,
+                                size: 14, color: Color(0xFF2563EB)),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Se creará una nueva plantilla. La original no se modificará.',
+                                style: TextStyle(
+                                  fontFamily: 'Inter',
+                                  fontSize: 11,
+                                  color: Color(0xFF1D4ED8),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                    ],
                     // Nombre
                     _TplField(
                       label: 'Nombre',
@@ -1814,54 +1957,785 @@ SnackBar _waSnack(String msg) => SnackBar(
       margin: const EdgeInsets.all(16),
     );
 
-// ── Tab placeholder ───────────────────────────────────────────────────────────
+// ── Tab Bienvenida ────────────────────────────────────────────────────────────
 
-class _PlaceholderTab extends StatelessWidget {
-  const _PlaceholderTab({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-  });
-  final IconData icon;
-  final String title;
-  final String subtitle;
+class _WelcomeTab extends ConsumerStatefulWidget {
+  const _WelcomeTab();
+
+  @override
+  ConsumerState<_WelcomeTab> createState() => _WelcomeTabState();
+}
+
+class _WelcomeTabState extends ConsumerState<_WelcomeTab> {
+  bool _saving = false;
+  String? _error;
+  String? _success;
+
+  Future<void> _setWelcomeTemplate(String tenantId, String? templateId) async {
+    setState(() { _saving = true; _error = null; _success = null; });
+    try {
+      await ApiClient.instance.patch(
+        '/tenants/$tenantId/welcome-template',
+        data: {'welcome_template_id': templateId},
+        options: Options(validateStatus: (s) => s != null && s >= 200 && s < 300),
+      );
+      if (!mounted) return;
+      ref.invalidate(_credentialsProvider(tenantId));
+      setState(() { _saving = false; _success = 'Plantilla de bienvenida actualizada'; });
+    } on DioException catch (e) {
+      if (!mounted) return;
+      final detail = e.response?.data is Map
+          ? e.response!.data['detail']?.toString()
+          : e.response?.data?.toString();
+      setState(() { _saving = false; _error = detail ?? 'Error al guardar'; });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() { _saving = false; _error = 'Error: $e'; });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              color: AppColors.ctSurface2,
-              borderRadius: BorderRadius.circular(14),
-            ),
-            alignment: Alignment.center,
-            child: Icon(icon, size: 26, color: AppColors.ctText3),
-          ),
-          const SizedBox(height: 14),
-          Text(
-            title,
+    final tenantId     = ref.watch(activeTenantIdProvider);
+    final tenantAsync  = ref.watch(_credentialsProvider(tenantId));
+    final tplsAsync    = ref.watch(_templatesProvider(tenantId));
+    final defaultAsync = ref.watch(_defaultTemplateProvider);
+
+    return tenantAsync.when(
+      loading: () => const Center(
+          child: CircularProgressIndicator(color: AppColors.ctTeal)),
+      error: (e, _) => Center(
+        child: Text('Error: $e',
             style: const TextStyle(
-              fontFamily: 'Inter',
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              color: AppColors.ctText,
+                fontFamily: 'Inter', color: AppColors.ctText2)),
+      ),
+      data: (tenant) {
+        if (tenant == null) return const SizedBox.shrink();
+
+        final currentId = tenant['welcome_template_id']?.toString() ?? '';
+        final isActive  = currentId.isNotEmpty;
+
+        final approved = tplsAsync.maybeWhen(
+          data: (tpls) => tpls
+              .where((t) =>
+                  t['status']?.toString().toUpperCase() == 'APPROVED')
+              .toList(),
+          orElse: () => <Map<String, dynamic>>[],
+        );
+
+        final systemDefault = approved.isEmpty
+            ? defaultAsync.maybeWhen(data: (d) => d, orElse: () => null)
+            : null;
+
+        final allItems = <Map<String, dynamic>>[
+          if (systemDefault != null) {...systemDefault, '_is_default': true},
+          ...approved,
+        ];
+
+        final validIds =
+            allItems.map((t) => t['id']?.toString() ?? '').toSet();
+        final selectedId =
+            validIds.contains(currentId) ? currentId : null;
+
+        final selectedTpl = selectedId != null
+            ? allItems.firstWhere(
+                (t) => t['id']?.toString() == selectedId,
+                orElse: () => <String, dynamic>{},
+              )
+            : <String, dynamic>{};
+
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(22),
+          child: _SectionCard(
+            title: 'Mensaje de bienvenida a operadores',
+            subtitle:
+                'Este mensaje se envía automáticamente cuando se da de alta un nuevo operador.',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Estado
+                Row(
+                  children: [
+                    const Text(
+                      'Estado:',
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.ctText,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: isActive
+                            ? const Color(0xFFDCFCE7)
+                            : AppColors.ctSurface2,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        isActive ? 'Activa' : 'Sin configurar',
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: isActive
+                              ? const Color(0xFF065F46)
+                              : AppColors.ctText2,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+
+                // Selector
+                const Text(
+                  'Plantilla de bienvenida',
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.ctText,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                if (allItems.isEmpty)
+                  const Text(
+                    'No hay plantillas APPROVED disponibles. '
+                    'Crea y aprueba una plantilla primero.',
+                    style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 12,
+                        color: AppColors.ctText3),
+                  )
+                else
+                  Container(
+                    height: 40,
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: AppColors.ctSurface2,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppColors.ctBorder2),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String?>(
+                        value: selectedId,
+                        isExpanded: true,
+                        isDense: true,
+                        style: const TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 13,
+                            color: AppColors.ctText),
+                        icon: const Icon(
+                          Icons.keyboard_arrow_down_rounded,
+                          size: 16,
+                          color: AppColors.ctText3,
+                        ),
+                        items: [
+                          const DropdownMenuItem<String?>(
+                            value: null,
+                            child: Text(
+                              'Sin plantilla',
+                              style: TextStyle(
+                                  fontFamily: 'Inter',
+                                  fontSize: 13,
+                                  color: AppColors.ctText3),
+                            ),
+                          ),
+                          ...allItems.map((t) {
+                            final id        = t['id']?.toString() ?? '';
+                            final name      = t['name']?.toString() ?? '';
+                            final isDefault = t['_is_default'] == true;
+                            return DropdownMenuItem<String?>(
+                              value: id,
+                              child: Row(
+                                children: [
+                                  Expanded(child: Text(name)),
+                                  if (isDefault) ...[
+                                    const SizedBox(width: 6),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.ctSurface2,
+                                        borderRadius:
+                                            BorderRadius.circular(20),
+                                        border: Border.all(
+                                            color: AppColors.ctBorder),
+                                      ),
+                                      child: const Text(
+                                        'Default del sistema',
+                                        style: TextStyle(
+                                            fontFamily: 'Inter',
+                                            fontSize: 10,
+                                            color: AppColors.ctText3),
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            );
+                          }),
+                        ],
+                        onChanged:
+                            _saving ? null : (v) => _setWelcomeTemplate(tenantId, v),
+                      ),
+                    ),
+                  ),
+
+                // Preview
+                if (selectedTpl.isNotEmpty) ...[
+                  const SizedBox(height: 20),
+                  const _DetailLabel('Preview del mensaje'),
+                  const SizedBox(height: 8),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFDCFCE7),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFBBF7D0)),
+                    ),
+                    child: Text(
+                      _resolveTemplatePreview(selectedTpl),
+                      style: const TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 13,
+                        color: Color(0xFF065F46),
+                      ),
+                    ),
+                  ),
+                ],
+
+                // Feedback
+                if (_error != null) ...[
+                  const SizedBox(height: 12),
+                  _FeedbackBanner(message: _error!, isError: true),
+                ],
+                if (_success != null) ...[
+                  const SizedBox(height: 12),
+                  _FeedbackBanner(message: _success!, isError: false),
+                ],
+              ],
             ),
           ),
-          const SizedBox(height: 6),
-          Text(
-            subtitle,
-            style: const TextStyle(
-              fontFamily: 'Inter',
-              fontSize: 13,
-              color: AppColors.ctText2,
+        );
+      },
+    );
+  }
+}
+
+// ── Dialog de detalle de plantilla ────────────────────────────────────────────
+
+class _TemplateDetailDialog extends StatelessWidget {
+  const _TemplateDetailDialog({required this.template});
+  final Map<String, dynamic> template;
+
+  static const _sysVarDesc = <String, String>{
+    'nombre_operador':   'Nombre del operador',
+    'telefono_operador': 'Teléfono del operador',
+    'nombre_tenant':     'Nombre de la empresa',
+    'fecha_hoy':         'Fecha de hoy',
+    'hora_actual':       'Hora actual',
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final name     = template['name']?.toString() ?? '';
+    final category = template['category']?.toString() ?? '';
+    final language = template['language']?.toString() ?? '';
+    final status   = template['status']?.toString().toUpperCase() ?? '';
+    final vars     = template['variables'];
+    final varList  = vars is List
+        ? vars
+            .map((e) => e is Map
+                ? Map<String, dynamic>.from(e)
+                : <String, dynamic>{})
+            .where((m) => m.isNotEmpty)
+            .toList()
+        : <Map<String, dynamic>>[];
+
+    String varLabel(Map<String, dynamic> v) {
+      final type = v['type'] as String? ?? 'free';
+      final key  = v['key']  as String? ?? '';
+      return type == 'system'
+          ? (_sysVarDesc[key] ?? key)
+          : (key.isNotEmpty ? '[$key]' : '[variable]');
+    }
+
+    return Dialog(
+      backgroundColor: AppColors.ctSurface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: const BorderSide(color: AppColors.ctBorder),
+      ),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 520, maxHeight: 660),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header
+            Container(
+              padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
+              decoration: const BoxDecoration(
+                border:
+                    Border(bottom: BorderSide(color: AppColors.ctBorder)),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      name,
+                      style: const TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.ctText,
+                      ),
+                    ),
+                  ),
+                  _TemplateBadge(status: status),
+                ],
+              ),
             ),
-          ),
-        ],
+            // Body
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        _DetailChip(label: category),
+                        const SizedBox(width: 8),
+                        _DetailChip(label: language),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    const _DetailLabel('Cuerpo del mensaje'),
+                    const SizedBox(height: 6),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.ctSurface2,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppColors.ctBorder),
+                      ),
+                      child: Text(
+                        template['body_text']?.toString() ?? '',
+                        style: const TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 13,
+                          color: AppColors.ctText,
+                          height: 1.5,
+                        ),
+                      ),
+                    ),
+                    if (varList.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      const _DetailLabel('Variables'),
+                      const SizedBox(height: 8),
+                      ...varList.map((v) {
+                        final slot     = v['slot'] as int? ?? 0;
+                        final type     = v['type'] as String? ?? 'free';
+                        final isSystem = type == 'system';
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 6),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 32,
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 4, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: AppColors.ctSurface2,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                alignment: Alignment.center,
+                                child: Text(
+                                  '{{$slot}}',
+                                  style: const TextStyle(
+                                    fontFamily: 'Inter',
+                                    fontSize: 10,
+                                    color: AppColors.ctText3,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: isSystem
+                                      ? const Color(0xFFDCFCE7)
+                                      : AppColors.ctSurface2,
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Text(
+                                  isSystem ? 'Sistema' : 'Libre',
+                                  style: TextStyle(
+                                    fontFamily: 'Inter',
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                    color: isSystem
+                                        ? const Color(0xFF065F46)
+                                        : AppColors.ctText2,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                varLabel(v),
+                                style: const TextStyle(
+                                  fontFamily: 'Inter',
+                                  fontSize: 12,
+                                  color: AppColors.ctText2,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
+                    ],
+                    const SizedBox(height: 16),
+                    const _DetailLabel('Preview'),
+                    const SizedBox(height: 8),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFDCFCE7),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                            color: const Color(0xFFBBF7D0)),
+                      ),
+                      child: Text(
+                        _resolveTemplatePreview(template),
+                        style: const TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 13,
+                          color: Color(0xFF065F46),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            // Footer
+            Container(
+              padding: const EdgeInsets.fromLTRB(24, 12, 24, 20),
+              decoration: const BoxDecoration(
+                border: Border(top: BorderSide(color: AppColors.ctBorder)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  _WaOutlineButton(
+                    label: 'Cerrar',
+                    onTap: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Dialog enviar prueba ──────────────────────────────────────────────────────
+
+class _SendTestDialog extends ConsumerStatefulWidget {
+  const _SendTestDialog({
+    required this.template,
+    required this.tenantId,
+  });
+  final Map<String, dynamic> template;
+  final String tenantId;
+
+  @override
+  ConsumerState<_SendTestDialog> createState() => _SendTestDialogState();
+}
+
+class _SendTestDialogState extends ConsumerState<_SendTestDialog> {
+  final _phoneCtrl = TextEditingController();
+  bool _sending = false;
+  String? _error;
+  String? _success;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPhone();
+  }
+
+  @override
+  void dispose() {
+    _phoneCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadPhone() async {
+    try {
+      final uid = ref.read(currentUserProvider)?.id ?? '';
+      if (uid.isEmpty) return;
+      final res = await ApiClient.instance.get(
+        '/iam/users',
+        queryParameters: {'tenant_id': widget.tenantId},
+      );
+      final List rows = res.data is List ? res.data as List : [];
+      final match = rows.cast<Map>().firstWhere(
+        (r) => r['user_id']?.toString() == uid,
+        orElse: () => <String, dynamic>{},
+      );
+      final phone = match['telefono']?.toString() ?? '';
+      if (mounted && phone.isNotEmpty) {
+        setState(() => _phoneCtrl.text = phone);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _send() async {
+    final phone = _phoneCtrl.text.trim();
+    if (phone.isEmpty) {
+      setState(() => _error = 'Ingresa un número de teléfono');
+      return;
+    }
+    setState(() { _sending = true; _error = null; _success = null; });
+    try {
+      final preview = _resolveTemplatePreview(widget.template);
+      await ApiClient.instance.post(
+        '/messages/send',
+        data: {
+          'to':        phone,
+          'message':   preview,
+          'tenant_id': widget.tenantId,
+        },
+        options: Options(
+            validateStatus: (s) => s != null && s >= 200 && s < 300),
+      );
+      if (!mounted) return;
+      setState(() { _sending = false; _success = 'Mensaje enviado correctamente'; });
+    } on DioException catch (e) {
+      if (!mounted) return;
+      final detail = e.response?.data is Map
+          ? e.response!.data['detail']?.toString()
+          : e.response?.data?.toString();
+      setState(() {
+        _sending = false;
+        _error   = detail ?? 'Error al enviar el mensaje';
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() { _sending = false; _error = 'Error: $e'; });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final preview = _resolveTemplatePreview(widget.template);
+    final name    = widget.template['name']?.toString() ?? '';
+
+    return Dialog(
+      backgroundColor: AppColors.ctSurface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: const BorderSide(color: AppColors.ctBorder),
+      ),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 480, maxHeight: 560),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header
+            Container(
+              padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
+              decoration: const BoxDecoration(
+                border:
+                    Border(bottom: BorderSide(color: AppColors.ctBorder)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Enviar prueba',
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.ctText,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Plantilla: $name',
+                    style: const TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 11,
+                      color: AppColors.ctText2,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Body
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _TplField(
+                      label: 'Número de teléfono destino',
+                      child: TextField(
+                        controller: _phoneCtrl,
+                        keyboardType: TextInputType.phone,
+                        style: const TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 13,
+                            color: AppColors.ctText),
+                        decoration: _tplInputDecoration(
+                          '+52 55 1234 5678',
+                          hint: 'Incluye código de país (ej: 521)',
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    const _DetailLabel('Mensaje que se enviará'),
+                    const SizedBox(height: 8),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFDCFCE7),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                            color: const Color(0xFFBBF7D0)),
+                      ),
+                      child: Text(
+                        preview,
+                        style: const TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 13,
+                          color: Color(0xFF065F46),
+                        ),
+                      ),
+                    ),
+                    if (_error != null) ...[
+                      const SizedBox(height: 14),
+                      _FeedbackBanner(message: _error!, isError: true),
+                    ],
+                    if (_success != null) ...[
+                      const SizedBox(height: 14),
+                      _FeedbackBanner(message: _success!, isError: false),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+            // Footer
+            Container(
+              padding: const EdgeInsets.fromLTRB(24, 12, 24, 20),
+              decoration: const BoxDecoration(
+                border: Border(top: BorderSide(color: AppColors.ctBorder)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  _WaOutlineButton(
+                    label: 'Cancelar',
+                    onTap: () => Navigator.pop(context),
+                  ),
+                  const SizedBox(width: 10),
+                  _WaPrimaryButton(
+                    label: 'Enviar prueba',
+                    loading: _sending,
+                    onTap: (_sending || _success != null) ? null : _send,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Widgets auxiliares ────────────────────────────────────────────────────────
+
+class _RowActionIcon extends StatelessWidget {
+  const _RowActionIcon({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+  });
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      icon: Icon(icon, size: 15, color: AppColors.ctText3),
+      tooltip: tooltip,
+      onPressed: onTap,
+      splashRadius: 14,
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+    );
+  }
+}
+
+class _DetailLabel extends StatelessWidget {
+  const _DetailLabel(this.text);
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text,
+      style: const TextStyle(
+        fontFamily: 'Inter',
+        fontSize: 12,
+        fontWeight: FontWeight.w600,
+        color: AppColors.ctText,
+      ),
+    );
+  }
+}
+
+class _DetailChip extends StatelessWidget {
+  const _DetailChip({required this.label});
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: AppColors.ctSurface2,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.ctBorder),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          fontFamily: 'Inter',
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: AppColors.ctText2,
+        ),
       ),
     );
   }

@@ -98,6 +98,10 @@ class _ActivateScreenState extends State<ActivateScreen> {
       setState(() => _submitError = 'Ingresa tu nombre completo');
       return;
     }
+    if (_phoneCtrl.text.trim().isEmpty) {
+      setState(() => _submitError = 'Ingresa tu número de teléfono');
+      return;
+    }
     if (pass.length < 8) {
       setState(() =>
           _submitError = 'La contraseña debe tener al menos 8 caracteres');
@@ -443,7 +447,7 @@ class _ActivateScreenState extends State<ActivateScreen> {
 
         // Teléfono
         _Field(
-          label: 'Teléfono (opcional)',
+          label: 'Teléfono',
           controller: _phoneCtrl,
           placeholder: '+52 55 1234 5678',
         ),
