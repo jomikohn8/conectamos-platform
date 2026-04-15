@@ -898,9 +898,10 @@ class _TemplateBadge extends StatelessWidget {
 // ── Modelo de configuración de variable ───────────────────────────────────────
 
 class _VarConfig {
+  int slot;    // el número {{n}} real del cuerpo
   String type; // 'system' | 'free'
   String key;
-  _VarConfig({required this.type, required this.key});
+  _VarConfig({required this.slot, required this.type, required this.key});
 }
 
 // ── Modal nueva plantilla ─────────────────────────────────────────────────────
@@ -977,47 +978,71 @@ class _NewTemplateDialogState extends State<_NewTemplateDialog> {
         .replaceAll(RegExp(r'^_|_$'), '');
   }
 
-  int _countVars(String body) {
-    final matches = RegExp(r'\{\{(\d+)\}\}').allMatches(body);
-    if (matches.isEmpty) return 0;
-    return matches
-        .map((m) => int.tryParse(m.group(1) ?? '0') ?? 0)
-        .reduce((a, b) => a > b ? a : b);
+  // Devuelve los slots únicos encontrados en el cuerpo, ordenados.
+  List<int> _detectSlots(String body) {
+    return RegExp(r'\{\{(\d+)\}\}')
+        .allMatches(body)
+        .map((m) => int.tryParse(m.group(1)!) ?? 0)
+        .where((n) => n > 0)
+        .toSet()
+        .toList()
+      ..sort();
   }
 
   String _buildPreview() {
     String preview = _bodyCtrl.text;
     for (int i = 0; i < _varConfigs.length; i++) {
       final cfg = _varConfigs[i];
-      String val;
+      final String val;
       if (cfg.type == 'system') {
-        val = _sysVarExample[cfg.key] ?? '{{${i + 1}}}';
+        val = _sysVarExample[cfg.key] ?? '{{${cfg.slot}}}';
       } else {
         final freeKey = _freeKeyCtrls[i].text.trim();
-        val = freeKey.isNotEmpty ? '[$freeKey]' : '{{${i + 1}}}';
+        val = freeKey.isNotEmpty ? '[$freeKey]' : '{{${cfg.slot}}}';
       }
-      preview = preview.replaceAll('{{${i + 1}}}', val);
+      preview = preview.replaceAll('{{${cfg.slot}}}', val);
     }
     return preview;
   }
 
   void _syncVarsFromBody() {
-    final count = _countVars(_bodyCtrl.text);
-    if (count == _varConfigs.length) return;
+    final slots = _detectSlots(_bodyCtrl.text);
+
+    // Compara con el estado actual; si ya coincide, no hace nada.
+    final current = _varConfigs.map((c) => c.slot).toList();
+    if (slots.length == current.length &&
+        List.generate(slots.length, (i) => slots[i] == current[i])
+            .every((ok) => ok)) { return; }
+
     setState(() {
-      while (_varConfigs.length < count) {
-        _varConfigs.add(_VarConfig(
-          type: 'system',
-          key:  _sysVarDesc.keys.first,
-        ));
-        final ctrl = TextEditingController();
-        ctrl.addListener(() => setState(() {}));
-        _freeKeyCtrls.add(ctrl);
+      // Reutiliza configs y controllers para slots que ya existían.
+      final prevConfigs = {for (final c in _varConfigs) c.slot: c};
+      final prevCtrls = {
+        for (int i = 0; i < _varConfigs.length; i++) _varConfigs[i].slot: _freeKeyCtrls[i]
+      };
+
+      // Libera controllers de slots eliminados.
+      for (final slot in prevCtrls.keys) {
+        if (!slots.contains(slot)) prevCtrls[slot]!.dispose();
       }
-      while (_varConfigs.length > count) {
-        _varConfigs.removeLast();
-        _freeKeyCtrls.last.dispose();
-        _freeKeyCtrls.removeLast();
+
+      _varConfigs.clear();
+      _freeKeyCtrls.clear();
+
+      for (final slot in slots) {
+        if (prevConfigs.containsKey(slot)) {
+          _varConfigs.add(prevConfigs[slot]!);
+          _freeKeyCtrls.add(prevCtrls[slot]!);
+        } else {
+          _varConfigs.add(_VarConfig(
+            slot: slot,
+            type: 'system',
+            key:  _sysVarDesc.keys.first,
+          ));
+          final ctrl = TextEditingController();
+          ctrl.addListener(() => setState(() {}));
+          _freeKeyCtrls.add(ctrl);
+        }
       }
     });
   }
@@ -1046,7 +1071,7 @@ class _NewTemplateDialogState extends State<_NewTemplateDialog> {
         'variables':  List.generate(_varConfigs.length, (i) {
           final cfg = _varConfigs[i];
           return {
-            'slot': i + 1,
+            'slot': cfg.slot,
             'type': cfg.type,
             'key':  cfg.type == 'system'
                 ? cfg.key
@@ -1099,7 +1124,7 @@ class _NewTemplateDialogState extends State<_NewTemplateDialog> {
             Row(
               children: [
                 Text(
-                  'Variable {{${i + 1}}}',
+                  'Variable {{${cfg.slot}}}',
                   style: const TextStyle(
                     fontFamily: 'Inter',
                     fontSize: 12,
@@ -1112,6 +1137,7 @@ class _NewTemplateDialogState extends State<_NewTemplateDialog> {
                   isSystem: isSystem,
                   onChanged: (sys) => setState(() {
                     _varConfigs[i] = _VarConfig(
+                      slot: cfg.slot,
                       type: sys ? 'system' : 'free',
                       key:  sys ? _sysVarDesc.keys.first : '',
                     );
