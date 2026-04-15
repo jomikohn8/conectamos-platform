@@ -2504,6 +2504,33 @@ class _SendTestDialogState extends ConsumerState<_SendTestDialog> {
     } catch (_) {}
   }
 
+  static const _sysVarExamples = <String, String>{
+    'nombre_operador':   'José Miguel',
+    'telefono_operador': '5215559537449',
+    'nombre_tenant':     'TMR-Prixz',
+    'fecha_hoy':         '14/04/2026',
+    'hora_actual':       '10:30 AM',
+  };
+
+  List<String> _resolveVariables(Map<String, dynamic> template) {
+    final vars = template['variables'];
+    if (vars is! List || vars.isEmpty) return [];
+    final sorted = vars
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList()
+      ..sort((a, b) =>
+          ((a['slot'] as int?) ?? 0).compareTo((b['slot'] as int?) ?? 0));
+    return sorted.map((v) {
+      final type = v['type'] as String? ?? 'free';
+      final key  = v['key']  as String? ?? '';
+      if (type == 'system') {
+        return _sysVarExamples[key] ?? '[$key]';
+      }
+      return key.isNotEmpty ? '[$key]' : '[variable]';
+    }).toList();
+  }
+
   Future<void> _send() async {
     final phone = _phoneCtrl.text.trim();
     if (phone.isEmpty) {
@@ -2512,13 +2539,14 @@ class _SendTestDialogState extends ConsumerState<_SendTestDialog> {
     }
     setState(() { _sending = true; _error = null; _success = null; });
     try {
-      final preview = _resolveTemplatePreview(widget.template);
       await ApiClient.instance.post(
         '/messages/send',
         data: {
-          'to':        phone,
-          'message':   preview,
-          'tenant_id': widget.tenantId,
+          'to':                 phone,
+          'tenant_id':          widget.tenantId,
+          'template_name':      widget.template['name'],
+          'template_language':  widget.template['language'],
+          'template_variables': _resolveVariables(widget.template),
         },
         options: Options(
             validateStatus: (s) => s != null && s >= 200 && s < 300),
