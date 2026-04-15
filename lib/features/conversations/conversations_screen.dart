@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:typed_data';
 // ignore: avoid_web_libraries_in_flutter, deprecated_member_use
 import 'dart:html' as html;
@@ -1878,29 +1879,70 @@ class _ApiMessageBubble extends StatelessWidget {
         );
 
       case 'location':
-        final coords = body.replaceAll('📍', '').trim();
-        final mapsUrl = 'https://maps.google.com/?q=$coords';
-        return Row(
+        Map<String, dynamic>? locData;
+        try {
+          locData = jsonDecode(body) as Map<String, dynamic>;
+        } catch (_) {}
+        final locName = locData?['name'] as String? ??
+            locData?['address'] as String? ??
+            'Ubicación compartida';
+        final lat = locData?['latitude']?.toString() ?? '';
+        final lng = locData?['longitude']?.toString() ?? '';
+        final mapsUrl = (lat.isNotEmpty && lng.isNotEmpty)
+            ? 'https://maps.google.com/?q=$lat,$lng'
+            : 'https://maps.google.com/';
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.location_on, color: Colors.red, size: 20),
-            const SizedBox(width: 6),
-            Flexible(
-              child: Text(body,
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.location_on,
+                    color: Colors.red, size: 18),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    locName,
+                    style: const TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF111B21)),
+                  ),
+                ),
+              ],
+            ),
+            if (lat.isNotEmpty && lng.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 2, left: 24),
+                child: Text(
+                  '$lat, $lng',
                   style: const TextStyle(
                       fontFamily: 'Inter',
-                      fontSize: 13,
-                      color: Color(0xFF111B21))),
-            ),
-            const SizedBox(width: 6),
+                      fontSize: 11,
+                      color: Color(0xFF667781)),
+                ),
+              ),
+            const SizedBox(height: 6),
             GestureDetector(
               onTap: () => openUrl(mapsUrl),
-              child: const Text('Ver en mapa',
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF53BDEB).withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Text(
+                  'Ver en mapa',
                   style: TextStyle(
                       fontFamily: 'Inter',
                       fontSize: 12,
                       color: Color(0xFF53BDEB),
-                      fontWeight: FontWeight.w600)),
+                      fontWeight: FontWeight.w600),
+                ),
+              ),
             ),
           ],
         );
@@ -2820,6 +2862,8 @@ class _FeedMessages extends StatelessWidget {
                 _timeLabel(msg['received_at'] as String?);
             final waStatus = msg['wa_status'] as String?;
             final body = _msgBody(msg);
+            final messageType =
+                msg['message_type'] as String?;
 
             if (isOutbound) {
               return _FeedOutboundBubble(
@@ -2832,6 +2876,7 @@ class _FeedMessages extends StatelessWidget {
                 selectionMode: selectionMode,
                 onToggleSelect: () => onToggleSelect(msgId),
                 onLongPress: () => onLongPress(msgId),
+                messageType: messageType,
               );
             }
             return _FeedInboundBubble(
@@ -2847,12 +2892,105 @@ class _FeedMessages extends StatelessWidget {
               selectionMode: selectionMode,
               onToggleSelect: () => onToggleSelect(msgId),
               onLongPress: () => onLongPress(msgId),
+              messageType: messageType,
             );
           },
         ),
       ),
     );
   }
+}
+
+// ── Feed: helper de contenido ────────────────────────────────────────────────
+
+Widget _buildFeedBody(String body, String? messageType, String direction) {
+  final isOutbound = direction == 'outbound';
+  final textColor = isOutbound
+      ? const Color(0xFF0F2937)
+      : const Color(0xFF111827);
+
+  if (messageType == 'location') {
+    Map<String, dynamic>? locData;
+    try {
+      locData = jsonDecode(body) as Map<String, dynamic>;
+    } catch (_) {}
+    final locName = locData?['name'] as String? ??
+        locData?['address'] as String? ??
+        'Ubicación compartida';
+    final lat = locData?['latitude']?.toString() ?? '';
+    final lng = locData?['longitude']?.toString() ?? '';
+    final mapsUrl = (lat.isNotEmpty && lng.isNotEmpty)
+        ? 'https://maps.google.com/?q=$lat,$lng'
+        : 'https://maps.google.com/';
+
+    return Column(
+      crossAxisAlignment: isOutbound
+          ? CrossAxisAlignment.end
+          : CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.location_on,
+                color: Colors.red, size: 18),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                locName,
+                style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: textColor),
+              ),
+            ),
+          ],
+        ),
+        if (lat.isNotEmpty && lng.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 2, left: 24),
+            child: Text(
+              '$lat, $lng',
+              style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 11,
+                  color: textColor.withValues(alpha: 0.6)),
+            ),
+          ),
+        const SizedBox(height: 6),
+        GestureDetector(
+          onTap: () => launchUrl(Uri.parse(mapsUrl)),
+          child: Container(
+            padding: const EdgeInsets.symmetric(
+                horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFF53BDEB).withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: const Text(
+              'Ver en mapa',
+              style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 12,
+                  color: Color(0xFF53BDEB),
+                  fontWeight: FontWeight.w600),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  return Text(
+    body,
+    style: TextStyle(
+      fontSize: 13,
+      color: textColor,
+      fontFamily: 'Inter',
+      height: 1.4,
+    ),
+  );
 }
 
 // ── Feed: burbuja inbound ─────────────────────────────────────────────────────
@@ -2871,6 +3009,7 @@ class _FeedInboundBubble extends StatelessWidget {
     required this.selectionMode,
     required this.onToggleSelect,
     required this.onLongPress,
+    this.messageType,
   });
 
   final String body;
@@ -2884,6 +3023,7 @@ class _FeedInboundBubble extends StatelessWidget {
   final bool selectionMode;
   final VoidCallback onToggleSelect;
   final VoidCallback onLongPress;
+  final String? messageType;
 
   @override
   Widget build(BuildContext context) {
@@ -2968,15 +3108,8 @@ class _FeedInboundBubble extends StatelessWidget {
                       crossAxisAlignment:
                           CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          body,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: Color(0xFF111827),
-                            fontFamily: 'Inter',
-                            height: 1.4,
-                          ),
-                        ),
+                        _buildFeedBody(
+                            body, messageType, 'inbound'),
                         const SizedBox(height: 2),
                         Align(
                           alignment: Alignment.centerRight,
@@ -3015,6 +3148,7 @@ class _FeedOutboundBubble extends StatelessWidget {
     required this.selectionMode,
     required this.onToggleSelect,
     required this.onLongPress,
+    this.messageType,
   });
 
   final String body;
@@ -3025,6 +3159,7 @@ class _FeedOutboundBubble extends StatelessWidget {
   final bool selectionMode;
   final VoidCallback onToggleSelect;
   final VoidCallback onLongPress;
+  final String? messageType;
 
   Widget _statusIcon() {
     switch (waStatus) {
@@ -3097,15 +3232,8 @@ class _FeedOutboundBubble extends StatelessWidget {
                       crossAxisAlignment:
                           CrossAxisAlignment.end,
                       children: [
-                        Text(
-                          body,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: Color(0xFF0F2937),
-                            fontFamily: 'Inter',
-                            height: 1.4,
-                          ),
-                        ),
+                        _buildFeedBody(
+                            body, messageType, 'outbound'),
                         const SizedBox(height: 2),
                         Row(
                           mainAxisSize: MainAxisSize.min,
