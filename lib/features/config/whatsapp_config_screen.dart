@@ -436,8 +436,10 @@ class _TemplatesTabState extends ConsumerState<_TemplatesTab> {
 
   @override
   Widget build(BuildContext context) {
-    final tenantId      = ref.watch(activeTenantIdProvider);
+    final tenantId       = ref.watch(activeTenantIdProvider);
     final templatesAsync = ref.watch(_templatesProvider(tenantId));
+    final credsAsync     = ref.watch(_credentialsProvider(tenantId));
+    final activeWabaId   = credsAsync.valueOrNull?['wa_waba_id']?.toString();
 
     return Column(
       children: [
@@ -537,53 +539,62 @@ class _TemplatesTabState extends ConsumerState<_TemplatesTab> {
                 ],
               ),
             ),
-            data: (templates) => templates.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 52,
-                          height: 52,
-                          decoration: BoxDecoration(
-                            color: AppColors.ctSurface2,
-                            borderRadius: BorderRadius.circular(12),
+            data: (templatesRaw) {
+              final haveWaba = templatesRaw.any((t) => t.containsKey('waba_id'));
+              final templates = (haveWaba && activeWabaId != null && activeWabaId.isNotEmpty)
+                  ? templatesRaw.where((t) {
+                      final tWaba = t['waba_id']?.toString();
+                      return tWaba == null || tWaba.isEmpty || tWaba == activeWabaId;
+                    }).toList()
+                  : templatesRaw;
+              return templates.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 52,
+                            height: 52,
+                            decoration: BoxDecoration(
+                              color: AppColors.ctSurface2,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            alignment: Alignment.center,
+                            child: const Icon(Icons.format_list_bulleted_rounded,
+                                size: 24, color: AppColors.ctText3),
                           ),
-                          alignment: Alignment.center,
-                          child: const Icon(Icons.format_list_bulleted_rounded,
-                              size: 24, color: AppColors.ctText3),
-                        ),
-                        const SizedBox(height: 14),
-                        const Text(
-                          'Sin plantillas',
-                          style: TextStyle(
-                            fontFamily: 'Inter',
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.ctText,
+                          const SizedBox(height: 14),
+                          const Text(
+                            'Sin plantillas',
+                            style: TextStyle(
+                              fontFamily: 'Inter',
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.ctText,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 6),
-                        const Text(
-                          'Crea una plantilla o sincroniza con Meta.',
-                          style: TextStyle(
-                            fontFamily: 'Inter',
-                            fontSize: 13,
-                            color: AppColors.ctText2,
+                          const SizedBox(height: 6),
+                          const Text(
+                            'Crea una plantilla o sincroniza con Meta.',
+                            style: TextStyle(
+                              fontFamily: 'Inter',
+                              fontSize: 13,
+                              color: AppColors.ctText2,
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                  )
-                : SingleChildScrollView(
-                    padding: const EdgeInsets.all(22),
-                    child: _TemplatesTable(
-                      templates: templates,
-                      tenantId: tenantId,
-                      onRefresh: () =>
-                          ref.invalidate(_templatesProvider(tenantId)),
-                    ),
-                  ),
+                        ],
+                      ),
+                    )
+                  : SingleChildScrollView(
+                      padding: const EdgeInsets.all(22),
+                      child: _TemplatesTable(
+                        templates: templates,
+                        tenantId: tenantId,
+                        onRefresh: () =>
+                            ref.invalidate(_templatesProvider(tenantId)),
+                      ),
+                    );
+            },
           ),
         ),
       ],
@@ -2012,14 +2023,20 @@ class _WelcomeTabState extends ConsumerState<_WelcomeTab> {
       data: (tenant) {
         if (tenant == null) return const SizedBox.shrink();
 
-        final currentId = tenant['welcome_template_id']?.toString() ?? '';
-        final isActive  = currentId.isNotEmpty;
+        final currentId    = tenant['welcome_template_id']?.toString() ?? '';
+        final isActive     = currentId.isNotEmpty;
+        final activeWabaId = tenant['wa_waba_id']?.toString();
 
         final approved = tplsAsync.maybeWhen(
-          data: (tpls) => tpls
-              .where((t) =>
-                  t['status']?.toString().toUpperCase() == 'APPROVED')
-              .toList(),
+          data: (tpls) {
+            final haveWaba = tpls.any((t) => t.containsKey('waba_id'));
+            return tpls.where((t) {
+              if (t['status']?.toString().toUpperCase() != 'APPROVED') return false;
+              if (!haveWaba || activeWabaId == null || activeWabaId.isEmpty) return true;
+              final tWaba = t['waba_id']?.toString();
+              return tWaba == null || tWaba.isEmpty || tWaba == activeWabaId;
+            }).toList();
+          },
           orElse: () => <Map<String, dynamic>>[],
         );
 
