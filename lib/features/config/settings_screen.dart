@@ -6,20 +6,62 @@ import '../../core/api/api_client.dart';
 import '../../core/providers/tenant_provider.dart';
 import '../../core/theme/app_theme.dart';
 
-// ── Pantalla ──────────────────────────────────────────────────────────────────
+// ── Enum de secciones ─────────────────────────────────────────────────────────
 
-class SettingsScreen extends ConsumerWidget {
+enum _Section { general, address, billing, users, communication }
+
+// ── Pantalla principal ────────────────────────────────────────────────────────
+
+class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return const Column(
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
+  _Section _active = _Section.general;
+
+  static const _items = [
+    (section: _Section.general,       label: 'Información general', icon: Icons.business_outlined),
+    (section: _Section.address,       label: 'Dirección',           icon: Icons.location_on_outlined),
+    (section: _Section.billing,       label: 'Facturación',         icon: Icons.receipt_long_outlined),
+    (section: _Section.users,         label: 'Usuarios',            icon: Icons.group_outlined),
+    (section: _Section.communication, label: 'Comunicación',        icon: Icons.chat_bubble_outline_rounded),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
       children: [
         _ActionBar(),
         Expanded(
-          child: SingleChildScrollView(
-            padding: EdgeInsets.all(22),
-            child: _SettingsBody(),
+          child: Row(
+            children: [
+              // ── Panel izquierdo ──────────────────────────────────────────
+              Container(
+                width: 220,
+                decoration: const BoxDecoration(
+                  color: AppColors.ctSurface,
+                  border: Border(
+                    right: BorderSide(color: Color(0xFFE5E7EB)),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: _items.map((item) => _NavItem(
+                    label: item.label,
+                    icon: item.icon,
+                    active: _active == item.section,
+                    onTap: () => setState(() => _active = item.section),
+                  )).toList(),
+                ),
+              ),
+              // ── Panel derecho ────────────────────────────────────────────
+              Expanded(
+                child: _SectionPanel(active: _active),
+              ),
+            ],
           ),
         ),
       ],
@@ -27,11 +69,120 @@ class SettingsScreen extends ConsumerWidget {
   }
 }
 
+// ── Nav item ──────────────────────────────────────────────────────────────────
+
+class _NavItem extends StatefulWidget {
+  const _NavItem({
+    required this.label,
+    required this.icon,
+    required this.active,
+    required this.onTap,
+  });
+  final String label;
+  final IconData icon;
+  final bool active;
+  final VoidCallback onTap;
+
+  @override
+  State<_NavItem> createState() => _NavItemState();
+}
+
+class _NavItemState extends State<_NavItem> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final Color bg;
+    final Color textColor;
+    final FontWeight weight;
+
+    if (widget.active) {
+      bg        = const Color(0xFFCCFBF1);
+      textColor = AppColors.ctTeal;
+      weight    = FontWeight.w700;
+    } else if (_hovered) {
+      bg        = const Color(0xFFF9FAFB);
+      textColor = AppColors.ctText2;
+      weight    = FontWeight.w500;
+    } else {
+      bg        = Colors.transparent;
+      textColor = AppColors.ctText2;
+      weight    = FontWeight.w500;
+    }
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit:  (_) => setState(() => _hovered = false),
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 100),
+          decoration: BoxDecoration(
+            color: bg,
+            border: Border(
+              left: BorderSide(
+                color: widget.active ? AppColors.ctTeal : Colors.transparent,
+                width: 3,
+              ),
+            ),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Row(
+            children: [
+              Icon(widget.icon, size: 16, color: textColor),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  widget.label,
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 13,
+                    fontWeight: weight,
+                    color: textColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Panel derecho — despacha la sección activa ────────────────────────────────
+
+class _SectionPanel extends StatelessWidget {
+  const _SectionPanel({required this.active});
+  final _Section active;
+
+  @override
+  Widget build(BuildContext context) {
+    final Widget content;
+    switch (active) {
+      case _Section.general:
+        content = const _GeneralInfoCard();
+      case _Section.address:
+        content = const _AddressCard();
+      case _Section.billing:
+        content = const _BillingCard();
+      case _Section.users:
+        content = const _UsersCard();
+      case _Section.communication:
+        content = const _CommunicationSection();
+    }
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(22),
+      child: content,
+    );
+  }
+}
+
 // ── Action bar ────────────────────────────────────────────────────────────────
 
 class _ActionBar extends StatelessWidget {
-  const _ActionBar();
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -70,28 +221,6 @@ class _ActionBar extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-// ── Cuerpo ────────────────────────────────────────────────────────────────────
-
-class _SettingsBody extends StatelessWidget {
-  const _SettingsBody();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _GeneralInfoCard(),
-        SizedBox(height: 20),
-        _AddressCard(),
-        SizedBox(height: 20),
-        _BillingCard(),
-        SizedBox(height: 20),
-        _UsersCard(),
-      ],
     );
   }
 }
@@ -736,13 +865,11 @@ class _UserRowState extends ConsumerState<_UserRow> {
   String get _roleId =>
       widget.user['role_id']?.toString() ?? '';
   String get _role {
-    // Try nested roles object returned by the API join
     final nested = widget.user['roles'];
     if (nested is Map) {
       final name = nested['name']?.toString();
       if (name != null && name.isNotEmpty) return name;
     }
-    // Fall back to roleMap loaded separately
     if (_roleId.isNotEmpty) return widget.roleMap[_roleId] ?? _roleId;
     return widget.user['role']?.toString() ??
            widget.user['role_name']?.toString() ?? '';
@@ -1219,8 +1346,8 @@ class _ChangeRoleDialogState extends ConsumerState<_ChangeRoleDialog> {
       final roles =
           raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
       setState(() {
-        _roles       = roles;
-        _roleId      = roles.isNotEmpty ? roles.first['id']?.toString() : null;
+        _roles        = roles;
+        _roleId       = roles.isNotEmpty ? roles.first['id']?.toString() : null;
         _rolesLoading = false;
       });
     } catch (_) {
@@ -1590,6 +1717,197 @@ class _InviteUserDialogState extends ConsumerState<_InviteUserDialog> {
   }
 }
 
+// ── Sección 5 — Comunicación ──────────────────────────────────────────────────
+
+class _CommunicationSection extends ConsumerStatefulWidget {
+  const _CommunicationSection();
+
+  @override
+  ConsumerState<_CommunicationSection> createState() =>
+      _CommunicationSectionState();
+}
+
+class _CommunicationSectionState
+    extends ConsumerState<_CommunicationSection> {
+  bool _loading = true;
+  bool _showSupervisorName = false;
+  String _currentTenantId = '';
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final tenantId = ref.read(activeTenantIdProvider);
+    if (tenantId.isNotEmpty && tenantId != _currentTenantId) {
+      _currentTenantId = tenantId;
+      _load();
+    }
+  }
+
+  Future<void> _load() async {
+    setState(() => _loading = true);
+    try {
+      final res = await ApiClient.instance.get('/tenants/$_currentTenantId');
+      final d = Map<String, dynamic>.from(res.data as Map);
+      if (!mounted) return;
+      setState(() {
+        _showSupervisorName = d['show_supervisor_name'] == true;
+        _loading = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _toggle(bool value) async {
+    setState(() => _showSupervisorName = value);
+    try {
+      await ApiClient.instance.put(
+        '/tenants/$_currentTenantId',
+        data: {'show_supervisor_name': value},
+      );
+    } catch (_) {
+      // Revert on error
+      if (mounted) setState(() => _showSupervisorName = !value);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.ctSurface,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.ctBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Configuración de mensajes',
+            style: TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: AppColors.ctText,
+            ),
+          ),
+          const SizedBox(height: 20),
+          if (_loading)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 24),
+                child: CircularProgressIndicator(color: AppColors.ctTeal),
+              ),
+            )
+          else ...[
+            // Toggle row
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Mostrar nombre del usuario en mensajes salientes',
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.ctText,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        _showSupervisorName
+                            ? 'El nombre del supervisor aparecerá antes del mensaje'
+                            : 'Los mensajes se envían sin identificar al supervisor',
+                        style: const TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 11,
+                          color: AppColors.ctText2,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Switch(
+                  value: _showSupervisorName,
+                  onChanged: _toggle,
+                  activeThumbColor: AppColors.ctTeal,
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            // Preview bubble
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: AppColors.ctSurface2,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppColors.ctBorder),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Vista previa',
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.ctText2,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: Container(
+                      constraints: const BoxConstraints(maxWidth: 300),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFD9FDD3),
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(12),
+                          topRight: Radius.circular(2),
+                          bottomLeft: Radius.circular(12),
+                          bottomRight: Radius.circular(12),
+                        ),
+                      ),
+                      child: Text(
+                        _showSupervisorName
+                            ? 'Pedro: Buenos días, ¿cómo van con la ruta?'
+                            : 'Buenos días, ¿cómo van con la ruta?',
+                        style: const TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 13,
+                          color: Color(0xFF111827),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  const Text(
+                    'Así verán tus operadores los mensajes enviados desde la plataforma',
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 11,
+                      color: AppColors.ctText2,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
 // ── Shared: SectionCard ───────────────────────────────────────────────────────
 
 class _SectionCard extends StatelessWidget {
@@ -1662,7 +1980,7 @@ class _SectionCard extends StatelessWidget {
   }
 }
 
-// ── Shared: _Row2 (dos columnas iguales) ──────────────────────────────────────
+// ── Shared: _Row2 ─────────────────────────────────────────────────────────────
 
 class _Row2 extends StatelessWidget {
   const _Row2({required this.left, required this.right});
