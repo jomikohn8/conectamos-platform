@@ -1079,9 +1079,6 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
       case 'doc':
         _pickFile(type);
         break;
-      case 'voice':
-        _startVoiceRecording();
-        break;
       case 'location-request':
         _sendLocationRequest();
         break;
@@ -1176,7 +1173,6 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
     _recordingTimer?.cancel();
     _recordingTimer = null;
     final recorder = _mediaRecorder;
-    final duration = _recordingSeconds;
     if (recorder == null) return;
 
     final stopCompleter = Completer<void>();
@@ -1254,7 +1250,7 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
       }
 
       final ext = mimeType.contains('ogg') ? 'ogg' : mimeType.contains('mp4') ? 'mp4' : 'webm';
-      if (mounted) _openPreviewModal(bytes, 'voice_note.$ext', audioDuration: duration);
+      await _sendMedia(bytes, 'voice_note.$ext', null);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -1604,21 +1600,19 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
           ),
 
         // Input
-        if (_isRecording)
-          _RecordingBar(
-            seconds: _recordingSeconds,
-            onStop: _stopVoiceRecording,
-            onCancel: _cancelVoiceRecording,
-          )
-        else
-          _ChatInput(
-            controller: _msgCtrl,
-            onSend: _windowOpen ? _sendMessage : null,
-            onTyping: _windowOpen ? _handleTyping : null,
-            sending: _sending,
-            enabled: _windowOpen,
-            onAttach: _handleAttach,
-          ),
+        _ChatInput(
+          controller: _msgCtrl,
+          onSend: _windowOpen ? _sendMessage : null,
+          onTyping: _windowOpen ? _handleTyping : null,
+          sending: _sending,
+          enabled: _windowOpen,
+          onAttach: _handleAttach,
+          onMic: _windowOpen ? _startVoiceRecording : null,
+          isRecording: _isRecording,
+          recordingSeconds: _recordingSeconds,
+          onStop: _stopVoiceRecording,
+          onCancel: _cancelVoiceRecording,
+        ),
       ],
     );
 
@@ -2110,6 +2104,11 @@ class _ChatInput extends StatefulWidget {
     this.sending = false,
     this.enabled = true,
     this.onAttach,
+    this.onMic,
+    this.isRecording = false,
+    this.recordingSeconds = 0,
+    this.onStop,
+    this.onCancel,
   });
   final TextEditingController controller;
   final Future<void> Function()? onSend;
@@ -2117,18 +2116,45 @@ class _ChatInput extends StatefulWidget {
   final bool sending;
   final bool enabled;
   final void Function(String type)? onAttach;
+  final VoidCallback? onMic;
+  final bool isRecording;
+  final int recordingSeconds;
+  final Future<void> Function()? onStop;
+  final VoidCallback? onCancel;
 
   @override
   State<_ChatInput> createState() => _ChatInputState();
 }
 
-class _ChatInputState extends State<_ChatInput> {
+class _ChatInputState extends State<_ChatInput>
+    with SingleTickerProviderStateMixin {
   bool _hoverSend = false;
+  bool _stoppingRec = false;
   Timer? _typingTimer;
+  late final AnimationController _pulse;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulse = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void didUpdateWidget(_ChatInput old) {
+    super.didUpdateWidget(old);
+    // Reset stopping state when a new recording starts
+    if (widget.isRecording && !old.isRecording) {
+      _stoppingRec = false;
+    }
+  }
 
   @override
   void dispose() {
     _typingTimer?.cancel();
+    _pulse.dispose();
     super.dispose();
   }
 
@@ -2138,7 +2164,14 @@ class _ChatInputState extends State<_ChatInput> {
     _typingTimer = Timer(const Duration(milliseconds: 800), widget.onTyping!);
   }
 
-  PopupMenuItem<String> _buildAttachItem(String value, IconData icon, Color color, String label) {
+  String _formatDuration(int secs) {
+    final m = secs ~/ 60;
+    final s = secs % 60;
+    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+  }
+
+  PopupMenuItem<String> _buildAttachItem(
+      String value, IconData icon, Color color, String label) {
     return PopupMenuItem(
       value: value,
       height: 40,
@@ -2146,7 +2179,11 @@ class _ChatInputState extends State<_ChatInput> {
         children: [
           Icon(icon, size: 18, color: color),
           const SizedBox(width: 10),
-          Text(label, style: const TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppColors.ctNavy)),
+          Text(label,
+              style: const TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 13,
+                  color: AppColors.ctNavy)),
         ],
       ),
     );
@@ -2154,120 +2191,242 @@ class _ChatInputState extends State<_ChatInput> {
 
   @override
   Widget build(BuildContext context) {
-    final canSend = widget.onSend != null && !widget.sending && widget.enabled;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      decoration: const BoxDecoration(
-        color: AppColors.ctSurface,
-        border: Border(top: BorderSide(color: AppColors.ctBorder)),
-      ),
-      child: Row(
-        children: [
-          // Attach button
-          if (widget.onAttach != null) ...[
-            PopupMenuButton<String>(
-              onSelected: widget.onAttach,
-              tooltip: 'Adjuntar',
-              color: AppColors.ctSurface,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              offset: const Offset(0, -220),
-              itemBuilder: (context) => [
-                _buildAttachItem('image', Icons.image_rounded, const Color(0xFF3B82F6), 'Imagen'),
-                _buildAttachItem('voice', Icons.mic_rounded, const Color(0xFFF97316), 'Voice note'),
-                _buildAttachItem('doc', Icons.description_rounded, const Color(0xFFEF4444), 'Documento'),
-                _buildAttachItem('location-request', Icons.location_searching_rounded, AppColors.ctTeal, 'Solicitar ubicación'),
-              ],
+    // ── Recording mode ──────────────────────────────────────────────
+    if (widget.isRecording) {
+      return Container(
+        height: 56,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        decoration: const BoxDecoration(
+          color: AppColors.ctSurface,
+          border: Border(top: BorderSide(color: AppColors.ctBorder)),
+        ),
+        child: Row(
+          children: [
+            IconButton(
+              onPressed: widget.onCancel,
+              icon: const Icon(Icons.close_rounded,
+                  size: 20, color: AppColors.ctText3),
+              tooltip: 'Cancelar',
+            ),
+            const SizedBox(width: 4),
+            FadeTransition(
+              opacity: _pulse,
               child: Container(
-                width: 34,
-                height: 34,
-                alignment: Alignment.center,
-                child: const Icon(Icons.attach_file_rounded, size: 20, color: AppColors.ctText3),
+                width: 10,
+                height: 10,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFEF4444),
+                  shape: BoxShape.circle,
+                ),
               ),
             ),
-            const SizedBox(width: 6),
-          ],
-          Expanded(
-            child: TextField(
-              controller: widget.controller,
-              style: const TextStyle(
-                fontFamily: 'Inter',
-                fontSize: 13,
-                color: AppColors.ctText,
-              ),
-              enabled: widget.enabled,
-              onChanged: widget.enabled ? _onChanged : null,
-              onSubmitted: canSend ? (_) => widget.onSend!() : null,
-              decoration: InputDecoration(
-                hintText: 'Escribe un mensaje…',
-                hintStyle: const TextStyle(
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Grabando… ${_formatDuration(widget.recordingSeconds)}',
+                style: const TextStyle(
                   fontFamily: 'Inter',
                   fontSize: 13,
-                  color: AppColors.ctText3,
-                ),
-                filled: true,
-                fillColor: AppColors.ctSurface2,
-                contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 12, vertical: 9),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(color: AppColors.ctBorder),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(color: AppColors.ctBorder),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(
-                      color: AppColors.ctTeal, width: 1.5),
+                  color: AppColors.ctText,
                 ),
               ),
             ),
+            FilledButton.icon(
+              onPressed: (_stoppingRec || widget.onStop == null)
+                  ? null
+                  : () async {
+                      setState(() => _stoppingRec = true);
+                      await widget.onStop!();
+                      if (mounted) setState(() => _stoppingRec = false);
+                    },
+              style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.ctTeal),
+              icon: const Icon(Icons.stop_rounded,
+                  size: 16, color: AppColors.ctNavy),
+              label: const Text(
+                'Detener',
+                style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 13,
+                    color: AppColors.ctNavy,
+                    fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // ── Normal input mode ───────────────────────────────────────────
+    return ValueListenableBuilder<TextEditingValue>(
+      valueListenable: widget.controller,
+      builder: (context, value, _) {
+        final textEmpty = value.text.isEmpty;
+        final canSend =
+            widget.onSend != null && !widget.sending && widget.enabled;
+        final canMic =
+            widget.onMic != null && widget.enabled && !widget.sending;
+
+        return Container(
+          padding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          decoration: const BoxDecoration(
+            color: AppColors.ctSurface,
+            border:
+                Border(top: BorderSide(color: AppColors.ctBorder)),
           ),
-          const SizedBox(width: 8),
-          MouseRegion(
-            onEnter: (_) => setState(() => _hoverSend = true),
-            onExit: (_) => setState(() => _hoverSend = false),
-            cursor: canSend
-                ? SystemMouseCursors.click
-                : SystemMouseCursors.basic,
-            child: GestureDetector(
-              onTap: canSend ? widget.onSend : null,
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 120),
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: canSend
-                      ? (_hoverSend
-                          ? AppColors.ctTealDark
-                          : AppColors.ctTeal)
-                      : AppColors.ctSurface2,
-                  borderRadius: BorderRadius.circular(8),
+          child: Row(
+            children: [
+              // Attach button (no voice note — moved to mic button)
+              if (widget.onAttach != null) ...[
+                PopupMenuButton<String>(
+                  onSelected: widget.onAttach,
+                  tooltip: 'Adjuntar',
+                  color: AppColors.ctSurface,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                  offset: const Offset(0, -175),
+                  itemBuilder: (context) => [
+                    _buildAttachItem('image', Icons.image_rounded,
+                        const Color(0xFF3B82F6), 'Imagen'),
+                    _buildAttachItem('doc',
+                        Icons.description_rounded,
+                        const Color(0xFFEF4444), 'Documento'),
+                    _buildAttachItem(
+                        'location-request',
+                        Icons.location_searching_rounded,
+                        AppColors.ctTeal,
+                        'Solicitar ubicación'),
+                  ],
+                  child: Container(
+                    width: 34,
+                    height: 34,
+                    alignment: Alignment.center,
+                    child: const Icon(Icons.attach_file_rounded,
+                        size: 20, color: AppColors.ctText3),
+                  ),
                 ),
-                alignment: Alignment.center,
-                child: widget.sending
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: AppColors.ctNavy,
-                        ),
-                      )
-                    : Icon(
-                        Icons.send_rounded,
-                        size: 16,
-                        color: canSend
+                const SizedBox(width: 6),
+              ],
+              // TextField
+              Expanded(
+                child: TextField(
+                  controller: widget.controller,
+                  style: const TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 13,
+                    color: AppColors.ctText,
+                  ),
+                  enabled: widget.enabled,
+                  onChanged: widget.enabled ? _onChanged : null,
+                  onSubmitted:
+                      canSend ? (_) => widget.onSend!() : null,
+                  decoration: InputDecoration(
+                    hintText: 'Escribe un mensaje…',
+                    hintStyle: const TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 13,
+                      color: AppColors.ctText3,
+                    ),
+                    filled: true,
+                    fillColor: AppColors.ctSurface2,
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 9),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide:
+                          const BorderSide(color: AppColors.ctBorder),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide:
+                          const BorderSide(color: AppColors.ctBorder),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(
+                          color: AppColors.ctTeal, width: 1.5),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              // Right button: mic (text empty) or send (text present)
+              if (textEmpty && !widget.sending)
+                MouseRegion(
+                  cursor: canMic
+                      ? SystemMouseCursors.click
+                      : SystemMouseCursors.basic,
+                  child: GestureDetector(
+                    onTap: canMic ? widget.onMic : null,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 120),
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: canMic
+                            ? AppColors.ctTeal
+                            : AppColors.ctSurface2,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      alignment: Alignment.center,
+                      child: Icon(
+                        Icons.mic_rounded,
+                        size: 18,
+                        color: canMic
                             ? AppColors.ctNavy
                             : AppColors.ctText3,
                       ),
-              ),
-            ),
+                    ),
+                  ),
+                )
+              else
+                MouseRegion(
+                  onEnter: (_) =>
+                      setState(() => _hoverSend = true),
+                  onExit: (_) =>
+                      setState(() => _hoverSend = false),
+                  cursor: canSend
+                      ? SystemMouseCursors.click
+                      : SystemMouseCursors.basic,
+                  child: GestureDetector(
+                    onTap: canSend ? widget.onSend : null,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 120),
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: canSend
+                            ? (_hoverSend
+                                ? AppColors.ctTealDark
+                                : AppColors.ctTeal)
+                            : AppColors.ctSurface2,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      alignment: Alignment.center,
+                      child: widget.sending
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: AppColors.ctNavy,
+                              ),
+                            )
+                          : Icon(
+                              Icons.send_rounded,
+                              size: 16,
+                              color: canSend
+                                  ? AppColors.ctNavy
+                                  : AppColors.ctText3,
+                            ),
+                    ),
+                  ),
+                ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -4677,102 +4836,3 @@ class _LocationDialogState extends State<_LocationDialog> {
   }
 }
 
-// ── Recording Bar ─────────────────────────────────────────────────────────────
-
-class _RecordingBar extends StatefulWidget {
-  const _RecordingBar({
-    required this.seconds,
-    required this.onStop,
-    required this.onCancel,
-  });
-  final int seconds;
-  final Future<void> Function() onStop;
-  final VoidCallback onCancel;
-
-  @override
-  State<_RecordingBar> createState() => _RecordingBarState();
-}
-
-class _RecordingBarState extends State<_RecordingBar>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _pulse;
-  bool _stopping = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _pulse = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 800),
-    )..repeat(reverse: true);
-  }
-
-  @override
-  void dispose() {
-    _pulse.dispose();
-    super.dispose();
-  }
-
-  String _formatDuration(int secs) {
-    final m = secs ~/ 60;
-    final s = secs % 60;
-    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 56,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      decoration: const BoxDecoration(
-        color: AppColors.ctSurface,
-        border: Border(top: BorderSide(color: AppColors.ctBorder)),
-      ),
-      child: Row(
-        children: [
-          FadeTransition(
-            opacity: _pulse,
-            child: Container(
-              width: 10,
-              height: 10,
-              decoration: const BoxDecoration(
-                color: Color(0xFFEF4444),
-                shape: BoxShape.circle,
-              ),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Text(
-            'Grabando… ${_formatDuration(widget.seconds)}',
-            style: const TextStyle(
-              fontFamily: 'Inter',
-              fontSize: 13,
-              color: AppColors.ctText,
-            ),
-          ),
-          const Spacer(),
-          TextButton(
-            onPressed: widget.onCancel,
-            child: const Text(
-              'Cancelar',
-              style: TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppColors.ctText3),
-            ),
-          ),
-          const SizedBox(width: 8),
-          FilledButton.icon(
-            onPressed: _stopping ? null : () async {
-              setState(() => _stopping = true);
-              await widget.onStop();
-            },
-            style: FilledButton.styleFrom(backgroundColor: AppColors.ctTeal),
-            icon: const Icon(Icons.stop_rounded, size: 16, color: AppColors.ctNavy),
-            label: const Text(
-              'Detener',
-              style: TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppColors.ctNavy, fontWeight: FontWeight.w600),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
