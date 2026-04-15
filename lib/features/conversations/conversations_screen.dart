@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -11,6 +12,7 @@ import 'dart:ui_web' as ui_web;
 
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/api/api_client.dart';
 import '../../core/api/messages_api.dart';
 import '../../core/api/operators_api.dart';
 import '../../core/api/supabase_messages.dart';
@@ -90,7 +92,10 @@ class _ActionBar extends StatelessWidget {
           const SizedBox(width: 8),
           _PrimaryButton(
             label: '+ Nuevo mensaje',
-            onTap: () {},
+            onTap: () => showDialog(
+              context: context,
+              builder: (_) => const _NewMessageDialog(),
+            ),
           ),
         ],
       ),
@@ -3080,6 +3085,657 @@ class _DateFilterModalState extends State<_DateFilterModal> {
           ),
         ),
       ),
+    );
+  }
+}
+
+// ── Nuevo Mensaje Dialog ───────────────────────────────────────────────────────
+
+class _NewMessageDialog extends ConsumerStatefulWidget {
+  const _NewMessageDialog();
+
+  @override
+  ConsumerState<_NewMessageDialog> createState() => _NewMessageDialogState();
+}
+
+class _NewMessageDialogState extends ConsumerState<_NewMessageDialog> {
+  int _step = 0;
+
+  // Step 1 — recipient selection
+  final _searchCtrl = TextEditingController();
+  List<Map<String, dynamic>> _operators = [];
+  List<Map<String, dynamic>> _iamUsers = [];
+  bool _loadingAll = true;
+  String? _loadError;
+
+  // Step 2 — compose
+  Map<String, dynamic>? _selected; // {name, phone}
+  bool _checkingWindow = false;
+  bool _windowOpen = false;
+  bool _useTemplate = false;
+  final _msgCtrl = TextEditingController();
+  List<Map<String, dynamic>> _templates = [];
+  String? _selectedTemplateId;
+  bool _sending = false;
+  String? _sendError;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAll();
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    _msgCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadAll() async {
+    setState(() { _loadingAll = true; _loadError = null; });
+    try {
+      final tenantId = ref.read(activeTenantIdProvider);
+      final results = await Future.wait([
+        OperatorsApi.listOperators(tenantId: tenantId),
+        ApiClient.instance.get('/iam/users', queryParameters: {'tenant_id': tenantId}),
+        ApiClient.instance.get('/templates', queryParameters: {'tenant_id': tenantId}),
+      ]);
+      final ops = results[0] as List<Map<String, dynamic>>;
+      final iamRaw = results[1] as dynamic;
+      final iamData = iamRaw.data;
+      final List iamList = iamData is List
+          ? iamData
+          : (iamData['users'] ?? iamData['items'] ?? []) as List;
+      final iamUsers = iamList.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+
+      final tplRaw = results[2] as dynamic;
+      final tplData = tplRaw.data;
+      final List tplList = tplData is List
+          ? tplData
+          : (tplData['templates'] ?? tplData['items'] ?? []) as List;
+      final templates = tplList.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+
+      if (mounted) {
+        setState(() {
+          _operators = ops;
+          _iamUsers = iamUsers;
+          _templates = templates;
+          _loadingAll = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() { _loadingAll = false; _loadError = e.toString(); });
+    }
+  }
+
+  Future<void> _selectRecipient(Map<String, dynamic> recipient) async {
+    setState(() { _selected = recipient; _checkingWindow = true; _step = 1; });
+    try {
+      final phone = recipient['phone'] as String? ?? '';
+      final db = Supabase.instance.client;
+      final cutoff = DateTime.now().toUtc().subtract(const Duration(hours: 24)).toIso8601String();
+      final rows = await db
+          .from('wa_messages')
+          .select('received_at')
+          .eq('chat_id', phone)
+          .neq('direction', 'outbound')
+          .gte('received_at', cutoff)
+          .limit(1);
+      if (mounted) {
+        setState(() {
+          _windowOpen = (rows as List).isNotEmpty;
+          _checkingWindow = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() { _windowOpen = false; _checkingWindow = false; });
+    }
+  }
+
+  String _resolvePreview(Map<String, dynamic> tpl) {
+    final body = tpl['body'] as String? ?? tpl['text'] as String? ?? '';
+    final vars = tpl['variables'] as Map? ?? {};
+    var result = body;
+    vars.forEach((k, v) {
+      result = result.replaceAll('{{$k}}', v?.toString() ?? '[$k]');
+    });
+    return result;
+  }
+
+  Map<String, String> _resolveVars(Map<String, dynamic> tpl) {
+    final vars = tpl['variables'] as Map? ?? {};
+    return vars.map((k, v) => MapEntry(k.toString(), v?.toString() ?? ''));
+  }
+
+  Future<void> _send() async {
+    if (_selected == null) return;
+    final phone = _selected!['phone'] as String? ?? '';
+    final name = _selected!['name'] as String? ?? phone;
+    final tenantId = ref.read(activeTenantIdProvider);
+    final userId = Supabase.instance.client.auth.currentUser?.id;
+
+    setState(() { _sending = true; _sendError = null; });
+    try {
+      if (_useTemplate && _selectedTemplateId != null) {
+        final tpl = _templates.firstWhere(
+          (t) => (t['id'] ?? t['template_id'])?.toString() == _selectedTemplateId,
+          orElse: () => {},
+        );
+        await ApiClient.instance.post(
+          '/messages/send',
+          data: {
+            'to': phone,
+            'tenant_id': tenantId,
+            'template_name': tpl['name'] ?? tpl['template_name'] ?? '',
+            'template_language': tpl['language'] ?? tpl['lang'] ?? 'es',
+            'template_variables': _resolveVars(tpl),
+            'sent_by_user_id': ?userId,
+          },
+        );
+      } else {
+        final text = _msgCtrl.text.trim();
+        if (text.isEmpty) {
+          setState(() { _sending = false; _sendError = 'Escribe un mensaje.'; });
+          return;
+        }
+        await MessagesApi.sendWhatsAppMessage(
+          to: phone,
+          text: text,
+          tenantId: tenantId,
+          sentByUserId: userId,
+        );
+      }
+      if (mounted) {
+        Navigator.of(context).pop();
+        ref.read(selectedConvoTabProvider.notifier).state = 0;
+        ref.read(selectedChatIdProvider.notifier).state = phone;
+        ref.read(selectedChatNameProvider.notifier).state = name;
+      }
+    } on DioException catch (e) {
+      if (mounted) setState(() { _sending = false; _sendError = e.response?.data?.toString() ?? e.message ?? 'Error al enviar.'; });
+    } catch (e) {
+      if (mounted) setState(() { _sending = false; _sendError = e.toString(); });
+    }
+  }
+
+  List<Map<String, dynamic>> get _filteredOps {
+    final q = _searchCtrl.text.trim().toLowerCase();
+    if (q.isEmpty) return _operators;
+    return _operators.where((o) {
+      final n = (o['display_name'] ?? o['name'] ?? '').toString().toLowerCase();
+      final p = (o['phone'] ?? '').toString();
+      return n.contains(q) || p.contains(q);
+    }).toList();
+  }
+
+  List<Map<String, dynamic>> get _filteredIam {
+    final q = _searchCtrl.text.trim().toLowerCase();
+    if (q.isEmpty) return _iamUsers;
+    return _iamUsers.where((u) {
+      final n = (u['display_name'] ?? u['name'] ?? u['email'] ?? '').toString().toLowerCase();
+      final p = (u['phone'] ?? '').toString();
+      return n.contains(q) || p.contains(q);
+    }).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: AppColors.ctSurface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 32, vertical: 40),
+      child: SizedBox(
+        width: 480,
+        height: _step == 0 ? 520 : null,
+        child: _step == 0 ? _buildStep1() : _buildStep2(),
+      ),
+    );
+  }
+
+  Widget _buildStep1() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Header
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 12, 0),
+          child: Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Nuevo mensaje',
+                  style: TextStyle(fontFamily: 'Inter', fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.ctNavy),
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.close, size: 18, color: AppColors.ctText3),
+                onPressed: () => Navigator.of(context).pop(),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        // Search
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: TextField(
+            controller: _searchCtrl,
+            onChanged: (_) => setState(() {}),
+            style: const TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppColors.ctNavy),
+            decoration: InputDecoration(
+              hintText: 'Buscar por nombre o teléfono…',
+              hintStyle: const TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppColors.ctText3),
+              prefixIcon: const Icon(Icons.search, size: 16, color: AppColors.ctText3),
+              filled: true,
+              fillColor: AppColors.ctSurface2,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+              contentPadding: const EdgeInsets.symmetric(vertical: 8),
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        // List
+        Expanded(
+          child: _loadingAll
+              ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
+              : _loadError != null
+                  ? Center(child: Text(_loadError!, style: const TextStyle(fontFamily: 'Inter', fontSize: 12, color: Colors.red)))
+                  : ListView(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      children: [
+                        if (_filteredOps.isNotEmpty) ...[
+                          _NmSectionHeader(label: 'Operadores (${_filteredOps.length})'),
+                          ..._filteredOps.map((op) => _NmRecipientItem(
+                            name: op['display_name'] ?? op['name'] ?? '—',
+                            phone: op['phone'] ?? '',
+                            onTap: () => _selectRecipient({
+                              'name': op['display_name'] ?? op['name'] ?? '',
+                              'phone': op['phone'] ?? '',
+                            }),
+                          )),
+                        ],
+                        if (_filteredIam.isNotEmpty) ...[
+                          _NmSectionHeader(label: 'Usuarios de la plataforma (${_filteredIam.length})'),
+                          ..._filteredIam.map((u) => _NmRecipientItem(
+                            name: u['display_name'] ?? u['name'] ?? u['email'] ?? '—',
+                            phone: u['phone'] ?? '',
+                            onTap: () => _selectRecipient({
+                              'name': u['display_name'] ?? u['name'] ?? u['email'] ?? '',
+                              'phone': u['phone'] ?? '',
+                            }),
+                          )),
+                        ],
+                        if (_filteredOps.isEmpty && _filteredIam.isEmpty)
+                          const Padding(
+                            padding: EdgeInsets.all(24),
+                            child: Center(child: Text('Sin resultados', style: TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppColors.ctText3))),
+                          ),
+                      ],
+                    ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStep2() {
+    final name = _selected?['name'] as String? ?? '';
+    final phone = _selected?['phone'] as String? ?? '';
+    final tpl = _selectedTemplateId == null
+        ? null
+        : _templates.firstWhere(
+            (t) => (t['id'] ?? t['template_id'])?.toString() == _selectedTemplateId,
+            orElse: () => {},
+          );
+
+    return Padding(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.arrow_back, size: 18, color: AppColors.ctText3),
+                onPressed: () => setState(() { _step = 0; _selected = null; }),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'Nuevo mensaje',
+                  style: TextStyle(fontFamily: 'Inter', fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.ctNavy),
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.close, size: 18, color: AppColors.ctText3),
+                onPressed: () => Navigator.of(context).pop(),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          // Recipient card
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: AppColors.ctSurface2,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 16,
+                  backgroundColor: AppColors.ctTeal.withValues(alpha: 0.15),
+                  child: Text(
+                    name.isNotEmpty ? name[0].toUpperCase() : '?',
+                    style: const TextStyle(fontFamily: 'Inter', fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.ctTeal),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(name, style: const TextStyle(fontFamily: 'Inter', fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.ctNavy)),
+                    if (phone.isNotEmpty)
+                      Text(phone, style: const TextStyle(fontFamily: 'Inter', fontSize: 11, color: AppColors.ctText3)),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          // Window status
+          if (_checkingWindow)
+            const Padding(
+              padding: EdgeInsets.only(bottom: 8),
+              child: Row(children: [
+                SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)),
+                SizedBox(width: 8),
+                Text('Verificando ventana de 24h…', style: TextStyle(fontFamily: 'Inter', fontSize: 11, color: AppColors.ctText3)),
+              ]),
+            )
+          else
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: _windowOpen ? const Color(0xFFD1FAE5) : const Color(0xFFFEF3C7),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      _windowOpen ? Icons.check_circle_outline : Icons.warning_amber_rounded,
+                      size: 13,
+                      color: _windowOpen ? const Color(0xFF065F46) : const Color(0xFF92400E),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      _windowOpen
+                          ? 'Ventana de 24h abierta — puedes enviar texto libre.'
+                          : 'Ventana cerrada — solo puedes enviar plantillas aprobadas.',
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 11,
+                        color: _windowOpen ? const Color(0xFF065F46) : const Color(0xFF92400E),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          // Mode toggle (only if window open)
+          if (!_checkingWindow && _windowOpen) ...[
+            Row(
+              children: [
+                _NmToggleBtn(
+                  label: 'Texto libre',
+                  active: !_useTemplate,
+                  onTap: () => setState(() => _useTemplate = false),
+                ),
+                const SizedBox(width: 8),
+                _NmToggleBtn(
+                  label: 'Plantilla',
+                  active: _useTemplate,
+                  onTap: () => setState(() => _useTemplate = true),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+          ],
+          // Input area
+          if (!_checkingWindow) ...[
+            if (!_useTemplate || !_windowOpen) ...[
+              // Template selector (required when window closed, or optional when toggled)
+              if (_useTemplate || !_windowOpen)
+                _NmTemplateDropdown(
+                  templates: _templates,
+                  selectedId: _selectedTemplateId,
+                  onChanged: (id) => setState(() => _selectedTemplateId = id),
+                )
+              else
+                TextField(
+                  controller: _msgCtrl,
+                  maxLines: 4,
+                  style: const TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppColors.ctNavy),
+                  decoration: InputDecoration(
+                    hintText: 'Escribe tu mensaje…',
+                    hintStyle: const TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppColors.ctText3),
+                    filled: true,
+                    fillColor: AppColors.ctSurface2,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                    contentPadding: const EdgeInsets.all(12),
+                  ),
+                ),
+            ] else ...[
+              // Free text field
+              TextField(
+                controller: _msgCtrl,
+                maxLines: 4,
+                style: const TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppColors.ctNavy),
+                decoration: InputDecoration(
+                  hintText: 'Escribe tu mensaje…',
+                  hintStyle: const TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppColors.ctText3),
+                  filled: true,
+                  fillColor: AppColors.ctSurface2,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                  contentPadding: const EdgeInsets.all(12),
+                ),
+              ),
+            ],
+            // Template preview
+            if (_useTemplate && tpl != null && (tpl['body'] ?? tpl['text']) != null) ...[
+              const SizedBox(height: 8),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFECFDF5),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppColors.ctTeal.withValues(alpha: 0.3)),
+                ),
+                child: Text(
+                  _resolvePreview(tpl),
+                  style: const TextStyle(fontFamily: 'Inter', fontSize: 12, color: AppColors.ctNavy),
+                ),
+              ),
+            ],
+          ],
+          // Error
+          if (_sendError != null) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(color: const Color(0xFFFEE2E2), borderRadius: BorderRadius.circular(6)),
+              child: Text(_sendError!, style: const TextStyle(fontFamily: 'Inter', fontSize: 11, color: Color(0xFF991B1B))),
+            ),
+          ],
+          const SizedBox(height: 16),
+          // Actions
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              TextButton(
+                onPressed: _sending ? null : () => Navigator.of(context).pop(),
+                child: const Text('Cancelar', style: TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppColors.ctText3)),
+              ),
+              const SizedBox(width: 8),
+              FilledButton(
+                onPressed: _sending || _checkingWindow ? null : _send,
+                style: FilledButton.styleFrom(backgroundColor: AppColors.ctTeal),
+                child: _sending
+                    ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Text('Enviar', style: TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppColors.ctNavy, fontWeight: FontWeight.w600)),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Helpers internos del diálogo ─────────────────────────────────────────────
+
+class _NmSectionHeader extends StatelessWidget {
+  const _NmSectionHeader({required this.label});
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
+      child: Text(
+        label,
+        style: const TextStyle(fontFamily: 'Inter', fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.ctText3, letterSpacing: 0.3),
+      ),
+    );
+  }
+}
+
+class _NmRecipientItem extends StatefulWidget {
+  const _NmRecipientItem({required this.name, required this.phone, required this.onTap});
+  final String name;
+  final String phone;
+  final VoidCallback onTap;
+
+  @override
+  State<_NmRecipientItem> createState() => _NmRecipientItemState();
+}
+
+class _NmRecipientItemState extends State<_NmRecipientItem> {
+  bool _hover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: Container(
+          color: _hover ? AppColors.ctSurface2 : Colors.transparent,
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 14,
+                backgroundColor: AppColors.ctTeal.withValues(alpha: 0.12),
+                child: Text(
+                  widget.name.isNotEmpty ? widget.name[0].toUpperCase() : '?',
+                  style: const TextStyle(fontFamily: 'Inter', fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.ctTeal),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(widget.name, style: const TextStyle(fontFamily: 'Inter', fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.ctNavy)),
+                  if (widget.phone.isNotEmpty)
+                    Text(widget.phone, style: const TextStyle(fontFamily: 'Inter', fontSize: 11, color: AppColors.ctText3)),
+                ],
+              ),
+              const Spacer(),
+              const Icon(Icons.chevron_right, size: 16, color: AppColors.ctText3),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NmToggleBtn extends StatelessWidget {
+  const _NmToggleBtn({required this.label, required this.active, required this.onTap});
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: active ? AppColors.ctTeal : AppColors.ctSurface2,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+            color: active ? AppColors.ctNavy : AppColors.ctText3,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NmTemplateDropdown extends StatelessWidget {
+  const _NmTemplateDropdown({required this.templates, required this.selectedId, required this.onChanged});
+  final List<Map<String, dynamic>> templates;
+  final String? selectedId;
+  final ValueChanged<String?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    if (templates.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(color: AppColors.ctSurface2, borderRadius: BorderRadius.circular(8)),
+        child: const Text('No hay plantillas disponibles.', style: TextStyle(fontFamily: 'Inter', fontSize: 12, color: AppColors.ctText3)),
+      );
+    }
+    return DropdownButtonFormField<String>(
+      initialValue: selectedId,
+      hint: const Text('Seleccionar plantilla…', style: TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppColors.ctText3)),
+      decoration: InputDecoration(
+        filled: true,
+        fillColor: AppColors.ctSurface2,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      ),
+      items: templates.map((t) {
+        final id = (t['id'] ?? t['template_id'])?.toString() ?? '';
+        final name = (t['name'] ?? t['template_name'] ?? id).toString();
+        return DropdownMenuItem(value: id, child: Text(name, style: const TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppColors.ctNavy)));
+      }).toList(),
+      onChanged: onChanged,
+      dropdownColor: AppColors.ctSurface,
+      style: const TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppColors.ctNavy),
     );
   }
 }
