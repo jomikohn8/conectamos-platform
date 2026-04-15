@@ -50,20 +50,24 @@ class MessagesApi {
     return Map<String, dynamic>.from(response.data);
   }
 
-  static Future<void> markRead(String waMessageId) async {
+  static Future<void> markRead(String waMessageId, {String? tenantId}) async {
+    if (waMessageId.isEmpty || waMessageId == 'null') return;
+    if (tenantId == null || tenantId.isEmpty) return;
     try {
       await ApiClient.instance.post(
         '/messages/read',
-        data: {'message_id': waMessageId},
+        data: {'message_id': waMessageId, 'tenant_id': tenantId},
       );
     } catch (_) {}
   }
 
-  static Future<void> sendTyping(String waMessageId) async {
+  static Future<void> sendTyping(String waMessageId, {String? tenantId}) async {
+    if (waMessageId.isEmpty || waMessageId == 'null') return;
+    if (tenantId == null || tenantId.isEmpty) return;
     try {
       await ApiClient.instance.post(
         '/messages/typing',
-        data: {'message_id': waMessageId},
+        data: {'message_id': waMessageId, 'tenant_id': tenantId},
       );
     } catch (_) {}
   }
@@ -76,6 +80,7 @@ class MessagesApi {
     required String tenantId,
     String? sentByUserId,
   }) async {
+    if (to.isEmpty || tenantId.isEmpty) return;
     await ApiClient.instance.post(
       '/messages/send',
       data: {

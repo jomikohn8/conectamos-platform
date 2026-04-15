@@ -812,6 +812,9 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
   bool _isDragOver = false;
   StreamSubscription? _pasteSub;
 
+  // Track current subscribed chatId to avoid re-subscribing on web tab focus
+  String? _subscribedChatId;
+
   @override
   void initState() {
     super.initState();
@@ -832,7 +835,11 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       final chatId = ref.read(selectedChatIdProvider);
-      if (chatId != null) _subscribeToMessages(chatId);
+      // Only re-subscribe if chatId changed — on web, 'resumed' fires on every
+      // tab focus/blur which would spam read receipts if we always re-subscribe.
+      if (chatId != null && chatId != _subscribedChatId) {
+        _subscribeToMessages(chatId);
+      }
     }
   }
 
@@ -877,17 +884,21 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
   }
 
   void _sendReadReceipts(List<Map<String, dynamic>> messages) {
+    final tenantId = ref.read(activeTenantIdProvider);
+    if (tenantId.isEmpty) return;
     for (final msg in messages) {
       if ((msg['direction'] as String?) == 'outbound') continue;
       final waId = msg['wa_message_id'] as String?;
       if (waId == null || waId.isEmpty || waId == 'null') continue;
       if (_processedReadIds.contains(waId)) continue;
       _processedReadIds.add(waId);
-      MessagesApi.markRead(waId); // fire-and-forget
+      MessagesApi.markRead(waId, tenantId: tenantId); // fire-and-forget
     }
   }
 
   void _handleTyping() {
+    final tenantId = ref.read(activeTenantIdProvider);
+    if (tenantId.isEmpty) return;
     final lastInbound = _apiMessages
         .lastWhere(
           (m) => (m['direction'] as String?) != 'outbound' &&
@@ -896,8 +907,8 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
           orElse: () => {},
         );
     final waId = lastInbound['wa_message_id'] as String?;
-    if (waId == null || waId.isEmpty) return;
-    MessagesApi.sendTyping(waId); // fire-and-forget
+    if (waId == null || waId.isEmpty || waId == 'null') return;
+    MessagesApi.sendTyping(waId, tenantId: tenantId); // fire-and-forget
   }
 
   // ── Multimedia ──────────────────────────────────────────────────────────────
@@ -1111,6 +1122,7 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
 
   void _subscribeToMessages(String chatId) {
     _subscription?.cancel();
+    _subscribedChatId = chatId;
     _processedReadIds.clear();
     setState(() {
       _msgLoading = true;
@@ -1168,6 +1180,7 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
     if (chatId.isEmpty) return;
 
     final tenantId = ref.read(activeTenantIdProvider);
+    if (tenantId.isEmpty) return;
 
     _msgCtrl.clear();
     setState(() => _sending = true);
