@@ -1120,17 +1120,17 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
   /// types, so we probe by construction and discard the test instance.
   String _pickRecorderMimeType(html.MediaStream stream) {
     for (final mime in const [
-      'audio/webm;codecs=opus',
-      'audio/webm',
-      'audio/ogg;codecs=opus',
-      'audio/ogg',
+      'audio/ogg;codecs=opus',       // Firefox — Meta acepta
+      'audio/mp4;codecs=mp4a.40.2',  // Chrome AAC — Meta acepta
+      'audio/mp4',                    // mp4 genérico
+      'audio/webm;codecs=opus',       // último recurso — Meta no acepta webm
     ]) {
       try {
         html.MediaRecorder(stream, {'mimeType': mime}); // throws if unsupported
         return mime;
       } catch (_) {}
     }
-    return 'audio/webm'; // safe fallback
+    return 'audio/mp4'; // fallback: mp4 sobre webm
   }
 
   Future<void> _startVoiceRecording() async {
@@ -1253,7 +1253,7 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
         return;
       }
 
-      final ext = mimeType.contains('ogg') ? 'ogg' : 'webm';
+      final ext = mimeType.contains('ogg') ? 'ogg' : mimeType.contains('mp4') ? 'mp4' : 'webm';
       if (mounted) _openPreviewModal(bytes, 'voice_note.$ext', audioDuration: duration);
     } catch (e) {
       if (mounted) {
