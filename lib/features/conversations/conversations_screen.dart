@@ -1026,7 +1026,7 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
     final tenantId = ref.read(activeTenantIdProvider);
     final userId = Supabase.instance.client.auth.currentUser?.id;
 
-    setState(() { _sending = true; _isDragOver = false; });
+    if (mounted) setState(() { _sending = true; _isDragOver = false; });
     try {
       await MessagesApi.sendMedia(
         to: chatId,
@@ -1037,15 +1037,40 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
         sentByUserId: userId,
       );
       if (mounted) setState(() { _sending = false; _isDragOver = false; });
+    } on DioException catch (e) {
+      if (!mounted) return;
+      setState(() { _sending = false; _isDragOver = false; });
+      final String errorMsg = _dioErrorMessage(e);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(errorMsg),
+        backgroundColor: const Color(0xFFEF4444),
+      ));
     } catch (e) {
-      if (mounted) {
-        setState(() { _sending = false; _isDragOver = false; });
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Error al enviar archivo: $e'),
-          backgroundColor: const Color(0xFFEF4444),
-        ));
-      }
+      if (!mounted) return;
+      setState(() { _sending = false; _isDragOver = false; });
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Error al enviar archivo: $e'),
+        backgroundColor: const Color(0xFFEF4444),
+      ));
     }
+  }
+
+  /// Extrae un mensaje legible de un [DioException] sin usar ! en datos opcionales.
+  String _dioErrorMessage(DioException e) {
+    final response = e.response;
+    if (response == null) {
+      // Timeout, sin conexión, etc.
+      return 'Error de conexión al enviar archivo';
+    }
+    final data = response.data;
+    if (data is Map) {
+      final detail = data['detail'];
+      if (detail != null) return 'Error: $detail';
+    }
+    final status = response.statusCode;
+    if (status == 415) return 'Formato de archivo no soportado por WhatsApp';
+    if (status != null) return 'Error $status al enviar archivo';
+    return 'Error desconocido al enviar archivo';
   }
 
   void _handleAttach(String type) {
