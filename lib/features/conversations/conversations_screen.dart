@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'dart:async';
@@ -84,7 +85,7 @@ class _ActionBar extends StatelessWidget {
           ),
           _ActionBarGhostButton(
             label: '📢  Broadcast a todos',
-            onTap: () {},
+            onTap: () => context.go('/broadcast'),
           ),
           const SizedBox(width: 8),
           _PrimaryButton(
@@ -951,7 +952,11 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
 
     try {
       await MessagesApi.sendWhatsAppMessage(
-          to: chatId, text: text, tenantId: tenantId);
+          to: chatId,
+          text: text,
+          tenantId: tenantId,
+          sentByUserId:
+              Supabase.instance.client.auth.currentUser?.id);
       if (mounted) setState(() => _sending = false);
     } catch (e) {
       if (mounted) {

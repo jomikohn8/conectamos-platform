@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../config.dart';
 import '../../features/auth/activate_screen.dart';
 import '../../features/auth/login_screen.dart';
+import '../../features/broadcasts/broadcast_screen.dart';
 import '../../features/config/connections_screen.dart';
 import '../../features/config/operators_screen.dart';
 import '../../features/config/settings_screen.dart';
@@ -72,6 +73,12 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: '/conversations',
             pageBuilder: (context, state) => const NoTransitionPage(
               child: ConversationsScreen(),
+            ),
+          ),
+          GoRoute(
+            path: '/broadcast',
+            pageBuilder: (context, state) => const NoTransitionPage(
+              child: BroadcastScreen(),
             ),
           ),
           GoRoute(
