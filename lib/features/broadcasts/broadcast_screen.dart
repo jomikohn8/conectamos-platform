@@ -8,6 +8,10 @@ import '../../core/api/api_client.dart';
 import '../../core/providers/tenant_provider.dart';
 import '../../core/theme/app_theme.dart';
 
+// ── Enums ─────────────────────────────────────────────────────────────────────
+
+enum _BroadcastResultType { success, warning, error }
+
 // ── Providers ─────────────────────────────────────────────────────────────────
 
 final _bcastOperatorsProvider =
@@ -39,6 +43,20 @@ final _bcastTemplatesProvider =
         .where((t) =>
             (t['status']?.toString().toUpperCase() ?? '') == 'APPROVED')
         .toList();
+  },
+);
+
+/// Devuelve el wa_waba_id configurado para el tenant activo.
+final _bcastTenantCredsProvider =
+    FutureProvider.autoDispose.family<String?, String>(
+  (ref, tenantId) async {
+    if (tenantId.isEmpty) return null;
+    try {
+      final res = await ApiClient.instance.get('/tenants/$tenantId');
+      return (res.data as Map?)?['wa_waba_id']?.toString();
+    } catch (_) {
+      return null;
+    }
   },
 );
 
@@ -134,6 +152,8 @@ class _BroadcastScreenState extends ConsumerState<BroadcastScreen> {
   bool _sending = false;
   bool _confirming = false;
   String? _result;
+  _BroadcastResultType _resultType = _BroadcastResultType.success;
+  List<Map<String, dynamic>> _resultErrors = [];
 
   // Historial
   bool _showHistory = false;
@@ -205,19 +225,41 @@ class _BroadcastScreenState extends ConsumerState<BroadcastScreen> {
             validateStatus: (s) => s != null && s >= 200 && s < 300),
       );
 
-      final d          = res.data is Map ? res.data as Map : {};
-      final sentCount  = d['sent_count']      ?? d['sent']       ?? 0;
-      final failedCount = d['failed_count']   ?? d['failed']     ?? 0;
-      final total      = d['recipient_count'] ?? d['total']      ?? filtered.length;
+      final d           = res.data is Map ? res.data as Map : {};
+      final sentCount   = (d['sent_count']      ?? d['sent']   ?? 0) as num;
+      final failedCount = (d['failed_count']    ?? d['failed'] ?? 0) as num;
+      final total       = (d['recipient_count'] ?? d['total']  ?? filtered.length) as num;
+
+      // Bug 3: extract per-recipient errors if present
+      final errorsRaw = d['errors'];
+      final errors = errorsRaw is List
+          ? errorsRaw
+              .whereType<Map>()
+              .map((e) => Map<String, dynamic>.from(e))
+              .toList()
+          : <Map<String, dynamic>>[];
+
+      // Bug 1: determine result type and message
+      final _BroadcastResultType type;
+      final String resultMsg;
+      if (sentCount == 0 && failedCount > 0) {
+        type = _BroadcastResultType.error;
+        resultMsg = '❌ Envío fallido: $failedCount de $total destinatarios fallaron.';
+      } else if (sentCount > 0 && failedCount > 0) {
+        type = _BroadcastResultType.warning;
+        resultMsg = '⚠️ Enviado parcialmente: $sentCount enviados, $failedCount fallaron.';
+      } else {
+        type = _BroadcastResultType.success;
+        resultMsg = '✅ Enviado a $sentCount operadores.';
+      }
 
       if (!mounted) return;
-      final resultMsg = failedCount > 0
-          ? 'Enviado a $sentCount de $total operadores. $failedCount fallaron.'
-          : 'Enviado a $sentCount de $total operadores.';
       setState(() {
-        _sending    = false;
-        _confirming = false;
-        _result     = resultMsg;
+        _sending      = false;
+        _confirming   = false;
+        _result       = resultMsg;
+        _resultType   = type;
+        _resultErrors = errors;
       });
       ref.invalidate(_bcastHistoryProvider(tenantId));
     } on DioException catch (e) {
@@ -226,13 +268,21 @@ class _BroadcastScreenState extends ConsumerState<BroadcastScreen> {
           ? e.response!.data['detail']?.toString()
           : e.response?.data?.toString();
       setState(() {
-        _sending    = false;
-        _confirming = false;
-        _result     = _parseErrorMessage(raw ?? e.message ?? '');
+        _sending      = false;
+        _confirming   = false;
+        _result       = _parseErrorMessage(raw ?? e.message ?? '');
+        _resultType   = _BroadcastResultType.error;
+        _resultErrors = [];
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() { _sending = false; _confirming = false; _result = _parseErrorMessage(e.toString()); });
+      setState(() {
+        _sending      = false;
+        _confirming   = false;
+        _result       = _parseErrorMessage(e.toString());
+        _resultType   = _BroadcastResultType.error;
+        _resultErrors = [];
+      });
     }
   }
 
@@ -253,12 +303,22 @@ class _BroadcastScreenState extends ConsumerState<BroadcastScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final tenantId      = ref.watch(activeTenantIdProvider);
+    final tenantId       = ref.watch(activeTenantIdProvider);
     final operatorsAsync = ref.watch(_bcastOperatorsProvider(tenantId));
     final templatesAsync = ref.watch(_bcastTemplatesProvider(tenantId));
+    final credsAsync     = ref.watch(_bcastTenantCredsProvider(tenantId));
 
-    final operators = operatorsAsync.valueOrNull ?? [];
-    final templates = templatesAsync.valueOrNull ?? [];
+    final operators   = operatorsAsync.valueOrNull ?? [];
+    final templatesRaw = templatesAsync.valueOrNull ?? [];
+    final activeWabaId = credsAsync.valueOrNull; // null = still loading
+
+    // Bug 2: filter templates by waba_id if templates carry that field
+    final templatesHaveWabaId = templatesRaw.any((t) => t.containsKey('waba_id'));
+    final templates = (templatesHaveWabaId && activeWabaId != null && activeWabaId.isNotEmpty)
+        ? templatesRaw.where((t) => t['waba_id']?.toString() == activeWabaId).toList()
+        : templatesRaw;
+    final showWabaWarning = templatesRaw.isNotEmpty && !templatesHaveWabaId;
+
     final filtered  = _filterOperators(operators);
 
     // Unique flows across all operators
@@ -307,6 +367,9 @@ class _BroadcastScreenState extends ConsumerState<BroadcastScreen> {
                 sending: _sending,
                 confirming: _confirming,
                 result: _result,
+                resultType: _resultType,
+                resultErrors: _resultErrors,
+                showWabaWarning: showWabaWarning,
                 onToggleMode: (v) => setState(() {
                   _useTemplate = v;
                   _selectedTemplateId = null;
@@ -509,6 +572,9 @@ class _FormColumn extends StatelessWidget {
     required this.sending,
     required this.confirming,
     required this.result,
+    required this.resultType,
+    required this.resultErrors,
+    required this.showWabaWarning,
     required this.onToggleMode,
     required this.onSelectTemplate,
     required this.onToggleStatus,
@@ -531,6 +597,9 @@ class _FormColumn extends StatelessWidget {
   final bool sending;
   final bool confirming;
   final String? result;
+  final _BroadcastResultType resultType;
+  final List<Map<String, dynamic>> resultErrors;
+  final bool showWabaWarning;
   final ValueChanged<bool> onToggleMode;
   final ValueChanged<String?> onSelectTemplate;
   final ValueChanged<String> onToggleStatus;
@@ -570,6 +639,13 @@ class _FormColumn extends StatelessWidget {
                   ),
                 ],
               ] else ...[
+                // Bug 2: advertencia si las plantillas no tienen waba_id aún
+                if (showWabaWarning) ...[
+                  _WarningBanner(
+                    message: '⚠️ Verifica que tus credenciales de Meta estén actualizadas antes de enviar.',
+                  ),
+                  const SizedBox(height: 10),
+                ],
                 // Selector de plantilla
                 if (templates.isEmpty)
                   const Text(
@@ -707,7 +783,11 @@ class _FormColumn extends StatelessWidget {
         ],
 
         if (result != null)
-          _ResultBanner(message: result!),
+          _ResultBanner(
+            message: result!,
+            type: resultType,
+            errors: resultErrors,
+          ),
       ],
     );
   }
@@ -1645,46 +1725,108 @@ class _WarningBanner extends StatelessWidget {
 }
 
 class _ResultBanner extends StatelessWidget {
-  const _ResultBanner({required this.message});
+  const _ResultBanner({
+    required this.message,
+    required this.type,
+    this.errors = const [],
+  });
   final String message;
-
-  bool get _isError => message.startsWith('Error');
+  final _BroadcastResultType type;
+  final List<Map<String, dynamic>> errors;
 
   @override
   Widget build(BuildContext context) {
-    final isError = _isError;
+    final Color bgColor;
+    final Color borderColor;
+    final Color textColor;
+    final IconData iconData;
+
+    switch (type) {
+      case _BroadcastResultType.error:
+        bgColor     = AppColors.ctRedBg;
+        borderColor = const Color(0xFFFECACA);
+        textColor   = AppColors.ctRedText;
+        iconData    = Icons.error_outline_rounded;
+      case _BroadcastResultType.warning:
+        bgColor     = AppColors.ctWarnBg;
+        borderColor = AppColors.ctWarn;
+        textColor   = AppColors.ctWarnText;
+        iconData    = Icons.warning_amber_rounded;
+      case _BroadcastResultType.success:
+        bgColor     = AppColors.ctOkBg;
+        borderColor = AppColors.ctOk;
+        textColor   = AppColors.ctOkText;
+        iconData    = Icons.check_circle_outline_rounded;
+    }
+
+    final bannerRow = Row(
+      children: [
+        Icon(iconData, size: 15, color: textColor),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            message,
+            style: TextStyle(fontFamily: 'Inter', fontSize: 13, color: textColor),
+          ),
+        ),
+      ],
+    );
+
+    if (errors.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: borderColor),
+        ),
+        child: bannerRow,
+      );
+    }
+
+    // Bug 3: show expandable error list
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: isError ? AppColors.ctRedBg : AppColors.ctOkBg,
+        color: bgColor,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-            color: isError
-                ? const Color(0xFFFECACA)
-                : AppColors.ctOk),
+        border: Border.all(color: borderColor),
       ),
-      child: Row(
-        children: [
-          Icon(
-            isError
-                ? Icons.error_outline_rounded
-                : Icons.check_circle_outline_rounded,
-            size: 15,
-            color: isError ? AppColors.ctRedText : AppColors.ctOkText,
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
+          childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+          title: bannerRow,
+          iconColor: textColor,
+          collapsedIconColor: textColor,
+          initiallyExpanded: false,
+          subtitle: Text(
+            'Ver detalle de errores (${errors.length})',
+            style: TextStyle(fontFamily: 'Inter', fontSize: 11, color: textColor.withValues(alpha: 0.8)),
           ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              message,
-              style: TextStyle(
-                fontFamily: 'Inter',
-                fontSize: 13,
-                color: isError ? AppColors.ctRedText : AppColors.ctOkText,
+          children: errors.map((e) {
+            final phone   = e['phone']?.toString() ?? e['to']?.toString() ?? '—';
+            final errMsg  = e['error']?.toString() ?? e['message']?.toString() ?? e['detail']?.toString() ?? 'Error desconocido';
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.circle, size: 5, color: textColor.withValues(alpha: 0.6)),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      '$phone — $errMsg',
+                      style: TextStyle(fontFamily: 'Inter', fontSize: 11, color: textColor),
+                    ),
+                  ),
+                ],
               ),
-            ),
-          ),
-        ],
+            );
+          }).toList(),
+        ),
       ),
     );
   }
