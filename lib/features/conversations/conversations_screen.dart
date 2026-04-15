@@ -819,6 +819,7 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
   html.MediaRecorder? _mediaRecorder;
   html.MediaStream? _micStream;
   final List<html.Blob> _recordingChunks = [];
+  String _recordingMimeType = 'audio/webm';
 
   // Track current subscribed chatId to avoid re-subscribing on web tab focus
   String? _subscribedChatId;
@@ -1088,18 +1089,42 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
     }
   }
 
+  /// Picks the first MIME type the browser's MediaRecorder actually accepts.
+  /// The MediaRecorder constructor throws NotSupportedError for unsupported
+  /// types, so we probe by construction and discard the test instance.
+  String _pickRecorderMimeType(html.MediaStream stream) {
+    for (final mime in const [
+      'audio/webm;codecs=opus',
+      'audio/webm',
+      'audio/ogg;codecs=opus',
+      'audio/ogg',
+    ]) {
+      try {
+        html.MediaRecorder(stream, {'mimeType': mime}); // throws if unsupported
+        return mime;
+      } catch (_) {}
+    }
+    return 'audio/webm'; // safe fallback
+  }
+
   Future<void> _startVoiceRecording() async {
     try {
       final stream = await html.window.navigator.mediaDevices!
           .getUserMedia({'audio': true, 'video': false});
       _micStream = stream;
       _recordingChunks.clear();
-      final recorder = html.MediaRecorder(stream);
+      final mimeType = _pickRecorderMimeType(stream);
+      _recordingMimeType = mimeType;
+      final recorder = html.MediaRecorder(stream, {'mimeType': mimeType});
       _mediaRecorder = recorder;
       recorder.addEventListener('dataavailable', (html.Event event) {
-        // ignore: avoid_dynamic_calls
-        final blob = (event as dynamic).data as html.Blob?;
-        if (blob != null && blob.size > 0) _recordingChunks.add(blob);
+        try {
+          // ignore: avoid_dynamic_calls
+          final data = (event as dynamic).data;
+          if (data == null) return;
+          final blob = data as html.Blob;
+          if (blob.size > 0) _recordingChunks.add(blob);
+        } catch (_) {}
       });
       recorder.start();
       if (mounted) {
@@ -1138,17 +1163,80 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
 
     await stopCompleter.future;
 
-    if (_recordingChunks.isEmpty) return;
-    final blob = html.Blob(_recordingChunks, 'audio/ogg');
-    final fileReader = html.FileReader();
-    final readCompleter = Completer<Uint8List>();
-    fileReader.onLoad.listen((_) {
-      final buffer = fileReader.result as ByteBuffer;
-      readCompleter.complete(buffer.asUint8List());
-    });
-    fileReader.readAsArrayBuffer(blob);
-    final bytes = await readCompleter.future;
-    if (mounted) _openPreviewModal(bytes, 'voice_note.ogg', audioDuration: duration);
+    if (_recordingChunks.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('No se capturó audio. Intenta de nuevo.'),
+          backgroundColor: Color(0xFFEF4444),
+        ));
+      }
+      return;
+    }
+
+    try {
+      final mimeType = _recordingMimeType;
+      final blob = html.Blob(_recordingChunks, mimeType);
+
+      if (blob.size == 0) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('No se capturó audio. Intenta de nuevo.'),
+            backgroundColor: Color(0xFFEF4444),
+          ));
+        }
+        return;
+      }
+
+      final fileReader = html.FileReader();
+      final readCompleter = Completer<Uint8List>();
+
+      fileReader.onLoad.listen((_) {
+        try {
+          final result = fileReader.result;
+          Uint8List bytes;
+          if (result is ByteBuffer) {
+            bytes = result.asUint8List();
+          } else if (result is Uint8List) {
+            bytes = result;
+          } else {
+            // Last resort for environments where result wraps a raw JS ArrayBuffer
+            // ignore: avoid_dynamic_calls
+            bytes = (result as dynamic).asUint8List() as Uint8List;
+          }
+          if (!readCompleter.isCompleted) readCompleter.complete(bytes);
+        } catch (e) {
+          if (!readCompleter.isCompleted) readCompleter.completeError(e);
+        }
+      });
+      fileReader.onError.listen((_) {
+        if (!readCompleter.isCompleted) {
+          readCompleter.completeError('FileReader error');
+        }
+      });
+
+      fileReader.readAsArrayBuffer(blob);
+      final bytes = await readCompleter.future;
+
+      if (bytes.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('No se capturó audio. Intenta de nuevo.'),
+            backgroundColor: Color(0xFFEF4444),
+          ));
+        }
+        return;
+      }
+
+      final ext = mimeType.contains('ogg') ? 'ogg' : 'webm';
+      if (mounted) _openPreviewModal(bytes, 'voice_note.$ext', audioDuration: duration);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Error al procesar audio: $e'),
+          backgroundColor: const Color(0xFFEF4444),
+        ));
+      }
+    }
   }
 
   void _cancelVoiceRecording() {
