@@ -834,7 +834,10 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
   void didChangeDependencies() {
     super.didChangeDependencies();
     final chatId = ref.read(selectedChatIdProvider);
-    if (chatId != null && _apiMessages.isEmpty && !_msgLoading) {
+    final tenantId = ref.read(activeTenantIdProvider);
+    // Require tenantId to be loaded before subscribing; otherwise the
+    // stream would have no tenant filter and deliver cross-tenant messages.
+    if (chatId != null && tenantId.isNotEmpty && _apiMessages.isEmpty && !_msgLoading) {
       _subscribeToMessages(chatId);
     }
   }
@@ -893,13 +896,33 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
 
   void _sendReadReceipts(List<Map<String, dynamic>> messages) {
     final tenantId = ref.read(activeTenantIdProvider);
-    if (tenantId.isEmpty) return;
+    if (tenantId.isEmpty) {
+      debugPrint('[markRead] SKIP — tenantId empty');
+      return;
+    }
     for (final msg in messages) {
       if ((msg['direction'] as String?) == 'outbound') continue;
+
+      // Only process messages that belong to the active tenant.
+      // The stream subscription may lack a tenant filter if tenantId was
+      // empty at subscription time, so messages from other tenants can
+      // arrive here — calling markRead for them causes 400s from Meta.
+      final msgTenantId = msg['tenant_id'] as String?;
+      if (msgTenantId != tenantId) {
+        debugPrint('[markRead] SKIP tenant mismatch — msgTenant=$msgTenantId activeTenant=$tenantId');
+        continue;
+      }
+
       final waId = msg['wa_message_id'] as String?;
       if (waId == null || waId.isEmpty || waId == 'null') continue;
+      // Validate it is a real Meta wamid (format: wamid.XXXXX)
+      if (!waId.startsWith('wamid.')) {
+        debugPrint('[markRead] SKIP invalid waId format: "$waId"');
+        continue;
+      }
       if (_processedReadIds.contains(waId)) continue;
       _processedReadIds.add(waId);
+      debugPrint('[markRead] CALLING — tenantId=$tenantId waId=$waId');
       MessagesApi.markRead(waId, tenantId: tenantId); // fire-and-forget
     }
   }
@@ -1350,6 +1373,20 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
 
     ref.listen<String?>(selectedChatIdProvider, (prev, next) {
       if (next != null && next != prev) _subscribeToMessages(next);
+    });
+
+    // If the tenant was not loaded when didChangeDependencies first ran,
+    // subscribe now that we have a valid tenantId.
+    ref.listen<String>(activeTenantIdProvider, (prev, next) {
+      if (next.isNotEmpty && prev != next) {
+        final cid = ref.read(selectedChatIdProvider);
+        // Re-subscribe only if we have no active subscription yet (or the
+        // existing one was created without tenant filtering).
+        if (cid != null && (cid != _subscribedChatId || _apiMessages.isEmpty)) {
+          debugPrint('[ChatPanel] tenant loaded ($next), re-subscribing for chat $cid');
+          _subscribeToMessages(cid);
+        }
+      }
     });
 
     if (chatId == null) return _emptyState();

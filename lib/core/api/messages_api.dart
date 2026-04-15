@@ -1,5 +1,5 @@
-import 'dart:typed_data';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:conectamos_platform/core/api/api_client.dart';
 
 class MessagesApi {
@@ -51,14 +51,25 @@ class MessagesApi {
   }
 
   static Future<void> markRead(String waMessageId, {String? tenantId}) async {
-    if (waMessageId.isEmpty || waMessageId == 'null') return;
-    if (tenantId == null || tenantId.isEmpty) return;
+    // ignore: avoid_print
+    debugPrint('[MessagesApi.markRead] entry — waMessageId=$waMessageId tenantId=$tenantId');
+    if (waMessageId.isEmpty || waMessageId == 'null') {
+      debugPrint('[MessagesApi.markRead] GUARD: empty/null waMessageId');
+      return;
+    }
+    if (tenantId == null || tenantId.isEmpty) {
+      debugPrint('[MessagesApi.markRead] GUARD: empty tenantId');
+      return;
+    }
     try {
       await ApiClient.instance.post(
         '/messages/read',
         data: {'message_id': waMessageId, 'tenant_id': tenantId},
       );
-    } catch (_) {}
+      debugPrint('[MessagesApi.markRead] OK — $waMessageId');
+    } catch (e) {
+      debugPrint('[MessagesApi.markRead] ERROR — $waMessageId → $e');
+    }
   }
 
   static Future<void> sendTyping(String waMessageId, {String? tenantId}) async {
