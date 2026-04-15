@@ -652,10 +652,28 @@ class _TemplateRowState extends State<_TemplateRow> {
   String get _status   => widget.template['status']?.toString().toUpperCase() ?? '';
   bool   get _isWelcome => widget.template['is_welcome'] == true;
 
-  List<String> get _variables {
+  static const _sysVarDesc = <String, String>{
+    'nombre_operador':   'Nombre del operador',
+    'telefono_operador': 'Teléfono del operador',
+    'nombre_tenant':     'Nombre de la empresa',
+    'fecha_hoy':         'Fecha de hoy',
+    'hora_actual':       'Hora actual',
+  };
+
+  List<Map<String, dynamic>> get _varList {
     final v = widget.template['variables'];
-    if (v is List) return v.map((e) => e.toString()).toList();
-    return [];
+    if (v is! List) return [];
+    return v.map((e) {
+      if (e is Map) return Map<String, dynamic>.from(e);
+      return <String, dynamic>{'slot': 0, 'type': 'free', 'key': e.toString()};
+    }).toList();
+  }
+
+  String _varLabel(Map<String, dynamic> v) {
+    final type = v['type'] as String? ?? 'free';
+    final key  = v['key']  as String? ?? '';
+    if (type == 'system') return _sysVarDesc[key] ?? key;
+    return key.isNotEmpty ? '[$key]' : '[variable]';
   }
 
   Future<void> _delete() async {
@@ -796,23 +814,69 @@ class _TemplateRowState extends State<_TemplateRow> {
             // Variables
             Expanded(
               flex: 3,
-              child: _variables.isEmpty
-                  ? const Text(
-                      '—',
-                      style: TextStyle(
-                          fontFamily: 'Inter',
-                          fontSize: 12,
-                          color: AppColors.ctText3),
-                    )
-                  : Text(
-                      _variables.join(', '),
-                      style: const TextStyle(
+              child: Builder(builder: (_) {
+                final vars = _varList;
+                if (vars.isEmpty) {
+                  return const Text(
+                    '—',
+                    style: TextStyle(
                         fontFamily: 'Inter',
-                        fontSize: 11,
-                        color: AppColors.ctText2,
+                        fontSize: 12,
+                        color: AppColors.ctText3),
+                  );
+                }
+                final shown = vars.length > 2 ? vars.sublist(0, 2) : vars;
+                final extra = vars.length - shown.length;
+                return Wrap(
+                  spacing: 4,
+                  runSpacing: 4,
+                  children: [
+                    ...shown.map((v) {
+                      final isSystem =
+                          (v['type'] as String? ?? 'free') == 'system';
+                      return Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: isSystem
+                              ? const Color(0xFFDCFCE7)
+                              : AppColors.ctSurface2,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          _varLabel(v),
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: isSystem
+                                ? const Color(0xFF065F46)
+                                : AppColors.ctText2,
+                          ),
+                        ),
+                      );
+                    }),
+                    if (extra > 0)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.ctSurface2,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          '+$extra más',
+                          style: const TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.ctText2,
+                          ),
+                        ),
                       ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                  ],
+                );
+              }),
             ),
 
             // Status badge
@@ -1062,24 +1126,30 @@ class _NewTemplateDialogState extends State<_NewTemplateDialog> {
     }
     setState(() { _sending = true; _error = null; });
     try {
-      await ApiClient.instance.post('/templates', data: {
-        'tenant_id':  widget.tenantId,
-        'name':       name,
-        'category':   _category,
-        'language':   _language,
-        'body_text':  body,
-        'variables':  List.generate(_varConfigs.length, (i) {
-          final cfg = _varConfigs[i];
-          return {
-            'slot': cfg.slot,
-            'type': cfg.type,
-            'key':  cfg.type == 'system'
-                ? cfg.key
-                : _freeKeyCtrls[i].text.trim(),
-          };
-        }),
-        'is_welcome': false,
-      });
+      await ApiClient.instance.post(
+        '/templates',
+        data: {
+          'tenant_id':  widget.tenantId,
+          'name':       name,
+          'category':   _category,
+          'language':   _language,
+          'body_text':  body,
+          'variables':  List.generate(_varConfigs.length, (i) {
+            final cfg = _varConfigs[i];
+            return {
+              'slot': cfg.slot,
+              'type': cfg.type,
+              'key':  cfg.type == 'system'
+                  ? cfg.key
+                  : _freeKeyCtrls[i].text.trim(),
+            };
+          }),
+          'is_welcome': false,
+        },
+        options: Options(
+          validateStatus: (s) => s != null && s >= 200 && s < 300,
+        ),
+      );
       if (!mounted) return;
       widget.onCreated();
       Navigator.pop(context);
