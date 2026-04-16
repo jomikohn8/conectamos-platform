@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/api/operators_api.dart';
@@ -803,9 +802,9 @@ class _OperatorCardState extends State<OperatorCard> {
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
-      cursor: SystemMouseCursors.click,
+      cursor: SystemMouseCursors.basic,
       child: GestureDetector(
-        onTap: () => context.go('/sessions/${Uri.encodeComponent(op.name)}'),
+        onTap: null,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 120),
           decoration: BoxDecoration(
