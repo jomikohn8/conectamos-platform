@@ -55,7 +55,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     try {
       // Step 1: exchange the recovery token with Supabase to get a session
       final otpResponse = await Supabase.instance.client.auth.verifyOTP(
-        token: widget.token,
+        tokenHash: widget.token,
         type: OtpType.recovery,
       );
       final accessToken = otpResponse.session?.accessToken;
