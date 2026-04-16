@@ -108,18 +108,17 @@ class MessagesApi {
 
   /// Envía una reacción emoji sobre un mensaje.
   static Future<void> sendReaction({
-    required String channelId,
     required String messageId,
     required String emoji,
     required String toPhone,
     required String tenantId,
   }) async {
     await ApiClient.instance.post(
-      '/channels/$channelId/messages/reaction',
+      '/messages/send/reaction',
       data: {
         'message_id': messageId,
         'emoji':      emoji,
-        'to':         toPhone,
+        'to_phone':   toPhone,
         'tenant_id':  tenantId,
       },
     );

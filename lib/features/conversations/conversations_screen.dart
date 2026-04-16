@@ -994,76 +994,10 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
       Map<String, dynamic> msg, String emoji) async {
     final waId = msg['wa_message_id'] as String?;
     if (waId == null || waId.isEmpty) return;
-    // Resolve channelId — 4-level fallback chain:
-    // 1. msg['channel_id'] — channel that received/sent the message
-    // 2. Active channel tab from selectedOperatorChannelsProvider
-    // 3. First available channel of the operator (same list)
-    // 4. Any channel from any operator in the tenant (API call)
-    final msgChannelId = msg['channel_id'] as String?;
-    final channels = ref.read(selectedOperatorChannelsProvider);
-    final activeIdx = ref.read(selectedChannelIndexProvider);
-    final safeIdx =
-        channels.isEmpty ? 0 : activeIdx.clamp(0, channels.length - 1);
-    final tabChannelId = channels.isNotEmpty
-        ? channels[safeIdx]['channel_id'] as String?
-        : null;
-    final firstChannelId = channels.isNotEmpty
-        ? channels.first['channel_id'] as String?
-        : null;
-    String? channelId = (msgChannelId != null && msgChannelId.isNotEmpty)
-        ? msgChannelId
-        : tabChannelId ?? firstChannelId;
-
     final chatId = ref.read(selectedChatIdProvider) ?? '';
     final tenantId = ref.read(activeTenantIdProvider);
-
-    // Level 4: query all operators for the tenant and find a channel
-    if (channelId == null) {
-      try {
-        debugPrint('[sendReaction] L4: fetching operators for tenant $tenantId');
-        final allOps = await OperatorsApi.listOperators(tenantId: tenantId);
-        debugPrint('[sendReaction] L4: operators fetched: ${allOps.length}');
-        debugPrint('[sendReaction] L4: selected operator phone: $chatId');
-        // Prefer the selected operator first
-        final selectedOp = allOps.cast<Map<String, dynamic>?>().firstWhere(
-              (o) => (o!['phone'] as String?) == chatId,
-              orElse: () => null,
-            );
-        final selectedOpChannels =
-            List<Map<String, dynamic>>.from(selectedOp?['channels'] as List? ?? []);
-        debugPrint('[sendReaction] L4: channels for selected op: ${selectedOpChannels.map((c) => c['channel_id']).toList()}');
-        channelId = selectedOpChannels.isNotEmpty
-            ? selectedOpChannels.first['channel_id'] as String?
-            : null;
-        // Fallback to any operator that has channels
-        if (channelId == null) {
-          for (final op in allOps) {
-            final opChannels =
-                List<Map<String, dynamic>>.from(op['channels'] as List? ?? []);
-            if (opChannels.isNotEmpty) {
-              channelId = opChannels.first['channel_id'] as String?;
-              break;
-            }
-          }
-        }
-        debugPrint('[sendReaction] L4: resolved from L4: $channelId');
-      } catch (e) {
-        debugPrint('[sendReaction] L4: ERROR: $e');
-      }
-    }
-
-    if (channelId == null) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('No hay canal configurado para enviar la reacción'),
-          backgroundColor: AppColors.ctDanger,
-        ));
-      }
-      return;
-    }
     try {
       await MessagesApi.sendReaction(
-        channelId: channelId,
         messageId: waId,
         emoji: emoji,
         toPhone: chatId,
