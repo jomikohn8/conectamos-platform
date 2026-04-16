@@ -292,7 +292,7 @@ class _ChannelsBody extends StatelessWidget {
             child: const Row(
               children: [
                 Expanded(flex: 3, child: Text('CANAL',      style: _headerStyle)),
-                Expanded(flex: 2, child: Text('AI WORKER',  style: _headerStyle)),
+                Expanded(flex: 2, child: Text('WORKER',     style: _headerStyle)),
                 Expanded(flex: 2, child: Text('OPERADORES', style: _headerStyle)),
                 Expanded(flex: 1, child: Text('ESTADO',     style: _headerStyle)),
                 Expanded(flex: 2, child: Text('ACCIONES',   style: _headerStyle)),
@@ -366,8 +366,8 @@ class _ChannelRowState extends State<_ChannelRow> {
     final channelType = ch['channel_type'] as String? ?? 'whatsapp';
     final isActive    = ch['is_active'] as bool? ?? false;
 
-    final workerName  = ch['ai_worker_name']  as String? ?? '';
-    final workerColor = ch['ai_worker_color'] as String? ?? '#9CA3AF';
+    final workerName  = ch['worker_name']  as String? ?? '';
+    final workerColor = ch['worker_color'] as String? ?? '#9CA3AF';
 
     final ops = _parseOps(ch['operators']);
 
@@ -663,7 +663,7 @@ class _ChannelFormDialogState extends State<_ChannelFormDialog> {
     _color       = ch?['color'] as String? ?? _kColorPalette.first;
 
     // Set worker id — try to match with loaded workers list
-    final rawWorkerId = ch?['ai_worker_id'] as String?;
+    final rawWorkerId = ch?['tenant_worker_id'] as String?;
     if (rawWorkerId != null &&
         widget.workers.any((w) => (w['id'] as String?) == rawWorkerId)) {
       _workerId = rawWorkerId;
@@ -698,19 +698,19 @@ class _ChannelFormDialogState extends State<_ChannelFormDialog> {
     try {
       if (widget.isEdit) {
         await ChannelsApi.updateChannel(
-          channelId:    widget.channel!['id'] as String,
-          displayName:  name,
-          color:        _color,
-          aiWorkerId:   _workerId,
-          channelType: _channelType,
+          channelId:      widget.channel!['id'] as String,
+          displayName:    name,
+          color:          _color,
+          tenantWorkerId: _workerId,
+          channelType:    _channelType,
           phoneNumberId: _phoneCtrl.text.trim().isEmpty ? null : _phoneCtrl.text.trim(),
           wabaId:        _wabaCtrl.text.trim().isEmpty  ? null : _wabaCtrl.text.trim(),
           waToken:       _tokenCtrl.text.trim().isEmpty ? null : _tokenCtrl.text.trim(),
         );
       } else {
         await ChannelsApi.createChannel(
-          tenantId:      widget.tenantId,
-          aiWorkerId:    _workerId!,
+          tenantId:        widget.tenantId,
+          tenantWorkerId:  _workerId!,
           displayName:   name,
           color:         _color,
           channelType:   _channelType,
@@ -832,9 +832,9 @@ class _ChannelFormDialogState extends State<_ChannelFormDialog> {
                           style: const TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppColors.ctText),
                           icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: AppColors.ctText3),
                           items: widget.workers.map((w) {
-                            final wId    = w['id']    as String? ?? '';
-                            final wName  = w['name']  as String? ?? w['display_name'] as String? ?? '—';
-                            final wColor = w['color'] as String? ?? '#9CA3AF';
+                            final wId    = w['id'] as String? ?? '';
+                            final wName  = w['display_name'] as String? ?? w['catalog_name'] as String? ?? '—';
+                            final wColor = w['catalog_color'] as String? ?? '#9CA3AF';
                             return DropdownMenuItem<String>(
                               value: wId,
                               child: Row(

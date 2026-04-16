@@ -13,7 +13,7 @@ class ChannelsApi {
 
   static Future<Map<String, dynamic>> createChannel({
     required String tenantId,
-    required String aiWorkerId,
+    required String tenantWorkerId,
     required String displayName,
     required String color,
     String channelType = 'whatsapp',
@@ -22,12 +22,12 @@ class ChannelsApi {
     String? waToken,
   }) async {
     final response = await ApiClient.instance.post('/channels', data: {
-      'tenant_id':    tenantId,
-      'ai_worker_id': aiWorkerId,
-      'display_name': displayName,
-      'color':        color,
-      'channel_type': channelType,
-      'phone_number_id': ?phoneNumberId,
+      'tenant_id':        tenantId,
+      'tenant_worker_id': tenantWorkerId,
+      'display_name':     displayName,
+      'color':            color,
+      'channel_type':     channelType,
+      'phone_number_id':  ?phoneNumberId,
       'waba_id':  ?wabaId,
       'wa_token': ?waToken,
     });
@@ -39,7 +39,7 @@ class ChannelsApi {
     String? displayName,
     String? color,
     bool? isActive,
-    String? aiWorkerId,
+    String? tenantWorkerId,
     String? channelType,
     String? phoneNumberId,
     String? wabaId,
@@ -48,12 +48,12 @@ class ChannelsApi {
     final response = await ApiClient.instance.patch(
       '/channels/$channelId',
       data: {
-        'display_name':   ?displayName,
-        'color':          ?color,
-        'is_active':      ?isActive,
-        'ai_worker_id':   ?aiWorkerId,
-        'channel_type':   ?channelType,
-        'phone_number_id': ?phoneNumberId,
+        'display_name':     ?displayName,
+        'color':            ?color,
+        'is_active':        ?isActive,
+        'tenant_worker_id': ?tenantWorkerId,
+        'channel_type':     ?channelType,
+        'phone_number_id':  ?phoneNumberId,
         'waba_id':  ?wabaId,
         'wa_token': ?waToken,
       },
