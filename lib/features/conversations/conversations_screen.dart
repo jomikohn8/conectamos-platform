@@ -31,6 +31,8 @@ final selectedChatNameProvider = StateProvider<String?>((ref) => null);
 final selectedOperatorChannelsProvider =
     StateProvider<List<Map<String, dynamic>>>((ref) => []);
 final selectedChannelIndexProvider = StateProvider<int>((ref) => 0);
+final replyingToProvider =
+    StateProvider<Map<String, dynamic>?>((ref) => null);
 
 // ── Pantalla ──────────────────────────────────────────────────────────────────
 
@@ -984,6 +986,31 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
     MessagesApi.sendTyping(waId, tenantId: tenantId); // fire-and-forget
   }
 
+  Future<void> _sendReaction(
+      Map<String, dynamic> msg, String emoji) async {
+    final waId = msg['wa_message_id'] as String?;
+    if (waId == null || waId.isEmpty) return;
+    final channels = ref.read(selectedOperatorChannelsProvider);
+    final activeIdx = ref.read(selectedChannelIndexProvider);
+    final safeIdx =
+        channels.isEmpty ? 0 : activeIdx.clamp(0, channels.length - 1);
+    final channelId = channels.isNotEmpty
+        ? channels[safeIdx]['channel_id'] as String?
+        : null;
+    if (channelId == null) return;
+    final chatId = ref.read(selectedChatIdProvider) ?? '';
+    final tenantId = ref.read(activeTenantIdProvider);
+    try {
+      await MessagesApi.sendReaction(
+        channelId: channelId,
+        messageId: waId,
+        emoji: emoji,
+        toPhone: chatId,
+        tenantId: tenantId,
+      );
+    } catch (_) {}
+  }
+
   // ── Multimedia ──────────────────────────────────────────────────────────────
 
   void _handleDocumentPaste(html.ClipboardEvent event) {
@@ -1440,6 +1467,9 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
       return;
     }
 
+    final replyTo = ref.read(replyingToProvider);
+    ref.read(replyingToProvider.notifier).state = null;
+
     _msgCtrl.clear();
     setState(() => _sending = true);
 
@@ -1448,8 +1478,8 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
           to: chatId,
           text: text,
           tenantId: tenantId,
-          sentByUserId:
-              Supabase.instance.client.auth.currentUser?.id);
+          sentByUserId: Supabase.instance.client.auth.currentUser?.id,
+          replyToMessageId: replyTo?['wa_message_id'] as String?);
       if (mounted) setState(() => _sending = false);
     } catch (e) {
       if (mounted) {
@@ -1475,10 +1505,39 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
     return DateTime.now().toUtc().difference(receivedAt.toUtc()).inHours < 24;
   }
 
-  Widget _buildMessageBubble(Map<String, dynamic> msg) {
+  Widget _buildMessageBubble(
+    Map<String, dynamic> msg, {
+    required Map<String, List<String>> reactionsMap,
+  }) {
     final direction = msg['direction'] as String? ?? 'inbound';
     final isOutbound = direction == 'outbound';
+    final msgId = msg['id'] as String? ?? '';
+    final msgWaId = msg['wa_message_id'] as String?;
+
+    // Resolve reply context
+    final contextMsgId = msg['context_message_id'] as String?;
+    String? contextFrom;
+    String? contextBody;
+    if (contextMsgId != null && contextMsgId.isNotEmpty) {
+      contextFrom = msg['context_from'] as String?;
+      final ref_ = _apiMessages.cast<Map<String, dynamic>?>().firstWhere(
+            (m) =>
+                (m!['wa_message_id'] as String?) == contextMsgId ||
+                (m['id'] as String?) == contextMsgId,
+            orElse: () => null,
+          );
+      contextBody = ref_ != null
+          ? (ref_['raw_body'] as String? ?? '')
+          : null; // null → fallback "Mensaje citado"
+    }
+
+    // Reactions for this message: keyed by wa_message_id or id
+    final msgReactions = reactionsMap[msgWaId ?? msgId] ??
+        reactionsMap[msgId] ??
+        const <String>[];
+
     return _ApiMessageBubble(
+      key: ValueKey(msgId),
       body: _msgBody(msg),
       time: _formatTime(msg['received_at'] as String?),
       senderName: isOutbound
@@ -1489,6 +1548,13 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
       waStatus: msg['wa_status'] as String?,
       messageType: msg['message_type'] as String?,
       mediaUrl: msg['media_url'] as String?,
+      hasContext: contextMsgId != null && contextMsgId.isNotEmpty,
+      contextFrom: contextFrom,
+      contextBody: contextBody,
+      reactions: msgReactions,
+      onReply: () =>
+          ref.read(replyingToProvider.notifier).state = msg,
+      onReact: (emoji) => _sendReaction(msg, emoji),
     );
   }
 
@@ -1548,12 +1614,31 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
     final activeChannel = channels.isNotEmpty ? channels[safeIdx] : null;
     final activeChannelId = activeChannel?['channel_id'] as String?;
 
-    final visibleMessages = activeChannelId != null
+    final channelFiltered = activeChannelId != null
         ? _apiMessages.where((m) {
             final msgChannelId = m['channel_id'] as String?;
             return msgChannelId == null || msgChannelId == activeChannelId;
           }).toList()
-        : _apiMessages;
+        : List<Map<String, dynamic>>.from(_apiMessages);
+
+    // Build reactions map (keyed by reaction_message_id) and filter out
+    // reaction-type messages from the display list.
+    final reactionsMap = <String, List<String>>{};
+    for (final m in channelFiltered) {
+      if ((m['message_type'] as String?) == 'reaction') {
+        final targetId = m['reaction_message_id'] as String?;
+        final emoji = m['reaction_emoji'] as String?;
+        if (targetId != null && targetId.isNotEmpty &&
+            emoji != null && emoji.isNotEmpty) {
+          (reactionsMap[targetId] ??= []).add(emoji);
+        }
+      }
+    }
+    final visibleMessages = channelFiltered
+        .where((m) => (m['message_type'] as String?) != 'reaction')
+        .toList();
+
+    final replyingTo = ref.watch(replyingToProvider);
 
     final body = Column(
       children: [
@@ -1638,11 +1723,13 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
                           ],
                         ),
                       ),
-                      _buildMessageBubble(msg),
+                      _buildMessageBubble(msg,
+                          reactionsMap: reactionsMap),
                     ],
                   );
                 }
-                return _buildMessageBubble(msg);
+                return _buildMessageBubble(msg,
+                    reactionsMap: reactionsMap);
               },
             ),
             ),
@@ -1671,6 +1758,14 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
                 ),
               ],
             ),
+          ),
+
+        // Reply bar (shown when replying to a message)
+        if (replyingTo != null)
+          _ReplyBar(
+            message: replyingTo,
+            onDismiss: () =>
+                ref.read(replyingToProvider.notifier).state = null,
           ),
 
         // Input
@@ -1965,8 +2060,9 @@ class _ApiChatHeader extends StatelessWidget {
 
 // ── Burbuja de mensaje (modo API) ─────────────────────────────────────────────
 
-class _ApiMessageBubble extends StatelessWidget {
+class _ApiMessageBubble extends StatefulWidget {
   const _ApiMessageBubble({
+    super.key,
     required this.body,
     required this.time,
     required this.senderName,
@@ -1974,6 +2070,12 @@ class _ApiMessageBubble extends StatelessWidget {
     this.waStatus,
     this.messageType,
     this.mediaUrl,
+    this.hasContext = false,
+    this.contextFrom,
+    this.contextBody,
+    this.reactions = const [],
+    this.onReply,
+    this.onReact,
   });
   final String body;
   final String time;
@@ -1982,8 +2084,144 @@ class _ApiMessageBubble extends StatelessWidget {
   final String? waStatus;
   final String? messageType;
   final String? mediaUrl;
+  // Reply context
+  final bool hasContext;
+  final String? contextFrom;
+  final String? contextBody;
+  // Reactions
+  final List<String> reactions;
+  final VoidCallback? onReply;
+  final void Function(String emoji)? onReact;
+
+  @override
+  State<_ApiMessageBubble> createState() => _ApiMessageBubbleState();
+}
+
+class _ApiMessageBubbleState extends State<_ApiMessageBubble> {
+  double _swipeDx = 0;
 
   static final Set<String> _registeredMediaViews = {};
+
+  void _onDragUpdate(DragUpdateDetails d) {
+    if (d.delta.dx > 0 && widget.onReply != null) {
+      setState(() =>
+          _swipeDx = (_swipeDx + d.delta.dx).clamp(0.0, 64.0));
+    }
+  }
+
+  void _onDragEnd(DragEndDetails d) {
+    final triggered = _swipeDx >= 50;
+    setState(() => _swipeDx = 0);
+    if (triggered) widget.onReply?.call();
+  }
+
+  void _showEmojiPicker() {
+    if (widget.onReact == null && widget.onReply == null) return;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _EmojiPickerSheet(
+        onEmoji: (emoji) {
+          Navigator.pop(context);
+          widget.onReact?.call(emoji);
+        },
+        onReply: widget.onReply != null
+            ? () {
+                Navigator.pop(context);
+                widget.onReply!();
+              }
+            : null,
+      ),
+    );
+  }
+
+  Widget _buildQuote() {
+    final isOut = widget.isOutbound;
+    final name = widget.contextFrom ?? '—';
+    final raw = widget.contextBody ?? 'Mensaje citado';
+    final preview =
+        raw.length > 80 ? '${raw.substring(0, 80)}…' : raw;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      padding:
+          const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      decoration: BoxDecoration(
+        color: isOut
+            ? Colors.white.withValues(alpha: 0.5)
+            : const Color(0xFFE4E8EA),
+        borderRadius: BorderRadius.circular(6),
+        border: Border(
+          left: BorderSide(
+            width: 3,
+            color: isOut
+                ? const Color(0xFF2DD4BF)
+                : const Color(0xFF9CA3AF),
+          ),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            name,
+            style: const TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF2DD4BF),
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            preview,
+            style: const TextStyle(
+              fontFamily: 'Geist',
+              fontSize: 11,
+              color: Color(0xFF667781),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReactionPills() {
+    if (widget.reactions.isEmpty) return const SizedBox.shrink();
+    final counts = <String, int>{};
+    for (final e in widget.reactions) {
+      counts[e] = (counts[e] ?? 0) + 1;
+    }
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: Wrap(
+        spacing: 4,
+        children: counts.entries
+            .map((entry) => Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.9),
+                    borderRadius: BorderRadius.circular(10),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x22000000),
+                        blurRadius: 2,
+                        offset: Offset(0, 1),
+                      ),
+                    ],
+                  ),
+                  child: Text(
+                    entry.value > 1
+                        ? '${entry.key} ${entry.value}'
+                        : entry.key,
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                ))
+            .toList(),
+      ),
+    );
+  }
 
   Widget _fallback(String label) => Text(
         label,
@@ -1992,8 +2230,10 @@ class _ApiMessageBubble extends StatelessWidget {
       );
 
   Widget _buildContent(BuildContext context) {
-    final mType = messageType ?? 'text';
-    final mUrl = (mediaUrl != null && mediaUrl!.isNotEmpty) ? mediaUrl : null;
+    final mType = widget.messageType ?? 'text';
+    final mUrl = (widget.mediaUrl != null && widget.mediaUrl!.isNotEmpty)
+        ? widget.mediaUrl
+        : null;
 
     Future<void> openUrl(String url) async {
       final uri = Uri.parse(url);
@@ -2132,7 +2372,7 @@ class _ApiMessageBubble extends StatelessWidget {
       case 'location':
         Map<String, dynamic>? locData;
         try {
-          locData = jsonDecode(body) as Map<String, dynamic>;
+          locData = jsonDecode(widget.body) as Map<String, dynamic>;
         } catch (_) {}
         final locName = locData?['name'] as String? ??
             locData?['address'] as String? ??
@@ -2200,7 +2440,7 @@ class _ApiMessageBubble extends StatelessWidget {
 
       default:
         return Text(
-          body,
+          widget.body,
           style: const TextStyle(
               fontFamily: 'Inter',
               fontSize: 13,
@@ -2211,7 +2451,7 @@ class _ApiMessageBubble extends StatelessWidget {
   }
 
   Widget _statusIcon() {
-    switch (waStatus) {
+    switch (widget.waStatus) {
       case 'read':
         return const Icon(Icons.done_all,
             size: 12, color: Color(0xFF53BDEB));
@@ -2233,93 +2473,293 @@ class _ApiMessageBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const timeColor = Color(0xFF667781);
-    final isSticker = messageType == 'sticker';
+    final isSticker = widget.messageType == 'sticker';
+    final isOutbound = widget.isOutbound;
     final bubbleBg = isSticker
         ? Colors.transparent
         : isOutbound
             ? const Color(0xFFD9FDD3)
             : Colors.white;
 
+    final bubble = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: bubbleBg,
+        borderRadius: isOutbound
+            ? const BorderRadius.only(
+                topLeft: Radius.circular(12),
+                topRight: Radius.circular(2),
+                bottomLeft: Radius.circular(12),
+                bottomRight: Radius.circular(12),
+              )
+            : const BorderRadius.only(
+                topLeft: Radius.circular(2),
+                topRight: Radius.circular(12),
+                bottomLeft: Radius.circular(12),
+                bottomRight: Radius.circular(12),
+              ),
+      ),
+      child: Column(
+        crossAxisAlignment: isOutbound
+            ? CrossAxisAlignment.end
+            : CrossAxisAlignment.start,
+        children: [
+          if (widget.hasContext) _buildQuote(),
+          if (widget.senderName.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 3),
+              child: Text(
+                widget.senderName,
+                style: const TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  color: timeColor,
+                ),
+              ),
+            ),
+          _buildContent(context),
+          const SizedBox(height: 3),
+          if (isOutbound)
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  widget.time,
+                  style: const TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 10,
+                    color: timeColor,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                _statusIcon(),
+              ],
+            )
+          else
+            Text(
+              widget.time,
+              style: const TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 10,
+                color: timeColor,
+              ),
+            ),
+        ],
+      ),
+    );
+
+    final bubbleWithReactions = Column(
+      crossAxisAlignment:
+          isOutbound ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        bubble,
+        _buildReactionPills(),
+      ],
+    );
+
+    // Reply icon that appears during swipe
+    final replyHint = _swipeDx > 8
+        ? Positioned(
+            left: isOutbound ? null : 0,
+            right: isOutbound ? 0 : null,
+            top: 0,
+            bottom: 0,
+            child: Center(
+              child: Opacity(
+                opacity: (_swipeDx / 50).clamp(0.0, 1.0),
+                child: const Icon(
+                  Icons.reply_rounded,
+                  color: Color(0xFF667781),
+                  size: 20,
+                ),
+              ),
+            ),
+          )
+        : null;
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
-      child: Row(
-        mainAxisAlignment: isOutbound
-            ? MainAxisAlignment.end
-            : MainAxisAlignment.start,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          if (isOutbound) const SizedBox(width: 60),
-          Flexible(
-            child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: bubbleBg,
-                borderRadius: isOutbound
-                    ? const BorderRadius.only(
-                        topLeft: Radius.circular(12),
-                        topRight: Radius.circular(2),
-                        bottomLeft: Radius.circular(12),
-                        bottomRight: Radius.circular(12),
-                      )
-                    : const BorderRadius.only(
-                        topLeft: Radius.circular(2),
-                        topRight: Radius.circular(12),
-                        bottomLeft: Radius.circular(12),
-                        bottomRight: Radius.circular(12),
-                      ),
-                border: null,
-              ),
-              child: Column(
-                crossAxisAlignment: isOutbound
-                    ? CrossAxisAlignment.end
-                    : CrossAxisAlignment.start,
+      child: GestureDetector(
+        onHorizontalDragUpdate: _onDragUpdate,
+        onHorizontalDragEnd: _onDragEnd,
+        onLongPress: _showEmojiPicker,
+        child: Row(
+          mainAxisAlignment:
+              isOutbound ? MainAxisAlignment.end : MainAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            if (isOutbound) const SizedBox(width: 60),
+            Flexible(
+              child: Stack(
+                clipBehavior: Clip.none,
                 children: [
-                  if (senderName.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 3),
-                      child: Text(
-                        senderName,
-                        style: TextStyle(
-                          fontFamily: 'Inter',
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
-                          color: timeColor,
-                        ),
-                      ),
-                    ),
-                  _buildContent(context),
-                  const SizedBox(height: 3),
-                  if (isOutbound)
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          time,
-                          style: TextStyle(
-                            fontFamily: 'Inter',
-                            fontSize: 10,
-                            color: timeColor,
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        _statusIcon(),
-                      ],
-                    )
-                  else
-                    Text(
-                      time,
-                      style: TextStyle(
-                        fontFamily: 'Inter',
-                        fontSize: 10,
-                        color: timeColor,
-                      ),
-                    ),
+                  Transform.translate(
+                    offset: Offset(_swipeDx, 0),
+                    child: bubbleWithReactions,
+                  ),
+                  ?replyHint,
                 ],
               ),
             ),
+            if (!isOutbound) const SizedBox(width: 60),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Reply bar ─────────────────────────────────────────────────────────────────
+
+class _ReplyBar extends StatelessWidget {
+  const _ReplyBar({required this.message, required this.onDismiss});
+  final Map<String, dynamic> message;
+  final VoidCallback onDismiss;
+
+  @override
+  Widget build(BuildContext context) {
+    final isOutbound = (message['direction'] as String?) == 'outbound';
+    final name = isOutbound
+        ? 'Supervisor'
+        : (message['from_name'] as String? ??
+            message['from_phone'] as String? ?? '');
+    final raw = message['raw_body'] as String? ?? '';
+    final preview = raw.length > 60 ? '${raw.substring(0, 60)}…' : raw;
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+      decoration: const BoxDecoration(
+        color: AppColors.ctSurface,
+        border: Border(top: BorderSide(color: AppColors.ctBorder)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 3,
+            height: 36,
+            decoration: BoxDecoration(
+              color: const Color(0xFF2DD4BF),
+              borderRadius: BorderRadius.circular(2),
+            ),
           ),
-          if (!isOutbound) const SizedBox(width: 60),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.reply_rounded,
+                        size: 13, color: Color(0xFF2DD4BF)),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Respondiendo a $name',
+                      style: const TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF2DD4BF),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  preview,
+                  style: const TextStyle(
+                    fontFamily: 'Geist',
+                    fontSize: 11,
+                    color: AppColors.ctText2,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            onPressed: onDismiss,
+            icon: const Icon(Icons.close_rounded,
+                size: 16, color: AppColors.ctText2),
+            padding: EdgeInsets.zero,
+            constraints:
+                const BoxConstraints(minWidth: 28, minHeight: 28),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Emoji picker bottom sheet ─────────────────────────────────────────────────
+
+class _EmojiPickerSheet extends StatelessWidget {
+  const _EmojiPickerSheet({required this.onEmoji, this.onReply});
+  final void Function(String emoji) onEmoji;
+  final VoidCallback? onReply;
+
+  static const _emojis = ['❤️', '👍', '😂', '😮', '😢', '👎'];
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.ctSurface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.ctBorder),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: _emojis
+                .map((e) => GestureDetector(
+                      onTap: () => onEmoji(e),
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: AppColors.ctSurface2,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(e,
+                            style: const TextStyle(fontSize: 26)),
+                      ),
+                    ))
+                .toList(),
+          ),
+          if (onReply != null) ...[
+            const SizedBox(height: 8),
+            const Divider(height: 1, color: AppColors.ctBorder),
+            InkWell(
+              onTap: onReply,
+              borderRadius: BorderRadius.circular(8),
+              child: const Padding(
+                padding:
+                    EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: Row(
+                  children: [
+                    Icon(Icons.reply_rounded,
+                        size: 18, color: AppColors.ctText2),
+                    SizedBox(width: 10),
+                    Text(
+                      'Responder',
+                      style: TextStyle(
+                        fontFamily: 'Geist',
+                        fontSize: 14,
+                        color: AppColors.ctText,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );

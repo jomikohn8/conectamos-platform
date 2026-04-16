@@ -91,15 +91,36 @@ class MessagesApi {
     required String text,
     required String tenantId,
     String? sentByUserId,
+    String? replyToMessageId,
   }) async {
     if (to.isEmpty || tenantId.isEmpty) return;
     await ApiClient.instance.post(
       '/messages/send',
       data: {
-        'to':               to,
-        'message':          text,
-        'tenant_id':        tenantId,
-        'sent_by_user_id': ?sentByUserId,
+        'to':                   to,
+        'message':              text,
+        'tenant_id':            tenantId,
+        'sent_by_user_id':     ?sentByUserId,
+        'reply_to_message_id': ?replyToMessageId,
+      },
+    );
+  }
+
+  /// Envía una reacción emoji sobre un mensaje.
+  static Future<void> sendReaction({
+    required String channelId,
+    required String messageId,
+    required String emoji,
+    required String toPhone,
+    required String tenantId,
+  }) async {
+    await ApiClient.instance.post(
+      '/channels/$channelId/messages/reaction',
+      data: {
+        'message_id': messageId,
+        'emoji':      emoji,
+        'to':         toPhone,
+        'tenant_id':  tenantId,
       },
     );
   }
