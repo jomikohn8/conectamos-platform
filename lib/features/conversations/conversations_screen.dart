@@ -994,10 +994,11 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
       Map<String, dynamic> msg, String emoji) async {
     final waId = msg['wa_message_id'] as String?;
     if (waId == null || waId.isEmpty) return;
-    // Resolve channelId with fallback chain:
+    // Resolve channelId — 4-level fallback chain:
     // 1. msg['channel_id'] — channel that received/sent the message
     // 2. Active channel tab from selectedOperatorChannelsProvider
-    // 3. First available channel of the operator
+    // 3. First available channel of the operator (same list)
+    // 4. Any channel from any operator in the tenant (API call)
     final msgChannelId = msg['channel_id'] as String?;
     final channels = ref.read(selectedOperatorChannelsProvider);
     final activeIdx = ref.read(selectedChannelIndexProvider);
@@ -1009,14 +1010,41 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
     final firstChannelId = channels.isNotEmpty
         ? channels.first['channel_id'] as String?
         : null;
-    final channelId = (msgChannelId != null && msgChannelId.isNotEmpty)
+    String? channelId = (msgChannelId != null && msgChannelId.isNotEmpty)
         ? msgChannelId
         : tabChannelId ?? firstChannelId;
-    // --- DIAGNÓSTICO Bug 1 ---
-    debugPrint('[sendReaction] msg[channel_id]: $msgChannelId  (type: ${msg['channel_id'].runtimeType})');
-    debugPrint('[sendReaction] operatorChannels: ${channels.map((c) => c['channel_id']).toList()}');
-    debugPrint('[sendReaction] resolved channelId: $channelId');
-    // -------------------------
+
+    final chatId = ref.read(selectedChatIdProvider) ?? '';
+    final tenantId = ref.read(activeTenantIdProvider);
+
+    // Level 4: query all operators for the tenant and find a channel
+    if (channelId == null) {
+      try {
+        final allOps = await OperatorsApi.listOperators(tenantId: tenantId);
+        // Prefer the selected operator first
+        final selectedOp = allOps.cast<Map<String, dynamic>?>().firstWhere(
+              (o) => (o!['phone'] as String?) == chatId,
+              orElse: () => null,
+            );
+        final selectedOpChannels =
+            List<Map<String, dynamic>>.from(selectedOp?['channels'] as List? ?? []);
+        channelId = selectedOpChannels.isNotEmpty
+            ? selectedOpChannels.first['channel_id'] as String?
+            : null;
+        // Fallback to any operator that has channels
+        if (channelId == null) {
+          for (final op in allOps) {
+            final opChannels =
+                List<Map<String, dynamic>>.from(op['channels'] as List? ?? []);
+            if (opChannels.isNotEmpty) {
+              channelId = opChannels.first['channel_id'] as String?;
+              break;
+            }
+          }
+        }
+      } catch (_) {}
+    }
+
     if (channelId == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
@@ -1026,8 +1054,6 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
       }
       return;
     }
-    final chatId = ref.read(selectedChatIdProvider) ?? '';
-    final tenantId = ref.read(activeTenantIdProvider);
     try {
       await MessagesApi.sendReaction(
         channelId: channelId,
@@ -1561,11 +1587,6 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
 
     // Resolve reply context
     final contextMsgId = msg['context_message_id'] as String?;
-    // --- DIAGNÓSTICO Bug 4 ---
-    if ((msg['message_type'] as String?) == 'image') {
-      debugPrint('[buildBubble] IMAGE id=$msgId context_message_id=${msg['context_message_id']} (type: ${msg['context_message_id'].runtimeType}) hasContext=${contextMsgId != null && contextMsgId.isNotEmpty}');
-    }
-    // -------------------------
     String? contextFrom;
     String? contextBody;
     if (contextMsgId != null && contextMsgId.isNotEmpty) {
