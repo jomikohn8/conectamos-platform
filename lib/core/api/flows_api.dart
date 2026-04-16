@@ -1,0 +1,57 @@
+import 'package:conectamos_platform/core/api/api_client.dart';
+
+class FlowsApi {
+  static Future<List<Map<String, dynamic>>> listFlows({
+    required String tenantId,
+  }) async {
+    final response = await ApiClient.instance.get(
+      '/flows',
+      queryParameters: {'tenant_id': tenantId},
+    );
+    return List<Map<String, dynamic>>.from(response.data);
+  }
+
+  static Future<Map<String, dynamic>> createFlow({
+    required String tenantId,
+    required String tenantWorkerId,
+    required String name,
+    String? description,
+    List<Map<String, dynamic>> fields = const [],
+    Map<String, dynamic> behavior = const {},
+  }) async {
+    final response = await ApiClient.instance.post('/flows', data: {
+      'tenant_id':        tenantId,
+      'tenant_worker_id': tenantWorkerId,
+      'name':             name,
+      'description':      ?description,
+      'fields':   fields,
+      'behavior': behavior,
+    });
+    return Map<String, dynamic>.from(response.data);
+  }
+
+  static Future<Map<String, dynamic>> updateFlow({
+    required String flowId,
+    String? name,
+    String? description,
+    bool? isActive,
+    List<Map<String, dynamic>>? fields,
+    Map<String, dynamic>? behavior,
+  }) async {
+    final response = await ApiClient.instance.patch(
+      '/flows/$flowId',
+      data: {
+        'name':        ?name,
+        'description': ?description,
+        'is_active':   ?isActive,
+        'fields':      ?fields,
+        'behavior':    ?behavior,
+      },
+    );
+    return Map<String, dynamic>.from(response.data);
+  }
+
+  static Future<void> deleteFlow({required String flowId}) async {
+    await ApiClient.instance.delete('/flows/$flowId');
+  }
+}

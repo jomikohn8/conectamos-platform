@@ -1,110 +1,220 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/api/ai_workers_api.dart';
+import '../../core/api/flows_api.dart';
+import '../../core/providers/tenant_provider.dart';
 import '../../core/theme/app_theme.dart';
 
-// ── Modelos mock ──────────────────────────────────────────────────────────────
+// ── Constants ─────────────────────────────────────────────────────────────────
 
-class _FieldMock {
-  const _FieldMock({
-    required this.name,
-    required this.type,
-    required this.required,
-  });
-  final String name;
-  final String type;
-  final bool required;
+const _kTypeConfig = {
+  'logistics':   (label: 'Logística', bg: Color(0xFFDBEAFE), fg: Color(0xFF1E40AF)),
+  'sales':       (label: 'Ventas',    bg: Color(0xFFEDE9FE), fg: Color(0xFF6D28D9)),
+  'collections': (label: 'Cobranza', bg: Color(0xFFFEF3C7), fg: Color(0xFFB45309)),
+  'custom':      (label: 'Custom',   bg: Color(0xFFF3F4F6), fg: Color(0xFF374151)),
+};
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+Color _hexColor(String? hex) {
+  if (hex == null) return const Color(0xFF9CA3AF);
+  try {
+    final h = hex.replaceAll('#', '');
+    if (h.length != 6) return const Color(0xFF9CA3AF);
+    return Color(int.parse('FF$h', radix: 16));
+  } catch (_) {
+    return const Color(0xFF9CA3AF);
+  }
 }
 
-class _WorkflowMock {
-  const _WorkflowMock({
-    required this.number,
-    required this.name,
-    required this.description,
-    required this.chips,
-    required this.fields,
-  });
-  final int number;
-  final String name;
-  final String description;
-  final List<String> chips;
-  final List<_FieldMock> fields;
+String _dioError(Object e) {
+  if (e is DioException) {
+    final data = e.response?.data;
+    if (data is Map) {
+      final d = data['detail'];
+      if (d != null) return 'Error: $d';
+    }
+    final s = e.response?.statusCode;
+    if (s != null) return 'Error $s al procesar la solicitud';
+  }
+  return e.toString();
 }
 
-const _kWorkflows = [
-  _WorkflowMock(
-    number: 1,
-    name: 'Flujo 1 · Turno',
-    description: 'Registro de inicio y cierre de turno del operador',
-    chips: ['2 campos', 'Modo: Evento único', 'Sin IDs'],
-    fields: [
-      _FieldMock(
-          name: 'Hora de llegada', type: 'Hora automática', required: true),
-      _FieldMock(
-          name: 'Ubicación de inicio', type: 'Texto libre', required: true),
-    ],
-  ),
-  _WorkflowMock(
-    number: 2,
-    name: 'Flujo 2 · Registros',
-    description: 'Captura de eventos de entrega o registro durante el turno',
-    chips: [
-      '4 campos',
-      'Modo: IDs por conversación',
-      'IDs generados en conversación'
-    ],
-    fields: [
-      _FieldMock(name: 'ID del registro', type: 'Texto', required: true),
-      _FieldMock(name: 'Cantidad', type: 'Número', required: true),
-      _FieldMock(
-          name: 'Resultado',
-          type: 'Selección (Exitoso / Fallido)',
-          required: true),
-      _FieldMock(name: 'Evidencia', type: 'Foto', required: false),
-    ],
-  ),
-  _WorkflowMock(
-    number: 3,
-    name: 'Flujo 3 · Incidencias',
-    description: 'Reporte de incidencias durante el turno',
-    chips: [
-      '3 campos',
-      'Modo: IDs por conversación',
-      'Alerta automática a supervisores'
-    ],
-    fields: [
-      _FieldMock(
-          name: 'Tipo de incidencia',
-          type: 'Selección (Mecánica / Accidente / Retraso / Otro)',
-          required: true),
-      _FieldMock(name: 'Descripción', type: 'Texto libre', required: true),
-      _FieldMock(name: 'Foto', type: 'Foto', required: false),
-    ],
-  ),
-];
+// ── Screen ────────────────────────────────────────────────────────────────────
 
-// ── Pantalla ──────────────────────────────────────────────────────────────────
-
-class WorkflowsScreen extends ConsumerWidget {
+class WorkflowsScreen extends ConsumerStatefulWidget {
   const WorkflowsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<WorkflowsScreen> createState() => _WorkflowsScreenState();
+}
+
+class _WorkflowsScreenState extends ConsumerState<WorkflowsScreen> {
+  List<Map<String, dynamic>> _flows   = [];
+  List<Map<String, dynamic>> _workers = [];
+  bool    _loading = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _fetchAll());
+  }
+
+  Future<void> _fetchAll() async {
+    if (!mounted) return;
+    setState(() { _loading = true; _error = null; });
+    try {
+      final tenantId = ref.read(activeTenantIdProvider);
+      final results = await Future.wait([
+        FlowsApi.listFlows(tenantId: tenantId),
+        AiWorkersApi.listWorkers(tenantId: tenantId),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _flows   = results[0];
+        _workers = results[1];
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() { _loading = false; _error = _dioError(e); });
+    }
+  }
+
+  Future<void> _toggleActive(Map<String, dynamic> flow) async {
+    final id       = flow['id'] as String? ?? '';
+    final isActive = flow['is_active'] as bool? ?? false;
+    // Optimistic update
+    setState(() {
+      _flows = [
+        for (final f in _flows)
+          if ((f['id'] as String?) == id)
+            {...f, 'is_active': !isActive}
+          else
+            f,
+      ];
+    });
+    try {
+      await FlowsApi.updateFlow(flowId: id, isActive: !isActive);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        backgroundColor: const Color(0xFF059669),
+        content: Text(
+          !isActive ? 'Flujo activado' : 'Flujo desactivado',
+          style: const TextStyle(fontFamily: 'Geist', color: Colors.white),
+        ),
+        duration: const Duration(seconds: 2),
+      ));
+    } catch (e) {
+      if (!mounted) return;
+      // Revert
+      setState(() {
+        _flows = [
+          for (final f in _flows)
+            if ((f['id'] as String?) == id)
+              {...f, 'is_active': isActive}
+            else
+              f,
+        ];
+      });
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        backgroundColor: AppColors.ctDanger,
+        content: Text(
+          _dioError(e),
+          style: const TextStyle(fontFamily: 'Geist', color: Colors.white),
+        ),
+        duration: const Duration(seconds: 3),
+      ));
+    }
+  }
+
+  void _openForm({Map<String, dynamic>? flow}) {
+    showDialog(
+      context: context,
+      builder: (_) => _FlowFormDialog(
+        flow: flow,
+        workers: _workers,
+        onSaved: _fetchAll,
+        tenantId: ref.read(activeTenantIdProvider),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    ref.listen<String>(activeTenantIdProvider, (prev, next) {
+      if (next.isNotEmpty && next != prev) _fetchAll();
+    });
+
     return Column(
       children: [
-        _ActionBar(
-          onNew: () => showDialog(
-            context: context,
-            builder: (_) => const _NewWorkflowDialog(),
-          ),
-        ),
-        const Expanded(
-          child: SingleChildScrollView(
-            padding: EdgeInsets.all(22),
-            child: _WorkflowsBody(),
-          ),
-        ),
+        _ActionBar(onNew: () => _openForm()),
+        Expanded(child: _buildBody()),
       ],
+    );
+  }
+
+  Widget _buildBody() {
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_error != null) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              _error!,
+              style: const TextStyle(
+                fontFamily: 'Geist',
+                fontSize: 13,
+                color: AppColors.ctDanger,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            _PrimaryButton(label: 'Reintentar', onTap: _fetchAll),
+          ],
+        ),
+      );
+    }
+    if (_flows.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'No hay flujos configurados aún',
+              style: TextStyle(
+                fontFamily: 'Geist',
+                fontSize: 13,
+                color: AppColors.ctText2,
+              ),
+            ),
+            const SizedBox(height: 12),
+            _PrimaryButton(label: '+ Crear primer flujo', onTap: () => _openForm()),
+          ],
+        ),
+      );
+    }
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(22),
+      child: Column(
+        children: _flows.asMap().entries.map((entry) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: _FlowCard(
+              flow: entry.value,
+              index: entry.key,
+              onToggle: () => _toggleActive(entry.value),
+              onEdit: () => _openForm(flow: entry.value),
+            ),
+          );
+        }).toList(),
+      ),
     );
   }
 }
@@ -145,7 +255,7 @@ class _ActionBar extends StatelessWidget {
                 Text(
                   'Configura los flujos de reporte de tus operadores',
                   style: TextStyle(
-                    fontFamily: 'Inter',
+                    fontFamily: 'Geist',
                     fontSize: 11,
                     color: AppColors.ctText2,
                   ),
@@ -160,41 +270,44 @@ class _ActionBar extends StatelessWidget {
   }
 }
 
-// ── Cuerpo ────────────────────────────────────────────────────────────────────
+// ── Flow card ─────────────────────────────────────────────────────────────────
 
-class _WorkflowsBody extends StatelessWidget {
-  const _WorkflowsBody();
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: _kWorkflows
-          .map((w) => Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: _WorkflowCard(workflow: w),
-              ))
-          .toList(),
-    );
-  }
-}
-
-// ── Card de flujo ─────────────────────────────────────────────────────────────
-
-class _WorkflowCard extends StatefulWidget {
-  const _WorkflowCard({required this.workflow});
-  final _WorkflowMock workflow;
+class _FlowCard extends StatefulWidget {
+  const _FlowCard({
+    required this.flow,
+    required this.index,
+    required this.onToggle,
+    required this.onEdit,
+  });
+  final Map<String, dynamic> flow;
+  final int index;
+  final VoidCallback onToggle;
+  final VoidCallback onEdit;
 
   @override
-  State<_WorkflowCard> createState() => _WorkflowCardState();
+  State<_FlowCard> createState() => _FlowCardState();
 }
 
-class _WorkflowCardState extends State<_WorkflowCard> {
+class _FlowCardState extends State<_FlowCard> {
   bool _expanded = false;
-  bool _active = true;
 
   @override
   Widget build(BuildContext context) {
-    final w = widget.workflow;
+    final f          = widget.flow;
+    final name       = f['name'] as String? ?? '—';
+    final desc       = f['description'] as String? ?? '';
+    final isActive   = f['is_active'] as bool? ?? false;
+    final rawFields  = f['fields'];
+    final fields     = rawFields is List
+        ? List<Map<String, dynamic>>.from(
+            rawFields.whereType<Map>().map((e) => Map<String, dynamic>.from(e)))
+        : <Map<String, dynamic>>[];
+
+    // Worker info
+    final workerName  = f['worker_name'] as String?;
+    final workerColor = f['worker_color'] as String?;
+    final workerType  = f['worker_type'] as String? ?? f['catalog_worker_type'] as String? ?? 'custom';
+    final typeEntry   = _kTypeConfig[workerType] ?? _kTypeConfig['custom']!;
 
     return Container(
       decoration: BoxDecoration(
@@ -204,13 +317,13 @@ class _WorkflowCardState extends State<_WorkflowCard> {
       ),
       child: Column(
         children: [
-          // ── Header de la card ──
+          // ── Header row ──
           Padding(
             padding: const EdgeInsets.all(20),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // Número circular
+                // Number circle
                 Container(
                   width: 32,
                   height: 32,
@@ -220,7 +333,7 @@ class _WorkflowCardState extends State<_WorkflowCard> {
                   ),
                   alignment: Alignment.center,
                   child: Text(
-                    '${w.number}',
+                    '${widget.index + 1}',
                     style: const TextStyle(
                       fontFamily: 'Inter',
                       fontSize: 13,
@@ -231,13 +344,14 @@ class _WorkflowCardState extends State<_WorkflowCard> {
                 ),
                 const SizedBox(width: 14),
 
-                // Nombre + descripción
+                // Name + description + chips
                 Expanded(
+                  flex: 4,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        w.name,
+                        name,
                         style: const TextStyle(
                           fontFamily: 'Inter',
                           fontSize: 14,
@@ -245,34 +359,41 @@ class _WorkflowCardState extends State<_WorkflowCard> {
                           color: AppColors.ctText,
                         ),
                       ),
-                      const SizedBox(height: 3),
-                      Text(
-                        w.description,
-                        style: const TextStyle(
-                          fontFamily: 'Inter',
-                          fontSize: 12,
-                          color: AppColors.ctText2,
+                      if (desc.isNotEmpty) ...[
+                        const SizedBox(height: 3),
+                        Text(
+                          desc,
+                          style: const TextStyle(
+                            fontFamily: 'Geist',
+                            fontSize: 12,
+                            color: AppColors.ctText2,
+                          ),
                         ),
-                      ),
+                      ],
                       const SizedBox(height: 8),
-                      // Chips de metadata
                       Wrap(
                         spacing: 6,
                         runSpacing: 6,
-                        children: w.chips
-                            .map((c) => _MetadataChip(label: c))
-                            .toList(),
+                        children: [
+                          if (fields.isNotEmpty)
+                            _MetadataChip(label: '${fields.length} campo${fields.length == 1 ? '' : 's'}'),
+                          if (workerName != null)
+                            _WorkerChip(
+                              name: workerName,
+                              color: workerColor,
+                            ),
+                          _TypeBadge(typeEntry: typeEntry),
+                        ],
                       ),
                     ],
                   ),
                 ),
                 const SizedBox(width: 16),
 
-                // Badge estado + botones
+                // Badge + switch + edit button
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    // Badge + switch
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -280,18 +401,18 @@ class _WorkflowCardState extends State<_WorkflowCard> {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
-                            color: _active
+                            color: isActive
                                 ? AppColors.ctOkBg
                                 : AppColors.ctSurface2,
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(
-                            _active ? 'Activo' : 'Inactivo',
+                            isActive ? 'Activo' : 'Inactivo',
                             style: TextStyle(
-                              fontFamily: 'Inter',
+                              fontFamily: 'Geist',
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
-                              color: _active
+                              color: isActive
                                   ? AppColors.ctOkText
                                   : AppColors.ctText2,
                             ),
@@ -301,8 +422,8 @@ class _WorkflowCardState extends State<_WorkflowCard> {
                         Transform.scale(
                           scale: 0.8,
                           child: Switch(
-                            value: _active,
-                            onChanged: (v) => setState(() => _active = v),
+                            value: isActive,
+                            onChanged: (_) => widget.onToggle(),
                             activeThumbColor: AppColors.ctTeal,
                             activeTrackColor:
                                 AppColors.ctTeal.withValues(alpha: 0.3),
@@ -313,15 +434,14 @@ class _WorkflowCardState extends State<_WorkflowCard> {
                       ],
                     ),
                     const SizedBox(height: 8),
-                    // Botón editar
-                    _EditButton(onTap: () {}),
+                    _EditButton(onTap: widget.onEdit),
                   ],
                 ),
               ],
             ),
           ),
 
-          // ── Toggle "Ver campos" ──
+          // ── Expand toggle ──
           InkWell(
             onTap: () => setState(() => _expanded = !_expanded),
             child: Container(
@@ -345,30 +465,14 @@ class _WorkflowCardState extends State<_WorkflowCard> {
                   ),
                   const SizedBox(width: 6),
                   Text(
-                    _expanded ? 'Ocultar campos' : 'Ver campos',
+                    _expanded
+                        ? 'Ocultar campos'
+                        : 'Ver campos ${fields.length}',
                     style: const TextStyle(
-                      fontFamily: 'Inter',
+                      fontFamily: 'Geist',
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
                       color: AppColors.ctText2,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 6, vertical: 1),
-                    decoration: BoxDecoration(
-                      color: AppColors.ctSurface2,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      '${w.fields.length}',
-                      style: const TextStyle(
-                        fontFamily: 'Inter',
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.ctText2,
-                      ),
                     ),
                   ),
                 ],
@@ -376,13 +480,13 @@ class _WorkflowCardState extends State<_WorkflowCard> {
             ),
           ),
 
-          // ── Tabla de campos expandible ──
+          // ── Expandable fields table ──
           AnimatedCrossFade(
             duration: const Duration(milliseconds: 220),
             crossFadeState: _expanded
                 ? CrossFadeState.showFirst
                 : CrossFadeState.showSecond,
-            firstChild: _FieldsTable(fields: w.fields),
+            firstChild: _FieldsTable(fields: fields),
             secondChild: const SizedBox(width: double.infinity),
           ),
         ],
@@ -391,14 +495,14 @@ class _WorkflowCardState extends State<_WorkflowCard> {
   }
 }
 
-// ── Tabla de campos ───────────────────────────────────────────────────────────
+// ── Fields table ──────────────────────────────────────────────────────────────
 
 class _FieldsTable extends StatelessWidget {
   const _FieldsTable({required this.fields});
-  final List<_FieldMock> fields;
+  final List<Map<String, dynamic>> fields;
 
   static const _headerStyle = TextStyle(
-    fontFamily: 'Inter',
+    fontFamily: 'Geist',
     fontSize: 10,
     fontWeight: FontWeight.w600,
     color: AppColors.ctText2,
@@ -416,82 +520,88 @@ class _FieldsTable extends StatelessWidget {
           bottomRight: Radius.circular(9),
         ),
       ),
-      child: Column(
-        children: [
-          // Header
-          Padding(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            child: const Row(
+      child: fields.isEmpty
+          ? const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text(
+                'Sin campos configurados',
+                style: TextStyle(
+                  fontFamily: 'Geist',
+                  fontSize: 12,
+                  color: AppColors.ctText2,
+                ),
+              ),
+            )
+          : Column(
               children: [
-                Expanded(flex: 3, child: Text('CAMPO', style: _headerStyle)),
-                Expanded(flex: 2, child: Text('TIPO', style: _headerStyle)),
-                Expanded(
-                    flex: 1,
-                    child: Text('REQUERIDO', style: _headerStyle)),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  child: Row(
+                    children: [
+                      Expanded(flex: 3, child: Text('CAMPO', style: _headerStyle)),
+                      Expanded(flex: 2, child: Text('TIPO', style: _headerStyle)),
+                      Expanded(flex: 1, child: Text('REQUERIDO', style: _headerStyle)),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1, color: AppColors.ctBorder),
+                ...fields.asMap().entries.map((entry) {
+                  final isLast = entry.key == fields.length - 1;
+                  return Column(
+                    children: [
+                      _FieldRow(field: entry.value),
+                      if (!isLast)
+                        const Divider(height: 1, color: AppColors.ctBorder),
+                    ],
+                  );
+                }),
               ],
             ),
-          ),
-          const Divider(height: 1, color: AppColors.ctBorder),
-
-          // Filas
-          ...fields.asMap().entries.map((entry) {
-            final isLast = entry.key == fields.length - 1;
-            return Column(
-              children: [
-                _FieldRow(field: entry.value),
-                if (!isLast)
-                  const Divider(height: 1, color: AppColors.ctBorder),
-              ],
-            );
-          }),
-        ],
-      ),
     );
   }
 }
 
 class _FieldRow extends StatelessWidget {
   const _FieldRow({required this.field});
-  final _FieldMock field;
+  final Map<String, dynamic> field;
 
   @override
   Widget build(BuildContext context) {
+    final label    = field['label'] as String? ?? field['name'] as String? ?? '—';
+    final type     = field['type'] as String? ?? '—';
+    final required = field['required'] as bool? ?? false;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: Row(
         children: [
-          // Nombre del campo
           Expanded(
             flex: 3,
             child: Text(
-              field.name,
+              label,
               style: const TextStyle(
-                fontFamily: 'Inter',
+                fontFamily: 'Geist',
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
                 color: AppColors.ctText,
               ),
             ),
           ),
-
-          // Tipo — badge gris
           Expanded(
             flex: 2,
             child: Align(
               alignment: Alignment.centerLeft,
               child: Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 8, vertical: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
                   color: AppColors.ctSurface2,
                   borderRadius: BorderRadius.circular(5),
                   border: Border.all(color: AppColors.ctBorder),
                 ),
                 child: Text(
-                  field.type,
+                  type,
                   style: const TextStyle(
-                    fontFamily: 'Inter',
+                    fontFamily: 'Geist',
                     fontSize: 11,
                     color: AppColors.ctText2,
                   ),
@@ -500,32 +610,26 @@ class _FieldRow extends StatelessWidget {
               ),
             ),
           ),
-
-          // Requerido
           Expanded(
             flex: 1,
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(
-                  field.required
+                  required
                       ? Icons.check_circle_rounded
                       : Icons.remove_circle_outline_rounded,
                   size: 13,
-                  color: field.required
-                      ? AppColors.ctOk
-                      : AppColors.ctText3,
+                  color: required ? AppColors.ctOk : AppColors.ctText3,
                 ),
                 const SizedBox(width: 4),
                 Text(
-                  field.required ? 'Sí' : 'No',
+                  required ? 'Sí' : 'No',
                   style: TextStyle(
-                    fontFamily: 'Inter',
+                    fontFamily: 'Geist',
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
-                    color: field.required
-                        ? AppColors.ctOkText
-                        : AppColors.ctText3,
+                    color: required ? AppColors.ctOkText : AppColors.ctText3,
                   ),
                 ),
               ],
@@ -537,26 +641,43 @@ class _FieldRow extends StatelessWidget {
   }
 }
 
-// ── Modal nuevo flujo ─────────────────────────────────────────────────────────
+// ── Flow form dialog ──────────────────────────────────────────────────────────
 
-class _NewWorkflowDialog extends StatefulWidget {
-  const _NewWorkflowDialog();
+class _FlowFormDialog extends StatefulWidget {
+  const _FlowFormDialog({
+    required this.workers,
+    required this.onSaved,
+    required this.tenantId,
+    this.flow,
+  });
+  final Map<String, dynamic>? flow;
+  final List<Map<String, dynamic>> workers;
+  final Future<void> Function() onSaved;
+  final String tenantId;
 
   @override
-  State<_NewWorkflowDialog> createState() => _NewWorkflowDialogState();
+  State<_FlowFormDialog> createState() => _FlowFormDialogState();
 }
 
-class _NewWorkflowDialogState extends State<_NewWorkflowDialog> {
+class _FlowFormDialogState extends State<_FlowFormDialog> {
   final _nameCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
-  int _idMode = 0; // 0 = evento único, 1 = precargados, 2 = en conversación
-  bool _alertas = false;
+  String? _selectedWorkerId;
+  bool _saving = false;
 
-  static const _idModes = [
-    'Evento único (sin IDs)',
-    'IDs precargados',
-    'IDs generados en conversación',
-  ];
+  bool get _isEdit => widget.flow != null;
+
+  @override
+  void initState() {
+    super.initState();
+    if (_isEdit) {
+      _nameCtrl.text = widget.flow!['name'] as String? ?? '';
+      _descCtrl.text = widget.flow!['description'] as String? ?? '';
+    }
+    if (widget.workers.isNotEmpty) {
+      _selectedWorkerId = widget.workers.first['id'] as String?;
+    }
+  }
 
   @override
   void dispose() {
@@ -565,8 +686,57 @@ class _NewWorkflowDialogState extends State<_NewWorkflowDialog> {
     super.dispose();
   }
 
+  Future<void> _submit() async {
+    final name = _nameCtrl.text.trim();
+    if (name.isEmpty) return;
+
+    setState(() => _saving = true);
+    try {
+      final desc = _descCtrl.text.trim();
+      if (_isEdit) {
+        await FlowsApi.updateFlow(
+          flowId: widget.flow!['id'] as String,
+          name: name,
+          description: desc.isNotEmpty ? desc : null,
+        );
+      } else {
+        if (_selectedWorkerId == null) return;
+        await FlowsApi.createFlow(
+          tenantId: widget.tenantId,
+          tenantWorkerId: _selectedWorkerId!,
+          name: name,
+          description: desc.isNotEmpty ? desc : null,
+        );
+      }
+      await widget.onSaved();
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      final isDio = e is DioException;
+      final is409 = isDio && e.response?.statusCode == 409;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        backgroundColor: is409
+            ? const Color(0xFFF97316)
+            : AppColors.ctDanger,
+        content: Text(
+          is409
+              ? 'Ya existe un flujo con ese nombre'
+              : _dioError(e),
+          style: const TextStyle(fontFamily: 'Geist', color: Colors.white),
+        ),
+        duration: const Duration(seconds: 3),
+      ));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final editWorkerName = _isEdit
+        ? (widget.flow!['worker_name'] as String? ??
+            widget.flow!['display_name'] as String?)
+        : null;
+
     return Dialog(
       backgroundColor: AppColors.ctSurface,
       shape: RoundedRectangleBorder(
@@ -581,10 +751,9 @@ class _NewWorkflowDialogState extends State<_NewWorkflowDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Título
-              const Text(
-                'Nuevo flujo de trabajo',
-                style: TextStyle(
+              Text(
+                _isEdit ? 'Editar flujo' : 'Nuevo flujo',
+                style: const TextStyle(
                   fontFamily: 'Inter',
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
@@ -593,12 +762,100 @@ class _NewWorkflowDialogState extends State<_NewWorkflowDialog> {
               ),
               const SizedBox(height: 20),
 
-              // Nombre del flujo
+              // Nombre
               _DialogField(
                 label: 'Nombre del flujo',
                 controller: _nameCtrl,
                 placeholder: 'Ej: Flujo 4 · Entregas',
               ),
+              const SizedBox(height: 14),
+
+              // Worker
+              const Text(
+                'Worker',
+                style: TextStyle(
+                  fontFamily: 'Geist',
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.ctText,
+                ),
+              ),
+              const SizedBox(height: 6),
+              if (_isEdit)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: AppColors.ctSurface2,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.ctBorder2),
+                  ),
+                  child: Text(
+                    editWorkerName ?? '—',
+                    style: const TextStyle(
+                      fontFamily: 'Geist',
+                      fontSize: 13,
+                      color: AppColors.ctText2,
+                    ),
+                  ),
+                )
+              else if (widget.workers.isEmpty)
+                const Text(
+                  'No hay workers disponibles',
+                  style: TextStyle(
+                    fontFamily: 'Geist',
+                    fontSize: 13,
+                    color: AppColors.ctText2,
+                  ),
+                )
+              else
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.ctSurface2,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.ctBorder2),
+                  ),
+                  child: DropdownButton<String>(
+                    value: _selectedWorkerId,
+                    isExpanded: true,
+                    underline: const SizedBox.shrink(),
+                    dropdownColor: AppColors.ctSurface,
+                    items: widget.workers.map((w) {
+                      final wName  = w['display_name'] as String? ??
+                          w['catalog_name'] as String? ?? '—';
+                      final wColor = w['catalog_color'] as String?;
+                      return DropdownMenuItem<String>(
+                        value: w['id'] as String?,
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 8,
+                              height: 8,
+                              decoration: BoxDecoration(
+                                color: _hexColor(wColor),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              wName,
+                              style: const TextStyle(
+                                fontFamily: 'Geist',
+                                fontSize: 13,
+                                color: AppColors.ctText,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: (v) => setState(() => _selectedWorkerId = v),
+                  ),
+                ),
               const SizedBox(height: 14),
 
               // Descripción
@@ -608,137 +865,9 @@ class _NewWorkflowDialogState extends State<_NewWorkflowDialog> {
                 placeholder: 'Describe el propósito de este flujo...',
                 maxLines: 3,
               ),
-              const SizedBox(height: 18),
-
-              // Modo de IDs
-              const Text(
-                'Modo de IDs',
-                style: TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.ctText,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Container(
-                decoration: BoxDecoration(
-                  border: Border.all(color: AppColors.ctBorder),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Column(
-                  children: List.generate(_idModes.length, (i) {
-                    final isLast = i == _idModes.length - 1;
-                    return Column(
-                      children: [
-                        InkWell(
-                          borderRadius: isLast
-                              ? const BorderRadius.only(
-                                  bottomLeft: Radius.circular(7),
-                                  bottomRight: Radius.circular(7),
-                                )
-                              : BorderRadius.zero,
-                          onTap: () => setState(() => _idMode = i),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 10),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 16,
-                                  height: 16,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                      color: _idMode == i
-                                          ? AppColors.ctTeal
-                                          : AppColors.ctBorder2,
-                                      width: 1.5,
-                                    ),
-                                  ),
-                                  alignment: Alignment.center,
-                                  child: _idMode == i
-                                      ? Container(
-                                          width: 8,
-                                          height: 8,
-                                          decoration: const BoxDecoration(
-                                            color: AppColors.ctTeal,
-                                            shape: BoxShape.circle,
-                                          ),
-                                        )
-                                      : null,
-                                ),
-                                const SizedBox(width: 10),
-                                Text(
-                                  _idModes[i],
-                                  style: const TextStyle(
-                                    fontFamily: 'Inter',
-                                    fontSize: 13,
-                                    color: AppColors.ctText,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        if (!isLast)
-                          const Divider(
-                              height: 1, color: AppColors.ctBorder),
-                      ],
-                    );
-                  }),
-                ),
-              ),
-              const SizedBox(height: 14),
-
-              // Alertas automáticas
-              Container(
-                decoration: BoxDecoration(
-                  border: Border.all(color: AppColors.ctBorder),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(7),
-                  onTap: () => setState(() => _alertas = !_alertas),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 10),
-                    child: Row(
-                      children: [
-                        SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: Checkbox(
-                            value: _alertas,
-                            onChanged: (v) =>
-                                setState(() => _alertas = v ?? false),
-                            activeColor: AppColors.ctTeal,
-                            checkColor: AppColors.ctNavy,
-                            materialTapTargetSize:
-                                MaterialTapTargetSize.shrinkWrap,
-                            side: const BorderSide(
-                                color: AppColors.ctBorder2),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        const Expanded(
-                          child: Text(
-                            '¿Genera alertas automáticas?',
-                            style: TextStyle(
-                              fontFamily: 'Inter',
-                              fontSize: 13,
-                              color: AppColors.ctText,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
               const SizedBox(height: 24),
 
-              // Botones
+              // Buttons
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
@@ -748,8 +877,8 @@ class _NewWorkflowDialogState extends State<_NewWorkflowDialog> {
                   ),
                   const SizedBox(width: 10),
                   _PrimaryButton(
-                    label: 'Crear flujo',
-                    onTap: () => Navigator.pop(context),
+                    label: _saving ? 'Guardando...' : 'Guardar',
+                    onTap: _saving ? () {} : _submit,
                   ),
                 ],
               ),
@@ -761,7 +890,7 @@ class _NewWorkflowDialogState extends State<_NewWorkflowDialog> {
   }
 }
 
-// ── Widgets reutilizables ─────────────────────────────────────────────────────
+// ── Reusable widgets ──────────────────────────────────────────────────────────
 
 class _MetadataChip extends StatelessWidget {
   const _MetadataChip({required this.label});
@@ -779,9 +908,74 @@ class _MetadataChip extends StatelessWidget {
       child: Text(
         label,
         style: const TextStyle(
-          fontFamily: 'Inter',
+          fontFamily: 'Geist',
           fontSize: 11,
           color: AppColors.ctText2,
+        ),
+      ),
+    );
+  }
+}
+
+class _WorkerChip extends StatelessWidget {
+  const _WorkerChip({required this.name, this.color});
+  final String name;
+  final String? color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: AppColors.ctSurface2,
+        borderRadius: BorderRadius.circular(5),
+        border: Border.all(color: AppColors.ctBorder),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              color: _hexColor(color),
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 5),
+          Text(
+            name,
+            style: const TextStyle(
+              fontFamily: 'Geist',
+              fontSize: 11,
+              color: AppColors.ctText2,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TypeBadge extends StatelessWidget {
+  const _TypeBadge({required this.typeEntry});
+  final ({String label, Color bg, Color fg}) typeEntry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: typeEntry.bg,
+        borderRadius: BorderRadius.circular(5),
+      ),
+      child: Text(
+        typeEntry.label,
+        style: TextStyle(
+          fontFamily: 'Geist',
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: typeEntry.fg,
         ),
       ),
     );
@@ -809,8 +1003,7 @@ class _EditButtonState extends State<_EditButton> {
         onTap: widget.onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 120),
-          padding:
-              const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
             color: _hovered
                 ? AppColors.ctInfo.withValues(alpha: 0.08)
@@ -834,7 +1027,7 @@ class _EditButtonState extends State<_EditButton> {
               Text(
                 'Editar',
                 style: TextStyle(
-                  fontFamily: 'Inter',
+                  fontFamily: 'Geist',
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
                   color: _hovered ? AppColors.ctInfo : AppColors.ctText2,
@@ -868,7 +1061,7 @@ class _DialogField extends StatelessWidget {
         Text(
           label,
           style: const TextStyle(
-            fontFamily: 'Inter',
+            fontFamily: 'Geist',
             fontSize: 13,
             fontWeight: FontWeight.w500,
             color: AppColors.ctText,
@@ -880,14 +1073,14 @@ class _DialogField extends StatelessWidget {
           maxLines: maxLines,
           minLines: maxLines,
           style: const TextStyle(
-            fontFamily: 'Inter',
+            fontFamily: 'Geist',
             fontSize: 13,
             color: AppColors.ctText,
           ),
           decoration: InputDecoration(
             hintText: placeholder,
             hintStyle: const TextStyle(
-              fontFamily: 'Inter',
+              fontFamily: 'Geist',
               fontSize: 13,
               color: AppColors.ctText3,
             ),
@@ -905,8 +1098,7 @@ class _DialogField extends StatelessWidget {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide:
-                  const BorderSide(color: AppColors.ctTeal, width: 1.5),
+              borderSide: const BorderSide(color: AppColors.ctTeal),
             ),
           ),
         ),
@@ -915,42 +1107,28 @@ class _DialogField extends StatelessWidget {
   }
 }
 
-class _PrimaryButton extends StatefulWidget {
+class _PrimaryButton extends StatelessWidget {
   const _PrimaryButton({required this.label, required this.onTap});
   final String label;
   final VoidCallback onTap;
 
   @override
-  State<_PrimaryButton> createState() => _PrimaryButtonState();
-}
-
-class _PrimaryButtonState extends State<_PrimaryButton> {
-  bool _hovered = false;
-
-  @override
   Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          padding:
-              const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          decoration: BoxDecoration(
-            color: _hovered ? AppColors.ctTealDark : AppColors.ctTeal,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Text(
-            widget.label,
-            style: const TextStyle(
-              fontFamily: 'Inter',
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: AppColors.ctNavy,
-            ),
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: AppColors.ctTeal,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Text(
+          label,
+          style: const TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: AppColors.ctNavy,
           ),
         ),
       ),
@@ -958,43 +1136,28 @@ class _PrimaryButtonState extends State<_PrimaryButton> {
   }
 }
 
-class _GhostButton extends StatefulWidget {
+class _GhostButton extends StatelessWidget {
   const _GhostButton({required this.label, required this.onTap});
   final String label;
   final VoidCallback onTap;
 
   @override
-  State<_GhostButton> createState() => _GhostButtonState();
-}
-
-class _GhostButtonState extends State<_GhostButton> {
-  bool _hovered = false;
-
-  @override
   Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          padding:
-              const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            color: _hovered ? AppColors.ctSurface2 : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: AppColors.ctBorder2),
-          ),
-          child: Text(
-            widget.label,
-            style: const TextStyle(
-              fontFamily: 'Inter',
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: AppColors.ctText2,
-            ),
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: AppColors.ctBorder2),
+        ),
+        child: Text(
+          label,
+          style: const TextStyle(
+            fontFamily: 'Geist',
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+            color: AppColors.ctText2,
           ),
         ),
       ),
