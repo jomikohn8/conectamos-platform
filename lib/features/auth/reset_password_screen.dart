@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/api/api_client.dart';
 import '../../core/theme/app_theme.dart';
@@ -52,11 +53,29 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     });
 
     try {
+      // Step 1: exchange the recovery token with Supabase to get a session
+      final otpResponse = await Supabase.instance.client.auth.verifyOTP(
+        token: widget.token,
+        type: OtpType.recovery,
+      );
+      final accessToken = otpResponse.session?.accessToken;
+
+      if (!mounted) return;
+
+      if (accessToken == null) {
+        setState(() {
+          _error = 'El enlace expiró o es inválido. Solicita uno nuevo.';
+          _submitting = false;
+        });
+        return;
+      }
+
+      // Step 2: send access_token + new password to the backend
       await ApiClient.instance.post(
         '/iam/password-reset/confirm',
         data: {
-          'token':    widget.token,
-          'password': pass,
+          'access_token': accessToken,
+          'password':     pass,
         },
       );
       if (!mounted) return;
@@ -79,7 +98,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = 'Error al actualizar la contraseña. Intenta nuevamente.';
+        _error = 'El enlace expiró o es inválido. Solicita uno nuevo.';
         _submitting = false;
       });
     }
