@@ -823,6 +823,74 @@ class _UserRowState extends ConsumerState<_UserRow> {
     }
   }
 
+  Future<void> _sendPasswordReset() async {
+    final email = _email;
+    if (email.isEmpty) return;
+    try {
+      await ApiClient.instance.post(
+        '/iam/password-reset',
+        data: {'email': email},
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Enlace enviado a $email',
+              style: const TextStyle(fontFamily: 'Inter', fontSize: 13)),
+          backgroundColor: AppColors.ctNavy,
+          behavior: SnackBarBehavior.floating,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          margin: const EdgeInsets.all(16),
+        ));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(_errorSnack('Error al enviar el enlace: $e'));
+      }
+    }
+  }
+
+  void _showPasswordResetConfirm() {
+    final email = _email;
+    showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: const Text(
+          'Enviar reset de contraseña',
+          style: TextStyle(
+              fontFamily: 'Inter', fontSize: 15, fontWeight: FontWeight.w700),
+        ),
+        content: Text(
+          '¿Enviar enlace de recuperación de contraseña a $email?',
+          style: const TextStyle(
+              fontFamily: 'Geist', fontSize: 13, color: Color(0xFF6B7280)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancelar',
+                style: TextStyle(
+                    fontFamily: 'Geist',
+                    fontSize: 13,
+                    color: AppColors.ctText2)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Enviar',
+                style: TextStyle(
+                    fontFamily: 'Geist',
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.ctTeal)),
+          ),
+        ],
+      ),
+    ).then((confirmed) {
+      if (confirmed == true) _sendPasswordReset();
+    });
+  }
+
   void _showChangeRoleDialog() {
     showDialog(
       context: context,
@@ -963,6 +1031,12 @@ class _UserRowState extends ConsumerState<_UserRow> {
                                     fontFamily: 'Inter', fontSize: 13)),
                           ));
                           items.add(const PopupMenuItem(
+                            value: 'password_reset',
+                            child: Text('Enviar reset de contraseña',
+                                style: TextStyle(
+                                    fontFamily: 'Inter', fontSize: 13)),
+                          ));
+                          items.add(const PopupMenuItem(
                             value: 'suspend',
                             child: Text('Suspender',
                                 style: TextStyle(
@@ -1002,6 +1076,8 @@ class _UserRowState extends ConsumerState<_UserRow> {
                           _showEditDialog();
                         } else if (v == 'role') {
                           _showChangeRoleDialog();
+                        } else if (v == 'password_reset') {
+                          _showPasswordResetConfirm();
                         } else if (v == 'suspend') {
                           _patch({'status': 'suspended'});
                         } else if (v == 'reactivate') {
