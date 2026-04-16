@@ -1020,7 +1020,10 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
     // Level 4: query all operators for the tenant and find a channel
     if (channelId == null) {
       try {
+        debugPrint('[sendReaction] L4: fetching operators for tenant $tenantId');
         final allOps = await OperatorsApi.listOperators(tenantId: tenantId);
+        debugPrint('[sendReaction] L4: operators fetched: ${allOps.length}');
+        debugPrint('[sendReaction] L4: selected operator phone: $chatId');
         // Prefer the selected operator first
         final selectedOp = allOps.cast<Map<String, dynamic>?>().firstWhere(
               (o) => (o!['phone'] as String?) == chatId,
@@ -1028,6 +1031,7 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
             );
         final selectedOpChannels =
             List<Map<String, dynamic>>.from(selectedOp?['channels'] as List? ?? []);
+        debugPrint('[sendReaction] L4: channels for selected op: ${selectedOpChannels.map((c) => c['channel_id']).toList()}');
         channelId = selectedOpChannels.isNotEmpty
             ? selectedOpChannels.first['channel_id'] as String?
             : null;
@@ -1042,7 +1046,10 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
             }
           }
         }
-      } catch (_) {}
+        debugPrint('[sendReaction] L4: resolved from L4: $channelId');
+      } catch (e) {
+        debugPrint('[sendReaction] L4: ERROR: $e');
+      }
     }
 
     if (channelId == null) {
@@ -2343,27 +2350,48 @@ class _ApiMessageBubbleState extends State<_ApiMessageBubble> {
   Widget _buildImageContent() {
     final mUrl = (widget.mediaUrl?.isNotEmpty == true) ? widget.mediaUrl! : null;
     if (mUrl == null) return _fallback('[Imagen]');
-    return GestureDetector(
-      onTap: () => showDialog(
-        context: context,
-        builder: (_) => Dialog(
-          backgroundColor: Colors.transparent,
-          child: GestureDetector(
-            onTap: () => Navigator.of(context).pop(),
-            child: Image.network(mUrl,
-                errorBuilder: (ctx, e, s) => _fallback('[Imagen]')),
+    final caption =
+        (widget.body.isNotEmpty && !widget.body.startsWith('[')) ? widget.body : null;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        GestureDetector(
+          onTap: () => showDialog(
+            context: context,
+            builder: (_) => Dialog(
+              backgroundColor: Colors.transparent,
+              child: GestureDetector(
+                onTap: () => Navigator.of(context).pop(),
+                child: Image.network(mUrl,
+                    errorBuilder: (ctx, e, s) => _fallback('[Imagen]')),
+              ),
+            ),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Image.network(
+              mUrl,
+              width: 240,
+              fit: BoxFit.cover,
+              errorBuilder: (ctx, e, s) => _fallback('[Imagen]'),
+            ),
           ),
         ),
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(8),
-        child: Image.network(
-          mUrl,
-          width: 240,
-          fit: BoxFit.cover,
-          errorBuilder: (ctx, e, s) => _fallback('[Imagen]'),
-        ),
-      ),
+        if (caption != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              caption,
+              style: const TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 13,
+                color: Color(0xFF111B21),
+                height: 1.4,
+              ),
+            ),
+          ),
+      ],
     );
   }
 
@@ -2422,10 +2450,31 @@ class _ApiMessageBubbleState extends State<_ApiMessageBubble> {
         },
       );
     }
-    return SizedBox(
-      width: 240,
-      height: 135,
-      child: HtmlElementView(viewType: videoViewId),
+    final caption =
+        (widget.body.isNotEmpty && !widget.body.startsWith('[')) ? widget.body : null;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          width: 240,
+          height: 135,
+          child: HtmlElementView(viewType: videoViewId),
+        ),
+        if (caption != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              caption,
+              style: const TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 13,
+                color: Color(0xFF111B21),
+                height: 1.4,
+              ),
+            ),
+          ),
+      ],
     );
   }
 
@@ -2433,27 +2482,48 @@ class _ApiMessageBubbleState extends State<_ApiMessageBubble> {
     final mUrl = (widget.mediaUrl?.isNotEmpty == true) ? widget.mediaUrl! : null;
     if (mUrl == null) return _fallback('[Documento]');
     final fileName = Uri.parse(mUrl).pathSegments.lastOrNull ?? 'Documento';
-    return Row(
+    final caption =
+        (widget.body.isNotEmpty && !widget.body.startsWith('[')) ? widget.body : null;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Icon(Icons.insert_drive_file, size: 24, color: Color(0xFF667781)),
-        const SizedBox(width: 8),
-        Flexible(
-          child: Text(fileName,
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.insert_drive_file, size: 24, color: Color(0xFF667781)),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(fileName,
+                  style: const TextStyle(
+                      fontFamily: 'Inter', fontSize: 12, color: Color(0xFF111B21)),
+                  overflow: TextOverflow.ellipsis),
+            ),
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: () => _openUrl(mUrl),
+              child: const Text('Abrir',
+                  style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 12,
+                      color: Color(0xFF53BDEB),
+                      fontWeight: FontWeight.w600)),
+            ),
+          ],
+        ),
+        if (caption != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              caption,
               style: const TextStyle(
-                  fontFamily: 'Inter', fontSize: 12, color: Color(0xFF111B21)),
-              overflow: TextOverflow.ellipsis),
-        ),
-        const SizedBox(width: 8),
-        GestureDetector(
-          onTap: () => _openUrl(mUrl),
-          child: const Text('Abrir',
-              style: TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 12,
-                  color: Color(0xFF53BDEB),
-                  fontWeight: FontWeight.w600)),
-        ),
+                fontFamily: 'Inter',
+                fontSize: 13,
+                color: Color(0xFF111B21),
+                height: 1.4,
+              ),
+            ),
+          ),
       ],
     );
   }
