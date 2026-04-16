@@ -595,22 +595,15 @@ class _Sidebar extends ConsumerWidget {
                           currentRoute: currentRoute,
                           collapsed: collapsed,
                         ),
-                        _NavItem(
-                          icon: Icons.bar_chart_rounded,
-                          label: 'Dashboard',
-                          route: '/dashboard',
-                          currentRoute: currentRoute,
-                          collapsed: collapsed,
-                        ),
                         const SizedBox(height: 4),
                         _NavSection(
-                          label: 'Gestión',
+                          label: 'Workers',
                           collapsed: collapsed,
                         ),
                         _NavItem(
-                          icon: Icons.people_outline_rounded,
-                          label: 'Operadores',
-                          route: '/operators',
+                          icon: Icons.smart_toy_rounded,
+                          label: 'Mis Workers',
+                          route: '/workers',
                           currentRoute: currentRoute,
                           collapsed: collapsed,
                         ),
@@ -618,13 +611,6 @@ class _Sidebar extends ConsumerWidget {
                           icon: Icons.account_tree_outlined,
                           label: 'Flujos de trabajo',
                           route: '/flows',
-                          currentRoute: currentRoute,
-                          collapsed: collapsed,
-                        ),
-                        _NavItem(
-                          icon: Icons.smart_toy_rounded,
-                          label: 'AI Workers',
-                          route: '/workers',
                           currentRoute: currentRoute,
                           collapsed: collapsed,
                         ),
@@ -641,6 +627,13 @@ class _Sidebar extends ConsumerWidget {
                           collapsed: collapsed,
                         ),
                         _NavItem(
+                          icon: Icons.people_outline_rounded,
+                          label: 'Operadores',
+                          route: '/operators',
+                          currentRoute: currentRoute,
+                          collapsed: collapsed,
+                        ),
+                        _NavItem(
                           icon: Icons.cable_outlined,
                           label: 'Conexiones',
                           route: '/connections',
@@ -652,6 +645,21 @@ class _Sidebar extends ConsumerWidget {
                           label: 'Ajustes',
                           route: '/settings',
                           currentRoute: currentRoute,
+                          collapsed: collapsed,
+                        ),
+                        const SizedBox(height: 4),
+                        _NavSection(
+                          label: 'Próximamente',
+                          collapsed: collapsed,
+                        ),
+                        _DisabledNavItem(
+                          icon: Icons.bar_chart_rounded,
+                          label: 'Dashboards',
+                          collapsed: collapsed,
+                        ),
+                        _DisabledNavItem(
+                          icon: Icons.group_work_outlined,
+                          label: 'Catálogo',
                           collapsed: collapsed,
                         ),
                       ],
@@ -838,6 +846,101 @@ class _NavItemState extends State<_NavItem> {
         ],
       ),
     );
+  }
+}
+
+// ── Disabled nav item (Coming Soon) ───────────────────────────────────────────
+
+class _DisabledNavItem extends StatefulWidget {
+  const _DisabledNavItem({
+    required this.icon,
+    required this.label,
+    required this.collapsed,
+  });
+  final IconData icon;
+  final String label;
+  final bool collapsed;
+
+  @override
+  State<_DisabledNavItem> createState() => _DisabledNavItemState();
+}
+
+class _DisabledNavItemState extends State<_DisabledNavItem> {
+  bool _hovered = false;
+
+  Widget _buildCollapsed() {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 1, horizontal: 6),
+      width: 44,
+      height: 36,
+      decoration: BoxDecoration(
+        color: _hovered ? AppColors.ctSurface2 : Colors.transparent,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      alignment: Alignment.center,
+      child: Opacity(
+        opacity: 0.4,
+        child: Icon(widget.icon, size: 18, color: AppColors.ctText3),
+      ),
+    );
+  }
+
+  Widget _buildExpanded() {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 1, horizontal: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: _hovered ? AppColors.ctSurface2 : Colors.transparent,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Opacity(
+        opacity: 0.4,
+        child: Row(
+          children: [
+            Icon(widget.icon, size: 16, color: AppColors.ctText3),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                widget.label,
+                style: const TextStyle(
+                  fontFamily: 'Geist',
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.ctText2,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final content = Tooltip(
+      message: 'Próximamente',
+      preferBelow: false,
+      waitDuration: Duration.zero,
+      decoration: BoxDecoration(
+        color: AppColors.ctNavy,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      textStyle: const TextStyle(
+        fontFamily: 'Geist',
+        fontSize: 12,
+        color: Colors.white,
+      ),
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit:  (_) => setState(() => _hovered = false),
+        cursor: SystemMouseCursors.forbidden,
+        child: widget.collapsed ? _buildCollapsed() : _buildExpanded(),
+      ),
+    );
+
+    return content;
   }
 }
 
