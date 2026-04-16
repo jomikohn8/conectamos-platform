@@ -1012,6 +1012,11 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
     final channelId = (msgChannelId != null && msgChannelId.isNotEmpty)
         ? msgChannelId
         : tabChannelId ?? firstChannelId;
+    // --- DIAGNÓSTICO Bug 1 ---
+    debugPrint('[sendReaction] msg[channel_id]: $msgChannelId  (type: ${msg['channel_id'].runtimeType})');
+    debugPrint('[sendReaction] operatorChannels: ${channels.map((c) => c['channel_id']).toList()}');
+    debugPrint('[sendReaction] resolved channelId: $channelId');
+    // -------------------------
     if (channelId == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
@@ -1556,6 +1561,11 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
 
     // Resolve reply context
     final contextMsgId = msg['context_message_id'] as String?;
+    // --- DIAGNÓSTICO Bug 4 ---
+    if ((msg['message_type'] as String?) == 'image') {
+      debugPrint('[buildBubble] IMAGE id=$msgId context_message_id=${msg['context_message_id']} (type: ${msg['context_message_id'].runtimeType}) hasContext=${contextMsgId != null && contextMsgId.isNotEmpty}');
+    }
+    // -------------------------
     String? contextFrom;
     String? contextBody;
     if (contextMsgId != null && contextMsgId.isNotEmpty) {
@@ -2302,225 +2312,212 @@ class _ApiMessageBubbleState extends State<_ApiMessageBubble> {
             fontFamily: 'Inter', fontSize: 13, color: Color(0xFF667781)),
       );
 
-  Widget _buildContent(BuildContext context) {
-    final mType = widget.messageType ?? 'text';
-    final mUrl = (widget.mediaUrl != null && widget.mediaUrl!.isNotEmpty)
-        ? widget.mediaUrl
-        : null;
-
-    Future<void> openUrl(String url) async {
-      final uri = Uri.parse(url);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      }
+  Future<void> _openUrl(String url) async {
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
+  }
 
-    switch (mType) {
-      case 'image':
-        if (mUrl == null) return _fallback('[Imagen]');
-        return GestureDetector(
-          onTap: () => showDialog(
-            context: context,
-            builder: (_) => Dialog(
-              backgroundColor: Colors.transparent,
-              child: GestureDetector(
-                onTap: () => Navigator.of(context).pop(),
-                child: Image.network(mUrl,
-                    errorBuilder: (ctx, e, s) => _fallback('[Imagen]')),
-              ),
-            ),
+  Widget _buildImageContent() {
+    final mUrl = (widget.mediaUrl?.isNotEmpty == true) ? widget.mediaUrl! : null;
+    if (mUrl == null) return _fallback('[Imagen]');
+    return GestureDetector(
+      onTap: () => showDialog(
+        context: context,
+        builder: (_) => Dialog(
+          backgroundColor: Colors.transparent,
+          child: GestureDetector(
+            onTap: () => Navigator.of(context).pop(),
+            child: Image.network(mUrl,
+                errorBuilder: (ctx, e, s) => _fallback('[Imagen]')),
           ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: Image.network(
-              mUrl,
-              width: 240,
-              fit: BoxFit.cover,
-              errorBuilder: (ctx, e, s) => _fallback('[Imagen]'),
-            ),
-          ),
-        );
-
-      case 'audio':
-        if (mUrl == null) return _fallback('[Audio]');
-        final audioUrl = mUrl;
-        final audioViewId = 'audio-${audioUrl.hashCode}';
-        if (!_registeredMediaViews.contains(audioViewId)) {
-          _registeredMediaViews.add(audioViewId);
-          ui_web.platformViewRegistry.registerViewFactory(
-            audioViewId,
-            (int id) {
-              final audio = html.AudioElement()
-                ..controls = true
-                ..style.width = '220px'
-                ..style.outline = 'none'
-                ..style.display = 'block';
-              audio.append(html.SourceElement()
-                ..src = audioUrl
-                ..type = 'audio/ogg');
-              audio.append(html.SourceElement()
-                ..src = audioUrl
-                ..type = 'audio/mpeg');
-              return audio;
-            },
-          );
-        }
-        return SizedBox(
-          width: 220,
-          height: 54,
-          child: HtmlElementView(viewType: audioViewId),
-        );
-
-      case 'video':
-        if (mUrl == null) return _fallback('[Video]');
-        final videoUrl = mUrl;
-        final videoViewId = 'video-${videoUrl.hashCode}';
-        if (!_registeredMediaViews.contains(videoViewId)) {
-          _registeredMediaViews.add(videoViewId);
-          ui_web.platformViewRegistry.registerViewFactory(
-            videoViewId,
-            (int id) {
-              final video = html.VideoElement()
-                ..controls = true
-                ..style.width = '240px'
-                ..style.height = '135px'
-                ..style.borderRadius = '8px'
-                ..style.background = '#000'
-                ..style.outline = 'none'
-                ..style.display = 'block';
-              video.append(html.SourceElement()
-                ..src = videoUrl
-                ..type = 'video/mp4');
-              return video;
-            },
-          );
-        }
-        return SizedBox(
-          width: 240,
-          height: 135,
-          child: HtmlElementView(viewType: videoViewId),
-        );
-
-      case 'document':
-        if (mUrl == null) return _fallback('[Documento]');
-        final fileName =
-            Uri.parse(mUrl).pathSegments.lastOrNull ?? 'Documento';
-        return Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.insert_drive_file,
-                size: 24, color: Color(0xFF667781)),
-            const SizedBox(width: 8),
-            Flexible(
-              child: Text(fileName,
-                  style: const TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 12,
-                      color: Color(0xFF111B21)),
-                  overflow: TextOverflow.ellipsis),
-            ),
-            const SizedBox(width: 8),
-            GestureDetector(
-              onTap: () => openUrl(mUrl),
-              child: const Text('Abrir',
-                  style: TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 12,
-                      color: Color(0xFF53BDEB),
-                      fontWeight: FontWeight.w600)),
-            ),
-          ],
-        );
-
-      case 'sticker':
-        if (mUrl == null) return _fallback('[Sticker]');
-        return Image.network(
+        ),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: Image.network(
           mUrl,
-          width: 120,
-          height: 120,
-          fit: BoxFit.contain,
-          errorBuilder: (ctx, e, s) => _fallback('[Sticker]'),
-        );
+          width: 240,
+          fit: BoxFit.cover,
+          errorBuilder: (ctx, e, s) => _fallback('[Imagen]'),
+        ),
+      ),
+    );
+  }
 
-      case 'location':
-        Map<String, dynamic>? locData;
-        try {
-          locData = jsonDecode(widget.body) as Map<String, dynamic>;
-        } catch (_) {}
-        final locName = locData?['name'] as String? ??
-            locData?['address'] as String? ??
-            'Ubicación compartida';
-        final lat = locData?['latitude']?.toString() ?? '';
-        final lng = locData?['longitude']?.toString() ?? '';
-        final mapsUrl = (lat.isNotEmpty && lng.isNotEmpty)
-            ? 'https://maps.google.com/?q=$lat,$lng'
-            : 'https://maps.google.com/';
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildAudioContent() {
+    final mUrl = (widget.mediaUrl?.isNotEmpty == true) ? widget.mediaUrl! : null;
+    if (mUrl == null) return _fallback('[Audio]');
+    final audioViewId = 'audio-${mUrl.hashCode}';
+    if (!_registeredMediaViews.contains(audioViewId)) {
+      _registeredMediaViews.add(audioViewId);
+      ui_web.platformViewRegistry.registerViewFactory(
+        audioViewId,
+        (int id) {
+          final audio = html.AudioElement()
+            ..controls = true
+            ..style.width = '220px'
+            ..style.outline = 'none'
+            ..style.display = 'block';
+          audio.append(html.SourceElement()
+            ..src = mUrl
+            ..type = 'audio/ogg');
+          audio.append(html.SourceElement()
+            ..src = mUrl
+            ..type = 'audio/mpeg');
+          return audio;
+        },
+      );
+    }
+    return SizedBox(
+      width: 220,
+      height: 54,
+      child: HtmlElementView(viewType: audioViewId),
+    );
+  }
+
+  Widget _buildVideoContent() {
+    final mUrl = (widget.mediaUrl?.isNotEmpty == true) ? widget.mediaUrl! : null;
+    if (mUrl == null) return _fallback('[Video]');
+    final videoViewId = 'video-${mUrl.hashCode}';
+    if (!_registeredMediaViews.contains(videoViewId)) {
+      _registeredMediaViews.add(videoViewId);
+      ui_web.platformViewRegistry.registerViewFactory(
+        videoViewId,
+        (int id) {
+          final video = html.VideoElement()
+            ..controls = true
+            ..style.width = '240px'
+            ..style.height = '135px'
+            ..style.borderRadius = '8px'
+            ..style.background = '#000'
+            ..style.outline = 'none'
+            ..style.display = 'block';
+          video.append(html.SourceElement()
+            ..src = mUrl
+            ..type = 'video/mp4');
+          return video;
+        },
+      );
+    }
+    return SizedBox(
+      width: 240,
+      height: 135,
+      child: HtmlElementView(viewType: videoViewId),
+    );
+  }
+
+  Widget _buildDocumentContent() {
+    final mUrl = (widget.mediaUrl?.isNotEmpty == true) ? widget.mediaUrl! : null;
+    if (mUrl == null) return _fallback('[Documento]');
+    final fileName = Uri.parse(mUrl).pathSegments.lastOrNull ?? 'Documento';
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(Icons.insert_drive_file, size: 24, color: Color(0xFF667781)),
+        const SizedBox(width: 8),
+        Flexible(
+          child: Text(fileName,
+              style: const TextStyle(
+                  fontFamily: 'Inter', fontSize: 12, color: Color(0xFF111B21)),
+              overflow: TextOverflow.ellipsis),
+        ),
+        const SizedBox(width: 8),
+        GestureDetector(
+          onTap: () => _openUrl(mUrl),
+          child: const Text('Abrir',
+              style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 12,
+                  color: Color(0xFF53BDEB),
+                  fontWeight: FontWeight.w600)),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStickerContent() {
+    final mUrl = (widget.mediaUrl?.isNotEmpty == true) ? widget.mediaUrl! : null;
+    if (mUrl == null) return _fallback('[Sticker]');
+    return Image.network(
+      mUrl,
+      width: 120,
+      height: 120,
+      fit: BoxFit.contain,
+      errorBuilder: (ctx, e, s) => _fallback('[Sticker]'),
+    );
+  }
+
+  Widget _buildLocationContent() {
+    Map<String, dynamic>? locData;
+    try {
+      locData = jsonDecode(widget.body) as Map<String, dynamic>;
+    } catch (_) {}
+    final locName = locData?['name'] as String? ??
+        locData?['address'] as String? ??
+        'Ubicación compartida';
+    final lat = locData?['latitude']?.toString() ?? '';
+    final lng = locData?['longitude']?.toString() ?? '';
+    final mapsUrl = (lat.isNotEmpty && lng.isNotEmpty)
+        ? 'https://maps.google.com/?q=$lat,$lng'
+        : 'https://maps.google.com/';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.location_on,
-                    color: Colors.red, size: 18),
-                const SizedBox(width: 6),
-                Flexible(
-                  child: Text(
-                    locName,
-                    style: const TextStyle(
-                        fontFamily: 'Inter',
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF111B21)),
-                  ),
-                ),
-              ],
-            ),
-            if (lat.isNotEmpty && lng.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(top: 2, left: 24),
-                child: Text(
-                  '$lat, $lng',
+            const Icon(Icons.location_on, color: Colors.red, size: 18),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(locName,
                   style: const TextStyle(
                       fontFamily: 'Inter',
-                      fontSize: 11,
-                      color: Color(0xFF667781)),
-                ),
-              ),
-            const SizedBox(height: 6),
-            GestureDetector(
-              onTap: () => openUrl(mapsUrl),
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF53BDEB).withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: const Text(
-                  'Ver en mapa',
-                  style: TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 12,
-                      color: Color(0xFF53BDEB),
-                      fontWeight: FontWeight.w600),
-                ),
-              ),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF111B21))),
             ),
           ],
-        );
+        ),
+        if (lat.isNotEmpty && lng.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 2, left: 24),
+            child: Text('$lat, $lng',
+                style: const TextStyle(
+                    fontFamily: 'Inter', fontSize: 11, color: Color(0xFF667781))),
+          ),
+        const SizedBox(height: 6),
+        GestureDetector(
+          onTap: () => _openUrl(mapsUrl),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFF53BDEB).withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: const Text('Ver en mapa',
+                style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 12,
+                    color: Color(0xFF53BDEB),
+                    fontWeight: FontWeight.w600)),
+          ),
+        ),
+      ],
+    );
+  }
 
-      default:
-        return Text(
-          widget.body,
-          style: const TextStyle(
-              fontFamily: 'Inter',
-              fontSize: 13,
-              color: Color(0xFF111B21),
-              height: 1.4),
-        );
-    }
+  Widget _buildTextContent() {
+    return Text(
+      widget.body,
+      style: const TextStyle(
+          fontFamily: 'Inter',
+          fontSize: 13,
+          color: Color(0xFF111B21),
+          height: 1.4),
+    );
   }
 
   Widget _statusIcon() {
@@ -2591,7 +2588,15 @@ class _ApiMessageBubbleState extends State<_ApiMessageBubble> {
                 ),
               ),
             ),
-          _buildContent(context),
+          if (widget.messageType == 'image')   _buildImageContent(),
+          if (widget.messageType == 'video')   _buildVideoContent(),
+          if (widget.messageType == 'audio')   _buildAudioContent(),
+          if (widget.messageType == 'document') _buildDocumentContent(),
+          if (widget.messageType == 'sticker') _buildStickerContent(),
+          if (widget.messageType == 'location') _buildLocationContent(),
+          if (!const ['image', 'video', 'audio', 'document', 'sticker', 'location']
+              .contains(widget.messageType))
+            _buildTextContent(),
           const SizedBox(height: 3),
           if (isOutbound)
             Row(
