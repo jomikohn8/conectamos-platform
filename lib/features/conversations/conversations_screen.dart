@@ -556,6 +556,7 @@ class _ConvoListState extends ConsumerState<_ConvoList> {
         ref.read(selectedChatNameProvider.notifier).state = null;
         ref.read(selectedOperatorChannelsProvider.notifier).state = [];
         ref.read(selectedChannelIndexProvider.notifier).state = 0;
+        ref.read(replyingToProvider.notifier).state = null;
       }
     });
 
@@ -633,6 +634,7 @@ class _ConvoListState extends ConsumerState<_ConvoList> {
                       ref.read(selectedChatNameProvider.notifier).state = name;
                       ref.read(selectedOperatorChannelsProvider.notifier).state = opChannels;
                       ref.read(selectedChannelIndexProvider.notifier).state = 0;
+                      ref.read(replyingToProvider.notifier).state = null;
                     },
                   );
                 },
