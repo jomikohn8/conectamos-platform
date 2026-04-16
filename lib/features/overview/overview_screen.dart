@@ -294,31 +294,40 @@ class OverviewScreen extends ConsumerStatefulWidget {
 
 class _OverviewScreenState extends ConsumerState<OverviewScreen> {
   Map<String, dynamic>? _kpis;
-  bool _kpisLoading = true;
+  bool _kpisLoading = false;
   bool _kpisError = false;
+  bool _initialized = false;
 
   @override
   void initState() {
     super.initState();
-    _fetchKpis();
+    // Defer until after first frame so activeTenantIdProvider is populated.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final tenantId = ref.read(activeTenantIdProvider);
+      if (tenantId.isNotEmpty) _fetchKpis(tenantId);
+      // If still empty, the ref.listen in build() will trigger the fetch.
+    });
   }
 
-  Future<void> _fetchKpis() async {
+  Future<void> _fetchKpis(String tenantId) async {
+    if (tenantId.isEmpty) return;
     setState(() {
       _kpisLoading = true;
       _kpisError = false;
     });
     try {
-      final tenantId = ref.read(activeTenantIdProvider);
       final data = await OverviewApi.getKpis(tenantId: tenantId);
       setState(() {
         _kpis = data;
         _kpisLoading = false;
+        _initialized = true;
       });
     } catch (_) {
       setState(() {
         _kpisLoading = false;
         _kpisError = true;
+        _initialized = true;
       });
     }
   }
@@ -326,6 +335,18 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
   @override
   Widget build(BuildContext context) {
     final tenantId = ref.watch(activeTenantIdProvider);
+
+    // Catch the moment tenantId arrives (e.g. slow auth load).
+    ref.listen<String>(activeTenantIdProvider, (prev, next) {
+      if (next.isNotEmpty && !_initialized && !_kpisLoading) {
+        _fetchKpis(next);
+      }
+    });
+
+    // While tenant is not yet resolved, show a full-screen spinner.
+    if (tenantId.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
 
     return Column(
       children: [
@@ -666,10 +687,21 @@ class _OperatorGridState extends State<_OperatorGrid> {
   @override
   void initState() {
     super.initState();
-    _load();
+    // Guard: only load when tenantId is available.
+    if (widget.tenantId.isNotEmpty) _load();
+  }
+
+  @override
+  void didUpdateWidget(_OperatorGrid oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Tenant arrived after widget was first built with an empty id.
+    if (oldWidget.tenantId.isEmpty && widget.tenantId.isNotEmpty) {
+      _load();
+    }
   }
 
   Future<void> _load() async {
+    if (widget.tenantId.isEmpty) return;
     if (kMockMode) {
       setState(() {
         _operators = _kOperators.toList();
