@@ -24,9 +24,14 @@ const _kChannelTypeOptions = ['whatsapp', 'telegram', 'sms'];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-Color _hexColor(String hex) {
-  final h = hex.replaceAll('#', '');
-  return Color(int.parse('FF$h', radix: 16));
+Color _hexColor(String? hex) {
+  try {
+    final h = (hex ?? '#9CA3AF').replaceAll('#', '');
+    if (h.length != 6) return const Color(0xFF9CA3AF);
+    return Color(int.parse('FF$h', radix: 16));
+  } catch (_) {
+    return const Color(0xFF9CA3AF);
+  }
 }
 
 String _initials(String name) {
@@ -809,8 +814,8 @@ class _ChannelFormDialogState extends State<_ChannelFormDialog> {
               ),
               const SizedBox(height: 14),
 
-              // 2. AI Worker
-              _label('AI Worker'),
+              // 2. Worker
+              _label('Worker'),
               widget.workers.isEmpty
                   ? Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
