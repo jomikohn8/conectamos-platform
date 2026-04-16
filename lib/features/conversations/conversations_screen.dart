@@ -994,17 +994,28 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
       Map<String, dynamic> msg, String emoji) async {
     final waId = msg['wa_message_id'] as String?;
     if (waId == null || waId.isEmpty) return;
+    // Resolve channelId with fallback chain:
+    // 1. msg['channel_id'] — channel that received/sent the message
+    // 2. Active channel tab from selectedOperatorChannelsProvider
+    // 3. First available channel of the operator
+    final msgChannelId = msg['channel_id'] as String?;
     final channels = ref.read(selectedOperatorChannelsProvider);
     final activeIdx = ref.read(selectedChannelIndexProvider);
     final safeIdx =
         channels.isEmpty ? 0 : activeIdx.clamp(0, channels.length - 1);
-    final channelId = channels.isNotEmpty
+    final tabChannelId = channels.isNotEmpty
         ? channels[safeIdx]['channel_id'] as String?
         : null;
+    final firstChannelId = channels.isNotEmpty
+        ? channels.first['channel_id'] as String?
+        : null;
+    final channelId = (msgChannelId != null && msgChannelId.isNotEmpty)
+        ? msgChannelId
+        : tabChannelId ?? firstChannelId;
     if (channelId == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('No hay canal activo para enviar la reacción'),
+          content: Text('No hay canal configurado para enviar la reacción'),
           backgroundColor: AppColors.ctDanger,
         ));
       }
@@ -1548,16 +1559,39 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
     String? contextFrom;
     String? contextBody;
     if (contextMsgId != null && contextMsgId.isNotEmpty) {
-      contextFrom = msg['context_from'] as String?;
       final ref_ = _apiMessages.cast<Map<String, dynamic>?>().firstWhere(
             (m) =>
                 (m!['wa_message_id'] as String?) == contextMsgId ||
                 (m['id'] as String?) == contextMsgId,
             orElse: () => null,
           );
-      contextBody = ref_ != null
-          ? (ref_['raw_body'] as String? ?? '')
-          : null; // null → fallback "Mensaje citado"
+      if (ref_ != null) {
+        // Bug 2 fix: resolve display name from original message
+        final refIsOutbound = (ref_['direction'] as String?) == 'outbound';
+        contextFrom = refIsOutbound
+            ? 'Supervisor'
+            : (ref_['from_name'] as String? ??
+                ref_['from_phone'] as String? ?? '');
+        // Bug 3 & 4 fix: media-aware preview
+        final refType = ref_['message_type'] as String?;
+        final refBody = ref_['raw_body'] as String? ?? '';
+        if (refBody.isNotEmpty) {
+          contextBody = refBody;
+        } else {
+          contextBody = switch (refType) {
+            'image'    => '📷 Imagen',
+            'video'    => '🎥 Video',
+            'document' => '📄 Documento',
+            'audio'    => '🎵 Audio',
+            'location' => '📍 Ubicación',
+            _          => null,
+          };
+        }
+      } else {
+        // Original not found: fall back to raw context_from (phone) as name
+        contextFrom = msg['context_from'] as String?;
+        contextBody = null; // → "Mensaje citado"
+      }
     }
 
     // Reactions for this message: keyed by wa_message_id or id
@@ -2173,10 +2207,13 @@ class _ApiMessageBubbleState extends State<_ApiMessageBubble> {
 
   Widget _buildQuote() {
     final isOut = widget.isOutbound;
-    final name = widget.contextFrom ?? '—';
-    final raw = widget.contextBody ?? 'Mensaje citado';
-    final preview =
-        raw.length > 80 ? '${raw.substring(0, 80)}…' : raw;
+    final name = (widget.contextFrom?.isNotEmpty == true)
+        ? widget.contextFrom!
+        : 'Mensaje citado';
+    final raw = widget.contextBody ?? '';
+    final preview = raw.isNotEmpty
+        ? (raw.length > 80 ? '${raw.substring(0, 80)}…' : raw)
+        : 'Mensaje citado';
     return Container(
       margin: const EdgeInsets.only(bottom: 6),
       padding:
