@@ -7,6 +7,32 @@ import '../../core/api/operators_api.dart';
 import '../../core/providers/tenant_provider.dart';
 import '../../core/theme/app_theme.dart';
 
+// ── Canal model ───────────────────────────────────────────────────────────────
+
+class OperatorChannel {
+  final String id;
+  final String name;
+  final String color; // hex, e.g. '#2DD4BF'
+  final String workerType;
+  const OperatorChannel({
+    required this.id,
+    required this.name,
+    required this.color,
+    required this.workerType,
+  });
+}
+
+const _kAvailableChannels = [
+  OperatorChannel(id: 'ch1', name: 'Canal Logística', color: '#2DD4BF', workerType: 'logistics'),
+  OperatorChannel(id: 'ch2', name: 'Canal Ventas',    color: '#818CF8', workerType: 'sales'),
+  OperatorChannel(id: 'ch3', name: 'Canal Soporte',   color: '#FB923C', workerType: 'support'),
+];
+
+Color _hexColor(String hex) {
+  final h = hex.replaceAll('#', '');
+  return Color(int.parse('FF$h', radix: 16));
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 String _initials(String name) {
@@ -88,9 +114,24 @@ class _OperatorsScreenState extends ConsumerState<OperatorsScreen> {
       final ops = await OperatorsApi.listOperators(
         tenantId: tenantId.isNotEmpty ? tenantId : 'default',
       );
+      // Mock: inject channels cyclically to show different states
+      final channelPatterns = [
+        <String>[],
+        ['ch1'],
+        ['ch1', 'ch2'],
+        ['ch2'],
+        ['ch1', 'ch2', 'ch3'],
+      ];
+      final injected = ops.asMap().entries.map((e) {
+        final pattern = e.key < channelPatterns.length
+            ? channelPatterns[e.key]
+            : ['ch3'];
+        return {...e.value, 'channels': pattern};
+      }).toList();
+
       if (mounted) {
         setState(() {
-          _operators = ops;
+          _operators = injected;
           _loading = false;
         });
       }
@@ -376,6 +417,10 @@ class _OperatorsBodyState extends State<_OperatorsBody> {
                             style: _headerStyle)),
                     Expanded(
                         flex: 2,
+                        child: Text('CANALES',
+                            style: _headerStyle)),
+                    Expanded(
+                        flex: 2,
                         child: Text('ÚLTIMO ACCESO',
                             style: _headerStyle)),
                     Expanded(
@@ -480,6 +525,11 @@ class _OperatorRowState extends State<_OperatorRow> {
     final verified = op['whatsapp_verified'] as bool? ?? false;
     final flows =
         List<String>.from(op['flows'] as List? ?? []);
+    final channelIds =
+        List<String>.from(op['channels'] as List? ?? []);
+    final channels = _kAvailableChannels
+        .where((c) => channelIds.contains(c.id))
+        .toList();
     final lastEventAt = op['last_event_at'] as String?;
     final id = op['id'] as String? ?? '';
     final st = _statusStyle(status);
@@ -618,6 +668,44 @@ class _OperatorRowState extends State<_OperatorRow> {
               ),
             ),
 
+            // Canales asignados
+            Expanded(
+              flex: 2,
+              child: channels.isEmpty
+                  ? const Text(
+                      'Sin canales',
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 12,
+                        color: AppColors.ctText3,
+                      ),
+                    )
+                  : Wrap(
+                      spacing: 4,
+                      runSpacing: 4,
+                      children: channels.map((c) {
+                        final color = _hexColor(c.color);
+                        return Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: color.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            c.name,
+                            style: TextStyle(
+                              fontFamily: 'Inter',
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: color,
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+            ),
+
             // Último acceso
             Expanded(
               flex: 2,
@@ -648,6 +736,7 @@ class _OperatorRowState extends State<_OperatorRow> {
                           initialName: name,
                           initialPhone: phone,
                           initialFlows: flows,
+                          initialChannels: channelIds,
                           onSaved: widget.onRefresh,
                         ),
                       );
@@ -684,6 +773,7 @@ class _OperatorFormDialog extends ConsumerStatefulWidget {
     this.initialName,
     this.initialPhone,
     this.initialFlows,
+    this.initialChannels,
     required this.onSaved,
   });
 
@@ -691,6 +781,7 @@ class _OperatorFormDialog extends ConsumerStatefulWidget {
   final String? initialName;
   final String? initialPhone;
   final List<String>? initialFlows;
+  final List<String>? initialChannels;
   final VoidCallback onSaved;
 
   bool get isEdit => operatorId != null;
@@ -703,6 +794,7 @@ class _OperatorFormDialogState extends ConsumerState<_OperatorFormDialog> {
   late final TextEditingController _nameCtrl;
   late final TextEditingController _phoneCtrl;
   late final Map<String, bool> _flows;
+  late final Map<String, bool> _channels;
   bool _saving = false;
   String? _errorMsg;
 
@@ -718,6 +810,10 @@ class _OperatorFormDialogState extends ConsumerState<_OperatorFormDialog> {
       'Flujo 1': sel.contains('Flujo 1'),
       'Flujo 2': sel.contains('Flujo 2'),
       'Flujo 3': sel.contains('Flujo 3'),
+    };
+    final selCh = widget.initialChannels ?? [];
+    _channels = {
+      for (final c in _kAvailableChannels) c.id: selCh.contains(c.id),
     };
   }
 
@@ -909,6 +1005,90 @@ class _OperatorFormDialogState extends ConsumerState<_OperatorFormDialog> {
                         if (!isLast)
                           const Divider(
                               height: 1, color: AppColors.ctBorder),
+                      ],
+                    );
+                  }).toList(),
+                ),
+              ),
+
+              const SizedBox(height: 18),
+
+              // Canales
+              const Text(
+                'Canales asignados',
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.ctText,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Container(
+                decoration: BoxDecoration(
+                  border: Border.all(color: AppColors.ctBorder),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  children: _kAvailableChannels.asMap().entries.map((e) {
+                    final ch = e.value;
+                    final isLast = e.key == _kAvailableChannels.length - 1;
+                    final color = _hexColor(ch.color);
+                    return Column(
+                      children: [
+                        InkWell(
+                          borderRadius: isLast
+                              ? const BorderRadius.only(
+                                  bottomLeft: Radius.circular(7),
+                                  bottomRight: Radius.circular(7),
+                                )
+                              : BorderRadius.zero,
+                          onTap: () => setState(
+                              () => _channels[ch.id] = !(_channels[ch.id] ?? false)),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 10),
+                            child: Row(
+                              children: [
+                                SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: Checkbox(
+                                    value: _channels[ch.id] ?? false,
+                                    onChanged: (v) => setState(
+                                        () => _channels[ch.id] = v ?? false),
+                                    activeColor: AppColors.ctTeal,
+                                    checkColor: AppColors.ctNavy,
+                                    materialTapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                    side: const BorderSide(
+                                        color: AppColors.ctBorder2),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Container(
+                                  width: 10,
+                                  height: 10,
+                                  decoration: BoxDecoration(
+                                    color: color,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  ch.name,
+                                  style: const TextStyle(
+                                    fontFamily: 'Inter',
+                                    fontSize: 13,
+                                    color: AppColors.ctText,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        if (!isLast)
+                          const Divider(height: 1, color: AppColors.ctBorder),
                       ],
                     );
                   }).toList(),
