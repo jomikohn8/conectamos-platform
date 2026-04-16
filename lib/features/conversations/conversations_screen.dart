@@ -852,6 +852,8 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
   String? _firstUnreadMessageId;
   final _firstUnreadKey = GlobalKey();
   final Set<String> _processedReadIds = {};
+  // Optimistic reactions keyed by wa_message_id of the target message
+  final Map<String, List<String>> _pendingReactions = {};
 
   // Multimedia
   bool _isDragOver = false;
@@ -999,7 +1001,15 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
     final channelId = channels.isNotEmpty
         ? channels[safeIdx]['channel_id'] as String?
         : null;
-    if (channelId == null) return;
+    if (channelId == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('No hay canal activo para enviar la reacción'),
+          backgroundColor: AppColors.ctDanger,
+        ));
+      }
+      return;
+    }
     final chatId = ref.read(selectedChatIdProvider) ?? '';
     final tenantId = ref.read(activeTenantIdProvider);
     try {
@@ -1010,7 +1020,23 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
         toPhone: chatId,
         tenantId: tenantId,
       );
-    } catch (_) {}
+      // Optimistic update: show the reaction immediately without waiting
+      // for the webhook to arrive and update the Supabase stream.
+      if (mounted) {
+        setState(() {
+          final existing = _pendingReactions.putIfAbsent(waId, () => []);
+          if (!existing.contains(emoji)) existing.add(emoji);
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Error al enviar reacción: $e'),
+          backgroundColor: AppColors.ctDanger,
+          duration: const Duration(seconds: 3),
+        ));
+      }
+    }
   }
 
   // ── Multimedia ──────────────────────────────────────────────────────────────
@@ -1364,6 +1390,7 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
     _subscription?.cancel();
     _subscribedChatId = chatId;
     _processedReadIds.clear();
+    _pendingReactions.clear();
     setState(() {
       _msgLoading = true;
       _apiMessages = [];
@@ -1634,6 +1661,13 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
             emoji != null && emoji.isNotEmpty) {
           (reactionsMap[targetId] ??= []).add(emoji);
         }
+      }
+    }
+    // Merge pending (optimistic) reactions, avoiding duplicates.
+    for (final entry in _pendingReactions.entries) {
+      final existing = reactionsMap.putIfAbsent(entry.key, () => []);
+      for (final e in entry.value) {
+        if (!existing.contains(e)) existing.add(e);
       }
     }
     final visibleMessages = channelFiltered
