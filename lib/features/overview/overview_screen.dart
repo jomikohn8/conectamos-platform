@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 
 import '../../core/api/operators_api.dart';
+import '../../core/api/overview_api.dart';
 import '../../core/config.dart';
 import '../../core/providers/tenant_provider.dart';
 import '../../core/theme/app_theme.dart';
@@ -45,7 +47,7 @@ class OperatorData {
   final String footerText;
 }
 
-// ── Datos mock ────────────────────────────────────────────────────────────────
+// ── Datos mock (solo para kMockMode) ─────────────────────────────────────────
 
 const _kOperators = [
   OperatorData(
@@ -199,7 +201,6 @@ OperatorData _operatorFromApi(Map<String, dynamic> data) {
   final phone = data['phone'] as String? ?? '';
   final lastEventAt = data['last_event_at'] as String?;
 
-  // Colores según status
   final Color avatarBg;
   final Color avatarTextColor;
   final String statusLabel;
@@ -227,7 +228,6 @@ OperatorData _operatorFromApi(Map<String, dynamic> data) {
       statusTextColor = AppColors.ctText2;
   }
 
-  // Flujos
   final rawFlows = data['flows'];
   final List<FlowBadgeData> flows;
   if (rawFlows is List && rawFlows.isNotEmpty) {
@@ -249,7 +249,6 @@ OperatorData _operatorFromApi(Map<String, dynamic> data) {
     ];
   }
 
-  // Pie de tarjeta
   String footerText;
   if (lastEventAt == null) {
     footerText = 'Sin actividad';
@@ -295,23 +294,56 @@ class OverviewScreen extends ConsumerStatefulWidget {
 }
 
 class _OverviewScreenState extends ConsumerState<OverviewScreen> {
+  Map<String, dynamic>? _kpis;
+  bool _kpisLoading = true;
+  bool _kpisError = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchKpis();
+  }
+
+  Future<void> _fetchKpis() async {
+    setState(() {
+      _kpisLoading = true;
+      _kpisError = false;
+    });
+    try {
+      final tenantId = ref.read(activeTenantIdProvider);
+      final data = await OverviewApi.getKpis(tenantId: tenantId);
+      setState(() {
+        _kpis = data;
+        _kpisLoading = false;
+      });
+    } catch (_) {
+      setState(() {
+        _kpisLoading = false;
+        _kpisError = true;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final tenantId = ref.watch(activeTenantIdProvider);
+
     return Column(
       children: [
-        // Barra de acciones fija — no entra en el scroll
-        const _ActionBar(),
-
-        // Contenido scrolleable
+        _ActionBar(),
         Expanded(
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 18),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
-                _KpiRow(),
-                SizedBox(height: 18),
-                Text(
+              children: [
+                _KpiRow(
+                  kpis: _kpis,
+                  loading: _kpisLoading,
+                  error: _kpisError,
+                ),
+                const SizedBox(height: 18),
+                const Text(
                   'OPERADORES EN TURNO',
                   style: TextStyle(
                     fontFamily: 'Geist',
@@ -321,8 +353,8 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
                     letterSpacing: 1.2,
                   ),
                 ),
-                SizedBox(height: 12),
-                _OperatorGrid(),
+                const SizedBox(height: 12),
+                _OperatorGrid(tenantId: tenantId),
               ],
             ),
           ),
@@ -354,7 +386,6 @@ class _ActionBar extends ConsumerWidget {
       padding: const EdgeInsets.symmetric(horizontal: 22),
       child: Row(
         children: [
-          // Título + subtítulo
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -380,8 +411,6 @@ class _ActionBar extends ConsumerWidget {
               ],
             ),
           ),
-
-          // Botón de fecha
           const _DateButton(),
         ],
       ),
@@ -401,6 +430,9 @@ class _DateButtonState extends State<_DateButton> {
 
   @override
   Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final formatted = DateFormat('dd MMM yyyy', 'es_MX').format(now);
+
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
@@ -415,16 +447,16 @@ class _DateButtonState extends State<_DateButton> {
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
-          children: const [
-            Icon(
+          children: [
+            const Icon(
               Icons.calendar_today_outlined,
               size: 13,
               color: AppColors.ctText,
             ),
-            SizedBox(width: 6),
+            const SizedBox(width: 6),
             Text(
-              '02 Abr 2026  ▾',
-              style: TextStyle(
+              '$formatted  ▾',
+              style: const TextStyle(
                 fontFamily: 'Geist',
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
@@ -441,10 +473,40 @@ class _DateButtonState extends State<_DateButton> {
 // ── Fila de KPIs ─────────────────────────────────────────────────────────────
 
 class _KpiRow extends StatelessWidget {
-  const _KpiRow();
+  const _KpiRow({
+    required this.kpis,
+    required this.loading,
+    required this.error,
+  });
+
+  final Map<String, dynamic>? kpis;
+  final bool loading;
+  final bool error;
+
+  String _val(String key) {
+    if (loading) return '...';
+    if (error || kpis == null) return '—';
+    return kpis![key]?.toString() ?? '—';
+  }
 
   @override
   Widget build(BuildContext context) {
+    final activeOps = loading ? null : (kpis?['operators_active'] as num?)?.toInt();
+    final totalOps  = loading ? null : (kpis?['operators_total']  as num?)?.toInt();
+
+    final opsValue = loading
+        ? '...'
+        : (error || kpis == null)
+            ? '— / —'
+            : '${activeOps ?? '—'} / ${totalOps ?? '—'}';
+
+    final inactivos = (activeOps != null && totalOps != null)
+        ? totalOps - activeOps
+        : null;
+    final opsSub = inactivos != null
+        ? '$inactivos sin turno hoy'
+        : 'Operadores en turno activo';
+
     return LayoutBuilder(
       builder: (context, constraints) {
         return Row(
@@ -453,35 +515,39 @@ class _KpiRow extends StatelessWidget {
               child: KpiCard(
                 topBorderColor: AppColors.ctTeal,
                 label: 'OPERADORES ACTIVOS',
-                value: '5 / 8',
-                subtext: '3 sin turno hoy',
+                value: opsValue,
+                subtext: opsSub,
+                hasError: error,
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: KpiCard(
                 topBorderColor: AppColors.ctOk,
-                label: 'SESIONES ABIERTAS',
-                value: '5',
+                label: 'FLUJOS ACTIVOS',
+                value: _val('flows_active'),
                 subtext: 'Flujos activos en curso',
+                hasError: error,
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: KpiCard(
                 topBorderColor: AppColors.ctWarn,
-                label: 'EVENTOS DEL DÍA',
-                value: '143',
-                subtext: 'Procesados por el sistema',
+                label: 'FLUJOS COMPLETADOS HOY',
+                value: _val('flows_completed_today'),
+                subtext: 'Completados desde medianoche',
+                hasError: error,
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: KpiCard(
                 topBorderColor: AppColors.ctDanger,
-                label: 'INCIDENCIAS ABIERTAS',
-                value: '2',
-                subtext: 'Requieren atención',
+                label: 'WORKERS CONTRATADOS',
+                value: _val('workers_contracted'),
+                subtext: 'Workers activos en tu operación',
+                hasError: error,
               ),
             ),
           ],
@@ -500,15 +566,40 @@ class KpiCard extends StatelessWidget {
     required this.label,
     required this.value,
     required this.subtext,
+    this.hasError = false,
   });
 
   final Color topBorderColor;
   final String label;
   final String value;
   final String subtext;
+  final bool hasError;
 
   @override
   Widget build(BuildContext context) {
+    final valueWidget = hasError
+        ? Tooltip(
+            message: 'Error al cargar',
+            child: Text(
+              value,
+              style: AppFonts.onest(
+                fontSize: 28,
+                fontWeight: FontWeight.w700,
+                color: AppColors.ctText3,
+                height: 1,
+              ),
+            ),
+          )
+        : Text(
+            value,
+            style: AppFonts.onest(
+              fontSize: 28,
+              fontWeight: FontWeight.w700,
+              color: AppColors.ctText,
+              height: 1,
+            ),
+          );
+
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       decoration: BoxDecoration(
@@ -519,7 +610,6 @@ class KpiCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Borde superior de color (3px)
           Container(
             height: 3,
             decoration: BoxDecoration(
@@ -531,7 +621,6 @@ class KpiCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 14),
-          // Label
           Text(
             label,
             style: const TextStyle(
@@ -543,18 +632,8 @@ class KpiCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
-          // Valor
-          Text(
-            value,
-            style: AppFonts.onest(
-              fontSize: 28,
-              fontWeight: FontWeight.w700,
-              color: AppColors.ctText,
-              height: 1,
-            ),
-          ),
+          valueWidget,
           const SizedBox(height: 5),
-          // Subtexto
           Text(
             subtext,
             style: const TextStyle(
@@ -572,7 +651,9 @@ class KpiCard extends StatelessWidget {
 // ── Grid de operadores ────────────────────────────────────────────────────────
 
 class _OperatorGrid extends StatefulWidget {
-  const _OperatorGrid();
+  const _OperatorGrid({required this.tenantId});
+
+  final String tenantId;
 
   @override
   State<_OperatorGrid> createState() => _OperatorGridState();
@@ -603,7 +684,7 @@ class _OperatorGridState extends State<_OperatorGrid> {
     });
 
     try {
-      final raw = await OperatorsApi.listOperators();
+      final raw = await OperatorsApi.listOperators(tenantId: widget.tenantId);
       setState(() {
         _operators = raw.map(_operatorFromApi).toList();
         _loading = false;
@@ -746,20 +827,17 @@ class _OperatorCardState extends State<OperatorCard> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ── Header ──
               Padding(
                 padding: const EdgeInsets.fromLTRB(13, 13, 13, 10),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Avatar
                     _OperatorAvatar(
                       initials: op.initials,
                       bg: op.avatarBg,
                       textColor: op.avatarTextColor,
                     ),
                     const SizedBox(width: 10),
-                    // Nombre + teléfono
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -786,7 +864,6 @@ class _OperatorCardState extends State<OperatorCard> {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    // Badge estado
                     StatusBadge(
                       label: op.statusLabel,
                       bg: op.statusBg,
@@ -795,30 +872,20 @@ class _OperatorCardState extends State<OperatorCard> {
                   ],
                 ),
               ),
-
-              // ── Fila de flujos ──
               Padding(
                 padding: const EdgeInsets.fromLTRB(13, 0, 13, 10),
                 child: Wrap(
                   spacing: 5,
                   runSpacing: 5,
-                  children: op.flows
-                      .map((f) => FlowBadge(data: f))
-                      .toList(),
+                  children: op.flows.map((f) => FlowBadge(data: f)).toList(),
                 ),
               ),
-
               const Spacer(),
-
-              // ── Pie ──
               Container(
                 width: double.infinity,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
                 decoration: const BoxDecoration(
-                  border: Border(
-                    top: BorderSide(color: AppColors.ctBorder),
-                  ),
+                  border: Border(top: BorderSide(color: AppColors.ctBorder)),
                 ),
                 child: Text(
                   op.footerText,
