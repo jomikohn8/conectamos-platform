@@ -1,8 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-
 import '../../core/api/operators_api.dart';
 import '../../core/providers/tenant_provider.dart';
 import '../../core/theme/app_theme.dart';
@@ -98,13 +96,11 @@ class OperatorsScreen extends ConsumerStatefulWidget {
 class _OperatorsScreenState extends ConsumerState<OperatorsScreen> {
   List<Map<String, dynamic>> _operators = [];
   bool _loading = true;
-  bool _showBanner = false;
 
   @override
   void initState() {
     super.initState();
     _fetchOperators();
-    _checkUnregistered();
   }
 
   Future<void> _fetchOperators() async {
@@ -140,19 +136,6 @@ class _OperatorsScreenState extends ConsumerState<OperatorsScreen> {
     }
   }
 
-  Future<void> _checkUnregistered() async {
-    try {
-      final response = await Supabase.instance.client
-          .from('wa_messages')
-          .select('id')
-          .eq('unregistered', true)
-          .limit(1);
-      if (mounted && (response as List).isNotEmpty) {
-        setState(() => _showBanner = true);
-      }
-    } catch (_) {}
-  }
-
   @override
   Widget build(BuildContext context) {
     // Recarga operadores cuando cambia el tenant
@@ -171,46 +154,6 @@ class _OperatorsScreenState extends ConsumerState<OperatorsScreen> {
             );
           },
         ),
-
-        // Banner mensajes no registrados
-        if (_showBanner)
-          Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 22, vertical: 10),
-            color: AppColors.ctWarnBg,
-            child: Row(
-              children: [
-                const Icon(
-                  Icons.warning_amber_rounded,
-                  size: 16,
-                  color: AppColors.ctWarnText,
-                ),
-                const SizedBox(width: 8),
-                const Expanded(
-                  child: Text(
-                    '⚠ Hay mensajes de contactos no registrados',
-                    style: TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 12,
-                      color: AppColors.ctWarnText,
-                    ),
-                  ),
-                ),
-                TextButton(
-                  onPressed: () => setState(() => _showBanner = false),
-                  child: const Text(
-                    'Ver',
-                    style: TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.ctWarnText,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
 
         Expanded(
           child: _loading

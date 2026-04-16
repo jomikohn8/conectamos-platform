@@ -621,6 +621,13 @@ class _Sidebar extends ConsumerWidget {
                           currentRoute: currentRoute,
                           collapsed: collapsed,
                         ),
+                        _NavItem(
+                          icon: Icons.smart_toy_rounded,
+                          label: 'AI Workers',
+                          route: '/workers',
+                          currentRoute: currentRoute,
+                          collapsed: collapsed,
+                        ),
                         const SizedBox(height: 4),
                         _NavSection(
                           label: 'Configuración',
