@@ -441,6 +441,23 @@ class _LoginCard extends StatelessWidget {
           // Botón iniciar sesión
           _LoginButton(loading: loading, onTap: onSignIn),
 
+          // ¿Olvidaste tu contraseña?
+          const SizedBox(height: 16),
+          Center(
+            child: GestureDetector(
+              onTap: () => context.go('/forgot-password'),
+              child: const Text(
+                '¿Olvidaste tu contraseña?',
+                style: TextStyle(
+                  fontFamily: 'Geist',
+                  fontSize: 13,
+                  color: AppColors.ctTeal,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ),
+
           // Error
           if (error != null) ...[
             const SizedBox(height: 16),

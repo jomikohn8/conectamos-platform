@@ -5,7 +5,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../config.dart';
 import '../../features/auth/activate_screen.dart';
+import '../../features/auth/forgot_password_screen.dart';
 import '../../features/auth/login_screen.dart';
+import '../../features/auth/reset_password_screen.dart';
 import '../../features/broadcasts/broadcast_screen.dart';
 import '../../features/config/connections_screen.dart';
 import '../../features/config/operators_screen.dart';
@@ -35,9 +37,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       final loc = state.matchedLocation;
       final isLoggingIn = loc == '/login';
       final isActivating = loc.startsWith('/activate');
+      final isPublicAuth = loc == '/forgot-password' || loc.startsWith('/reset-password');
 
-      // /activate es siempre pública
-      if (isActivating) return null;
+      // Rutas de auth públicas
+      if (isActivating || isPublicAuth) return null;
 
       // Redirect bare / to /overview
       if (loc == '/') return '/overview';
@@ -58,6 +61,19 @@ final routerProvider = Provider<GoRouter>((ref) {
         pageBuilder: (context, state) {
           final token = state.uri.queryParameters['token'] ?? '';
           return NoTransitionPage(child: ActivateScreen(token: token));
+        },
+      ),
+      GoRoute(
+        path: '/forgot-password',
+        pageBuilder: (context, state) => const NoTransitionPage(
+          child: ForgotPasswordScreen(),
+        ),
+      ),
+      GoRoute(
+        path: '/reset-password',
+        pageBuilder: (context, state) {
+          final token = state.uri.queryParameters['token'] ?? '';
+          return NoTransitionPage(child: ResetPasswordScreen(token: token));
         },
       ),
       ShellRoute(
