@@ -28,6 +28,9 @@ import '../../core/theme/app_theme.dart';
 final selectedConvoTabProvider = StateProvider<int>((ref) => 0);
 final selectedChatIdProvider = StateProvider<String?>((ref) => null);
 final selectedChatNameProvider = StateProvider<String?>((ref) => null);
+final selectedOperatorChannelsProvider =
+    StateProvider<List<Map<String, dynamic>>>((ref) => []);
+final selectedChannelIndexProvider = StateProvider<int>((ref) => 0);
 
 // ── Pantalla ──────────────────────────────────────────────────────────────────
 
@@ -383,6 +386,16 @@ String _initials(String name) {
   return (parts[0][0] + parts[1][0]).toUpperCase();
 }
 
+Color _hexColor(String? hex) {
+  try {
+    final h = (hex ?? '#9CA3AF').replaceAll('#', '');
+    if (h.length != 6) return const Color(0xFF9CA3AF);
+    return Color(int.parse('FF$h', radix: 16));
+  } catch (_) {
+    return const Color(0xFF9CA3AF);
+  }
+}
+
 // ── Lista de conversaciones (240px) ───────────────────────────────────────────
 
 class _ConvoList extends ConsumerStatefulWidget {
@@ -539,6 +552,8 @@ class _ConvoListState extends ConsumerState<_ConvoList> {
         _subscribeToConversations();
         ref.read(selectedChatIdProvider.notifier).state = null;
         ref.read(selectedChatNameProvider.notifier).state = null;
+        ref.read(selectedOperatorChannelsProvider.notifier).state = [];
+        ref.read(selectedChannelIndexProvider.notifier).state = 0;
       }
     });
 
@@ -583,11 +598,15 @@ class _ConvoListState extends ConsumerState<_ConvoList> {
                   final name = op['name'] as String? ??
                       op['display_name'] as String? ??
                       phone;
+                  final opChannels = List<Map<String, dynamic>>.from(
+                    (op['channels'] as List?) ?? [],
+                  );
                   final lastMsg = _allStreamMessages
                       .where((m) => (m['chat_id'] as String?) == phone)
                       .firstOrNull;
                   return _ApiConvoItem(
                     name: name,
+                    channels: opChannels,
                     preview: lastMsg != null
                         ? _previewText(lastMsg)
                         : 'Sin mensajes',
@@ -610,6 +629,8 @@ class _ConvoListState extends ConsumerState<_ConvoList> {
                       setState(() {});
                       ref.read(selectedChatIdProvider.notifier).state = phone;
                       ref.read(selectedChatNameProvider.notifier).state = name;
+                      ref.read(selectedOperatorChannelsProvider.notifier).state = opChannels;
+                      ref.read(selectedChannelIndexProvider.notifier).state = 0;
                     },
                   );
                 },
@@ -632,6 +653,7 @@ class _ApiConvoItem extends StatefulWidget {
     required this.isSelected,
     required this.onTap,
     this.unreadCount = 0,
+    this.channels = const [],
   });
   final String name;
   final String preview;
@@ -640,6 +662,7 @@ class _ApiConvoItem extends StatefulWidget {
   final bool isSelected;
   final VoidCallback onTap;
   final int unreadCount;
+  final List<Map<String, dynamic>> channels;
 
   @override
   State<_ApiConvoItem> createState() => _ApiConvoItemState();
@@ -726,6 +749,23 @@ class _ApiConvoItemState extends State<_ApiConvoItem> {
                         ),
                       ],
                     ),
+                    if (widget.channels.isNotEmpty) ...[
+                      const SizedBox(height: 3),
+                      Row(
+                        children: [
+                          for (final ch in widget.channels.take(3))
+                            Container(
+                              width: 6,
+                              height: 6,
+                              margin: const EdgeInsets.only(right: 3),
+                              decoration: BoxDecoration(
+                                color: _hexColor(ch['channel_color'] as String?),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ],
                     const SizedBox(height: 2),
                     Row(
                       children: [
@@ -1501,12 +1541,46 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
 
     if (chatId == null) return _emptyState();
 
+    final channels = ref.watch(selectedOperatorChannelsProvider);
+    final activeChannelIdx = ref.watch(selectedChannelIndexProvider);
+    final safeIdx =
+        channels.isEmpty ? 0 : activeChannelIdx.clamp(0, channels.length - 1);
+    final activeChannel = channels.isNotEmpty ? channels[safeIdx] : null;
+    final activeChannelId = activeChannel?['channel_id'] as String?;
+
+    final visibleMessages = activeChannelId != null
+        ? _apiMessages.where((m) {
+            final msgChannelId = m['channel_id'] as String?;
+            return msgChannelId == null || msgChannelId == activeChannelId;
+          }).toList()
+        : _apiMessages;
+
     final body = Column(
       children: [
+        // Channel tabs (solo cuando hay más de un canal)
+        if (channels.length > 1)
+          _ChannelTabBar(
+            channels: channels,
+            selectedIndex: safeIdx,
+            onTap: (i) =>
+                ref.read(selectedChannelIndexProvider.notifier).state = i,
+          ),
         // Header
         _ApiChatHeader(
           name: chatName ?? chatId,
           windowOpen: _windowOpen,
+          channelName: activeChannel?['channel_name'] as String?,
+          workerName: activeChannel?['worker_name'] as String?,
+          channelColor: activeChannel?['channel_color'] as String?,
+          onIntervene: activeChannel != null
+              ? () => ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Intervención activada — el Worker pausará las respuestas automáticas en este canal',
+                      ),
+                    ),
+                  )
+              : null,
         ),
 
         // Mensajes
@@ -1522,9 +1596,9 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
               controller: _scrollCtrl,
               padding: const EdgeInsets.symmetric(
                   horizontal: 20, vertical: 16),
-              itemCount: _apiMessages.length,
+              itemCount: visibleMessages.length,
               itemBuilder: (context, i) {
-                final msg = _apiMessages[i];
+                final msg = visibleMessages[i];
                 final msgId = msg['id'] as String?;
                 final isFirstUnread = msgId != null &&
                     msgId == _firstUnreadMessageId;
@@ -1637,12 +1711,164 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
   }
 }
 
+// ── Channel tab bar ───────────────────────────────────────────────────────────
+
+class _ChannelTabBar extends StatelessWidget {
+  const _ChannelTabBar({
+    required this.channels,
+    required this.selectedIndex,
+    required this.onTap,
+  });
+
+  final List<Map<String, dynamic>> channels;
+  final int selectedIndex;
+  final ValueChanged<int> onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 40,
+      decoration: const BoxDecoration(
+        color: Color(0xFFF9FAFB),
+        border: Border(bottom: BorderSide(color: AppColors.ctBorder)),
+      ),
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        itemCount: channels.length,
+        itemBuilder: (context, i) {
+          final ch = channels[i];
+          final isSelected = i == selectedIndex;
+          final color = _hexColor(ch['channel_color'] as String?);
+          final label = ch['worker_name'] as String? ??
+              ch['channel_name'] as String? ??
+              'Canal ${i + 1}';
+          return MouseRegion(
+            cursor: SystemMouseCursors.click,
+            child: GestureDetector(
+              onTap: () => onTap(i),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 120),
+                alignment: Alignment.center,
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? AppColors.ctSurface
+                      : const Color(0xFFF9FAFB),
+                  border: isSelected
+                      ? Border(bottom: BorderSide(color: color, width: 2))
+                      : null,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: color,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      label,
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 12,
+                        fontWeight: isSelected
+                            ? FontWeight.w600
+                            : FontWeight.w500,
+                        color: isSelected
+                            ? AppColors.ctText
+                            : AppColors.ctText2,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+// ── Intervene button ──────────────────────────────────────────────────────────
+
+class _InterveneButton extends StatefulWidget {
+  const _InterveneButton({required this.onTap});
+  final VoidCallback onTap;
+
+  @override
+  State<_InterveneButton> createState() => _InterveneButtonState();
+}
+
+class _InterveneButtonState extends State<_InterveneButton> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 120),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: _hovered
+                ? const Color(0xFFFFF7ED)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(7),
+            border: Border.all(color: const Color(0xFFFB923C)),
+          ),
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.pan_tool_outlined,
+                size: 14,
+                color: Color(0xFFFB923C),
+              ),
+              SizedBox(width: 5),
+              Text(
+                'Intervenir',
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFFFB923C),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 // ── Header de chat (modo API) ─────────────────────────────────────────────────
 
 class _ApiChatHeader extends StatelessWidget {
-  const _ApiChatHeader({required this.name, required this.windowOpen});
+  const _ApiChatHeader({
+    required this.name,
+    required this.windowOpen,
+    this.channelName,
+    this.workerName,
+    this.channelColor,
+    this.onIntervene,
+  });
   final String name;
   final bool windowOpen;
+  final String? channelName;
+  final String? workerName;
+  final String? channelColor;
+  final VoidCallback? onIntervene;
 
   @override
   Widget build(BuildContext context) {
@@ -1714,9 +1940,11 @@ class _ApiChatHeader extends StatelessWidget {
                     ),
                   ],
                 ),
-                const Text(
-                  'WhatsApp · API',
-                  style: TextStyle(
+                Text(
+                  channelName != null
+                      ? '$channelName${workerName != null ? ' · $workerName' : ''}'
+                      : 'WhatsApp · Sin canal asignado',
+                  style: const TextStyle(
                     fontFamily: 'Inter',
                     fontSize: 11,
                     color: AppColors.ctText2,
@@ -1725,6 +1953,10 @@ class _ApiChatHeader extends StatelessWidget {
               ],
             ),
           ),
+          if (onIntervene != null) ...[
+            const SizedBox(width: 12),
+            _InterveneButton(onTap: onIntervene!),
+          ],
         ],
       ),
     );
