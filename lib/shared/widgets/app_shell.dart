@@ -634,6 +634,13 @@ class _Sidebar extends ConsumerWidget {
                           collapsed: collapsed,
                         ),
                         _NavItem(
+                          icon: Icons.router_rounded,
+                          label: 'Canales',
+                          route: '/channels',
+                          currentRoute: currentRoute,
+                          collapsed: collapsed,
+                        ),
+                        _NavItem(
                           icon: Icons.cable_outlined,
                           label: 'Conexiones',
                           route: '/connections',

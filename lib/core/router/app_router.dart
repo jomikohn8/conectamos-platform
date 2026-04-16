@@ -12,6 +12,7 @@ import '../../features/config/operators_screen.dart';
 import '../../features/config/settings_screen.dart';
 import '../../features/config/whatsapp_config_screen.dart';
 import '../../features/config/ai_workers_screen.dart';
+import '../../features/config/channels_screen.dart';
 import '../../features/config/workflows_screen.dart';
 import '../../features/conversations/conversations_screen.dart';
 import '../../features/dashboard/dashboard_screen.dart';
@@ -104,6 +105,12 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: '/workers',
             pageBuilder: (context, state) => const NoTransitionPage(
               child: AiWorkersScreen(),
+            ),
+          ),
+          GoRoute(
+            path: '/channels',
+            pageBuilder: (context, state) => const NoTransitionPage(
+              child: ChannelsScreen(),
             ),
           ),
           GoRoute(
