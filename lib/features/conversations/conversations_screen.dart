@@ -382,6 +382,18 @@ String _msgBody(Map<String, dynamic> msg) {
   return _mediaFallback(msg['message_type'] as String? ?? '');
 }
 
+/// Resuelve el nombre a mostrar para mensajes outbound.
+/// Usa from_name si está disponible; luego deriva del origin o sent_by_user_id.
+String _outboundSenderName(Map<String, dynamic> msg) {
+  final fromName = msg['from_name'] as String?;
+  if (fromName != null && fromName.isNotEmpty) return fromName;
+  final origin = msg['origin'] as String?;
+  if (origin == 'ai_worker') return 'AI Worker';
+  final sentByUserId = msg['sent_by_user_id'] as String?;
+  if (sentByUserId != null && sentByUserId.isNotEmpty) return 'Agente';
+  return 'Supervisor';
+}
+
 String _initials(String name) {
   final parts = name.trim().split(' ').where((p) => p.isNotEmpty).toList();
   if (parts.isEmpty) return '?';
@@ -1596,7 +1608,7 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
         // Bug 2 fix: resolve display name from original message
         final refIsOutbound = (ref_['direction'] as String?) == 'outbound';
         contextFrom = refIsOutbound
-            ? 'Supervisor'
+            ? _outboundSenderName(ref_)
             : (ref_['from_name'] as String? ??
                 ref_['from_phone'] as String? ?? '');
         // Bug 3 & 4 fix: media-aware preview
@@ -1631,7 +1643,7 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
       body: _msgBody(msg),
       time: _formatTime(msg['received_at'] as String?),
       senderName: isOutbound
-          ? 'Supervisor'
+          ? _outboundSenderName(msg)
           : (msg['from_name'] as String? ??
               msg['from_phone'] as String? ?? ''),
       isOutbound: isOutbound,
@@ -2855,7 +2867,7 @@ class _ReplyBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final isOutbound = (message['direction'] as String?) == 'outbound';
     final name = isOutbound
-        ? 'Supervisor'
+        ? _outboundSenderName(message)
         : (message['from_name'] as String? ??
             message['from_phone'] as String? ?? '');
     final raw = message['raw_body'] as String? ?? '';
@@ -3975,6 +3987,7 @@ class _FeedMessages extends StatelessWidget {
                 body: body,
                 time: time,
                 toPhone: chatId,
+                senderName: _outboundSenderName(msg),
                 waStatus: waStatus,
                 isSelected: isSelected,
                 selectionMode: selectionMode,
@@ -4247,6 +4260,7 @@ class _FeedOutboundBubble extends StatelessWidget {
     required this.body,
     required this.time,
     required this.toPhone,
+    required this.senderName,
     required this.waStatus,
     required this.isSelected,
     required this.selectionMode,
@@ -4258,6 +4272,7 @@ class _FeedOutboundBubble extends StatelessWidget {
   final String body;
   final String time;
   final String toPhone;
+  final String senderName;
   final String? waStatus;
   final bool isSelected;
   final bool selectionMode;
@@ -4305,7 +4320,7 @@ class _FeedOutboundBubble extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    'Supervisor → $toPhone',
+                    '$senderName → $toPhone',
                     style: const TextStyle(
                       fontSize: 10,
                       color: Color(0xFF9CA3AF),
