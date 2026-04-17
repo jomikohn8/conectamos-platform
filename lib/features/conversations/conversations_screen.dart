@@ -847,6 +847,7 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
 
   List<Map<String, dynamic>> _apiMessages = [];
   bool _msgLoading = false;
+  bool? _windowOpen; // null = cargando, true = abierta, false = cerrada
   bool _sending = false;
   StreamSubscription<List<Map<String, dynamic>>>? _subscription;
   String? _firstUnreadMessageId;
@@ -1378,6 +1379,7 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
       _msgLoading = true;
       _apiMessages = [];
       _firstUnreadMessageId = null;
+      _windowOpen = null;
     });
 
     // Use the pre-tap lastRead so we correctly find "new" messages
@@ -1409,7 +1411,19 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
       // Mientras el chat está abierto, marcar mensajes como leídos en tiempo real
       _ConvoListState.setLastRead(
           chatId, DateTime.now().toUtc(), ref.read(activeTenantIdProvider));
-      setState(() { _apiMessages = messages; _msgLoading = false; });
+      final lastInbound = messages
+          .where((m) => (m['direction'] as String?) != 'outbound')
+          .lastOrNull;
+      final receivedAt = lastInbound != null
+          ? DateTime.tryParse(lastInbound['received_at'] as String? ?? '')
+          : null;
+      final computed = receivedAt != null &&
+          DateTime.now().toUtc().difference(receivedAt.toUtc()).inHours < 24;
+      setState(() {
+        _apiMessages = messages;
+        _msgLoading = false;
+        _windowOpen = computed;
+      });
       _sendReadReceipts(messages);
 
       if (firstEmit) {
@@ -1504,17 +1518,6 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
         );
       }
     }
-  }
-
-  bool get _windowOpen {
-    final lastInbound = _apiMessages
-        .where((m) => (m['direction'] as String?) != 'outbound')
-        .lastOrNull;
-    if (lastInbound == null) return false;
-    final receivedAt =
-        DateTime.tryParse(lastInbound['received_at'] as String? ?? '');
-    if (receivedAt == null) return false;
-    return DateTime.now().toUtc().difference(receivedAt.toUtc()).inHours < 24;
   }
 
   Widget _buildMessageBubble(
@@ -1778,7 +1781,7 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
           ),
 
         // Banner ventana cerrada
-        if (!_windowOpen)
+        if (_windowOpen == false)
           Container(
             padding: const EdgeInsets.symmetric(
                 horizontal: 16, vertical: 8),
@@ -1813,12 +1816,12 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
         // Input
         _ChatInput(
           controller: _msgCtrl,
-          onSend: _windowOpen ? _sendMessage : null,
-          onTyping: _windowOpen ? _handleTyping : null,
+          onSend: (_windowOpen == true) ? _sendMessage : null,
+          onTyping: (_windowOpen == true) ? _handleTyping : null,
           sending: _sending,
-          enabled: _windowOpen,
+          enabled: _windowOpen == true,
           onAttach: _handleAttach,
-          onMic: _windowOpen ? _startVoiceRecording : null,
+          onMic: (_windowOpen == true) ? _startVoiceRecording : null,
           isRecording: _isRecording,
           recordingSeconds: _recordingSeconds,
           onStop: _stopVoiceRecording,
@@ -2001,7 +2004,7 @@ class _ApiChatHeader extends StatelessWidget {
     this.onIntervene,
   });
   final String name;
-  final bool windowOpen;
+  final bool? windowOpen;
   final String? channelName;
   final String? workerName;
   final String? channelColor;
@@ -2054,27 +2057,28 @@ class _ApiChatHeader extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 7, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: windowOpen
-                            ? const Color(0xFFD1FAE5)
-                            : AppColors.ctSurface2,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        windowOpen ? 'Ventana abierta' : 'Ventana cerrada',
-                        style: TextStyle(
-                          fontFamily: 'Inter',
-                          fontSize: 10,
-                          fontWeight: FontWeight.w500,
-                          color: windowOpen
-                              ? const Color(0xFF065F46)
-                              : AppColors.ctText3,
+                    if (windowOpen != null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 7, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: windowOpen!
+                              ? const Color(0xFFD1FAE5)
+                              : AppColors.ctSurface2,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          windowOpen! ? 'Ventana abierta' : 'Ventana cerrada',
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
+                            color: windowOpen!
+                                ? const Color(0xFF065F46)
+                                : AppColors.ctText3,
+                          ),
                         ),
                       ),
-                    ),
                   ],
                 ),
                 Text(
