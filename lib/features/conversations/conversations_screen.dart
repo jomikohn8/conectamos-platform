@@ -394,6 +394,61 @@ String _outboundSenderName(Map<String, dynamic> msg) {
   return 'Supervisor';
 }
 
+/// Devuelve el color del nombre y el badge de origen para mensajes outbound.
+({Color nameColor, Widget? badge}) _outboundOriginStyle(
+    Map<String, dynamic> msg) {
+  final origin = msg['origin'] as String?;
+  switch (origin) {
+    case 'ai_worker':
+      return (
+        nameColor: const Color(0xFF1e40af),
+        badge: _OriginBadge(
+          label: 'IA',
+          bg: const Color(0xFFDBEAFE),
+          fg: const Color(0xFF1e40af),
+        ),
+      );
+    case 'human':
+      return (nameColor: const Color(0xFF065F46), badge: null);
+    default:
+      return (
+        nameColor: const Color(0xFF6B7280),
+        badge: _OriginBadge(
+          label: 'Sistema',
+          bg: const Color(0xFFF3F4F6),
+          fg: const Color(0xFF6B7280),
+        ),
+      );
+  }
+}
+
+class _OriginBadge extends StatelessWidget {
+  const _OriginBadge({required this.label, required this.bg, required this.fg});
+  final String label;
+  final Color bg;
+  final Color fg;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontFamily: 'Inter',
+          fontSize: 9,
+          fontWeight: FontWeight.w600,
+          color: fg,
+        ),
+      ),
+    );
+  }
+}
+
 String _initials(String name) {
   final parts = name.trim().split(' ').where((p) => p.isNotEmpty).toList();
   if (parts.isEmpty) return '?';
@@ -1638,6 +1693,8 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
         reactionsMap[msgId] ??
         const <String>[];
 
+    final originStyle = isOutbound ? _outboundOriginStyle(msg) : null;
+
     return _ApiMessageBubble(
       key: ValueKey(msgId),
       body: _msgBody(msg),
@@ -1657,6 +1714,8 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
       onReply: () =>
           ref.read(replyingToProvider.notifier).state = msg,
       onReact: (emoji) => _sendReaction(msg, emoji),
+      senderNameColor: originStyle?.nameColor,
+      senderBadge: originStyle?.badge,
     );
   }
 
@@ -2260,11 +2319,15 @@ class _ApiMessageBubble extends StatefulWidget {
     this.reactions = const [],
     this.onReply,
     this.onReact,
+    this.senderNameColor,
+    this.senderBadge,
   });
   final String body;
   final String time;
   final String senderName;
   final bool isOutbound;
+  final Color? senderNameColor;
+  final Widget? senderBadge;
   final String? waStatus;
   final String? messageType;
   final String? mediaUrl;
@@ -2745,14 +2808,23 @@ class _ApiMessageBubbleState extends State<_ApiMessageBubble> {
           if (widget.senderName.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(bottom: 3),
-              child: Text(
-                widget.senderName,
-                style: const TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                  color: timeColor,
-                ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    widget.senderName,
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: widget.senderNameColor ?? timeColor,
+                    ),
+                  ),
+                  if (widget.senderBadge != null) ...[
+                    const SizedBox(width: 4),
+                    widget.senderBadge!,
+                  ],
+                ],
               ),
             ),
           if (widget.messageType == 'image')   _buildImageContent(),
