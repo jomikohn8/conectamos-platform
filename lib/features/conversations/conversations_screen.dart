@@ -849,6 +849,7 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
   List<Map<String, dynamic>> _apiMessages = [];
   bool _msgLoading = false;
   bool? _windowOpen; // null = cargando, true = abierta, false = cerrada
+  bool _streamError = false;
   bool _sending = false;
   StreamSubscription<List<Map<String, dynamic>>>? _subscription;
   String? _firstUnreadMessageId;
@@ -1407,6 +1408,7 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
       _windowOpen = null;
       _atBottom = true;
       _hasNewMessage = false;
+      _streamError = false;
     });
 
     // Use the pre-tap lastRead so we correctly find "new" messages
@@ -1450,6 +1452,7 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
         _apiMessages = messages;
         _msgLoading = false;
         _windowOpen = computed;
+        _streamError = false;
       });
       _sendReadReceipts(messages);
 
@@ -1469,7 +1472,7 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
         });
       }
     }, onError: (_) {
-      if (mounted) setState(() => _msgLoading = false);
+      if (mounted) setState(() { _msgLoading = false; _streamError = true; });
     });
   }
 
@@ -1766,6 +1769,43 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
         if (_msgLoading)
           const Expanded(
             child: Center(child: CircularProgressIndicator()),
+          )
+        else if (_streamError)
+          Expanded(
+            child: ColoredBox(
+              color: const Color(0xFFEBEBE9),
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.cloud_off_rounded,
+                        size: 40, color: AppColors.ctText3),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'No se pudieron cargar los mensajes',
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 13,
+                        color: AppColors.ctText3,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    OutlinedButton.icon(
+                      onPressed: () => _subscribeToMessages(chatId),
+                      icon: const Icon(Icons.refresh_rounded, size: 16),
+                      label: const Text('Reintentar',
+                          style: TextStyle(fontFamily: 'Inter', fontSize: 13)),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.ctTeal,
+                        side: const BorderSide(color: AppColors.ctTeal),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           )
         else
           Expanded(
