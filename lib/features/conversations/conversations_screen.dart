@@ -956,12 +956,16 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
     }
   }
 
-  void _sendReadReceipts(List<Map<String, dynamic>> messages) {
+  Future<void> _sendReadReceipts(List<Map<String, dynamic>> messages) async {
     final tenantId = ref.read(activeTenantIdProvider);
     if (tenantId.isEmpty) {
       debugPrint('[markRead] SKIP — tenantId empty');
       return;
     }
+    // Fase 1: recolectar IDs pendientes (dedup + validación),
+    // añadiendo a _processedReadIds antes del async para evitar
+    // que un segundo emit encole los mismos IDs mientras este procesa.
+    final pending = <String>[];
     for (final msg in messages) {
       if ((msg['direction'] as String?) == 'outbound') continue;
 
@@ -984,8 +988,15 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
       }
       if (_processedReadIds.contains(waId)) continue;
       _processedReadIds.add(waId);
+      pending.add(waId);
+    }
+    // Fase 2: procesar en serie con 50ms entre requests para
+    // evitar la ráfaga de N POSTs simultáneos en el primer emit.
+    for (final waId in pending) {
+      if (!mounted) return;
       debugPrint('[markRead] CALLING — tenantId=$tenantId waId=$waId');
-      MessagesApi.markRead(waId, tenantId: tenantId); // fire-and-forget
+      await MessagesApi.markRead(waId, tenantId: tenantId);
+      if (waId != pending.last) await Future.delayed(const Duration(milliseconds: 50));
     }
   }
 
