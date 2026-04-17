@@ -872,11 +872,24 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
   // Track current subscribed chatId to avoid re-subscribing on web tab focus
   String? _subscribedChatId;
 
+  // Auto-scroll state
+  bool _atBottom = true;       // true mientras el usuario esté cerca del fondo
+  bool _hasNewMessage = false; // badge "↓ Nuevo mensaje" visible
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _pasteSub = html.document.onPaste.listen(_handleDocumentPaste);
+    _scrollCtrl.addListener(_onScroll);
+  }
+
+  void _onScroll() {
+    if (!_scrollCtrl.hasClients) return;
+    final pos = _scrollCtrl.position;
+    final nearBottom = pos.maxScrollExtent - pos.pixels <= 100;
+    if (nearBottom != _atBottom) setState(() => _atBottom = nearBottom);
+    if (nearBottom && _hasNewMessage) setState(() => _hasNewMessage = false);
   }
 
   @override
@@ -1380,6 +1393,8 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
       _apiMessages = [];
       _firstUnreadMessageId = null;
       _windowOpen = null;
+      _atBottom = true;
+      _hasNewMessage = false;
     });
 
     // Use the pre-tap lastRead so we correctly find "new" messages
@@ -1430,6 +1445,16 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
         firstEmit = false;
         WidgetsBinding.instance.addPostFrameCallback(
             (_) => _scrollToFirstUnread());
+      } else {
+        // Emit posterior: mensaje nuevo en tiempo real
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted || !_scrollCtrl.hasClients) return;
+          if (_atBottom) {
+            _scrollCtrl.jumpTo(_scrollCtrl.position.maxScrollExtent);
+          } else {
+            setState(() => _hasNewMessage = true);
+          }
+        });
       }
     }, onError: (_) {
       if (mounted) setState(() => _msgLoading = false);
@@ -1467,6 +1492,11 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
         );
         if (mounted) {
           setState(() => _sending = false);
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && _scrollCtrl.hasClients) {
+              _scrollCtrl.jumpTo(_scrollCtrl.position.maxScrollExtent);
+            }
+          });
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
             content: Text('✅ Ubicación enviada'),
             backgroundColor: Color(0xFF10B981),
@@ -1506,7 +1536,14 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
           tenantId: tenantId,
           sentByUserId: Supabase.instance.client.auth.currentUser?.id,
           replyToMessageId: replyTo?['wa_message_id'] as String?);
-      if (mounted) setState(() => _sending = false);
+      if (mounted) {
+        setState(() => _sending = false);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _scrollCtrl.hasClients) {
+            _scrollCtrl.jumpTo(_scrollCtrl.position.maxScrollExtent);
+          }
+        });
+      }
     } catch (e) {
       if (mounted) {
         setState(() => _sending = false);
@@ -1811,6 +1848,43 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
             message: replyingTo,
             onDismiss: () =>
                 ref.read(replyingToProvider.notifier).state = null,
+          ),
+
+        // Badge "Nuevo mensaje"
+        if (_hasNewMessage)
+          GestureDetector(
+            onTap: () {
+              if (_scrollCtrl.hasClients) {
+                _scrollCtrl.animateTo(
+                  _scrollCtrl.position.maxScrollExtent,
+                  duration: const Duration(milliseconds: 200),
+                  curve: Curves.easeOut,
+                );
+              }
+              setState(() => _hasNewMessage = false);
+            },
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
+              color: AppColors.ctTeal.withValues(alpha: 0.12),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.arrow_downward_rounded,
+                      size: 13, color: AppColors.ctTealDark),
+                  SizedBox(width: 6),
+                  Text(
+                    'Nuevo mensaje',
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.ctTealDark,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
 
         // Input
