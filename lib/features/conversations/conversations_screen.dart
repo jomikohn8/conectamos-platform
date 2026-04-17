@@ -325,7 +325,7 @@ class _TabOperador extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: const [
         _ConvoList(),
         VerticalDivider(width: 1, color: AppColors.ctBorder),
