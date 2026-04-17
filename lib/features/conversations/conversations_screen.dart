@@ -10,6 +10,7 @@ import 'package:desktop_drop/desktop_drop.dart';
 import 'package:dio/dio.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -2996,6 +2997,7 @@ class _ChatInputState extends State<_ChatInput>
   bool _stoppingRec = false;
   Timer? _typingTimer;
   late final AnimationController _pulse;
+  late final FocusNode _focusNode;
 
   @override
   void initState() {
@@ -3004,6 +3006,18 @@ class _ChatInputState extends State<_ChatInput>
       vsync: this,
       duration: const Duration(milliseconds: 800),
     )..repeat(reverse: true);
+    _focusNode = FocusNode(onKeyEvent: (node, event) {
+      // En desktop/web: Enter envía, Shift+Enter inserta salto de línea
+      if (event is KeyDownEvent &&
+          event.logicalKey == LogicalKeyboardKey.enter &&
+          !HardwareKeyboard.instance.isShiftPressed) {
+        final canSend =
+            widget.onSend != null && !widget.sending && widget.enabled;
+        if (canSend) widget.onSend!();
+        return KeyEventResult.handled; // previene inserción de newline
+      }
+      return KeyEventResult.ignored;
+    });
   }
 
   @override
@@ -3019,6 +3033,7 @@ class _ChatInputState extends State<_ChatInput>
   void dispose() {
     _typingTimer?.cancel();
     _pulse.dispose();
+    _focusNode.dispose();
     super.dispose();
   }
 
@@ -3176,6 +3191,9 @@ class _ChatInputState extends State<_ChatInput>
               Expanded(
                 child: TextField(
                   controller: widget.controller,
+                  focusNode: _focusNode,
+                  minLines: 1,
+                  maxLines: 5,
                   style: const TextStyle(
                     fontFamily: 'Inter',
                     fontSize: 13,
@@ -3183,8 +3201,6 @@ class _ChatInputState extends State<_ChatInput>
                   ),
                   enabled: widget.enabled,
                   onChanged: widget.enabled ? _onChanged : null,
-                  onSubmitted:
-                      canSend ? (_) => widget.onSend!() : null,
                   decoration: InputDecoration(
                     hintText: 'Escribe un mensaje…',
                     hintStyle: const TextStyle(
