@@ -1096,6 +1096,13 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
     if (waId == null || waId.isEmpty) return;
     final chatId = ref.read(selectedChatIdProvider) ?? '';
     final tenantId = ref.read(activeTenantIdProvider);
+    // Optimistic: mostrar reacción antes de que el POST confirme
+    if (mounted) {
+      setState(() {
+        final existing = _pendingReactions.putIfAbsent(waId, () => []);
+        if (!existing.contains(emoji)) existing.add(emoji);
+      });
+    }
     try {
       await MessagesApi.sendReaction(
         messageId: waId,
@@ -1103,16 +1110,10 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
         toPhone: chatId,
         tenantId: tenantId,
       );
-      // Optimistic update: show the reaction immediately without waiting
-      // for the webhook to arrive and update the Supabase stream.
-      if (mounted) {
-        setState(() {
-          final existing = _pendingReactions.putIfAbsent(waId, () => []);
-          if (!existing.contains(emoji)) existing.add(emoji);
-        });
-      }
     } catch (e) {
       if (mounted) {
+        // Revertir actualización optimista
+        setState(() => _pendingReactions[waId]?.remove(emoji));
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text('Error al enviar reacción: $e'),
           backgroundColor: AppColors.ctDanger,
@@ -2250,13 +2251,17 @@ class _ApiChatHeader extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Text(
-                      name,
-                      style: const TextStyle(
-                        fontFamily: 'Inter',
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.ctText,
+                    Flexible(
+                      child: Text(
+                        name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.ctText,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -3308,8 +3313,8 @@ class _ChatInputState extends State<_ChatInput>
                         'Solicitar ubicación'),
                   ],
                   child: Container(
-                    width: 34,
-                    height: 34,
+                    width: 44,
+                    height: 44,
                     alignment: Alignment.center,
                     child: const Icon(Icons.attach_file_rounded,
                         size: 20, color: AppColors.ctText3),
@@ -3329,10 +3334,12 @@ class _ChatInputState extends State<_ChatInput>
                     fontSize: 13,
                     color: AppColors.ctText,
                   ),
-                  enabled: widget.enabled,
+                  enabled: widget.enabled && !widget.sending,
                   onChanged: widget.enabled ? _onChanged : null,
                   decoration: InputDecoration(
-                    hintText: 'Escribe un mensaje…',
+                    hintText: widget.enabled
+                        ? 'Escribe un mensaje…'
+                        : 'Ventana de 24h cerrada — usa una plantilla',
                     hintStyle: const TextStyle(
                       fontFamily: 'Inter',
                       fontSize: 13,
@@ -3369,23 +3376,29 @@ class _ChatInputState extends State<_ChatInput>
                       : SystemMouseCursors.basic,
                   child: GestureDetector(
                     onTap: canMic ? widget.onMic : null,
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 120),
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: canMic
-                            ? AppColors.ctTeal
-                            : AppColors.ctSurface2,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      alignment: Alignment.center,
-                      child: Icon(
-                        Icons.mic_rounded,
-                        size: 18,
-                        color: canMic
-                            ? AppColors.ctNavy
-                            : AppColors.ctText3,
+                    child: SizedBox(
+                      width: 44,
+                      height: 44,
+                      child: Center(
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 120),
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: canMic
+                                ? AppColors.ctTeal
+                                : AppColors.ctSurface2,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          alignment: Alignment.center,
+                          child: Icon(
+                            Icons.mic_rounded,
+                            size: 18,
+                            color: canMic
+                                ? AppColors.ctNavy
+                                : AppColors.ctText3,
+                          ),
+                        ),
                       ),
                     ),
                   ),
@@ -3401,35 +3414,41 @@ class _ChatInputState extends State<_ChatInput>
                       : SystemMouseCursors.basic,
                   child: GestureDetector(
                     onTap: canSend ? widget.onSend : null,
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 120),
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: canSend
-                            ? (_hoverSend
-                                ? AppColors.ctTealDark
-                                : AppColors.ctTeal)
-                            : AppColors.ctSurface2,
-                        borderRadius: BorderRadius.circular(8),
+                    child: SizedBox(
+                      width: 44,
+                      height: 44,
+                      child: Center(
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 120),
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: canSend
+                                ? (_hoverSend
+                                    ? AppColors.ctTealDark
+                                    : AppColors.ctTeal)
+                                : AppColors.ctSurface2,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          alignment: Alignment.center,
+                          child: widget.sending
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: AppColors.ctNavy,
+                                  ),
+                                )
+                              : Icon(
+                                  Icons.send_rounded,
+                                  size: 16,
+                                  color: canSend
+                                      ? AppColors.ctNavy
+                                      : AppColors.ctText3,
+                                ),
+                        ),
                       ),
-                      alignment: Alignment.center,
-                      child: widget.sending
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: AppColors.ctNavy,
-                              ),
-                            )
-                          : Icon(
-                              Icons.send_rounded,
-                              size: 16,
-                              color: canSend
-                                  ? AppColors.ctNavy
-                                  : AppColors.ctText3,
-                            ),
                     ),
                   ),
                 ),
