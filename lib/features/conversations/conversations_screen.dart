@@ -1000,6 +1000,12 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
 
     if (_firstUnreadMessageId == null) {
       _scrollCtrl.jumpTo(_scrollCtrl.position.maxScrollExtent);
+      // ListView.builder solo mide ítems visibles en el primer frame; maxScrollExtent
+      // puede estar subestimado. Un segundo jump tras el re-layout alcanza el fondo real.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_scrollCtrl.hasClients) return;
+        _scrollCtrl.jumpTo(_scrollCtrl.position.maxScrollExtent);
+      });
       return;
     }
 
