@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/api/ai_workers_api.dart';
 import '../../core/api/channels_api.dart';
 import '../../core/api/operators_api.dart';
+import '../../core/api/templates_api.dart';
 import '../../core/providers/tenant_provider.dart';
 import '../../core/theme/colors.dart';
 
@@ -67,6 +68,7 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen>
   bool    _loading = true;
   String? _error;
   bool    _toggling = false;
+  String  _tenantId = '';
 
   TabController? _tabCtrl;
 
@@ -87,6 +89,7 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen>
     setState(() { _loading = true; _error = null; });
     try {
       final tenantId = ref.read(activeTenantIdProvider);
+      _tenantId = tenantId;
       final results = await Future.wait([
         ChannelsApi.getChannel(channelId: widget.channelId, tenantId: tenantId),
         AiWorkersApi.listWorkers(tenantId: tenantId),
@@ -286,6 +289,7 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen>
                 if (_isWhatsApp) ...[
                   _CredentialsTab(
                     channel: _channel!,
+                    tenantId: _tenantId,
                     onUpdated: (updated) {
                       if (mounted) setState(() => _channel = updated);
                     },
@@ -294,11 +298,13 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen>
                   ),
                   _TemplatesTab(
                     channelId: widget.channelId,
+                    tenantId: _tenantId,
                     onError: _showError,
                     onSuccess: _showSuccess,
                   ),
                   _WelcomeTab(
                     channel: _channel!,
+                    tenantId: _tenantId,
                     onError: _showError,
                     onSuccess: _showSuccess,
                   ),
@@ -523,11 +529,13 @@ class _InfoTabState extends State<_InfoTab> {
 class _CredentialsTab extends StatefulWidget {
   const _CredentialsTab({
     required this.channel,
+    required this.tenantId,
     required this.onUpdated,
     required this.onError,
     required this.onSuccess,
   });
   final Map<String, dynamic> channel;
+  final String tenantId;
   final ValueChanged<Map<String, dynamic>> onUpdated;
   final ValueChanged<String> onError;
   final ValueChanged<String> onSuccess;
@@ -600,8 +608,10 @@ class _CredentialsTabState extends State<_CredentialsTab> {
       );
       widget.onUpdated(updated);
       // Sync templates after credentials update
-      ChannelsApi.syncTemplates(channelId: widget.channel['id'] as String)
-          .catchError((e) => <String, dynamic>{});
+      TemplatesApi.syncTemplates(
+        channelId: widget.channel['id'] as String,
+        tenantId: widget.tenantId,
+      ).catchError((_) {});
       widget.onSuccess('Credenciales guardadas');
     } catch (e) {
       widget.onError(_dioError(e));
@@ -751,10 +761,12 @@ class _CredentialsTabState extends State<_CredentialsTab> {
 class _TemplatesTab extends StatefulWidget {
   const _TemplatesTab({
     required this.channelId,
+    required this.tenantId,
     required this.onError,
     required this.onSuccess,
   });
   final String channelId;
+  final String tenantId;
   final ValueChanged<String> onError;
   final ValueChanged<String> onSuccess;
 
@@ -776,7 +788,8 @@ class _TemplatesTabState extends State<_TemplatesTab> {
   Future<void> _fetchTemplates() async {
     setState(() => _loading = true);
     try {
-      final list = await ChannelsApi.listTemplates(channelId: widget.channelId);
+      final list = await TemplatesApi.listTemplates(
+          channelId: widget.channelId, tenantId: widget.tenantId);
       if (mounted) setState(() { _templates = list; _loading = false; });
     } catch (e) {
       if (mounted) setState(() { _templates = []; _loading = false; });
@@ -786,7 +799,8 @@ class _TemplatesTabState extends State<_TemplatesTab> {
   Future<void> _sync() async {
     setState(() => _syncing = true);
     try {
-      await ChannelsApi.syncTemplates(channelId: widget.channelId);
+      await TemplatesApi.syncTemplates(
+          channelId: widget.channelId, tenantId: widget.tenantId);
       widget.onSuccess('Plantillas sincronizadas');
       await _fetchTemplates();
     } catch (e) {
@@ -961,10 +975,12 @@ class _TemplatesTabState extends State<_TemplatesTab> {
 class _WelcomeTab extends StatefulWidget {
   const _WelcomeTab({
     required this.channel,
+    required this.tenantId,
     required this.onError,
     required this.onSuccess,
   });
   final Map<String, dynamic> channel;
+  final String tenantId;
   final ValueChanged<String> onError;
   final ValueChanged<String> onSuccess;
 
@@ -986,8 +1002,9 @@ class _WelcomeTabState extends State<_WelcomeTab> {
 
   Future<void> _loadApproved() async {
     try {
-      final all = await ChannelsApi.listTemplates(
-          channelId: widget.channel['id'] as String);
+      final all = await TemplatesApi.listTemplates(
+          channelId: widget.channel['id'] as String,
+          tenantId: widget.tenantId);
       final approved = all
           .where((t) =>
               (t['status'] as String? ?? '').toUpperCase() == 'APPROVED')
@@ -1343,7 +1360,10 @@ class _OperatorRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final name = op['display_name'] as String? ?? '?';
+    final name = op['nombre'] as String?
+        ?? op['display_name'] as String?
+        ?? op['phone'] as String?
+        ?? '?';
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
@@ -1383,6 +1403,15 @@ class _OperatorRow extends StatelessWidget {
   }
 }
 
+String _opLabel(Map<String, dynamic> op) {
+  final nombre = op['nombre'] as String? ?? op['display_name'] as String?;
+  final phone  = op['phone'] as String?;
+  if (nombre != null && nombre.isNotEmpty) {
+    return phone != null && phone.isNotEmpty ? '$nombre · $phone' : nombre;
+  }
+  return phone ?? op['id'].toString();
+}
+
 class _AssignButton extends StatelessWidget {
   const _AssignButton({required this.operators, required this.onAssign});
   final List<Map<String, dynamic>> operators;
@@ -1397,7 +1426,7 @@ class _AssignButton extends StatelessWidget {
           PopupMenuItem(
             value: op['id'].toString(),
             child: Text(
-              op['display_name'] as String? ?? op['id'].toString(),
+              _opLabel(op),
               style: const TextStyle(fontFamily: 'Inter', fontSize: 13),
             ),
           ),

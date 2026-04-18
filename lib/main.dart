@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/router/app_router.dart';
@@ -12,6 +13,9 @@ const _supabaseAnonKey = 'sb_publishable_DqEJfyb-C4-0GfrmLI-QdQ_nwRmghCG';
 Future<void> main() async {
   usePathUrlStrategy();
   WidgetsFlutterBinding.ensureInitialized();
+
+  await initializeDateFormatting('es_MX', null);
+  await initializeDateFormatting('es', null);
 
   await Supabase.initialize(
     url: _supabaseUrl,
