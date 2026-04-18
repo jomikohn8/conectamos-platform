@@ -108,7 +108,7 @@ class _ChannelsScreenState extends ConsumerState<ChannelsScreen> {
     final isActive = channel['is_active'] as bool? ?? false;
     try {
       if (isActive) {
-        await ChannelsApi.updateChannel(channelId: id, isActive: false);
+        await ChannelsApi.updateChannel(channelId: id, isActive: false, tenantId: ref.read(activeTenantIdProvider));
       } else {
         await ChannelsApi.activateChannel(channelId: id, tenantId: ref.read(activeTenantIdProvider));
       }

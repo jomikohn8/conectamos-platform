@@ -125,6 +125,7 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen>
       final updated = await ChannelsApi.updateChannel(
         channelId: widget.channelId,
         isActive: !current,
+        tenantId: _tenantId,
       );
       if (!mounted) return;
       setState(() { _channel = updated; _toggling = false; });
@@ -410,6 +411,7 @@ class _InfoTabState extends State<_InfoTab> {
         displayName: name,
         color: _selectedColor,
         tenantWorkerId: _selectedWorkerId,
+        tenantId: widget.channel['tenant_id'] as String?,
       );
       widget.onUpdated(updated);
       widget.onSuccess('Cambios guardados');
@@ -595,16 +597,10 @@ class _CredentialsTabState extends State<_CredentialsTab> {
     try {
       final updated = await ChannelsApi.updateChannel(
         channelId: widget.channel['id'] as String,
+        tenantId: widget.tenantId,
         phoneNumberId: phone,
         wabaId: waba,
         waToken: token,
-        channelConfig: {
-          'credentials': {
-            'phone_number_id': phone,
-            'waba_id': waba,
-            'access_token': token,
-          },
-        },
       );
       widget.onUpdated(updated);
       // Sync templates after credentials update

@@ -1566,7 +1566,7 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
       final receivedAt = lastInbound != null
           ? DateTime.tryParse(lastInbound['received_at'] as String? ?? '')
           : null;
-      final channelIsActive = (ref.read(selectedOperatorChannelsProvider).firstOrNull)?['is_active'] as bool? ?? true;
+      final channelIsActive = (ref.read(selectedOperatorChannelsProvider).firstOrNull)?['is_active'] as bool? ?? false;
       final computed = receivedAt != null &&
           DateTime.now().toUtc().difference(receivedAt.toUtc()).inHours < 24 &&
           channelIsActive;
@@ -1879,7 +1879,12 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
     final activeChannelIdx = ref.watch(selectedChannelIndexProvider);
     final safeIdx =
         channels.isEmpty ? 0 : activeChannelIdx.clamp(0, channels.length - 1);
-    final activeChannel = channels.isNotEmpty ? channels[safeIdx] : null;
+    final activeChannel = channels.isNotEmpty
+        ? channels.firstWhere(
+            (c) => c['is_active'] as bool? ?? false,
+            orElse: () => channels[safeIdx],
+          )
+        : null;
     final activeChannelId = activeChannel?['channel_id'] as String?;
 
     final channelFiltered = activeChannelId != null
@@ -5132,7 +5137,7 @@ class _NewMessageDialogState extends ConsumerState<_NewMessageDialog> {
           .gte('received_at', cutoff)
           .limit(1);
       final hasRecentInbound = (rows as List).isNotEmpty;
-      final channelIsActive = (ref.read(selectedOperatorChannelsProvider).firstOrNull)?['is_active'] as bool? ?? true;
+      final channelIsActive = (ref.read(selectedOperatorChannelsProvider).firstOrNull)?['is_active'] as bool? ?? false;
       if (mounted) {
         setState(() {
           _windowOpen = hasRecentInbound && channelIsActive;

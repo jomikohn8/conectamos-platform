@@ -32,21 +32,25 @@ class ChannelsApi {
     String? wabaId,
     String? waToken,
   }) async {
+    final creds = <String, dynamic>{};
+    if (phoneNumberId != null) creds['phone_number_id'] = phoneNumberId;
+    if (wabaId != null)        creds['waba_id']         = wabaId;
+    if (waToken != null)       creds['access_token']    = waToken;
+
     final response = await ApiClient.instance.post('/channels', data: {
       'tenant_id':        tenantId,
       'tenant_worker_id': tenantWorkerId,
       'display_name':     displayName,
       'color':            color,
       'channel_type':     channelType,
-      'phone_number_id':  ?phoneNumberId,
-      'waba_id':  ?wabaId,
-      'wa_token': ?waToken,
+      if (creds.isNotEmpty) 'channel_config': {'credentials': creds},
     });
     return Map<String, dynamic>.from(response.data);
   }
 
   static Future<Map<String, dynamic>> updateChannel({
     required String channelId,
+    String? tenantId,
     String? displayName,
     String? color,
     bool? isActive,
@@ -57,18 +61,33 @@ class ChannelsApi {
     String? waToken,
     Map<String, dynamic>? channelConfig,
   }) async {
+    // Credential fields are always nested under channel_config.credentials
+    Map<String, dynamic>? effectiveConfig = channelConfig;
+    if (phoneNumberId != null || wabaId != null || waToken != null) {
+      final base = Map<String, dynamic>.from(channelConfig ?? {});
+      final creds = Map<String, dynamic>.from(
+        (base['credentials'] as Map?)?.cast<String, dynamic>() ?? {},
+      );
+      if (phoneNumberId != null) creds['phone_number_id'] = phoneNumberId;
+      if (wabaId != null)        creds['waba_id']         = wabaId;
+      if (waToken != null)       creds['access_token']    = waToken;
+      base['credentials'] = creds;
+      effectiveConfig = base;
+    }
+
+    final qp = <String, dynamic>{};
+    if (tenantId != null && tenantId.isNotEmpty) qp['tenant_id'] = tenantId;
+
     final response = await ApiClient.instance.patch(
       '/channels/$channelId',
+      queryParameters: qp.isEmpty ? null : qp,
       data: {
         'display_name':     ?displayName,
         'color':            ?color,
         'is_active':        ?isActive,
         'tenant_worker_id': ?tenantWorkerId,
         'channel_type':     ?channelType,
-        'phone_number_id':  ?phoneNumberId,
-        'waba_id':  ?wabaId,
-        'wa_token': ?waToken,
-        'channel_config': ?channelConfig,
+        'channel_config':   ?effectiveConfig,
       },
     );
     return Map<String, dynamic>.from(response.data);
