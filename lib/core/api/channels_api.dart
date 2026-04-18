@@ -11,6 +11,13 @@ class ChannelsApi {
     return List<Map<String, dynamic>>.from(response.data);
   }
 
+  static Future<Map<String, dynamic>> getChannel({
+    required String channelId,
+  }) async {
+    final response = await ApiClient.instance.get('/channels/$channelId');
+    return Map<String, dynamic>.from(response.data);
+  }
+
   static Future<Map<String, dynamic>> createChannel({
     required String tenantId,
     required String tenantWorkerId,
@@ -44,6 +51,7 @@ class ChannelsApi {
     String? phoneNumberId,
     String? wabaId,
     String? waToken,
+    Map<String, dynamic>? channelConfig,
   }) async {
     final response = await ApiClient.instance.patch(
       '/channels/$channelId',
@@ -56,6 +64,7 @@ class ChannelsApi {
         'phone_number_id':  ?phoneNumberId,
         'waba_id':  ?wabaId,
         'wa_token': ?waToken,
+        'channel_config': ?channelConfig,
       },
     );
     return Map<String, dynamic>.from(response.data);
@@ -82,6 +91,40 @@ class ChannelsApi {
   }) async {
     await ApiClient.instance.delete(
       '/channels/$channelId/operators/$operatorId',
+    );
+  }
+
+  static Future<Map<String, dynamic>> syncTemplates({
+    required String channelId,
+  }) async {
+    final response = await ApiClient.instance.post(
+      '/templates/sync',
+      queryParameters: {'channel_id': channelId},
+    );
+    return Map<String, dynamic>.from(response.data);
+  }
+
+  static Future<List<Map<String, dynamic>>> listTemplates({
+    required String channelId,
+  }) async {
+    final response = await ApiClient.instance.get(
+      '/templates',
+      queryParameters: {'channel_id': channelId},
+    );
+    final data = response.data;
+    final List raw = data is List
+        ? data
+        : (data['templates'] ?? data['items'] ?? []) as List;
+    return raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+  }
+
+  static Future<void> updateWelcomeTemplate({
+    required String channelId,
+    required String templateId,
+  }) async {
+    await ApiClient.instance.patch(
+      '/channels/$channelId/welcome-template',
+      data: {'template_id': templateId},
     );
   }
 }

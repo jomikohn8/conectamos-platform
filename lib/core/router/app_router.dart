@@ -9,12 +9,12 @@ import '../../features/auth/forgot_password_screen.dart';
 import '../../features/auth/login_screen.dart';
 import '../../features/auth/reset_password_screen.dart';
 import '../../features/broadcasts/broadcast_screen.dart';
+import '../../features/config/channel_detail_screen.dart';
+import '../../features/config/channels_screen.dart';
 import '../../features/config/connections_screen.dart';
 import '../../features/config/operators_screen.dart';
 import '../../features/config/settings_screen.dart';
-import '../../features/config/whatsapp_config_screen.dart';
 import '../../features/config/ai_workers_screen.dart';
-import '../../features/config/channels_screen.dart';
 import '../../features/config/workflows_screen.dart';
 import '../../features/conversations/conversations_screen.dart';
 import '../../features/dashboard/dashboard_screen.dart';
@@ -130,15 +130,18 @@ final routerProvider = Provider<GoRouter>((ref) {
             ),
           ),
           GoRoute(
+            path: '/channels/:channelId',
+            pageBuilder: (context, state) {
+              final channelId = state.pathParameters['channelId'] ?? '';
+              return NoTransitionPage(
+                child: ChannelDetailScreen(channelId: channelId),
+              );
+            },
+          ),
+          GoRoute(
             path: '/connections',
             pageBuilder: (context, state) => const NoTransitionPage(
               child: ConnectionsScreen(),
-            ),
-          ),
-          GoRoute(
-            path: '/connections/whatsapp',
-            pageBuilder: (context, state) => const NoTransitionPage(
-              child: WhatsAppConfigScreen(),
             ),
           ),
           GoRoute(
