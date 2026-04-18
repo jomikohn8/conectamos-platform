@@ -1,83 +1,106 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/api/api_client.dart';
-import '../../core/providers/tenant_provider.dart';
-import '../../core/theme/app_theme.dart';
-
-// ── Provider ──────────────────────────────────────────────────────────────────
-
-final _tenantDetailsProvider =
-    FutureProvider.autoDispose.family<Map<String, dynamic>?, String>(
-  (ref, tenantId) async {
-    if (tenantId.isEmpty) return null;
-    try {
-      final res = await ApiClient.instance.get('/tenants/$tenantId');
-      return Map<String, dynamic>.from(res.data as Map);
-    } catch (_) {
-      return null;
-    }
-  },
-);
+import '../../core/theme/colors.dart';
 
 // ── Pantalla ──────────────────────────────────────────────────────────────────
 
-class ConnectionsScreen extends ConsumerWidget {
+class ConnectionsScreen extends StatelessWidget {
   const ConnectionsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final tenantId = ref.watch(activeTenantIdProvider);
-    final tenantAsync = ref.watch(_tenantDetailsProvider(tenantId));
-
-    final waConfigured = tenantAsync.maybeWhen(
-      data: (d) {
-        final id = d?['wa_phone_number_id']?.toString() ?? '';
-        return id.isNotEmpty;
-      },
-      orElse: () => false,
-    );
-
+  Widget build(BuildContext context) {
     return Column(
       children: [
         _ActionBar(),
         Expanded(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(22),
+            padding: const EdgeInsets.all(24),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // ── Section 1: Canales ──────────────────────────────────────
+                const Text(
+                  'Canales de comunicación',
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.ctText,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Gestiona los canales por los que recibes y envías mensajes.',
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 12,
+                    color: AppColors.ctText2,
+                  ),
+                ),
+                const SizedBox(height: 16),
                 _ChannelCard(
                   icon: Icons.chat_rounded,
                   iconBg: const Color(0xFFDCFCE7),
-                  iconColor: const Color(0xFF16A34A),
+                  iconColor: const Color(0xFF25D366),
                   title: 'WhatsApp Business API',
                   subtitle: 'Meta Cloud API',
-                  connected: waConfigured,
-                  onConfigure: () => context.go('/connections/whatsapp'),
+                  actionLabel: 'Gestionar canales',
+                  onAction: () => context.go('/channels'),
                 ),
                 const SizedBox(height: 12),
                 _ChannelCard(
                   icon: Icons.send_rounded,
-                  iconBg: AppColors.ctSurface2,
-                  iconColor: AppColors.ctText3,
+                  iconBg: const Color(0xFFE0F2FE),
+                  iconColor: const Color(0xFF229ED9),
                   title: 'Telegram',
                   subtitle: 'Telegram Bot API',
-                  connected: false,
                   comingSoon: true,
-                  onConfigure: null,
                 ),
                 const SizedBox(height: 12),
                 _ChannelCard(
                   icon: Icons.sms_outlined,
                   iconBg: AppColors.ctSurface2,
-                  iconColor: AppColors.ctText3,
+                  iconColor: const Color(0xFF6B7280),
                   title: 'SMS',
                   subtitle: 'Twilio / Vonage',
-                  connected: false,
                   comingSoon: true,
-                  onConfigure: null,
+                ),
+                const SizedBox(height: 12),
+                _ChannelCard(
+                  icon: Icons.facebook_rounded,
+                  iconBg: const Color(0xFFDBEAFE),
+                  iconColor: const Color(0xFF1877F2),
+                  title: 'Facebook Messenger',
+                  subtitle: 'Meta Graph API',
+                  comingSoon: true,
+                ),
+
+                const SizedBox(height: 32),
+
+                // ── Section 2: Integraciones ────────────────────────────────
+                const Text(
+                  'Integraciones de datos',
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.ctText,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Conecta tu CRM, ERP u otras fuentes de datos.',
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 12,
+                    color: AppColors.ctText2,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                _DashedCard(
+                  icon: Icons.extension_outlined,
+                  label: 'Más integraciones próximamente',
                 ),
               ],
             ),
@@ -118,7 +141,7 @@ class _ActionBar extends StatelessWidget {
               ),
               SizedBox(height: 1),
               Text(
-                'Gestiona tus canales de comunicación',
+                'Canales de comunicación e integraciones',
                 style: TextStyle(
                   fontFamily: 'Inter',
                   fontSize: 11,
@@ -133,7 +156,7 @@ class _ActionBar extends StatelessWidget {
   }
 }
 
-// ── Card de canal ─────────────────────────────────────────────────────────────
+// ── Channel Card ──────────────────────────────────────────────────────────────
 
 class _ChannelCard extends StatefulWidget {
   const _ChannelCard({
@@ -142,9 +165,9 @@ class _ChannelCard extends StatefulWidget {
     required this.iconColor,
     required this.title,
     required this.subtitle,
-    required this.connected,
     this.comingSoon = false,
-    required this.onConfigure,
+    this.actionLabel,
+    this.onAction,
   });
 
   final IconData icon;
@@ -152,9 +175,9 @@ class _ChannelCard extends StatefulWidget {
   final Color iconColor;
   final String title;
   final String subtitle;
-  final bool connected;
   final bool comingSoon;
-  final VoidCallback? onConfigure;
+  final String? actionLabel;
+  final VoidCallback? onAction;
 
   @override
   State<_ChannelCard> createState() => _ChannelCardState();
@@ -172,13 +195,14 @@ class _ChannelCardState extends State<_ChannelCard> {
         duration: const Duration(milliseconds: 120),
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: _hovered ? AppColors.ctBg : AppColors.ctSurface,
+          color: _hovered && !widget.comingSoon
+              ? AppColors.ctBg
+              : AppColors.ctSurface,
           border: Border.all(color: AppColors.ctBorder),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Row(
           children: [
-            // Icono canal
             Container(
               width: 44,
               height: 44,
@@ -190,8 +214,6 @@ class _ChannelCardState extends State<_ChannelCard> {
               child: Icon(widget.icon, size: 22, color: widget.iconColor),
             ),
             const SizedBox(width: 16),
-
-            // Título + subtítulo
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -218,35 +240,17 @@ class _ChannelCardState extends State<_ChannelCard> {
               ),
             ),
             const SizedBox(width: 16),
-
-            // Badge de status + botón
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                if (widget.comingSoon)
-                  _Badge(
-                    label: 'Próximamente',
-                    bg: AppColors.ctSurface2,
-                    textColor: AppColors.ctText2,
-                  )
-                else if (widget.connected)
-                  _Badge(
-                    label: 'Conectado',
-                    bg: const Color(0xFFDCFCE7),
-                    textColor: const Color(0xFF16A34A),
-                  )
-                else
-                  _Badge(
-                    label: 'Sin configurar',
-                    bg: AppColors.ctSurface2,
-                    textColor: AppColors.ctText2,
-                  ),
-                if (widget.onConfigure != null) ...[
-                  const SizedBox(height: 10),
-                  _ConfigureButton(onTap: widget.onConfigure!),
-                ],
-              ],
-            ),
+            if (widget.comingSoon)
+              _Badge(
+                label: 'Próximamente',
+                bg: AppColors.ctSurface2,
+                textColor: AppColors.ctText2,
+              )
+            else if (widget.onAction != null)
+              _ActionButton(
+                label: widget.actionLabel ?? 'Configurar',
+                onTap: widget.onAction!,
+              ),
           ],
         ),
       ),
@@ -254,14 +258,51 @@ class _ChannelCardState extends State<_ChannelCard> {
   }
 }
 
-// ── Widgets locales ───────────────────────────────────────────────────────────
+// ── Dashed placeholder card ───────────────────────────────────────────────────
+
+class _DashedCard extends StatelessWidget {
+  const _DashedCard({required this.icon, required this.label});
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 28),
+      decoration: BoxDecoration(
+        color: AppColors.ctSurface,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: AppColors.ctBorder2,
+          width: 1.5,
+          // Dashed effect via custom painter not available natively;
+          // using solid thin border as closest approximation.
+        ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 32, color: AppColors.ctBorder2),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            style: const TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 13,
+              color: AppColors.ctText3,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Shared Widgets ────────────────────────────────────────────────────────────
 
 class _Badge extends StatelessWidget {
-  const _Badge({
-    required this.label,
-    required this.bg,
-    required this.textColor,
-  });
+  const _Badge({required this.label, required this.bg, required this.textColor});
   final String label;
   final Color bg;
   final Color textColor;
@@ -287,15 +328,16 @@ class _Badge extends StatelessWidget {
   }
 }
 
-class _ConfigureButton extends StatefulWidget {
-  const _ConfigureButton({required this.onTap});
+class _ActionButton extends StatefulWidget {
+  const _ActionButton({required this.label, required this.onTap});
+  final String label;
   final VoidCallback onTap;
 
   @override
-  State<_ConfigureButton> createState() => _ConfigureButtonState();
+  State<_ActionButton> createState() => _ActionButtonState();
 }
 
-class _ConfigureButtonState extends State<_ConfigureButton> {
+class _ActionButtonState extends State<_ActionButton> {
   bool _hovered = false;
 
   @override
@@ -308,14 +350,14 @@ class _ConfigureButtonState extends State<_ConfigureButton> {
         onTap: widget.onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 120),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
           decoration: BoxDecoration(
             color: _hovered ? AppColors.ctTealDark : AppColors.ctTeal,
             borderRadius: BorderRadius.circular(7),
           ),
-          child: const Text(
-            'Configurar',
-            style: TextStyle(
+          child: Text(
+            widget.label,
+            style: const TextStyle(
               fontFamily: 'Inter',
               fontSize: 12,
               fontWeight: FontWeight.w600,
