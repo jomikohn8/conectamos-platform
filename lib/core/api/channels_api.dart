@@ -78,8 +78,14 @@ class ChannelsApi {
     await ApiClient.instance.delete('/channels/$channelId');
   }
 
-  static Future<void> activateChannel({required String channelId}) async {
-    await ApiClient.instance.post('/channels/$channelId/activate');
+  static Future<void> activateChannel({
+    required String channelId,
+    required String tenantId,
+  }) async {
+    await ApiClient.instance.post(
+      '/channels/$channelId/activate',
+      queryParameters: {'tenant_id': tenantId},
+    );
   }
 
   static Future<void> assignOperator({

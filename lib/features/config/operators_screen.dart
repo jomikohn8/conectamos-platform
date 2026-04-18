@@ -422,8 +422,10 @@ class _OperatorRowState extends State<_OperatorRow> {
     final phone = op['phone'] as String? ?? '—';
     final status = op['status'] as String?;
     final verified = op['whatsapp_verified'] as bool? ?? false;
-    final flows =
-        List<String>.from(op['flows'] as List? ?? []);
+    final flows = (op['flows'] as List? ?? [])
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
     final lastEventAt = op['last_event_at'] as String?;
     final id = op['id'] as String? ?? '';
     final st = _statusStyle(status);
@@ -557,7 +559,7 @@ class _OperatorRowState extends State<_OperatorRow> {
                 spacing: 4,
                 runSpacing: 4,
                 children: flows
-                    .map((f) => _FlowBadge(label: f))
+                    .map((f) => _FlowBadge(flow: f))
                     .toList(),
               ),
             ),
@@ -591,7 +593,7 @@ class _OperatorRowState extends State<_OperatorRow> {
                           operatorId: id,
                           initialName: name,
                           initialPhone: phone,
-                          initialFlows: flows,
+                          initialFlows: flows.map((f) => f['id'] as String? ?? '').where((s) => s.isNotEmpty).toList(),
                           onSaved: widget.onRefresh,
                         ),
                       );
@@ -1139,25 +1141,29 @@ class _StatusBadge extends StatelessWidget {
 }
 
 class _FlowBadge extends StatelessWidget {
-  const _FlowBadge({required this.label});
-  final String label;
+  const _FlowBadge({required this.flow});
+  final Map<String, dynamic> flow;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding:
-          const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(
-        color: AppColors.ctInfoBg,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        label,
-        style: const TextStyle(
-          fontFamily: 'Inter',
-          fontSize: 10,
-          fontWeight: FontWeight.w600,
-          color: AppColors.ctInfoText,
+    final label = flow['name'] as String? ?? flow['id'] as String? ?? '—';
+    final isActive = flow['is_active'] as bool? ?? true;
+    return Opacity(
+      opacity: isActive ? 1.0 : 0.45,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+        decoration: BoxDecoration(
+          color: AppColors.ctInfoBg,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(
+          label,
+          style: const TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            color: AppColors.ctInfoText,
+          ),
         ),
       ),
     );
