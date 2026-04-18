@@ -13,8 +13,12 @@ class ChannelsApi {
 
   static Future<Map<String, dynamic>> getChannel({
     required String channelId,
+    required String tenantId,
   }) async {
-    final response = await ApiClient.instance.get('/channels/$channelId');
+    final response = await ApiClient.instance.get(
+      '/channels/$channelId',
+      queryParameters: {'tenant_id': tenantId},
+    );
     return Map<String, dynamic>.from(response.data);
   }
 

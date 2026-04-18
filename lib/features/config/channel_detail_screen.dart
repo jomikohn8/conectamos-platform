@@ -88,7 +88,7 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen>
     try {
       final tenantId = ref.read(activeTenantIdProvider);
       final results = await Future.wait([
-        ChannelsApi.getChannel(channelId: widget.channelId),
+        ChannelsApi.getChannel(channelId: widget.channelId, tenantId: tenantId),
         AiWorkersApi.listWorkers(tenantId: tenantId),
         OperatorsApi.listOperators(tenantId: tenantId),
       ]);
