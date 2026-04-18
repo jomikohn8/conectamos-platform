@@ -38,6 +38,7 @@ class MessagesApi {
   static Future<Map<String, dynamic>> sendMessage({
     required String to,
     required String text,
+    required String channelId,
     String? phoneNumberId,
   }) async {
     final response = await ApiClient.instance.post(
@@ -45,15 +46,16 @@ class MessagesApi {
       queryParameters: {
         'to': to,
         'text': text,
+        'channel_id': channelId,
         'phone_number_id': ?phoneNumberId,
       },
     );
     return Map<String, dynamic>.from(response.data);
   }
 
-  static Future<void> markRead(String waMessageId, {String? tenantId}) async {
+  static Future<void> markRead(String waMessageId, {String? tenantId, required String channelId}) async {
     // ignore: avoid_print
-    debugPrint('[MessagesApi.markRead] entry — waMessageId=$waMessageId tenantId=$tenantId');
+    debugPrint('[MessagesApi.markRead] entry — waMessageId=$waMessageId tenantId=$tenantId channelId=$channelId');
     if (waMessageId.isEmpty || waMessageId == 'null') {
       debugPrint('[MessagesApi.markRead] GUARD: empty/null waMessageId');
       return;
@@ -62,10 +64,14 @@ class MessagesApi {
       debugPrint('[MessagesApi.markRead] GUARD: empty tenantId');
       return;
     }
+    if (channelId.isEmpty) {
+      debugPrint('[MessagesApi.markRead] GUARD: empty channelId');
+      return;
+    }
     try {
       await ApiClient.instance.post(
         '/messages/read',
-        data: {'message_id': waMessageId, 'tenant_id': tenantId},
+        data: {'message_id': waMessageId, 'tenant_id': tenantId, 'channel_id': channelId},
       );
       debugPrint('[MessagesApi.markRead] OK — $waMessageId');
     } catch (e) {
@@ -73,13 +79,14 @@ class MessagesApi {
     }
   }
 
-  static Future<void> sendTyping(String waMessageId, {String? tenantId}) async {
+  static Future<void> sendTyping(String waMessageId, {String? tenantId, required String channelId}) async {
     if (waMessageId.isEmpty || waMessageId == 'null') return;
     if (tenantId == null || tenantId.isEmpty) return;
+    if (channelId.isEmpty) return;
     try {
       await ApiClient.instance.post(
         '/messages/typing',
-        data: {'message_id': waMessageId, 'tenant_id': tenantId},
+        data: {'message_id': waMessageId, 'tenant_id': tenantId, 'channel_id': channelId},
       );
     } catch (_) {}
   }
@@ -90,16 +97,18 @@ class MessagesApi {
     required String to,
     required String text,
     required String tenantId,
+    required String channelId,
     String? sentByUserId,
     String? replyToMessageId,
   }) async {
-    if (to.isEmpty || tenantId.isEmpty) return;
+    if (to.isEmpty || tenantId.isEmpty || channelId.isEmpty) return;
     await ApiClient.instance.post(
       '/messages/send',
       data: {
         'to':                   to,
         'message':              text,
         'tenant_id':            tenantId,
+        'channel_id':           channelId,
         'sent_by_user_id':     ?sentByUserId,
         'reply_to_message_id': ?replyToMessageId,
       },
@@ -112,6 +121,7 @@ class MessagesApi {
     required String emoji,
     required String toPhone,
     required String tenantId,
+    required String channelId,
   }) async {
     await ApiClient.instance.post(
       '/messages/send/reaction',
@@ -120,6 +130,7 @@ class MessagesApi {
         'emoji':      emoji,
         'to_phone':   toPhone,
         'tenant_id':  tenantId,
+        'channel_id': channelId,
       },
     );
   }
@@ -130,12 +141,14 @@ class MessagesApi {
     required Uint8List fileBytes,
     required String filename,
     required String tenantId,
+    required String channelId,
     String? caption,
     String? sentByUserId,
   }) async {
     final formData = FormData.fromMap({
       'to': to,
       'tenant_id': tenantId,
+      'channel_id': channelId,
       'file': MultipartFile.fromBytes(
         fileBytes,
         filename: filename,
@@ -151,6 +164,7 @@ class MessagesApi {
   static Future<void> sendLocation({
     required String to,
     required String tenantId,
+    required String channelId,
     required String googleMapsUrl,
     String? sentByUserId,
   }) async {
@@ -159,6 +173,7 @@ class MessagesApi {
       data: {
         'to':              to,
         'tenant_id':       tenantId,
+        'channel_id':      channelId,
         'google_maps_url': googleMapsUrl,
         'sent_by_user_id': ?sentByUserId,
       },
@@ -169,6 +184,7 @@ class MessagesApi {
   static Future<void> sendLocationRequest({
     required String to,
     required String tenantId,
+    required String channelId,
     String? sentByUserId,
   }) async {
     await ApiClient.instance.post(
@@ -176,6 +192,7 @@ class MessagesApi {
       data: {
         'to':              to,
         'tenant_id':       tenantId,
+        'channel_id':      channelId,
         'sent_by_user_id': ?sentByUserId,
       },
     );

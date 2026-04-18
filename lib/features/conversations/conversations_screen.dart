@@ -1031,6 +1031,13 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
     }
   }
 
+  String? _activeChannelId() {
+    final channels = ref.read(selectedOperatorChannelsProvider);
+    final idx = ref.read(selectedChannelIndexProvider).clamp(
+        0, channels.isEmpty ? 0 : channels.length - 1);
+    return channels.isNotEmpty ? channels[idx]['channel_id'] as String? : null;
+  }
+
   Future<void> _sendReadReceipts(List<Map<String, dynamic>> messages) async {
     final tenantId = ref.read(activeTenantIdProvider);
     if (tenantId.isEmpty) {
@@ -1040,7 +1047,7 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
     // Fase 1: recolectar IDs pendientes (dedup + validación),
     // añadiendo a _processedReadIds antes del async para evitar
     // que un segundo emit encole los mismos IDs mientras este procesa.
-    final pending = <String>[];
+    final pending = <({String waId, String channelId})>[];
     for (final msg in messages) {
       if ((msg['direction'] as String?) == 'outbound') continue;
 
@@ -1062,16 +1069,23 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
         continue;
       }
       if (_processedReadIds.contains(waId)) continue;
+
+      final channelId = msg['channel_id'] as String? ?? '';
+      if (channelId.isEmpty) {
+        debugPrint('[markRead] SKIP — no channel_id for $waId');
+        continue;
+      }
+
       _processedReadIds.add(waId);
-      pending.add(waId);
+      pending.add((waId: waId, channelId: channelId));
     }
     // Fase 2: procesar en serie con 50ms entre requests para
     // evitar la ráfaga de N POSTs simultáneos en el primer emit.
-    for (final waId in pending) {
+    for (final item in pending) {
       if (!mounted) return;
-      debugPrint('[markRead] CALLING — tenantId=$tenantId waId=$waId');
-      await MessagesApi.markRead(waId, tenantId: tenantId);
-      if (waId != pending.last) await Future.delayed(const Duration(milliseconds: 50));
+      debugPrint('[markRead] CALLING — tenantId=$tenantId waId=${item.waId} channelId=${item.channelId}');
+      await MessagesApi.markRead(item.waId, tenantId: tenantId, channelId: item.channelId);
+      if (item.waId != pending.last.waId) await Future.delayed(const Duration(milliseconds: 50));
     }
   }
 
@@ -1087,7 +1101,12 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
         );
     final waId = lastInbound['wa_message_id'] as String?;
     if (waId == null || waId.isEmpty || waId == 'null') return;
-    MessagesApi.sendTyping(waId, tenantId: tenantId); // fire-and-forget
+    final channelId = lastInbound['channel_id'] as String? ?? '';
+    if (channelId.isEmpty) {
+      debugPrint('[_handleTyping] SKIP — no channel_id');
+      return;
+    }
+    MessagesApi.sendTyping(waId, tenantId: tenantId, channelId: channelId); // fire-and-forget
   }
 
   Future<void> _sendReaction(
@@ -1096,6 +1115,11 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
     if (waId == null || waId.isEmpty) return;
     final chatId = ref.read(selectedChatIdProvider) ?? '';
     final tenantId = ref.read(activeTenantIdProvider);
+    final channelId = msg['channel_id'] as String? ?? '';
+    if (channelId.isEmpty) {
+      debugPrint('[_sendReaction] SKIP — no channel_id for $waId');
+      return;
+    }
     // Optimistic: mostrar reacción antes de que el POST confirme
     if (mounted) {
       setState(() {
@@ -1109,6 +1133,7 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
         emoji: emoji,
         toPhone: chatId,
         tenantId: tenantId,
+        channelId: channelId,
       );
     } catch (e) {
       if (mounted) {
@@ -1203,6 +1228,11 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
     final chatId = ref.read(selectedChatIdProvider) ?? '';
     if (chatId.isEmpty) return;
     final tenantId = ref.read(activeTenantIdProvider);
+    final channelId = _activeChannelId() ?? '';
+    if (channelId.isEmpty) {
+      debugPrint('[_sendMedia] SKIP — no channelId');
+      return;
+    }
     final userId = Supabase.instance.client.auth.currentUser?.id;
 
     if (mounted) setState(() { _sending = true; _isDragOver = false; });
@@ -1212,6 +1242,7 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
         fileBytes: bytes,
         filename: filename,
         tenantId: tenantId,
+        channelId: channelId,
         caption: caption,
         sentByUserId: userId,
       );
@@ -1268,11 +1299,17 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
     final chatId = ref.read(selectedChatIdProvider) ?? '';
     if (chatId.isEmpty) return;
     final tenantId = ref.read(activeTenantIdProvider);
+    final channelId = _activeChannelId() ?? '';
+    if (channelId.isEmpty) {
+      debugPrint('[_sendLocationRequest] SKIP — no channelId');
+      return;
+    }
     final userId = Supabase.instance.client.auth.currentUser?.id;
     try {
       await MessagesApi.sendLocationRequest(
         to: chatId,
         tenantId: tenantId,
+        channelId: channelId,
         sentByUserId: userId,
       );
       if (mounted) {
@@ -1568,6 +1605,12 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
     final tenantId = ref.read(activeTenantIdProvider);
     if (tenantId.isEmpty) return;
 
+    final channelId = _activeChannelId() ?? '';
+    if (channelId.isEmpty) {
+      debugPrint('[_sendMessage] SKIP — no channelId');
+      return;
+    }
+
     // Auto-detect Google Maps URLs
     if (_isGoogleMapsUrl(text)) {
       _msgCtrl.clear();
@@ -1576,6 +1619,7 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
         await MessagesApi.sendLocation(
           to: chatId,
           tenantId: tenantId,
+          channelId: channelId,
           googleMapsUrl: text,
           sentByUserId: Supabase.instance.client.auth.currentUser?.id,
         );
@@ -1623,6 +1667,7 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
           to: chatId,
           text: text,
           tenantId: tenantId,
+          channelId: channelId,
           sentByUserId: Supabase.instance.client.auth.currentUser?.id,
           replyToMessageId: replyTo?['wa_message_id'] as String?);
       if (mounted) {
@@ -5089,10 +5134,22 @@ class _NewMessageDialogState extends ConsumerState<_NewMessageDialog> {
           setState(() { _sending = false; _sendError = 'Escribe un mensaje.'; });
           return;
         }
+        final channels = ref.read(selectedOperatorChannelsProvider);
+        final idx = ref.read(selectedChannelIndexProvider).clamp(
+            0, channels.isEmpty ? 0 : channels.length - 1);
+        final channelId = channels.isNotEmpty
+            ? channels[idx]['channel_id'] as String? ?? ''
+            : '';
+        if (channelId.isEmpty) {
+          debugPrint('[_NewMessageDialog._send] SKIP — no channelId');
+          setState(() { _sending = false; _sendError = 'No hay canal activo. Selecciona un operador primero.'; });
+          return;
+        }
         await MessagesApi.sendWhatsAppMessage(
           to: phone,
           text: text,
           tenantId: tenantId,
+          channelId: channelId,
           sentByUserId: userId,
         );
       }
