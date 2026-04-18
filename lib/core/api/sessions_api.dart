@@ -25,4 +25,31 @@ class SessionsApi {
     );
     return List<Map<String, dynamic>>.from(response.data);
   }
+
+  static Future<void> patchStatus({
+    required String sessionId,
+    required String status,
+  }) async {
+    await ApiClient.instance.patch(
+      '/sessions/$sessionId',
+      data: {'status': status},
+    );
+  }
+
+  /// Busca el ID de la sesión activa para un chat (phone).
+  static Future<String?> findActiveSessionId({
+    required String chatId,
+    required String tenantId,
+  }) async {
+    try {
+      final sessions = await listSessions(tenantId: tenantId);
+      final match = sessions.firstWhere(
+        (s) => (s['chat_id'] as String?) == chatId || (s['phone'] as String?) == chatId,
+        orElse: () => {},
+      );
+      return match['id'] as String?;
+    } catch (_) {
+      return null;
+    }
+  }
 }

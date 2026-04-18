@@ -107,7 +107,12 @@ class _ChannelsScreenState extends ConsumerState<ChannelsScreen> {
     final id       = channel['id'] as String? ?? '';
     final isActive = channel['is_active'] as bool? ?? false;
     try {
-      await ChannelsApi.updateChannel(channelId: id, isActive: !isActive);
+      if (isActive) {
+        await ChannelsApi.updateChannel(channelId: id, isActive: false);
+      } else {
+        await ChannelsApi.activateChannel(channelId: id);
+      }
+      ref.read(channelStateVersionProvider.notifier).state++;
       await _fetchAll();
     } catch (e) {
       if (!mounted) return;
@@ -320,7 +325,9 @@ class _ChannelRowState extends State<_ChannelRow> {
         duration: const Duration(milliseconds: 100),
         color: _hovered ? AppColors.ctBg : AppColors.ctSurface,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Row(
+        child: Opacity(
+          opacity: isActive ? 1.0 : 0.45,
+          child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Expanded(
@@ -390,6 +397,7 @@ class _ChannelRowState extends State<_ChannelRow> {
               ),
             ),
           ],
+        ),
         ),
       ),
     );

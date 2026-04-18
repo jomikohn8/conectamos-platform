@@ -19,6 +19,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/api/api_client.dart';
 import '../../core/api/messages_api.dart';
 import '../../core/api/operators_api.dart';
+import '../../core/api/sessions_api.dart';
 import '../../core/api/supabase_messages.dart';
 import '../../core/api/supabase_read_receipts.dart';
 import '../../core/providers/tenant_provider.dart';
@@ -627,6 +628,10 @@ class _ConvoListState extends ConsumerState<_ConvoList> {
         ref.read(replyingToProvider.notifier).state = null;
       }
     });
+    // Recarga operadores cuando cambia el estado de canales (activar/desactivar)
+    ref.listen<int>(channelStateVersionProvider, (prev, next) {
+      if (prev != null && prev != next) _fetchOperators();
+    });
 
     final selectedChatId = ref.watch(selectedChatIdProvider);
     final filtered = _operators.where((op) {
@@ -940,6 +945,9 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
 
   // Track current subscribed chatId to avoid re-subscribing on web tab focus
   String? _subscribedChatId;
+
+  // Supervisor mode — true after user explicitly taps "Intervenir"
+  bool _isSupervisorMode = false;
 
   // Auto-scroll state
   bool _atBottom = true;       // true mientras el usuario esté cerca del fondo
@@ -1517,6 +1525,7 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
       _apiMessages = [];
       _firstUnreadMessageId = null;
       _windowOpen = null;
+      _isSupervisorMode = false;
       _atBottom = true;
       _hasNewMessage = false;
       _streamError = false;
@@ -1557,8 +1566,10 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
       final receivedAt = lastInbound != null
           ? DateTime.tryParse(lastInbound['received_at'] as String? ?? '')
           : null;
+      final channelIsActive = (ref.read(selectedOperatorChannelsProvider).firstOrNull)?['is_active'] as bool? ?? true;
       final computed = receivedAt != null &&
-          DateTime.now().toUtc().difference(receivedAt.toUtc()).inHours < 24;
+          DateTime.now().toUtc().difference(receivedAt.toUtc()).inHours < 24 &&
+          channelIsActive;
       setState(() {
         _apiMessages = messages;
         _msgLoading = false;
@@ -1593,6 +1604,42 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
         lower.contains('google.com/maps') ||
         lower.contains('goo.gl/maps') ||
         lower.contains('maps.app.goo.gl');
+  }
+
+  Future<void> _intervene() async {
+    final chatId = ref.read(selectedChatIdProvider);
+    if (chatId == null) return;
+    setState(() => _isSupervisorMode = true);
+    try {
+      final tenantId = ref.read(activeTenantIdProvider);
+      final sessionId = await SessionsApi.findActiveSessionId(
+        chatId: chatId,
+        tenantId: tenantId,
+      );
+      if (sessionId != null) {
+        await SessionsApi.patchStatus(sessionId: sessionId, status: 'supervisor');
+      }
+    } catch (_) {
+      // best-effort — supervisor mode is already enabled locally
+    }
+  }
+
+  Future<void> _stopIntervening() async {
+    final chatId = ref.read(selectedChatIdProvider);
+    if (chatId == null) return;
+    setState(() => _isSupervisorMode = false);
+    try {
+      final tenantId = ref.read(activeTenantIdProvider);
+      final sessionId = await SessionsApi.findActiveSessionId(
+        chatId: chatId,
+        tenantId: tenantId,
+      );
+      if (sessionId != null) {
+        await SessionsApi.patchStatus(sessionId: sessionId, status: 'worker');
+      }
+    } catch (_) {
+      // best-effort
+    }
   }
 
   Future<void> _sendMessage() async {
@@ -1747,6 +1794,14 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
 
     final originStyle = isOutbound ? _outboundOriginStyle(msg) : null;
 
+    // "Sin operador" badge for unregistered inbound with no assigned operator
+    final isUnregisteredNoOp = !isOutbound &&
+        (msg['unregistered'] as bool? ?? false) &&
+        msg['operator_id'] == null;
+    final inboundBadge = isUnregisteredNoOp
+        ? _OriginBadge(label: 'Sin operador', bg: AppColors.ctSurface2, fg: AppColors.ctText2)
+        : null;
+
     return _ApiMessageBubble(
       key: ValueKey(msgId),
       body: _msgBody(msg),
@@ -1767,7 +1822,7 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
           ref.read(replyingToProvider.notifier).state = msg,
       onReact: (emoji) => _sendReaction(msg, emoji),
       senderNameColor: originStyle?.nameColor,
-      senderBadge: originStyle?.badge,
+      senderBadge: originStyle?.badge ?? inboundBadge,
     );
   }
 
@@ -1877,15 +1932,10 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
           channelName: activeChannel?['channel_name'] as String?,
           workerName: activeChannel?['worker_name'] as String?,
           channelColor: activeChannel?['channel_color'] as String?,
-          onIntervene: activeChannel != null
-              ? () => ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'Intervención activada — el Worker pausará las respuestas automáticas en este canal',
-                      ),
-                    ),
-                  )
-              : null,
+          onIntervene: (_windowOpen == true && !_isSupervisorMode)
+              ? _intervene
+              : (_isSupervisorMode ? _stopIntervening : null),
+          isSupervisorMode: _isSupervisorMode,
         ),
 
         // Mensajes
@@ -2065,12 +2115,12 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
         // Input
         _ChatInput(
           controller: _msgCtrl,
-          onSend: (_windowOpen == true) ? _sendMessage : null,
-          onTyping: (_windowOpen == true) ? _handleTyping : null,
+          onSend: (_windowOpen == true && _isSupervisorMode) ? _sendMessage : null,
+          onTyping: (_windowOpen == true && _isSupervisorMode) ? _handleTyping : null,
           sending: _sending,
-          enabled: _windowOpen == true,
+          enabled: _windowOpen == true && _isSupervisorMode,
           onAttach: _handleAttach,
-          onMic: (_windowOpen == true) ? _startVoiceRecording : null,
+          onMic: (_windowOpen == true && _isSupervisorMode) ? _startVoiceRecording : null,
           isRecording: _isRecording,
           recordingSeconds: _recordingSeconds,
           onStop: _stopVoiceRecording,
@@ -2187,8 +2237,9 @@ class _ChannelTabBar extends StatelessWidget {
 // ── Intervene button ──────────────────────────────────────────────────────────
 
 class _InterveneButton extends StatefulWidget {
-  const _InterveneButton({required this.onTap});
+  const _InterveneButton({required this.onTap, this.isSupervisorMode = false});
   final VoidCallback onTap;
+  final bool isSupervisorMode;
 
   @override
   State<_InterveneButton> createState() => _InterveneButtonState();
@@ -2199,6 +2250,13 @@ class _InterveneButtonState extends State<_InterveneButton> {
 
   @override
   Widget build(BuildContext context) {
+    final isActive = widget.isSupervisorMode;
+    final borderColor = isActive ? AppColors.ctTeal : const Color(0xFFFB923C);
+    final hoverBg = isActive ? AppColors.ctTealLight : const Color(0xFFFFF7ED);
+    final iconColor = isActive ? AppColors.ctTeal : const Color(0xFFFB923C);
+    final label = isActive ? 'Dejar de intervenir' : 'Intervenir';
+    final icon = isActive ? Icons.stop_circle_outlined : Icons.pan_tool_outlined;
+
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
@@ -2209,28 +2267,22 @@ class _InterveneButtonState extends State<_InterveneButton> {
           duration: const Duration(milliseconds: 120),
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
-            color: _hovered
-                ? const Color(0xFFFFF7ED)
-                : Colors.transparent,
+            color: _hovered ? hoverBg : (isActive ? AppColors.ctTealLight.withValues(alpha: 0.5) : Colors.transparent),
             borderRadius: BorderRadius.circular(7),
-            border: Border.all(color: const Color(0xFFFB923C)),
+            border: Border.all(color: borderColor),
           ),
-          child: const Row(
+          child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                Icons.pan_tool_outlined,
-                size: 14,
-                color: Color(0xFFFB923C),
-              ),
-              SizedBox(width: 5),
+              Icon(icon, size: 14, color: iconColor),
+              const SizedBox(width: 5),
               Text(
-                'Intervenir',
+                label,
                 style: TextStyle(
                   fontFamily: 'Inter',
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
-                  color: Color(0xFFFB923C),
+                  color: iconColor,
                 ),
               ),
             ],
@@ -2251,6 +2303,7 @@ class _ApiChatHeader extends StatelessWidget {
     this.workerName,
     this.channelColor,
     this.onIntervene,
+    this.isSupervisorMode = false,
   });
   final String name;
   final bool? windowOpen;
@@ -2258,6 +2311,7 @@ class _ApiChatHeader extends StatelessWidget {
   final String? workerName;
   final String? channelColor;
   final VoidCallback? onIntervene;
+  final bool isSupervisorMode;
 
   @override
   Widget build(BuildContext context) {
@@ -2349,7 +2403,7 @@ class _ApiChatHeader extends StatelessWidget {
           ),
           if (onIntervene != null) ...[
             const SizedBox(width: 12),
-            _InterveneButton(onTap: onIntervene!),
+            _InterveneButton(onTap: onIntervene!, isSupervisorMode: isSupervisorMode),
           ],
         ],
       ),
@@ -5077,9 +5131,11 @@ class _NewMessageDialogState extends ConsumerState<_NewMessageDialog> {
           .neq('direction', 'outbound')
           .gte('received_at', cutoff)
           .limit(1);
+      final hasRecentInbound = (rows as List).isNotEmpty;
+      final channelIsActive = (ref.read(selectedOperatorChannelsProvider).firstOrNull)?['is_active'] as bool? ?? true;
       if (mounted) {
         setState(() {
-          _windowOpen = (rows as List).isNotEmpty;
+          _windowOpen = hasRecentInbound && channelIsActive;
           _checkingWindow = false;
         });
       }

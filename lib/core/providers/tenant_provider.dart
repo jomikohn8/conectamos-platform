@@ -120,3 +120,7 @@ final activeTenantDisplayProvider = Provider<String>((ref) {
 final allTenantsProvider = Provider<List<TenantInfo>>((ref) {
   return ref.watch(tenantNotifierProvider).all;
 });
+
+/// Versión de estado de canales — incrementar tras toggle activo/inactivo para
+/// notificar a pantallas dependientes (conversations, operators).
+final channelStateVersionProvider = StateProvider<int>((ref) => 0);

@@ -60,4 +60,28 @@ class OperatorsApi {
       data: {'status': status},
     );
   }
+
+  static Future<List<Map<String, dynamic>>> listOperatorFlows({
+    required String operatorId,
+  }) async {
+    final response = await ApiClient.instance.get('/operators/$operatorId/flows');
+    return List<Map<String, dynamic>>.from(response.data);
+  }
+
+  static Future<void> assignFlow({
+    required String operatorId,
+    required String flowId,
+  }) async {
+    await ApiClient.instance.post(
+      '/operators/$operatorId/flows',
+      data: {'flow_id': flowId},
+    );
+  }
+
+  static Future<void> removeFlow({
+    required String operatorId,
+    required String flowId,
+  }) async {
+    await ApiClient.instance.delete('/operators/$operatorId/flows/$flowId');
+  }
 }

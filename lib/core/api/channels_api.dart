@@ -78,6 +78,10 @@ class ChannelsApi {
     await ApiClient.instance.delete('/channels/$channelId');
   }
 
+  static Future<void> activateChannel({required String channelId}) async {
+    await ApiClient.instance.post('/channels/$channelId/activate');
+  }
+
   static Future<void> assignOperator({
     required String channelId,
     required String operatorId,

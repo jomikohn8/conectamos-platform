@@ -1,35 +1,10 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/api/flows_api.dart';
 import '../../core/api/operators_api.dart';
 import '../../core/providers/tenant_provider.dart';
 import '../../core/theme/app_theme.dart';
-
-// ── Canal model ───────────────────────────────────────────────────────────────
-
-class OperatorChannel {
-  final String id;
-  final String name;
-  final String color; // hex, e.g. '#2DD4BF'
-  final String workerType;
-  const OperatorChannel({
-    required this.id,
-    required this.name,
-    required this.color,
-    required this.workerType,
-  });
-}
-
-const _kAvailableChannels = [
-  OperatorChannel(id: 'ch1', name: 'Canal Logística', color: '#2DD4BF', workerType: 'logistics'),
-  OperatorChannel(id: 'ch2', name: 'Canal Ventas',    color: '#818CF8', workerType: 'sales'),
-  OperatorChannel(id: 'ch3', name: 'Canal Soporte',   color: '#FB923C', workerType: 'support'),
-];
-
-Color _hexColor(String hex) {
-  final h = hex.replaceAll('#', '');
-  return Color(int.parse('FF$h', radix: 16));
-}
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -110,24 +85,9 @@ class _OperatorsScreenState extends ConsumerState<OperatorsScreen> {
       final ops = await OperatorsApi.listOperators(
         tenantId: tenantId.isNotEmpty ? tenantId : 'default',
       );
-      // Mock: inject channels cyclically to show different states
-      final channelPatterns = [
-        <String>[],
-        ['ch1'],
-        ['ch1', 'ch2'],
-        ['ch2'],
-        ['ch1', 'ch2', 'ch3'],
-      ];
-      final injected = ops.asMap().entries.map((e) {
-        final pattern = e.key < channelPatterns.length
-            ? channelPatterns[e.key]
-            : ['ch3'];
-        return {...e.value, 'channels': pattern};
-      }).toList();
-
       if (mounted) {
         setState(() {
-          _operators = injected;
+          _operators = ops;
           _loading = false;
         });
       }
@@ -360,10 +320,6 @@ class _OperatorsBodyState extends State<_OperatorsBody> {
                             style: _headerStyle)),
                     Expanded(
                         flex: 2,
-                        child: Text('CANALES',
-                            style: _headerStyle)),
-                    Expanded(
-                        flex: 2,
                         child: Text('ÚLTIMO ACCESO',
                             style: _headerStyle)),
                     Expanded(
@@ -468,11 +424,6 @@ class _OperatorRowState extends State<_OperatorRow> {
     final verified = op['whatsapp_verified'] as bool? ?? false;
     final flows =
         List<String>.from(op['flows'] as List? ?? []);
-    final channelIds =
-        List<String>.from(op['channels'] as List? ?? []);
-    final channels = _kAvailableChannels
-        .where((c) => channelIds.contains(c.id))
-        .toList();
     final lastEventAt = op['last_event_at'] as String?;
     final id = op['id'] as String? ?? '';
     final st = _statusStyle(status);
@@ -611,44 +562,6 @@ class _OperatorRowState extends State<_OperatorRow> {
               ),
             ),
 
-            // Canales asignados
-            Expanded(
-              flex: 2,
-              child: channels.isEmpty
-                  ? const Text(
-                      'Sin canales',
-                      style: TextStyle(
-                        fontFamily: 'Inter',
-                        fontSize: 12,
-                        color: AppColors.ctText3,
-                      ),
-                    )
-                  : Wrap(
-                      spacing: 4,
-                      runSpacing: 4,
-                      children: channels.map((c) {
-                        final color = _hexColor(c.color);
-                        return Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: color.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            c.name,
-                            style: TextStyle(
-                              fontFamily: 'Inter',
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: color,
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                    ),
-            ),
-
             // Último acceso
             Expanded(
               flex: 2,
@@ -679,7 +592,6 @@ class _OperatorRowState extends State<_OperatorRow> {
                           initialName: name,
                           initialPhone: phone,
                           initialFlows: flows,
-                          initialChannels: channelIds,
                           onSaved: widget.onRefresh,
                         ),
                       );
@@ -716,7 +628,6 @@ class _OperatorFormDialog extends ConsumerStatefulWidget {
     this.initialName,
     this.initialPhone,
     this.initialFlows,
-    this.initialChannels,
     required this.onSaved,
   });
 
@@ -724,7 +635,6 @@ class _OperatorFormDialog extends ConsumerStatefulWidget {
   final String? initialName;
   final String? initialPhone;
   final List<String>? initialFlows;
-  final List<String>? initialChannels;
   final VoidCallback onSaved;
 
   bool get isEdit => operatorId != null;
@@ -736,28 +646,34 @@ class _OperatorFormDialog extends ConsumerStatefulWidget {
 class _OperatorFormDialogState extends ConsumerState<_OperatorFormDialog> {
   late final TextEditingController _nameCtrl;
   late final TextEditingController _phoneCtrl;
-  late final Map<String, bool> _flows;
-  late final Map<String, bool> _channels;
   bool _saving = false;
   String? _errorMsg;
+
+  // Flows loaded from API
+  List<Map<String, dynamic>> _availableFlows = [];
+  bool _flowsLoading = true;
+  // IDs of currently selected flows
+  Set<String> _selectedFlowIds = {};
 
   @override
   void initState() {
     super.initState();
-    _nameCtrl =
-        TextEditingController(text: widget.initialName ?? '');
-    _phoneCtrl =
-        TextEditingController(text: widget.initialPhone ?? '');
-    final sel = widget.initialFlows ?? [];
-    _flows = {
-      'Flujo 1': sel.contains('Flujo 1'),
-      'Flujo 2': sel.contains('Flujo 2'),
-      'Flujo 3': sel.contains('Flujo 3'),
-    };
-    final selCh = widget.initialChannels ?? [];
-    _channels = {
-      for (final c in _kAvailableChannels) c.id: selCh.contains(c.id),
-    };
+    _nameCtrl = TextEditingController(text: widget.initialName ?? '');
+    _phoneCtrl = TextEditingController(text: widget.initialPhone ?? '');
+    _selectedFlowIds = Set<String>.from(widget.initialFlows ?? []);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadFlows());
+  }
+
+  Future<void> _loadFlows() async {
+    try {
+      final tenantId = ref.read(activeTenantIdProvider);
+      final flows = await FlowsApi.listFlows(
+        tenantId: tenantId.isNotEmpty ? tenantId : 'default',
+      );
+      if (mounted) setState(() { _availableFlows = flows; _flowsLoading = false; });
+    } catch (_) {
+      if (mounted) setState(() => _flowsLoading = false);
+    }
   }
 
   @override
@@ -771,21 +687,13 @@ class _OperatorFormDialogState extends ConsumerState<_OperatorFormDialog> {
     final name = _nameCtrl.text.trim();
     final phone = _phoneCtrl.text.trim();
     if (name.isEmpty || phone.isEmpty) {
-      setState(() =>
-          _errorMsg = 'Nombre y teléfono son obligatorios.');
+      setState(() => _errorMsg = 'Nombre y teléfono son obligatorios.');
       return;
     }
-    final flows = _flows.entries
-        .where((e) => e.value)
-        .map((e) => e.key)
-        .toList();
-
-    setState(() {
-      _saving = true;
-      _errorMsg = null;
-    });
+    setState(() { _saving = true; _errorMsg = null; });
 
     try {
+      final flows = _selectedFlowIds.toList();
       if (widget.isEdit) {
         await OperatorsApi.updateOperator(
           id: widget.operatorId!,
@@ -808,11 +716,8 @@ class _OperatorFormDialogState extends ConsumerState<_OperatorFormDialog> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              widget.isEdit
-                  ? 'Operador actualizado.'
-                  : 'Operador creado. Mensaje de bienvenida enviado.',
-              style: const TextStyle(
-                  fontFamily: 'Inter', fontSize: 13),
+              widget.isEdit ? 'Operador actualizado.' : 'Operador creado. Mensaje de bienvenida enviado.',
+              style: const TextStyle(fontFamily: 'Inter', fontSize: 13),
             ),
             backgroundColor: AppColors.ctNavy,
             duration: const Duration(seconds: 3),
@@ -828,10 +733,7 @@ class _OperatorFormDialogState extends ConsumerState<_OperatorFormDialog> {
             : 'Error al guardar. Intenta de nuevo.';
       });
     } catch (_) {
-      setState(() {
-        _saving = false;
-        _errorMsg = 'Error inesperado. Intenta de nuevo.';
-      });
+      setState(() { _saving = false; _errorMsg = 'Error inesperado. Intenta de nuevo.'; });
     }
   }
 
@@ -883,160 +785,94 @@ class _OperatorFormDialogState extends ConsumerState<_OperatorFormDialog> {
               // Flujos
               const Text(
                 'Flujos asignados',
-                style: TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.ctText,
-                ),
+                style: TextStyle(fontFamily: 'Inter', fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.ctText),
               ),
               const SizedBox(height: 6),
-              Container(
-                decoration: BoxDecoration(
-                  border: Border.all(color: AppColors.ctBorder),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Column(
-                  children: _flows.entries.map((e) {
-                    final isLast = e.key == _flows.keys.last;
-                    return Column(
-                      children: [
-                        InkWell(
-                          borderRadius: isLast
-                              ? const BorderRadius.only(
-                                  bottomLeft: Radius.circular(7),
-                                  bottomRight: Radius.circular(7),
-                                )
-                              : BorderRadius.zero,
-                          onTap: () => setState(
-                              () => _flows[e.key] = !e.value),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 10),
-                            child: Row(
-                              children: [
-                                SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: Checkbox(
-                                    value: e.value,
-                                    onChanged: (v) => setState(
-                                        () => _flows[e.key] =
-                                            v ?? false),
-                                    activeColor: AppColors.ctTeal,
-                                    checkColor: AppColors.ctNavy,
-                                    materialTapTargetSize:
-                                        MaterialTapTargetSize
-                                            .shrinkWrap,
-                                    side: const BorderSide(
-                                        color: AppColors.ctBorder2),
+              if (_flowsLoading)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 16),
+                  child: Center(child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.ctTeal))),
+                )
+              else if (_availableFlows.isEmpty)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  decoration: BoxDecoration(border: Border.all(color: AppColors.ctBorder), borderRadius: BorderRadius.circular(8)),
+                  child: const Text('No hay flujos disponibles en este tenant.', style: TextStyle(fontFamily: 'Inter', fontSize: 12, color: AppColors.ctText2)),
+                )
+              else
+                Container(
+                  decoration: BoxDecoration(border: Border.all(color: AppColors.ctBorder), borderRadius: BorderRadius.circular(8)),
+                  child: Column(
+                    children: _availableFlows.asMap().entries.map((entry) {
+                      final idx = entry.key;
+                      final flow = entry.value;
+                      final flowId = flow['id'] as String? ?? '';
+                      final flowName = flow['name'] as String? ?? flowId;
+                      final workerName = flow['worker_name'] as String? ?? flow['tenant_worker_name'] as String? ?? '';
+                      final isFlowActive = flow['is_active'] as bool? ?? true;
+                      final isSelected = _selectedFlowIds.contains(flowId);
+                      final isLast = idx == _availableFlows.length - 1;
+                      return Column(
+                        children: [
+                          InkWell(
+                            borderRadius: isLast
+                                ? const BorderRadius.only(bottomLeft: Radius.circular(7), bottomRight: Radius.circular(7))
+                                : BorderRadius.zero,
+                            onTap: () => setState(() {
+                              if (isSelected) { _selectedFlowIds.remove(flowId); }
+                              else { _selectedFlowIds.add(flowId); }
+                            }),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                              child: Row(
+                                children: [
+                                  SizedBox(
+                                    width: 20, height: 20,
+                                    child: Checkbox(
+                                      value: isSelected,
+                                      onChanged: (v) => setState(() {
+                                        if (v == true) { _selectedFlowIds.add(flowId); }
+                                        else { _selectedFlowIds.remove(flowId); }
+                                      }),
+                                      activeColor: AppColors.ctTeal,
+                                      checkColor: AppColors.ctNavy,
+                                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                      side: const BorderSide(color: AppColors.ctBorder2),
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(width: 10),
-                                Text(
-                                  e.key,
-                                  style: const TextStyle(
-                                    fontFamily: 'Inter',
-                                    fontSize: 13,
-                                    color: AppColors.ctText,
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(flowName, style: const TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppColors.ctText)),
+                                        if (workerName.isNotEmpty)
+                                          Text(workerName, style: const TextStyle(fontFamily: 'Inter', fontSize: 11, color: AppColors.ctText2)),
+                                      ],
+                                    ),
                                   ),
-                                ),
-                              ],
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: isFlowActive ? AppColors.ctOkBg : AppColors.ctSurface2,
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Text(
+                                      isFlowActive ? 'Activo' : 'Inactivo',
+                                      style: TextStyle(fontFamily: 'Inter', fontSize: 10, fontWeight: FontWeight.w600, color: isFlowActive ? AppColors.ctOkText : AppColors.ctText2),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
-                        ),
-                        if (!isLast)
-                          const Divider(
-                              height: 1, color: AppColors.ctBorder),
-                      ],
-                    );
-                  }).toList(),
+                          if (!isLast) const Divider(height: 1, color: AppColors.ctBorder),
+                        ],
+                      );
+                    }).toList(),
+                  ),
                 ),
-              ),
-
-              const SizedBox(height: 18),
-
-              // Canales
-              const Text(
-                'Canales asignados',
-                style: TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.ctText,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Container(
-                decoration: BoxDecoration(
-                  border: Border.all(color: AppColors.ctBorder),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Column(
-                  children: _kAvailableChannels.asMap().entries.map((e) {
-                    final ch = e.value;
-                    final isLast = e.key == _kAvailableChannels.length - 1;
-                    final color = _hexColor(ch.color);
-                    return Column(
-                      children: [
-                        InkWell(
-                          borderRadius: isLast
-                              ? const BorderRadius.only(
-                                  bottomLeft: Radius.circular(7),
-                                  bottomRight: Radius.circular(7),
-                                )
-                              : BorderRadius.zero,
-                          onTap: () => setState(
-                              () => _channels[ch.id] = !(_channels[ch.id] ?? false)),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 10),
-                            child: Row(
-                              children: [
-                                SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: Checkbox(
-                                    value: _channels[ch.id] ?? false,
-                                    onChanged: (v) => setState(
-                                        () => _channels[ch.id] = v ?? false),
-                                    activeColor: AppColors.ctTeal,
-                                    checkColor: AppColors.ctNavy,
-                                    materialTapTargetSize:
-                                        MaterialTapTargetSize.shrinkWrap,
-                                    side: const BorderSide(
-                                        color: AppColors.ctBorder2),
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                Container(
-                                  width: 10,
-                                  height: 10,
-                                  decoration: BoxDecoration(
-                                    color: color,
-                                    shape: BoxShape.circle,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  ch.name,
-                                  style: const TextStyle(
-                                    fontFamily: 'Inter',
-                                    fontSize: 13,
-                                    color: AppColors.ctText,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        if (!isLast)
-                          const Divider(height: 1, color: AppColors.ctBorder),
-                      ],
-                    );
-                  }).toList(),
-                ),
-              ),
 
               // Error
               if (_errorMsg != null) ...[
