@@ -1566,8 +1566,17 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
       final receivedAt = lastInbound != null
           ? DateTime.tryParse(lastInbound['received_at'] as String? ?? '')
           : null;
-      final computed = receivedAt != null &&
+      final chs = ref.read(selectedOperatorChannelsProvider);
+      final chIdx = ref.read(selectedChannelIndexProvider)
+          .clamp(0, chs.isEmpty ? 0 : chs.length - 1);
+      final activeCh = chs.isNotEmpty
+          ? chs.firstWhere((c) => c['is_active'] as bool? ?? false,
+              orElse: () => chs[chIdx])
+          : null;
+      final channelType = activeCh?['channel_type'] as String?;
+      final hasRecentInbound = receivedAt != null &&
           DateTime.now().toUtc().difference(receivedAt.toUtc()).inHours < 24;
+      final computed = (channelType != 'whatsapp') || hasRecentInbound;
       setState(() {
         _apiMessages = messages;
         _msgLoading = false;
