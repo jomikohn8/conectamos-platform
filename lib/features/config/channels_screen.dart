@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/api/ai_workers_api.dart';
 import '../../core/api/channels_api.dart';
-import '../../core/api/operators_api.dart';
 import '../../core/providers/tenant_provider.dart';
 import '../../core/theme/app_theme.dart';
 
@@ -70,7 +69,6 @@ class ChannelsScreen extends ConsumerStatefulWidget {
 class _ChannelsScreenState extends ConsumerState<ChannelsScreen> {
   List<Map<String, dynamic>> _channels  = [];
   List<Map<String, dynamic>> _workers   = [];
-  List<Map<String, dynamic>> _operators = [];
   bool    _loading = false;
   String? _error;
 
@@ -88,13 +86,11 @@ class _ChannelsScreenState extends ConsumerState<ChannelsScreen> {
       final results = await Future.wait([
         ChannelsApi.listChannels(tenantId: tenantId),
         AiWorkersApi.listWorkers(tenantId: tenantId),
-        OperatorsApi.listOperators(tenantId: tenantId),
       ]);
       if (!mounted) return;
       setState(() {
         _channels  = results[0];
         _workers   = results[1];
-        _operators = results[2];
         _loading   = false;
       });
     } catch (e) {
@@ -148,17 +144,6 @@ class _ChannelsScreenState extends ConsumerState<ChannelsScreen> {
     if (id.isNotEmpty) context.go('/channels/$id');
   }
 
-  void _openAssign(Map<String, dynamic> channel) async {
-    await showDialog(
-      context: context,
-      builder: (_) => _AssignOperatorsDialog(
-        channel: channel,
-        operators: _operators,
-        tenantId: ref.read(activeTenantIdProvider),
-        onClose: _fetchAll,
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -184,7 +169,6 @@ class _ChannelsScreenState extends ConsumerState<ChannelsScreen> {
                       child: _ChannelsBody(
                         channels: _channels,
                         onEdit: _openEdit,
-                        onAssign: _openAssign,
                         onToggleActive: _toggleActive,
                       ),
                     ),
@@ -237,12 +221,10 @@ class _ChannelsBody extends StatelessWidget {
   const _ChannelsBody({
     required this.channels,
     required this.onEdit,
-    required this.onAssign,
     required this.onToggleActive,
   });
   final List<Map<String, dynamic>> channels;
   final void Function(Map<String, dynamic>) onEdit;
-  final void Function(Map<String, dynamic>) onAssign;
   final void Function(Map<String, dynamic>) onToggleActive;
 
   static const _headerStyle = TextStyle(fontFamily: 'Inter', fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.ctText2, letterSpacing: 0.4);
@@ -278,7 +260,6 @@ class _ChannelsBody extends StatelessWidget {
                 _ChannelRow(
                   channel: entry.value,
                   onEdit: () => onEdit(entry.value),
-                  onAssign: () => onAssign(entry.value),
                   onToggleActive: () => onToggleActive(entry.value),
                 ),
                 if (!isLast) const Divider(height: 1, color: AppColors.ctBorder),
@@ -293,10 +274,9 @@ class _ChannelsBody extends StatelessWidget {
 // ── Channel row ───────────────────────────────────────────────────────────────
 
 class _ChannelRow extends StatefulWidget {
-  const _ChannelRow({required this.channel, required this.onEdit, required this.onAssign, required this.onToggleActive});
+  const _ChannelRow({required this.channel, required this.onEdit, required this.onToggleActive});
   final Map<String, dynamic> channel;
   final VoidCallback onEdit;
-  final VoidCallback onAssign;
   final VoidCallback onToggleActive;
 
   @override
@@ -389,8 +369,6 @@ class _ChannelRowState extends State<_ChannelRow> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   _ActionBtn(label: 'Editar', color: AppColors.ctInfo, onTap: widget.onEdit),
-                  const SizedBox(width: 4),
-                  _ActionBtn(label: 'Operadores', color: AppColors.ctTeal, onTap: widget.onAssign),
                   const SizedBox(width: 4),
                   _ActionBtn(label: isActive ? 'Desactivar' : 'Activar', color: isActive ? AppColors.ctDanger : AppColors.ctOk, onTap: widget.onToggleActive),
                 ],
@@ -1039,123 +1017,6 @@ class _EmptyTypeCard extends StatelessWidget {
   }
 }
 
-// ── Assign operators dialog ───────────────────────────────────────────────────
-
-class _AssignOperatorsDialog extends StatefulWidget {
-  const _AssignOperatorsDialog({required this.channel, required this.operators, required this.tenantId, required this.onClose});
-  final Map<String, dynamic> channel;
-  final List<Map<String, dynamic>> operators;
-  final String tenantId;
-  final Future<void> Function() onClose;
-
-  @override
-  State<_AssignOperatorsDialog> createState() => _AssignOperatorsDialogState();
-}
-
-class _AssignOperatorsDialogState extends State<_AssignOperatorsDialog> {
-  late Set<String> _assigned;
-  final Set<String> _processing = {};
-
-  String _opId(Map<String, dynamic> op) => op['id'] as String? ?? op['operator_id'] as String? ?? '';
-
-  @override
-  void initState() {
-    super.initState();
-    final channelOps = _parseOps(widget.channel['operators']);
-    _assigned = { for (final op in channelOps) _opId(op) }..remove('');
-  }
-
-  Future<void> _toggle(Map<String, dynamic> op, bool checked) async {
-    final id        = _opId(op);
-    final channelId = widget.channel['id'] as String? ?? '';
-    if (id.isEmpty || channelId.isEmpty || _processing.contains(id)) return;
-    setState(() => _processing.add(id));
-    try {
-      if (checked) {
-        await ChannelsApi.assignOperator(channelId: channelId, operatorId: id, tenantId: widget.tenantId);
-        if (mounted) setState(() => _assigned.add(id));
-      } else {
-        await ChannelsApi.removeOperator(channelId: channelId, operatorId: id);
-        if (mounted) setState(() => _assigned.remove(id));
-      }
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_dioError(e)), backgroundColor: AppColors.ctDanger));
-      setState(() { if (checked) { _assigned.remove(id); } else { _assigned.add(id); } });
-    } finally {
-      if (mounted) setState(() => _processing.remove(id));
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final channelName = widget.channel['display_name'] as String? ?? widget.channel['name'] as String? ?? 'Canal';
-    return Dialog(
-      backgroundColor: AppColors.ctSurface,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: AppColors.ctBorder)),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 460, maxHeight: 560),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Operadores en $channelName', style: const TextStyle(fontFamily: 'Inter', fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.ctText)),
-                  const SizedBox(height: 4),
-                  const Text('Los operadores asignados pueden ver las conversaciones de este canal.', style: TextStyle(fontFamily: 'Inter', fontSize: 12, color: AppColors.ctText2)),
-                ],
-              ),
-            ),
-            const Divider(height: 1, color: AppColors.ctBorder),
-            Flexible(
-              child: widget.operators.isEmpty
-                  ? const Padding(padding: EdgeInsets.all(24), child: Center(child: Text('No hay operadores disponibles.', style: TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppColors.ctText2))))
-                  : ListView.separated(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      shrinkWrap: true,
-                      itemCount: widget.operators.length,
-                      separatorBuilder: (_, _) => const Divider(height: 1, color: AppColors.ctBorder),
-                      itemBuilder: (_, i) {
-                        final op           = widget.operators[i];
-                        final id           = _opId(op);
-                        final name         = op['display_name'] as String? ?? op['name'] as String? ?? '—';
-                        final phone        = op['phone'] as String? ?? '';
-                        final isChecked    = _assigned.contains(id);
-                        final isProcessing = _processing.contains(id);
-                        return CheckboxListTile(
-                          value: isChecked,
-                          onChanged: isProcessing ? null : (v) => _toggle(op, v ?? false),
-                          activeColor: AppColors.ctTeal, checkColor: AppColors.ctNavy,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                          secondary: isProcessing
-                              ? const SizedBox(width: 32, height: 32, child: Padding(padding: EdgeInsets.all(6), child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.ctTeal)))
-                              : Container(width: 32, height: 32, decoration: const BoxDecoration(color: AppColors.ctTeal, shape: BoxShape.circle), alignment: Alignment.center, child: Text(_initials(name), style: const TextStyle(fontFamily: 'Inter', fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.ctNavy))),
-                          title: Text(name, style: const TextStyle(fontFamily: 'Inter', fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.ctText)),
-                          subtitle: phone.isNotEmpty ? Text(phone, style: const TextStyle(fontFamily: 'Inter', fontSize: 12, color: AppColors.ctText2)) : null,
-                        );
-                      },
-                    ),
-            ),
-            const Divider(height: 1, color: AppColors.ctBorder),
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  _GhostBtn(label: 'Cerrar', onTap: () async { Navigator.pop(context); await widget.onClose(); }),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 // ── Button helpers ────────────────────────────────────────────────────────────
 

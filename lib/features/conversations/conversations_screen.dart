@@ -836,7 +836,7 @@ class _ApiConvoItemState extends State<_ApiConvoItem> {
                               height: 6,
                               margin: const EdgeInsets.only(right: 3),
                               decoration: BoxDecoration(
-                                color: _hexColor(ch['channel_color'] as String?),
+                                color: _hexColor(ch['color'] as String?),
                                 shape: BoxShape.circle,
                               ),
                             ),
@@ -1566,10 +1566,8 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
       final receivedAt = lastInbound != null
           ? DateTime.tryParse(lastInbound['received_at'] as String? ?? '')
           : null;
-      final channelIsActive = (ref.read(selectedOperatorChannelsProvider).firstOrNull)?['is_active'] as bool? ?? false;
       final computed = receivedAt != null &&
-          DateTime.now().toUtc().difference(receivedAt.toUtc()).inHours < 24 &&
-          channelIsActive;
+          DateTime.now().toUtc().difference(receivedAt.toUtc()).inHours < 24;
       setState(() {
         _apiMessages = messages;
         _msgLoading = false;
@@ -1934,12 +1932,10 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
         _ApiChatHeader(
           name: chatName ?? chatId,
           windowOpen: _windowOpen,
-          channelName: activeChannel?['channel_name'] as String?,
+          channelName: activeChannel?['name'] as String?,
           workerName: activeChannel?['worker_name'] as String?,
-          channelColor: activeChannel?['channel_color'] as String?,
-          onIntervene: (_windowOpen == true && !_isSupervisorMode)
-              ? _intervene
-              : (_isSupervisorMode ? _stopIntervening : null),
+          channelColor: activeChannel?['color'] as String?,
+          onIntervene: !_isSupervisorMode ? _intervene : _stopIntervening,
           isSupervisorMode: _isSupervisorMode,
         ),
 
@@ -2183,9 +2179,9 @@ class _ChannelTabBar extends StatelessWidget {
         itemBuilder: (context, i) {
           final ch = channels[i];
           final isSelected = i == selectedIndex;
-          final color = _hexColor(ch['channel_color'] as String?);
+          final color = _hexColor(ch['color'] as String?);
           final label = ch['worker_name'] as String? ??
-              ch['channel_name'] as String? ??
+              ch['name'] as String? ??
               'Canal ${i + 1}';
           return MouseRegion(
             cursor: SystemMouseCursors.click,
@@ -5137,10 +5133,9 @@ class _NewMessageDialogState extends ConsumerState<_NewMessageDialog> {
           .gte('received_at', cutoff)
           .limit(1);
       final hasRecentInbound = (rows as List).isNotEmpty;
-      final channelIsActive = (ref.read(selectedOperatorChannelsProvider).firstOrNull)?['is_active'] as bool? ?? false;
       if (mounted) {
         setState(() {
-          _windowOpen = hasRecentInbound && channelIsActive;
+          _windowOpen = hasRecentInbound;
           _checkingWindow = false;
         });
       }

@@ -107,26 +107,6 @@ class ChannelsApi {
     );
   }
 
-  static Future<void> assignOperator({
-    required String channelId,
-    required String operatorId,
-    required String tenantId,
-  }) async {
-    await ApiClient.instance.post(
-      '/channels/$channelId/operators',
-      data: {'operator_id': operatorId, 'tenant_id': tenantId},
-    );
-  }
-
-  static Future<void> removeOperator({
-    required String channelId,
-    required String operatorId,
-  }) async {
-    await ApiClient.instance.delete(
-      '/channels/$channelId/operators/$operatorId',
-    );
-  }
-
   static Future<Map<String, dynamic>> syncTemplates({
     required String channelId,
   }) async {

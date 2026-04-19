@@ -70,18 +70,22 @@ class OperatorsApi {
 
   static Future<void> assignFlow({
     required String operatorId,
-    required String flowId,
+    required String flowDefinitionId,
+    required String tenantId,
   }) async {
     await ApiClient.instance.post(
       '/operators/$operatorId/flows',
-      data: {'flow_id': flowId},
+      data: {
+        'flow_definition_id': flowDefinitionId,
+        'tenant_id': tenantId,
+      },
     );
   }
 
   static Future<void> removeFlow({
     required String operatorId,
-    required String flowId,
+    required String flowDefinitionId,
   }) async {
-    await ApiClient.instance.delete('/operators/$operatorId/flows/$flowId');
+    await ApiClient.instance.delete('/operators/$operatorId/flows/$flowDefinitionId');
   }
 }
