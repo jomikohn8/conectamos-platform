@@ -283,7 +283,6 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen>
                   onUpdated: (updated) {
                     if (mounted) setState(() => _channel = updated);
                   },
-                  onOperatorsChanged: _load,
                   onError: _showError,
                   onSuccess: _showSuccess,
                 ),
@@ -349,7 +348,6 @@ class _InfoTab extends StatefulWidget {
     required this.workers,
     required this.operators,
     required this.onUpdated,
-    required this.onOperatorsChanged,
     required this.onError,
     required this.onSuccess,
   });
@@ -357,7 +355,6 @@ class _InfoTab extends StatefulWidget {
   final List<Map<String, dynamic>> workers;
   final List<Map<String, dynamic>> operators;
   final ValueChanged<Map<String, dynamic>> onUpdated;
-  final VoidCallback onOperatorsChanged;
   final ValueChanged<String> onError;
   final ValueChanged<String> onSuccess;
 
@@ -379,12 +376,6 @@ class _InfoTabState extends State<_InfoTab> {
     return widget.operators.where((o) => opIds.contains(o['id'])).toList();
   }
 
-  List<Map<String, dynamic>> get _unassignedOps {
-    final assigned = _assignedOps.map((o) => o['id'].toString()).toSet();
-    return widget.operators
-        .where((o) => !assigned.contains(o['id'].toString()))
-        .toList();
-  }
 
   @override
   void initState() {
@@ -422,31 +413,6 @@ class _InfoTabState extends State<_InfoTab> {
     }
   }
 
-  Future<void> _assign(String operatorId) async {
-    final channelId = widget.channel['id'] as String;
-    // tenantId comes from operator map
-    final op = widget.operators.firstWhere(
-        (o) => o['id'].toString() == operatorId,
-        orElse: () => {});
-    final tenantId = op['tenant_id'] as String? ?? '';
-    try {
-      await ChannelsApi.assignOperator(
-          channelId: channelId, operatorId: operatorId, tenantId: tenantId);
-      widget.onOperatorsChanged();
-    } catch (e) {
-      widget.onError(_dioError(e));
-    }
-  }
-
-  Future<void> _remove(String operatorId) async {
-    try {
-      await ChannelsApi.removeOperator(
-          channelId: widget.channel['id'] as String, operatorId: operatorId);
-      widget.onOperatorsChanged();
-    } catch (e) {
-      widget.onError(_dioError(e));
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -493,12 +459,6 @@ class _InfoTabState extends State<_InfoTab> {
           const SizedBox(height: 20),
           _SectionCard(
             title: 'Operadores asignados',
-            trailing: _unassignedOps.isNotEmpty
-                ? _AssignButton(
-                    operators: _unassignedOps,
-                    onAssign: _assign,
-                  )
-                : null,
             child: _assignedOps.isEmpty
                 ? const Padding(
                     padding: EdgeInsets.symmetric(vertical: 12),
@@ -513,10 +473,7 @@ class _InfoTabState extends State<_InfoTab> {
                 : Column(
                     children: [
                       for (final op in _assignedOps)
-                        _OperatorRow(
-                          op: op,
-                          onRemove: () => _remove(op['id'].toString()),
-                        ),
+                        _OperatorRow(op: op),
                     ],
                   ),
           ),
@@ -1155,11 +1112,9 @@ class _SectionCard extends StatelessWidget {
   const _SectionCard({
     required this.title,
     required this.child,
-    this.trailing,
   });
   final String title;
   final Widget child;
-  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -1186,10 +1141,6 @@ class _SectionCard extends StatelessWidget {
                     color: AppColors.ctText,
                   ),
                 ),
-                if (trailing != null) ...[
-                  const Spacer(),
-                  trailing!,
-                ],
               ],
             ),
           ),
@@ -1350,9 +1301,8 @@ class _WorkerDropdown extends StatelessWidget {
 }
 
 class _OperatorRow extends StatelessWidget {
-  const _OperatorRow({required this.op, required this.onRemove});
+  const _OperatorRow({required this.op});
   final Map<String, dynamic> op;
-  final VoidCallback onRemove;
 
   @override
   Widget build(BuildContext context) {
@@ -1388,72 +1338,12 @@ class _OperatorRow extends StatelessWidget {
               ),
             ),
           ),
-          IconButton(
-            icon: const Icon(Icons.close, size: 16, color: AppColors.ctText2),
-            onPressed: onRemove,
-            tooltip: 'Quitar del canal',
-          ),
         ],
       ),
     );
   }
 }
 
-String _opLabel(Map<String, dynamic> op) {
-  final nombre = op['nombre'] as String? ?? op['display_name'] as String?;
-  final phone  = op['phone'] as String?;
-  if (nombre != null && nombre.isNotEmpty) {
-    return phone != null && phone.isNotEmpty ? '$nombre · $phone' : nombre;
-  }
-  return phone ?? op['id'].toString();
-}
-
-class _AssignButton extends StatelessWidget {
-  const _AssignButton({required this.operators, required this.onAssign});
-  final List<Map<String, dynamic>> operators;
-  final ValueChanged<String> onAssign;
-
-  @override
-  Widget build(BuildContext context) {
-    return PopupMenuButton<String>(
-      tooltip: 'Asignar operador',
-      itemBuilder: (_) => [
-        for (final op in operators)
-          PopupMenuItem(
-            value: op['id'].toString(),
-            child: Text(
-              _opLabel(op),
-              style: const TextStyle(fontFamily: 'Inter', fontSize: 13),
-            ),
-          ),
-      ],
-      onSelected: onAssign,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        decoration: BoxDecoration(
-          border: Border.all(color: AppColors.ctBorder),
-          borderRadius: BorderRadius.circular(7),
-        ),
-        child: const Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.add, size: 14, color: AppColors.ctText2),
-            SizedBox(width: 4),
-            Text(
-              'Asignar',
-              style: TextStyle(
-                fontFamily: 'Inter',
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: AppColors.ctText2,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 class _TypeChip extends StatelessWidget {
   const _TypeChip(this.type);
