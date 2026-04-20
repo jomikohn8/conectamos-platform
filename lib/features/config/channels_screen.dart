@@ -732,14 +732,6 @@ class _CreateChannelStepperState extends State<_CreateChannelStepper> {
             );
           }).toList(),
         ),
-        if (_verifyError != null) ...[
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(color: AppColors.ctRedBg, borderRadius: BorderRadius.circular(8)),
-            child: Text(_verifyError!, style: const TextStyle(fontFamily: 'Inter', fontSize: 12, color: AppColors.ctRedText)),
-          ),
-        ],
       ],
     );
   }
@@ -892,6 +884,31 @@ class _CreateChannelStepperState extends State<_CreateChannelStepper> {
                           child: [_buildStep1(), _buildStep2(), _buildStep3()][_step],
                         ),
                       ),
+                      if (_step == 1 && _verifyError != null)
+                        Container(
+                          margin: const EdgeInsets.fromLTRB(28, 12, 28, 0),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: AppColors.ctRedBg,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.error_outline, size: 14, color: AppColors.ctDanger),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  _verifyError!,
+                                  style: const TextStyle(
+                                    fontFamily: 'Inter',
+                                    fontSize: 12,
+                                    color: AppColors.ctRedText,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       const Divider(height: 1, color: AppColors.ctBorder),
                       Padding(padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16), child: _buildNavButtons()),
                     ],
