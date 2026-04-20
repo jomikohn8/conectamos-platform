@@ -139,7 +139,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               ),
               const SizedBox(width: 10),
               const Text(
-                'Plataforma operativa · IA-first',
+                'Conectamos Platform',
                 style: TextStyle(
                   fontFamily: 'Onest',
                   fontSize: 13,
@@ -152,23 +152,33 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           ),
           const SizedBox(height: 28),
 
-          // Hero title
-          Text(
-            'Centraliza y automatiza\ntus operaciones',
-            style: TextStyle(
-              fontFamily: 'Onest',
-              fontSize: 52,
-              fontWeight: FontWeight.w700,
-              color: Colors.white,
-              height: 1.02,
-              letterSpacing: -2.0,
+          // Hero title — line 1 white, line 2 teal
+          RichText(
+            text: const TextSpan(
+              style: TextStyle(
+                fontFamily: 'Onest',
+                fontSize: 50,
+                fontWeight: FontWeight.w700,
+                height: 1.02,
+                letterSpacing: -2.0,
+              ),
+              children: [
+                TextSpan(
+                  text: 'Tu operación en tiempo real,\n',
+                  style: TextStyle(color: Colors.white),
+                ),
+                TextSpan(
+                  text: 'en un solo lugar.',
+                  style: TextStyle(color: Color(0xFF59E0CC)),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 20),
 
           // Subtitle
           Text(
-            'Conecta a tus operadores, estructura tu\ninformación y toma decisiones en tiempo real.',
+            'Conecta las herramientas que ya usas, detecta fallas antes de que escalen y gestiona toda tu operación sin cambiar la forma en que trabaja tu equipo.',
             style: TextStyle(
               fontFamily: 'Geist',
               fontSize: 17,
@@ -193,7 +203,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const AuthCardHead(
-            title: 'Bienvenido a Conectamos OS',
+            title: 'Bienvenido a ConectamOS',
             titleAccent: 'OS',
             subtitle: 'Inicia sesión para acceder a tu torre de control',
           ),
@@ -419,10 +429,10 @@ class _NotifClusterState extends State<_NotifCluster>
               ),
             ),
             child: const _NotifCard(
-              icon: Icons.check_circle_outline_rounded,
+              icon: Icons.storefront_outlined,
               title: 'Venta registrada',
-              desc: 'Abarrotes La Esquina',
-              meta: 'Hace 2 minutos',
+              desc: '\$2,840 MXN · Sucursal Roma Norte',
+              meta: '',
               showCheck: true,
             ),
           ),
@@ -440,12 +450,12 @@ class _NotifClusterState extends State<_NotifCluster>
                 ),
               ),
               child: const _NotifCard(
-                icon: Icons.signal_cellular_alt_rounded,
-                title: 'Torre de control',
-                desc: 'Retraso RF-123733 reportado',
-                meta: 'Hace 5 minutos',
+                icon: Icons.bar_chart_rounded,
+                title: 'Retraso en envío RF123733',
+                desc: 'El conductor tiene más de 30 minutos de retraso en la ruta.',
+                meta: 'Torre de control · Hace 5 minutos',
                 showCheck: false,
-                width: 290,
+                width: 320,
               ),
             ),
           ),

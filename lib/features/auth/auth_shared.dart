@@ -142,7 +142,7 @@ class _HelpLinkState extends State<_HelpLink> {
                 color: _hovered ? Colors.white : Colors.white.withValues(alpha: 0.75)),
             const SizedBox(width: 6),
             Text(
-              '¿Necesitas ayuda?',
+              'Soporte',
               style: TextStyle(
                 fontFamily: 'Geist', fontSize: 13,
                 color: _hovered ? Colors.white : Colors.white.withValues(alpha: 0.75),
