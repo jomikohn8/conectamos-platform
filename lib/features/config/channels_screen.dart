@@ -32,11 +32,6 @@ Color _hexColor(String? hex) {
   }
 }
 
-String _initials(String name) {
-  final parts = name.trim().split(RegExp(r'\s+'));
-  if (parts.length >= 2) return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
-  return name.isEmpty ? '?' : name[0].toUpperCase();
-}
 
 String _dioError(Object e) {
   if (e is DioException) {
@@ -51,11 +46,6 @@ String _dioError(Object e) {
   return e.toString();
 }
 
-List<Map<String, dynamic>> _parseOps(dynamic raw) =>
-    (raw as List<dynamic>? ?? [])
-        .whereType<Map>()
-        .map((o) => Map<String, dynamic>.from(o))
-        .toList();
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
@@ -240,11 +230,10 @@ class _ChannelsBody extends StatelessWidget {
             decoration: const BoxDecoration(color: AppColors.ctSurface2, borderRadius: BorderRadius.only(topLeft: Radius.circular(9), topRight: Radius.circular(9))),
             child: const Row(
               children: [
-                Expanded(flex: 3, child: Text('CANAL',      style: _headerStyle)),
-                Expanded(flex: 2, child: Text('WORKER',     style: _headerStyle)),
-                Expanded(flex: 2, child: Text('OPERADORES', style: _headerStyle)),
-                Expanded(flex: 1, child: Text('ESTADO',     style: _headerStyle)),
-                Expanded(flex: 2, child: Text('ACCIONES',   style: _headerStyle)),
+                Expanded(flex: 4, child: Text('CANAL',    style: _headerStyle)),
+                Expanded(flex: 3, child: Text('WORKER',   style: _headerStyle)),
+                Expanded(flex: 1, child: Text('ESTADO',   style: _headerStyle)),
+                Expanded(flex: 2, child: Text('ACCIONES', style: _headerStyle)),
               ],
             ),
           ),
@@ -295,7 +284,6 @@ class _ChannelRowState extends State<_ChannelRow> {
     final isActive    = ch['is_active'] as bool? ?? false;
     final workerName  = ch['worker_name']  as String? ?? '';
     final workerColor = ch['worker_color'] as String? ?? '#9CA3AF';
-    final ops         = _parseOps(ch['operators']);
     final typeEntry   = _kChannelTypeConfig[channelType] ?? _kChannelTypeConfig['whatsapp']!;
 
     return MouseRegion(
@@ -311,7 +299,7 @@ class _ChannelRowState extends State<_ChannelRow> {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Expanded(
-              flex: 3,
+              flex: 4,
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -339,7 +327,7 @@ class _ChannelRowState extends State<_ChannelRow> {
               ),
             ),
             Expanded(
-              flex: 2,
+              flex: 3,
               child: workerName.isEmpty
                   ? const Text('Sin worker', style: TextStyle(fontFamily: 'Inter', fontSize: 12, color: AppColors.ctText3))
                   : Row(
@@ -351,7 +339,6 @@ class _ChannelRowState extends State<_ChannelRow> {
                       ],
                     ),
             ),
-            Expanded(flex: 2, child: _OperatorAvatars(operators: ops)),
             Expanded(
               flex: 1,
               child: Align(
@@ -384,40 +371,6 @@ class _ChannelRowState extends State<_ChannelRow> {
 
 // ── Operator avatars ──────────────────────────────────────────────────────────
 
-class _OperatorAvatars extends StatelessWidget {
-  const _OperatorAvatars({required this.operators});
-  final List<Map<String, dynamic>> operators;
-
-  @override
-  Widget build(BuildContext context) {
-    if (operators.isEmpty) {
-      return const Text('Sin operadores', style: TextStyle(fontFamily: 'Inter', fontSize: 12, color: AppColors.ctText3));
-    }
-    final visible = operators.take(3).toList();
-    final extra   = operators.length - visible.length;
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        ...visible.map((op) {
-          final name = op['display_name'] as String? ?? op['name'] as String? ?? '?';
-          return Container(
-            width: 24, height: 24,
-            margin: const EdgeInsets.only(right: 4),
-            decoration: const BoxDecoration(color: AppColors.ctTeal, shape: BoxShape.circle),
-            alignment: Alignment.center,
-            child: Text(_initials(name), style: const TextStyle(fontFamily: 'Inter', fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.ctNavy)),
-          );
-        }),
-        if (extra > 0)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-            decoration: BoxDecoration(color: AppColors.ctSurface2, borderRadius: BorderRadius.circular(20), border: Border.all(color: AppColors.ctBorder)),
-            child: Text('+$extra', style: const TextStyle(fontFamily: 'Inter', fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.ctText2)),
-          ),
-      ],
-    );
-  }
-}
 
 // ── Create channel stepper ────────────────────────────────────────────────────
 

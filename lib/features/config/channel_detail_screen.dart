@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/api/ai_workers_api.dart';
 import '../../core/api/channels_api.dart';
@@ -119,16 +120,25 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen>
   Future<void> _toggleActive() async {
     final ch = _channel;
     if (ch == null) return;
-    final current = ch['is_active'] as bool? ?? true;
+    final current = ch['is_active'] as bool? ?? false;
     setState(() => _toggling = true);
     try {
-      final updated = await ChannelsApi.updateChannel(
-        channelId: widget.channelId,
-        isActive: !current,
-        tenantId: _tenantId,
-      );
-      if (!mounted) return;
-      setState(() { _channel = updated; _toggling = false; });
+      if (current) {
+        final updated = await ChannelsApi.updateChannel(
+          channelId: widget.channelId,
+          isActive: false,
+          tenantId: _tenantId,
+        );
+        if (!mounted) return;
+        setState(() { _channel = updated; _toggling = false; });
+      } else {
+        await ChannelsApi.activateChannel(
+          channelId: widget.channelId,
+          tenantId: _tenantId,
+        );
+        if (!mounted) return;
+        await _load();
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() => _toggling = false);
@@ -322,7 +332,10 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen>
     return AppBar(
       backgroundColor: AppColors.ctSurface,
       elevation: 0,
-      leading: const BackButton(color: AppColors.ctText),
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back, color: AppColors.ctText),
+        onPressed: () => context.go('/channels'),
+      ),
       title: Text(
         name,
         style: const TextStyle(
@@ -1016,6 +1029,29 @@ class _WelcomeTabState extends State<_WelcomeTab> {
               ),
             ),
             const SizedBox(height: 16),
+            if (_selectedId == null && _approved.isNotEmpty) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEF3C7),
+                  borderRadius: BorderRadius.circular(7),
+                  border: Border.all(color: const Color(0xFFFCD34D)),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.info_outline, size: 14, color: Color(0xFF92400E)),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'No hay plantilla de bienvenida configurada.',
+                        style: TextStyle(fontFamily: 'Inter', fontSize: 12, color: Color(0xFF92400E)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
             _FieldLabel('Seleccionar plantilla aprobada'),
             const SizedBox(height: 8),
             if (_approved.isEmpty)
