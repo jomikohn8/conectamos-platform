@@ -167,7 +167,7 @@ class AuthFooter extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(40, 18, 40, 22),
       child: Center(
         child: Text(
-          'Built with ❤️ Powered by AI 🤖',
+          'Built with ❤️ Powered by 🤖',
           style: TextStyle(
             fontFamily: 'Onest',
             fontSize: 13,

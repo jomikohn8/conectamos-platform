@@ -18,6 +18,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/api/api_client.dart';
 import '../../core/api/channels_api.dart';
+import '../../core/api/conversations_api.dart';
 import '../../core/api/messages_api.dart';
 import '../../core/api/operators_api.dart';
 import '../../core/api/sessions_api.dart';
@@ -37,6 +38,8 @@ final selectedOperatorChannelsProvider =
 final selectedChannelIndexProvider = StateProvider<int>((ref) => 0);
 final replyingToProvider =
     StateProvider<Map<String, dynamic>?>((ref) => null);
+final selectedConvOperatorIdProvider = StateProvider<String?>((ref) => null);
+final selectedChannelTypeProvider    = StateProvider<String?>((ref) => null);
 
 // ── Pantalla ──────────────────────────────────────────────────────────────────
 
@@ -235,6 +238,8 @@ class _ConversationsBodyState extends ConsumerState<_ConversationsBody> {
       if (active.isNotEmpty && ref.read(selectedChannelIdProvider) == null) {
         ref.read(selectedChannelIdProvider.notifier).state =
             active.first['id'] as String?;
+        ref.read(selectedChannelTypeProvider.notifier).state =
+            active.first['channel_type'] as String?;
       }
     } catch (_) {
       if (mounted) setState(() => _loadingChannels = false);
@@ -272,11 +277,18 @@ class _ConversationsBodyState extends ConsumerState<_ConversationsBody> {
             channels: _channels,
             selectedChannelId: selectedChannelId,
             onChannelSelected: (id) {
+              final ch = _channels.firstWhere(
+                (c) => (c['id'] as String?) == id,
+                orElse: () => {},
+              );
               ref.read(selectedChannelIdProvider.notifier).state = id;
+              ref.read(selectedChannelTypeProvider.notifier).state =
+                  ch['channel_type'] as String?;
               ref.read(selectedChannelTabProvider.notifier).state = 0;
               ref.read(selectedChatIdProvider.notifier).state = null;
               ref.read(selectedChatNameProvider.notifier).state = null;
               ref.read(selectedOperatorChannelsProvider.notifier).state = [];
+              ref.read(selectedConvOperatorIdProvider.notifier).state = null;
               ref.read(replyingToProvider.notifier).state = null;
             },
           ),
@@ -521,11 +533,6 @@ String _mediaFallback(String type) {
   }
 }
 
-String _previewText(Map<String, dynamic> msg) {
-  final raw = msg['raw_body'] as String?;
-  if (raw != null && raw.isNotEmpty) return raw;
-  return _mediaFallback(msg['message_type'] as String? ?? '');
-}
 
 String _msgBody(Map<String, dynamic> msg) {
   final raw = msg['raw_body'] as String?;
@@ -561,6 +568,15 @@ String _outboundSenderName(Map<String, dynamic> msg) {
       );
     case 'human':
       return (nameColor: const Color(0xFF065F46), badge: null);
+    case 'external':
+      return (
+        nameColor: const Color(0xFF6B7280),
+        badge: _OriginBadge(
+          label: 'Externo',
+          bg: const Color(0xFFF3F4F6),
+          fg: const Color(0xFF6B7280),
+        ),
+      );
     default:
       return (
         nameColor: const Color(0xFF6B7280),
@@ -617,6 +633,26 @@ Color _hexColor(String? hex) {
   }
 }
 
+IconData _mediaIcon(String mediaType) {
+  switch (mediaType) {
+    case 'image':    return Icons.image_outlined;
+    case 'video':    return Icons.videocam_outlined;
+    case 'audio':    return Icons.mic_outlined;
+    case 'document': return Icons.attach_file_rounded;
+    default:         return Icons.attach_file_rounded;
+  }
+}
+
+String _mediaLabel(String mediaType) {
+  switch (mediaType) {
+    case 'image':    return 'Imagen';
+    case 'video':    return 'Video';
+    case 'audio':    return 'Audio';
+    case 'document': return 'Archivo';
+    default:         return 'Adjunto';
+  }
+}
+
 // ── Lista de conversaciones (240px) ───────────────────────────────────────────
 
 class _ConvoList extends ConsumerStatefulWidget {
@@ -630,13 +666,10 @@ class _ConvoListState extends ConsumerState<_ConvoList> {
   static final Map<String, DateTime> _lastReadAtCache = {};
   static final Map<String, DateTime> _preOpenLastRead = {};
 
-  final DateTime _sessionStartAt = DateTime.now().toUtc();
-
   String _search = '';
-  List<Map<String, dynamic>> _operators = [];
-  List<Map<String, dynamic>> _allStreamMessages = [];
+  List<Map<String, dynamic>> _conversations = [];
+  final Map<String, int> _unreadOverride = {};
   bool _loading = false;
-  StreamSubscription<List<Map<String, dynamic>>>? _convoSubscription;
 
   static DateTime? getLastReadSync(String chatId) => _lastReadAtCache[chatId];
 
@@ -661,61 +694,29 @@ class _ConvoListState extends ConsumerState<_ConvoList> {
   void initState() {
     super.initState();
     _loadLastReadCache().then((_) {
-      if (mounted) {
-        _fetchOperators();
-        _subscribeToConversations();
-      }
+      if (mounted) _fetchConversations();
     });
   }
 
   @override
   void dispose() {
-    _convoSubscription?.cancel();
     super.dispose();
   }
 
-  Future<void> _fetchOperators() async {
+  Future<void> _fetchConversations() async {
+    final channelId = ref.read(selectedChannelIdProvider);
+    if (channelId == null) return;
     setState(() => _loading = true);
     try {
       final tenantId = ref.read(activeTenantIdProvider);
-      final ops = await OperatorsApi.listOperators(
+      final convs = await ConversationsApi.listConversations(
         tenantId: tenantId.isNotEmpty ? tenantId : 'default',
+        channelId: channelId,
       );
-      if (mounted) setState(() { _operators = ops; _loading = false; });
+      if (mounted) setState(() { _conversations = convs; _loading = false; });
     } catch (_) {
       if (mounted) setState(() => _loading = false);
     }
-  }
-
-  int _countUnread(String chatId) {
-    final lastRead = _lastReadAtCache[chatId];
-    final cutoff = lastRead ?? _sessionStartAt;
-
-    return _allStreamMessages.where((m) {
-      if (m['chat_id'] != chatId) return false;
-      if (m['direction'] == 'outbound') return false;
-      final receivedAt =
-          DateTime.tryParse(m['received_at'] as String? ?? '');
-      if (receivedAt == null) return false;
-      return receivedAt.isAfter(cutoff);
-    }).length;
-  }
-
-  void _subscribeToConversations() {
-    final tenantId = ref.read(activeTenantIdProvider);
-    _convoSubscription = Supabase.instance.client
-        .from('wa_messages')
-        .stream(primaryKey: ['id'])
-        .order('received_at', ascending: false)
-        .limit(500)
-        .listen((data) {
-          if (!mounted) return;
-          var msgs = List<Map<String, dynamic>>.from(data);
-          if (tenantId.isNotEmpty) {
-            msgs = msgs.where((m) => m['tenant_id'] == tenantId).toList();
-          }
-          setState(() { _allStreamMessages = msgs; });
-        });
   }
 
   Widget _searchBar() {
@@ -729,7 +730,7 @@ class _ConvoListState extends ConsumerState<_ConvoList> {
           color: AppColors.ctText,
         ),
         decoration: InputDecoration(
-          hintText: 'Buscar operador…',
+          hintText: 'Buscar conversación…',
           hintStyle: const TextStyle(
             fontFamily: 'Geist',
             fontSize: 13,
@@ -764,41 +765,32 @@ class _ConvoListState extends ConsumerState<_ConvoList> {
 
   @override
   Widget build(BuildContext context) {
-    // Reinicia streams y operadores cuando cambia el tenant
+    // Reinicia conversaciones cuando cambia el tenant
     ref.listen<String>(activeTenantIdProvider, (prev, next) {
       if (prev != null && prev != next) {
-        _convoSubscription?.cancel();
-        setState(() { _operators = []; _allStreamMessages = []; });
-        _fetchOperators();
-        _subscribeToConversations();
+        setState(() { _conversations = []; _unreadOverride.clear(); });
+        _fetchConversations();
         ref.read(selectedChatIdProvider.notifier).state = null;
         ref.read(selectedChatNameProvider.notifier).state = null;
         ref.read(selectedOperatorChannelsProvider.notifier).state = [];
+        ref.read(selectedConvOperatorIdProvider.notifier).state = null;
         ref.read(selectedChannelIndexProvider.notifier).state = 0;
         ref.read(selectedChannelIdProvider.notifier).state = null;
         ref.read(replyingToProvider.notifier).state = null;
       }
     });
-    // Recarga operadores cuando cambia el estado de canales (activar/desactivar)
+    // Recarga cuando cambia el estado de canales (activar/desactivar)
     ref.listen<int>(channelStateVersionProvider, (prev, next) {
-      if (prev != null && prev != next) _fetchOperators();
+      if (prev != null && prev != next) _fetchConversations();
+    });
+    // Recarga cuando cambia el canal seleccionado
+    ref.listen<String?>(selectedChannelIdProvider, (prev, next) {
+      if (prev != next) _fetchConversations();
     });
 
-    final selectedChatId    = ref.watch(selectedChatIdProvider);
-    final selectedChannelId = ref.watch(selectedChannelIdProvider);
-    final filtered = _operators.where((op) {
-      // Nivel 3 — filtrar por canal seleccionado
-      if (selectedChannelId != null) {
-        final opChannels = List<Map<String, dynamic>>.from(
-          (op['channels'] as List?) ?? [],
-        );
-        final hasChannel = opChannels.any(
-          (c) => (c['channel_id'] as String?) == selectedChannelId,
-        );
-        if (!hasChannel) return false;
-      }
-      final name = op['display_name'] as String? ??
-          op['phone'] as String? ?? '';
+    final selectedChatId = ref.watch(selectedChatIdProvider);
+    final filtered = _conversations.where((conv) {
+      final name = conv['display_name'] as String? ?? '';
       return name.toLowerCase().contains(_search.toLowerCase());
     }).toList();
 
@@ -811,11 +803,11 @@ class _ConvoListState extends ConsumerState<_ConvoList> {
             const Expanded(
               child: Center(child: CircularProgressIndicator()),
             )
-          else if (_operators.isEmpty)
+          else if (_conversations.isEmpty)
             const Expanded(
               child: Center(
                 child: Text(
-                  'No hay operadores registrados',
+                  'Sin conversaciones',
                   style: TextStyle(
                     fontFamily: 'Geist',
                     fontSize: 12,
@@ -831,43 +823,40 @@ class _ConvoListState extends ConsumerState<_ConvoList> {
                 padding: const EdgeInsets.symmetric(horizontal: 6),
                 itemCount: filtered.length,
                 itemBuilder: (context, i) {
-                  final op = filtered[i];
-                  final phone = op['phone'] as String? ?? '';
-                  final name = op['name'] as String? ??
-                      op['display_name'] as String? ??
-                      phone;
-                  final opChannels = List<Map<String, dynamic>>.from(
-                    (op['channels'] as List?) ?? [],
-                  );
-                  final lastMsg = _allStreamMessages
-                      .where((m) => (m['chat_id'] as String?) == phone)
-                      .firstOrNull;
+                  final conv    = filtered[i];
+                  final chatId  = conv['chat_id'] as String? ?? '';
+                  final name    = conv['display_name'] as String? ?? chatId;
+                  final lastMsg = conv['last_message'] as Map<String, dynamic>?;
+                  final body      = lastMsg?['body'] as String?;
+                  final mediaType = lastMsg?['media_type'] as String?;
+                  final createdAt = lastMsg?['created_at'] as String?;
+                  final unread = _unreadOverride[chatId]
+                      ?? (conv['unread_count'] as int? ?? 0);
                   return _ApiConvoItem(
                     name: name,
-                    channels: opChannels,
-                    preview: lastMsg != null
-                        ? _previewText(lastMsg)
-                        : 'Sin mensajes',
-                    time: lastMsg != null
-                        ? _formatTime(lastMsg['received_at'] as String?)
-                        : '',
-                    isToday: lastMsg != null &&
-                        _isToday(lastMsg['received_at'] as String?),
-                    isSelected: phone == selectedChatId,
-                    unreadCount: _countUnread(phone),
+                    preview: mediaType != null
+                        ? null
+                        : (body?.isNotEmpty == true ? body! : 'Sin mensajes'),
+                    mediaType: mediaType,
+                    time: _formatTime(createdAt),
+                    isToday: _isToday(createdAt),
+                    isSelected: chatId == selectedChatId,
+                    unreadCount: unread,
                     onTap: () {
-                      final prev = getLastReadSync(phone);
+                      final prev = getLastReadSync(chatId);
                       if (prev != null) {
-                        _preOpenLastRead[phone] = prev;
+                        _preOpenLastRead[chatId] = prev;
                       } else {
-                        _preOpenLastRead.remove(phone);
+                        _preOpenLastRead.remove(chatId);
                       }
-                      setLastRead(phone, DateTime.now().toUtc(),
+                      setLastRead(chatId, DateTime.now().toUtc(),
                           ref.read(activeTenantIdProvider));
-                      setState(() {});
-                      ref.read(selectedChatIdProvider.notifier).state = phone;
+                      setState(() { _unreadOverride[chatId] = 0; });
+                      ref.read(selectedChatIdProvider.notifier).state = chatId;
                       ref.read(selectedChatNameProvider.notifier).state = name;
-                      ref.read(selectedOperatorChannelsProvider.notifier).state = opChannels;
+                      ref.read(selectedOperatorChannelsProvider.notifier).state = [];
+                      ref.read(selectedConvOperatorIdProvider.notifier).state =
+                          conv['operator_id'] as String?;
                       ref.read(selectedChannelIndexProvider.notifier).state = 0;
                       ref.read(replyingToProvider.notifier).state = null;
                     },
@@ -886,22 +875,22 @@ class _ConvoListState extends ConsumerState<_ConvoList> {
 class _ApiConvoItem extends StatefulWidget {
   const _ApiConvoItem({
     required this.name,
-    required this.preview,
     required this.time,
     required this.isToday,
     required this.isSelected,
     required this.onTap,
+    this.preview,
+    this.mediaType,
     this.unreadCount = 0,
-    this.channels = const [],
   });
   final String name;
-  final String preview;
+  final String? preview;
+  final String? mediaType;
   final String time;
   final bool isToday;
   final bool isSelected;
   final VoidCallback onTap;
   final int unreadCount;
-  final List<Map<String, dynamic>> channels;
 
   @override
   State<_ApiConvoItem> createState() => _ApiConvoItemState();
@@ -988,36 +977,39 @@ class _ApiConvoItemState extends State<_ApiConvoItem> {
                         ),
                       ],
                     ),
-                    if (widget.channels.isNotEmpty) ...[
-                      const SizedBox(height: 3),
-                      Row(
-                        children: [
-                          for (final ch in widget.channels.take(3))
-                            Container(
-                              width: 6,
-                              height: 6,
-                              margin: const EdgeInsets.only(right: 3),
-                              decoration: BoxDecoration(
-                                color: _hexColor(ch['color'] as String?),
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                        ],
-                      ),
-                    ],
                     const SizedBox(height: 2),
                     Row(
                       children: [
                         Expanded(
-                          child: Text(
-                            widget.preview,
-                            style: const TextStyle(
-                              fontFamily: 'Geist',
-                              fontSize: 11,
-                              color: AppColors.ctText2,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                          child: widget.mediaType != null
+                              ? Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      _mediaIcon(widget.mediaType!),
+                                      size: 11,
+                                      color: AppColors.ctText2,
+                                    ),
+                                    const SizedBox(width: 3),
+                                    Text(
+                                      _mediaLabel(widget.mediaType!),
+                                      style: const TextStyle(
+                                        fontFamily: 'Geist',
+                                        fontSize: 11,
+                                        color: AppColors.ctText2,
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              : Text(
+                                  widget.preview ?? 'Sin mensajes',
+                                  style: const TextStyle(
+                                    fontFamily: 'Geist',
+                                    fontSize: 11,
+                                    color: AppColors.ctText2,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                         ),
                         const SizedBox(width: 4),
                         if (widget.unreadCount > 0)
@@ -1725,15 +1717,13 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
       final receivedAt = lastInbound != null
           ? DateTime.tryParse(lastInbound['received_at'] as String? ?? '')
           : null;
-      final chs = ref.read(selectedOperatorChannelsProvider);
-      final activeChId = ref.read(selectedChannelIdProvider);
-      final activeCh = chs
-          .where((c) => (c['channel_id'] as String?) == activeChId)
-          .firstOrNull;
-      final channelType = activeCh?['channel_type'] as String?;
+      final channelType = ref.read(selectedChannelTypeProvider);
+      final operatorId  = ref.read(selectedConvOperatorIdProvider);
       final hasRecentInbound = receivedAt != null &&
           DateTime.now().toUtc().difference(receivedAt.toUtc()).inHours < 24;
-      final computed = (channelType != 'whatsapp') || hasRecentInbound;
+      final computed = operatorId == null
+          ? true
+          : (channelType != 'whatsapp') || hasRecentInbound;
       setState(() {
         _apiMessages = messages;
         _msgLoading = false;

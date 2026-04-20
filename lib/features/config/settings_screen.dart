@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api/api_client.dart';
+import '../../core/api/channels_api.dart';
+import '../../core/api/iam_api.dart';
 import '../../core/providers/tenant_provider.dart';
 import '../../core/theme/app_theme.dart';
 
@@ -535,15 +537,7 @@ final _usersListProvider =
     FutureProvider.autoDispose.family<List<Map<String, dynamic>>, String>(
   (ref, tenantId) async {
     if (tenantId.isEmpty) return [];
-    final res = await ApiClient.instance.get(
-      '/iam/users',
-      queryParameters: {'tenant_id': tenantId},
-    );
-    final data = res.data;
-    final List raw = data is List
-        ? data
-        : (data['users'] ?? data['items'] ?? []) as List;
-    return raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    return IamApi.getUsers(tenantId: tenantId);
   },
 );
 
@@ -551,16 +545,9 @@ final _rolesMapProvider =
     FutureProvider.autoDispose.family<Map<String, String>, String>(
   (ref, tenantId) async {
     if (tenantId.isEmpty) return {};
-    final res = await ApiClient.instance.get(
-      '/iam/roles',
-      queryParameters: {'tenant_id': tenantId},
-    );
-    final data = res.data;
-    final List raw = data is List
-        ? data
-        : (data['roles'] ?? data['items'] ?? []) as List;
+    final roles = await IamApi.getRoles(tenantId: tenantId);
     final map = <String, String>{};
-    for (final e in raw) {
+    for (final e in roles) {
       final id   = e['id']?.toString() ?? '';
       final name = e['name']?.toString() ?? '';
       if (id.isNotEmpty) map[id] = name;
@@ -798,11 +785,26 @@ class _UserRowState extends ConsumerState<_UserRow> {
 
   String get _status => widget.user['status']?.toString() ?? 'active';
 
+  String get _tenantUserId =>
+      widget.user['tenant_user_id']?.toString() ??
+      widget.user['id']?.toString() ?? '';
+
+  void _showManageChannelsDialog() {
+    showDialog(
+      context: context,
+      builder: (_) => _ManageChannelsDialog(
+        tenantUserId: _tenantUserId,
+        tenantId: widget.tenantId,
+        userName: _name.isNotEmpty ? _name : _email,
+      ),
+    );
+  }
+
   Future<void> _patch(Map<String, dynamic> body) async {
     if (_id.isEmpty) return;
     setState(() => _acting = true);
     try {
-      await ApiClient.instance.patch('/iam/users/$_id', data: body);
+      await IamApi.updateUser(_id, body);
       widget.onRefresh();
     } catch (_) {
       if (mounted) setState(() => _acting = false);
@@ -813,10 +815,7 @@ class _UserRowState extends ConsumerState<_UserRow> {
     if (_id.isEmpty) return;
     setState(() => _acting = true);
     try {
-      await ApiClient.instance.post(
-        '/iam/users/$_id/resend-invite',
-        data: {'tenant_id': widget.tenantId},
-      );
+      await IamApi.resendInvite(_id, tenantId: widget.tenantId);
       if (mounted) setState(() => _acting = false);
     } catch (_) {
       if (mounted) setState(() => _acting = false);
@@ -827,10 +826,7 @@ class _UserRowState extends ConsumerState<_UserRow> {
     final email = _email;
     if (email.isEmpty) return;
     try {
-      await ApiClient.instance.post(
-        '/iam/password-reset',
-        data: {'email': email},
-      );
+      await IamApi.resetPassword(email);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text('Enlace enviado a $email',
@@ -1069,6 +1065,14 @@ class _UserRowState extends ConsumerState<_UserRow> {
                                     fontFamily: 'Geist', fontSize: 13)),
                           ));
                         }
+                        if (_role.toLowerCase() != 'admin') {
+                          items.add(const PopupMenuItem(
+                            value: 'channels',
+                            child: Text('Gestionar canales',
+                                style: TextStyle(
+                                    fontFamily: 'Geist', fontSize: 13)),
+                          ));
+                        }
                         return items;
                       },
                       onSelected: (v) {
@@ -1084,6 +1088,8 @@ class _UserRowState extends ConsumerState<_UserRow> {
                           _patch({'status': 'active'});
                         } else if (v == 'resend') {
                           _resendInvitation();
+                        } else if (v == 'channels') {
+                          _showManageChannelsDialog();
                         }
                       },
                     ),
@@ -1213,13 +1219,10 @@ class _EditUserDialogState extends State<_EditUserDialog> {
     }
     setState(() { _saving = true; _error = null; });
     try {
-      await ApiClient.instance.patch(
-        '/iam/users/${widget.userId}',
-        data: {
-          'nombre':   nombre,
-          'telefono': _telefonoCtrl.text.trim(),
-        },
-      );
+      await IamApi.updateUser(widget.userId, {
+        'nombre':   nombre,
+        'telefono': _telefonoCtrl.text.trim(),
+      });
       if (!mounted) return;
       widget.onSaved();
       Navigator.pop(context);
@@ -1331,17 +1334,8 @@ class _ChangeRoleDialogState extends ConsumerState<_ChangeRoleDialog> {
 
   Future<void> _loadRoles() async {
     try {
-      final res = await ApiClient.instance.get(
-        '/iam/roles',
-        queryParameters: {'tenant_id': widget.tenantId},
-      );
+      final roles = await IamApi.getRoles(tenantId: widget.tenantId);
       if (!mounted) return;
-      final data = res.data;
-      final List raw = data is List
-          ? data
-          : (data['roles'] ?? data['items'] ?? []) as List;
-      final roles =
-          raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
       setState(() {
         _roles        = roles;
         _roleId       = roles.isNotEmpty ? roles.first['id']?.toString() : null;
@@ -1356,10 +1350,7 @@ class _ChangeRoleDialogState extends ConsumerState<_ChangeRoleDialog> {
     if (_roleId == null || _roleId!.isEmpty) return;
     setState(() { _saving = true; _error = null; });
     try {
-      await ApiClient.instance.patch(
-        '/iam/users/${widget.userId}/role',
-        data: {'role_id': _roleId},
-      );
+      await IamApi.updateUserRole(widget.userId, _roleId!);
       if (!mounted) return;
       widget.onChanged();
       Navigator.pop(context);
@@ -1514,17 +1505,8 @@ class _InviteUserDialogState extends ConsumerState<_InviteUserDialog> {
 
   Future<void> _loadRoles() async {
     try {
-      final res = await ApiClient.instance.get(
-        '/iam/roles',
-        queryParameters: {'tenant_id': widget.tenantId},
-      );
+      final roles = await IamApi.getRoles(tenantId: widget.tenantId);
       if (!mounted) return;
-      final data = res.data;
-      final List raw = data is List
-          ? data
-          : (data['roles'] ?? data['items'] ?? []) as List;
-      final roles =
-          raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
       setState(() {
         _availableRoles = roles;
         _roleId         = roles.isNotEmpty ? roles.first['id']?.toString() : null;
@@ -1552,7 +1534,7 @@ class _InviteUserDialogState extends ConsumerState<_InviteUserDialog> {
     }
     setState(() { _sending = true; _error = null; });
     try {
-      await ApiClient.instance.post('/iam/invite', data: {
+      await IamApi.inviteUser({
         'nombre':    nombre,
         'telefono':  _telefonoCtrl.text.trim(),
         'email':     email,
@@ -1705,6 +1687,254 @@ class _InviteUserDialogState extends ConsumerState<_InviteUserDialog> {
                     onTap: _sending ? null : _send,
                   ),
                 ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Dialog: Gestionar canales ─────────────────────────────────────────────────
+
+class _ManageChannelsDialog extends StatefulWidget {
+  const _ManageChannelsDialog({
+    required this.tenantUserId,
+    required this.tenantId,
+    required this.userName,
+  });
+  final String tenantUserId;
+  final String tenantId;
+  final String userName;
+
+  @override
+  State<_ManageChannelsDialog> createState() => _ManageChannelsDialogState();
+}
+
+class _ManageChannelsDialogState extends State<_ManageChannelsDialog> {
+  List<Map<String, dynamic>> _channels = [];
+  Set<String> _assigned = {};
+  bool _loading = true;
+  final Set<String> _busy = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final results = await Future.wait([
+        ChannelsApi.listChannels(tenantId: widget.tenantId),
+        IamApi.getUserChannels(tenantUserId: widget.tenantUserId),
+      ]);
+      if (!mounted) return;
+      final channels   = results[0];
+      final accessList = results[1];
+      final assigned = <String>{};
+      for (final a in accessList) {
+        final cid = a['channel_id']?.toString() ?? '';
+        if (cid.isNotEmpty) assigned.add(cid);
+      }
+      setState(() {
+        _channels = channels;
+        _assigned = assigned;
+        _loading  = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _toggle(String channelId, bool checked) async {
+    if (_busy.contains(channelId)) return;
+    setState(() {
+      _busy.add(channelId);
+      if (checked) {
+        _assigned.add(channelId);
+      } else {
+        _assigned.remove(channelId);
+      }
+    });
+    try {
+      if (checked) {
+        await IamApi.assignChannel(
+          tenantUserId: widget.tenantUserId,
+          channelId: channelId,
+        );
+      } else {
+        await IamApi.removeChannel(
+          tenantUserId: widget.tenantUserId,
+          channelId: channelId,
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        if (checked) {
+          _assigned.remove(channelId);
+        } else {
+          _assigned.add(channelId);
+        }
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: $e',
+              style: const TextStyle(fontFamily: 'Geist', fontSize: 13)),
+          backgroundColor: AppColors.ctNavy,
+          behavior: SnackBarBehavior.floating,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          margin: const EdgeInsets.all(16),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _busy.remove(channelId));
+    }
+  }
+
+  Color _parseColor(String? hex) {
+    if (hex == null || hex.isEmpty) return AppColors.ctTeal;
+    final clean = hex.replaceFirst('#', '');
+    final value = int.tryParse(
+      clean.length == 6 ? 'FF$clean' : clean,
+      radix: 16,
+    );
+    return value != null ? Color(value) : AppColors.ctTeal;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: AppColors.ctSurface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: const BorderSide(color: AppColors.ctBorder),
+      ),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 400, maxHeight: 520),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Canales de ${widget.userName}',
+                style: const TextStyle(
+                  fontFamily: 'Geist',
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.ctText,
+                ),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Este usuario solo verá los canales seleccionados',
+                style: TextStyle(
+                  fontFamily: 'Geist',
+                  fontSize: 12,
+                  color: AppColors.ctText2,
+                ),
+              ),
+              const SizedBox(height: 16),
+              if (_loading)
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(vertical: 24),
+                    child: CircularProgressIndicator(color: AppColors.ctTeal),
+                  ),
+                )
+              else if (_channels.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 8),
+                  child: Text(
+                    'No hay canales activos en este tenant.',
+                    style: TextStyle(
+                      fontFamily: 'Geist',
+                      fontSize: 13,
+                      color: AppColors.ctText2,
+                    ),
+                  ),
+                )
+              else
+                Flexible(
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: _channels.length,
+                    separatorBuilder: (context, index) =>
+                        const Divider(height: 1, color: AppColors.ctBorder),
+                    itemBuilder: (_, i) {
+                      final ch    = _channels[i];
+                      final cid   = (ch['id'] ?? ch['channel_id'])?.toString() ?? '';
+                      final name  = ch['display_name']?.toString() ?? cid;
+                      final color = _parseColor(ch['color']?.toString());
+                      final isChecked = _assigned.contains(cid);
+                      final isBusy    = _busy.contains(cid);
+                      return CheckboxListTile(
+                        value: isChecked,
+                        onChanged: isBusy || cid.isEmpty
+                            ? null
+                            : (v) => _toggle(cid, v ?? false),
+                        activeColor: AppColors.ctTeal,
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        secondary: isBusy
+                            ? const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: AppColors.ctTeal,
+                                ),
+                              )
+                            : Container(
+                                width: 12,
+                                height: 12,
+                                decoration: BoxDecoration(
+                                  color: color,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                        title: Text(
+                          name,
+                          style: const TextStyle(
+                            fontFamily: 'Geist',
+                            fontSize: 13,
+                            color: AppColors.ctText,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              const SizedBox(height: 16),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppColors.ctSurface2,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppColors.ctBorder),
+                ),
+                child: const Text(
+                  'El usuario verá solo los operadores y conversaciones de los canales asignados',
+                  style: TextStyle(
+                    fontFamily: 'Geist',
+                    fontSize: 11,
+                    color: AppColors.ctText2,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Align(
+                alignment: Alignment.centerRight,
+                child: _OutlineButton(
+                  label: 'Cerrar',
+                  onTap: () => Navigator.pop(context),
+                ),
               ),
             ],
           ),
