@@ -398,6 +398,10 @@ class _CreateChannelStepperState extends State<_CreateChannelStepper> {
   String _color        = _kColorPalette.first;
   bool   _tokenVisible = false;
 
+  // Step 2 verify
+  bool    _verifying  = false;
+  String? _verifyError;
+
   // Step 3
   bool    _creating   = false;
   String? _createError;
@@ -452,6 +456,22 @@ class _CreateChannelStepperState extends State<_CreateChannelStepper> {
     } catch (e) {
       if (!mounted) return;
       setState(() { _creating = false; _createError = _dioError(e); });
+    }
+  }
+
+  Future<void> _verifyAndNext() async {
+    if (_verifying) return;
+    setState(() { _verifying = true; _verifyError = null; });
+    try {
+      await ChannelsApi.verifyCredentials(
+        phoneNumberId: _phoneCtrl.text.trim(),
+        accessToken:   _tokenCtrl.text.trim(),
+      );
+      if (!mounted) return;
+      setState(() { _verifying = false; _step++; });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() { _verifying = false; _verifyError = _dioError(e); });
     }
   }
 
@@ -712,6 +732,14 @@ class _CreateChannelStepperState extends State<_CreateChannelStepper> {
             );
           }).toList(),
         ),
+        if (_verifyError != null) ...[
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(color: AppColors.ctRedBg, borderRadius: BorderRadius.circular(8)),
+            child: Text(_verifyError!, style: const TextStyle(fontFamily: 'Inter', fontSize: 12, color: AppColors.ctRedText)),
+          ),
+        ],
       ],
     );
   }
@@ -798,10 +826,25 @@ class _CreateChannelStepperState extends State<_CreateChannelStepper> {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         _step > 0
-            ? _GhostBtn(label: '← Atrás', onTap: () => setState(() { _step--; _createError = null; }))
+            ? _GhostBtn(label: '← Atrás', onTap: () => setState(() { _step--; _createError = null; _verifyError = null; }))
             : _GhostBtn(label: 'Cancelar', onTap: () => Navigator.pop(context)),
-        if (_step < 2)
+        if (_step == 0)
           _PrimaryBtn(label: 'Siguiente →', onTap: _canNext ? () => setState(() => _step++) : (() {}), disabled: !_canNext)
+        else if (_step == 1 && _verifying)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+            decoration: BoxDecoration(color: AppColors.ctTeal, borderRadius: BorderRadius.circular(8)),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.ctNavy)),
+                SizedBox(width: 8),
+                Text('Verificando...', style: TextStyle(fontFamily: 'Inter', fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.ctNavy)),
+              ],
+            ),
+          )
+        else if (_step == 1)
+          _PrimaryBtn(label: 'Siguiente →', onTap: _canNext ? _verifyAndNext : (() {}), disabled: !_canNext)
         else if (_creating)
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),

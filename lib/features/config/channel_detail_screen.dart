@@ -520,8 +520,10 @@ class _CredentialsTabState extends State<_CredentialsTab> {
   late final TextEditingController _phoneCtrl;
   late final TextEditingController _wabaCtrl;
   late final TextEditingController _tokenCtrl;
-  bool _saving = false;
-  bool _showToken = false;
+  bool    _saving      = false;
+  bool    _verifying   = false;
+  String? _verifyError;
+  bool    _showToken   = false;
 
   Map<String, dynamic> get _credentials {
     final cfg = widget.channel['channel_config'];
@@ -555,7 +557,7 @@ class _CredentialsTabState extends State<_CredentialsTab> {
     super.dispose();
   }
 
-  Future<void> _save() async {
+  Future<void> _saveCredentials() async {
     final phone = _phoneCtrl.text.trim();
     final waba  = _wabaCtrl.text.trim();
     final token = _tokenCtrl.text.trim();
@@ -563,7 +565,17 @@ class _CredentialsTabState extends State<_CredentialsTab> {
       widget.onError('Completa todos los campos de credenciales');
       return;
     }
-    setState(() => _saving = true);
+    // Step 1: verify credentials against Meta
+    setState(() { _verifying = true; _verifyError = null; });
+    try {
+      await ChannelsApi.verifyCredentials(phoneNumberId: phone, accessToken: token);
+    } catch (e) {
+      if (mounted) setState(() { _verifying = false; _verifyError = _dioError(e); });
+      return;
+    }
+    if (!mounted) return;
+    setState(() { _verifying = false; _saving = true; });
+    // Step 2: persist credentials
     try {
       final updated = await ChannelsApi.updateChannel(
         channelId: widget.channel['id'] as String,
@@ -573,7 +585,6 @@ class _CredentialsTabState extends State<_CredentialsTab> {
         waToken: token,
       );
       widget.onUpdated(updated);
-      // Sync templates after credentials update
       TemplatesApi.syncTemplates(
         channelId: widget.channel['id'] as String,
         tenantId: widget.tenantId,
@@ -707,12 +718,33 @@ class _CredentialsTabState extends State<_CredentialsTab> {
                 const SizedBox(height: 20),
                 Align(
                   alignment: Alignment.centerRight,
-                  child: _PrimaryButton(
-                    label: 'Guardar credenciales',
-                    loading: _saving,
-                    onTap: _save,
-                  ),
+                  child: _verifying
+                      ? Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                          decoration: BoxDecoration(color: AppColors.ctTeal, borderRadius: BorderRadius.circular(8)),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.ctNavy)),
+                              SizedBox(width: 8),
+                              Text('Verificando...', style: TextStyle(fontFamily: 'Inter', fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.ctNavy)),
+                            ],
+                          ),
+                        )
+                      : _PrimaryButton(
+                          label: 'Guardar credenciales',
+                          loading: _saving,
+                          onTap: _saveCredentials,
+                        ),
                 ),
+                if (_verifyError != null) ...[
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(color: AppColors.ctRedBg, borderRadius: BorderRadius.circular(8)),
+                    child: Text(_verifyError!, style: const TextStyle(fontFamily: 'Inter', fontSize: 12, color: AppColors.ctRedText)),
+                  ),
+                ],
               ],
             ),
           ),

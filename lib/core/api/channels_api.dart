@@ -97,6 +97,20 @@ class ChannelsApi {
     await ApiClient.instance.delete('/channels/$channelId');
   }
 
+  static Future<void> verifyCredentials({
+    required String phoneNumberId,
+    required String accessToken,
+  }) async {
+    await ApiClient.instance.post(
+      '/channels/verify-credentials',
+      data: {
+        'phone_number_id': phoneNumberId,
+        'access_token':    accessToken,
+      },
+    );
+    // 422 lanzado por Dio como DioException — dejar que suba
+  }
+
   static Future<void> activateChannel({
     required String channelId,
     required String tenantId,
