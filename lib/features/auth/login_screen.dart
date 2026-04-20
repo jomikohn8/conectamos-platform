@@ -164,7 +164,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               ),
               children: [
                 TextSpan(
-                  text: 'Tu operación en tiempo real,\n',
+                  text: 'Tu operación en\ntiempo real,\n',
                   style: TextStyle(color: Colors.white),
                 ),
                 TextSpan(
@@ -414,7 +414,7 @@ class _NotifClusterState extends State<_NotifCluster>
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 200,
+      height: 260,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
@@ -439,7 +439,7 @@ class _NotifClusterState extends State<_NotifCluster>
 
           // Card 2 — "Torre de control"
           Positioned(
-            top: 84, left: 160,
+            top: 90, left: 140,
             child: AnimatedBuilder(
               animation: _a2,
               builder: (_, child) => Opacity(

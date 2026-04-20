@@ -422,13 +422,20 @@ class _AuthFieldState extends State<AuthField> {
                     color: Color(0xFF0B132B),
                     letterSpacing: -0.1,
                   ),
-                  decoration: InputDecoration.collapsed(
+                  decoration: InputDecoration(
                     hintText: widget.placeholder,
                     hintStyle: const TextStyle(
                       fontFamily: 'Geist',
                       fontSize: 14,
                       color: Color(0xFFA9B1BC),
                     ),
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    errorBorder: InputBorder.none,
+                    focusedErrorBorder: InputBorder.none,
+                    isDense: true,
+                    contentPadding: EdgeInsets.zero,
                   ),
                 ),
               ),
