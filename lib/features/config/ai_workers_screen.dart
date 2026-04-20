@@ -73,7 +73,7 @@ class _AiWorkersScreenState extends ConsumerState<AiWorkersScreen> {
       final tenantId = ref.read(activeTenantIdProvider);
       final results = await Future.wait([
         AiWorkersApi.listWorkers(tenantId: tenantId),
-        AiWorkersApi.listCatalog(),
+        AiWorkersApi.listCatalog(tenantId: tenantId),
       ]);
       if (!mounted) return;
       setState(() {

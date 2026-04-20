@@ -12,9 +12,14 @@ class AiWorkersApi {
     return List<Map<String, dynamic>>.from(response.data);
   }
 
-  /// Catálogo global de workers disponibles (no requiere tenant_id).
-  static Future<List<Map<String, dynamic>>> listCatalog() async {
-    final response = await ApiClient.instance.get('/catalog/workers');
+  /// Catálogo de workers visibles para el tenant.
+  static Future<List<Map<String, dynamic>>> listCatalog({
+    required String tenantId,
+  }) async {
+    final response = await ApiClient.instance.get(
+      '/catalog/workers',
+      queryParameters: {'tenant_id': tenantId},
+    );
     return List<Map<String, dynamic>>.from(response.data);
   }
 
