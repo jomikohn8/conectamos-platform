@@ -1,5 +1,6 @@
 import 'dart:ui';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -273,6 +274,51 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             trailingIcon: Icons.arrow_forward_rounded,
           ),
 
+          const SizedBox(height: 12),
+          Text.rich(
+            TextSpan(
+              style: const TextStyle(
+                fontFamily: 'Geist',
+                fontSize: 12,
+                color: Color(0xFF6E7273),
+                letterSpacing: -0.1,
+                height: 1.5,
+              ),
+              children: [
+                const TextSpan(text: 'Al continuar aceptas nuestros '),
+                TextSpan(
+                  text: 'Términos y Condiciones',
+                  style: const TextStyle(
+                    color: Color(0xFF5BC0BE),
+                    fontWeight: FontWeight.w500,
+                    decoration: TextDecoration.underline,
+                  ),
+                  recognizer: TapGestureRecognizer()
+                    ..onTap = () {
+                      // TODO: reemplazar con URL real cuando esté disponible
+                      // launchUrl(Uri.parse('https://conectamos.ai/terminos'));
+                    },
+                ),
+                const TextSpan(text: ' y '),
+                TextSpan(
+                  text: 'Política de Privacidad',
+                  style: const TextStyle(
+                    color: Color(0xFF5BC0BE),
+                    fontWeight: FontWeight.w500,
+                    decoration: TextDecoration.underline,
+                  ),
+                  recognizer: TapGestureRecognizer()
+                    ..onTap = () {
+                      // TODO: reemplazar con URL real cuando esté disponible
+                      // launchUrl(Uri.parse('https://conectamos.ai/privacidad'));
+                    },
+                ),
+                const TextSpan(text: '.'),
+              ],
+            ),
+            textAlign: TextAlign.center,
+          ),
+
           // Card foot
           const SizedBox(height: 24),
           Container(
@@ -414,7 +460,7 @@ class _NotifClusterState extends State<_NotifCluster>
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 260,
+      height: 300,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
@@ -439,7 +485,7 @@ class _NotifClusterState extends State<_NotifCluster>
 
           // Card 2 — "Torre de control"
           Positioned(
-            top: 90, left: 140,
+            top: 110, left: 120,
             child: AnimatedBuilder(
               animation: _a2,
               builder: (_, child) => Opacity(
