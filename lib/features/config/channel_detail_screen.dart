@@ -520,10 +520,11 @@ class _CredentialsTabState extends State<_CredentialsTab> {
   late final TextEditingController _phoneCtrl;
   late final TextEditingController _wabaCtrl;
   late final TextEditingController _tokenCtrl;
-  bool    _saving      = false;
-  bool    _verifying   = false;
+  bool    _saving             = false;
+  bool    _verifying          = false;
   String? _verifyError;
-  bool    _showToken   = false;
+  bool    _showToken          = false;
+  bool    _credentialsLocked  = false;
 
   Map<String, dynamic> get _credentials {
     final cfg = widget.channel['channel_config'];
@@ -591,6 +592,18 @@ class _CredentialsTabState extends State<_CredentialsTab> {
       ).catchError((_) {});
       widget.onSuccess('Credenciales guardadas');
     } catch (e) {
+      if (e is DioException && e.response?.statusCode == 409) {
+        final data = e.response?.data;
+        final errorCode = data is Map ? data['error'] as String? : null;
+        if (errorCode == 'channel_has_history') {
+          final msg = data is Map
+              ? (data['message'] as String? ?? 'Este canal tiene historial.')
+              : 'Este canal tiene historial.';
+          if (mounted) setState(() => _credentialsLocked = true);
+          widget.onError(msg);
+          return;
+        }
+      }
       widget.onError(_dioError(e));
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -689,15 +702,48 @@ class _CredentialsTabState extends State<_CredentialsTab> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                if (_credentialsLocked) ...[
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: AppColors.ctWarnBg,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppColors.ctWarnText.withValues(alpha: 0.3)),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(Icons.warning_amber_rounded, size: 16, color: AppColors.ctWarnText),
+                        const SizedBox(width: 8),
+                        const Expanded(
+                          child: Text(
+                            'Este canal tiene historial. Para cambiar el número o WABA, desactiva este canal y crea uno nuevo.',
+                            style: TextStyle(
+                              fontFamily: 'Geist',
+                              fontSize: 12.5,
+                              color: AppColors.ctWarnText,
+                              height: 1.4,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 _FieldLabel('Phone Number ID'),
                 const SizedBox(height: 6),
                 _StyledTextField(
-                    controller: _phoneCtrl, hint: '123456789012345'),
+                    controller: _phoneCtrl,
+                    hint: '123456789012345',
+                    enabled: !_credentialsLocked),
                 const SizedBox(height: 16),
                 _FieldLabel('WABA ID'),
                 const SizedBox(height: 6),
                 _StyledTextField(
-                    controller: _wabaCtrl, hint: '987654321098765'),
+                    controller: _wabaCtrl,
+                    hint: '987654321098765',
+                    enabled: !_credentialsLocked),
                 const SizedBox(height: 16),
                 _FieldLabel('Access Token'),
                 const SizedBox(height: 6),
@@ -705,6 +751,7 @@ class _CredentialsTabState extends State<_CredentialsTab> {
                   controller: _tokenCtrl,
                   hint: 'EAAxxxx...',
                   obscure: !_showToken,
+                  enabled: !_credentialsLocked,
                   suffix: IconButton(
                     icon: Icon(
                       _showToken ? Icons.visibility_off : Icons.visibility,
@@ -715,35 +762,37 @@ class _CredentialsTabState extends State<_CredentialsTab> {
                         setState(() => _showToken = !_showToken),
                   ),
                 ),
-                const SizedBox(height: 20),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: _verifying
-                      ? Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-                          decoration: BoxDecoration(color: AppColors.ctTeal, borderRadius: BorderRadius.circular(8)),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.ctNavy)),
-                              SizedBox(width: 8),
-                              Text('Verificando...', style: TextStyle(fontFamily: 'Geist', fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.ctNavy)),
-                            ],
+                if (!_credentialsLocked) ...[
+                  const SizedBox(height: 20),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: _verifying
+                        ? Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                            decoration: BoxDecoration(color: AppColors.ctTeal, borderRadius: BorderRadius.circular(8)),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.ctNavy)),
+                                SizedBox(width: 8),
+                                Text('Verificando...', style: TextStyle(fontFamily: 'Geist', fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.ctNavy)),
+                              ],
+                            ),
+                          )
+                        : _PrimaryButton(
+                            label: 'Guardar credenciales',
+                            loading: _saving,
+                            onTap: _saveCredentials,
                           ),
-                        )
-                      : _PrimaryButton(
-                          label: 'Guardar credenciales',
-                          loading: _saving,
-                          onTap: _saveCredentials,
-                        ),
-                ),
-                if (_verifyError != null) ...[
-                  const SizedBox(height: 10),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(color: AppColors.ctRedBg, borderRadius: BorderRadius.circular(8)),
-                    child: Text(_verifyError!, style: const TextStyle(fontFamily: 'Geist', fontSize: 12, color: AppColors.ctRedText)),
                   ),
+                  if (_verifyError != null) ...[
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(color: AppColors.ctRedBg, borderRadius: BorderRadius.circular(8)),
+                      child: Text(_verifyError!, style: const TextStyle(fontFamily: 'Geist', fontSize: 12, color: AppColors.ctRedText)),
+                    ),
+                  ],
                 ],
               ],
             ),
@@ -1247,19 +1296,24 @@ class _StyledTextField extends StatelessWidget {
     required this.hint,
     this.obscure = false,
     this.suffix,
+    this.enabled = true,
   });
   final TextEditingController controller;
   final String hint;
   final bool obscure;
   final Widget? suffix;
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
     return TextField(
       controller: controller,
       obscureText: obscure,
-      style: const TextStyle(
-          fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText),
+      enabled: enabled,
+      style: TextStyle(
+          fontFamily: 'Geist',
+          fontSize: 13,
+          color: enabled ? AppColors.ctText : AppColors.ctText3),
       decoration: InputDecoration(
         hintText: hint,
         hintStyle: const TextStyle(
@@ -1267,7 +1321,7 @@ class _StyledTextField extends StatelessWidget {
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         filled: true,
-        fillColor: AppColors.ctSurface,
+        fillColor: enabled ? AppColors.ctSurface : AppColors.ctSurface2,
         suffixIcon: suffix,
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
@@ -1276,6 +1330,10 @@ class _StyledTextField extends StatelessWidget {
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
           borderSide: const BorderSide(color: AppColors.ctTeal, width: 1.5),
+        ),
+        disabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: AppColors.ctBorder),
         ),
       ),
     );
