@@ -135,7 +135,7 @@ class _NavItemState extends State<_NavItem> {
                 child: Text(
                   widget.label,
                   style: TextStyle(
-                    fontFamily: 'Inter',
+                    fontFamily: 'Geist',
                     fontSize: 13,
                     fontWeight: weight,
                     color: textColor,
@@ -202,7 +202,7 @@ class _ActionBar extends StatelessWidget {
               Text(
                 'Ajustes',
                 style: TextStyle(
-                  fontFamily: 'Inter',
+                  fontFamily: 'Geist',
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
                   color: AppColors.ctText,
@@ -212,7 +212,7 @@ class _ActionBar extends StatelessWidget {
               Text(
                 'Configuración general del tenant',
                 style: TextStyle(
-                  fontFamily: 'Inter',
+                  fontFamily: 'Geist',
                   fontSize: 11,
                   color: AppColors.ctText2,
                 ),
@@ -483,7 +483,7 @@ class _BillingCardState extends ConsumerState<_BillingCard> {
                     const Text(
                       '¿Requiere CFDI?',
                       style: TextStyle(
-                        fontFamily: 'Inter',
+                        fontFamily: 'Geist',
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                         color: AppColors.ctText,
@@ -493,7 +493,7 @@ class _BillingCardState extends ConsumerState<_BillingCard> {
                     Text(
                       _requiereCfdi ? 'Sí, requiere factura' : 'No requiere factura',
                       style: const TextStyle(
-                        fontFamily: 'Inter',
+                        fontFamily: 'Geist',
                         fontSize: 11,
                         color: AppColors.ctText2,
                       ),
@@ -597,7 +597,7 @@ class _UsersCard extends ConsumerWidget {
                 child: Text(
                   'Usuarios',
                   style: TextStyle(
-                    fontFamily: 'Inter',
+                    fontFamily: 'Geist',
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
                     color: AppColors.ctText,
@@ -639,7 +639,7 @@ class _UsersCard extends ConsumerWidget {
                   child: const Text(
                     'Reintentar',
                     style: TextStyle(
-                      fontFamily: 'Inter',
+                      fontFamily: 'Geist',
                       fontSize: 12,
                       color: AppColors.ctTeal,
                     ),
@@ -653,7 +653,7 @@ class _UsersCard extends ConsumerWidget {
                     child: Text(
                       'No hay usuarios registrados en este tenant.',
                       style: TextStyle(
-                        fontFamily: 'Inter',
+                        fontFamily: 'Geist',
                         fontSize: 13,
                         color: AppColors.ctText2,
                       ),
@@ -688,7 +688,7 @@ class _UsersTable extends StatelessWidget {
   final VoidCallback onRefresh;
 
   static const _h = TextStyle(
-    fontFamily: 'Inter',
+    fontFamily: 'Geist',
     fontSize: 10,
     fontWeight: FontWeight.w600,
     color: AppColors.ctText2,
@@ -834,7 +834,7 @@ class _UserRowState extends ConsumerState<_UserRow> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text('Enlace enviado a $email',
-              style: const TextStyle(fontFamily: 'Inter', fontSize: 13)),
+              style: const TextStyle(fontFamily: 'Geist', fontSize: 13)),
           backgroundColor: AppColors.ctNavy,
           behavior: SnackBarBehavior.floating,
           shape:
@@ -859,7 +859,7 @@ class _UserRowState extends ConsumerState<_UserRow> {
         title: const Text(
           'Enviar reset de contraseña',
           style: TextStyle(
-              fontFamily: 'Inter', fontSize: 15, fontWeight: FontWeight.w700),
+              fontFamily: 'Geist', fontSize: 15, fontWeight: FontWeight.w700),
         ),
         content: Text(
           '¿Enviar enlace de recuperación de contraseña a $email?',
@@ -945,7 +945,7 @@ class _UserRowState extends ConsumerState<_UserRow> {
                     Text(
                       _name,
                       style: const TextStyle(
-                        fontFamily: 'Inter',
+                        fontFamily: 'Geist',
                         fontSize: 13,
                         fontWeight: FontWeight.w500,
                         color: AppColors.ctText,
@@ -954,7 +954,7 @@ class _UserRowState extends ConsumerState<_UserRow> {
                   Text(
                     _email,
                     style: TextStyle(
-                      fontFamily: 'Inter',
+                      fontFamily: 'Geist',
                       fontSize: _name.isNotEmpty ? 11 : 13,
                       color: _name.isNotEmpty
                           ? AppColors.ctText2
@@ -972,7 +972,7 @@ class _UserRowState extends ConsumerState<_UserRow> {
               child: Text(
                 _phone.isNotEmpty ? _phone : '—',
                 style: const TextStyle(
-                  fontFamily: 'Inter',
+                  fontFamily: 'Geist',
                   fontSize: 12,
                   color: AppColors.ctText2,
                 ),
@@ -1022,51 +1022,51 @@ class _UserRowState extends ConsumerState<_UserRow> {
                             value: 'edit',
                             child: Text('Editar',
                                 style: TextStyle(
-                                    fontFamily: 'Inter', fontSize: 13)),
+                                    fontFamily: 'Geist', fontSize: 13)),
                           ));
                           items.add(const PopupMenuItem(
                             value: 'role',
                             child: Text('Cambiar rol',
                                 style: TextStyle(
-                                    fontFamily: 'Inter', fontSize: 13)),
+                                    fontFamily: 'Geist', fontSize: 13)),
                           ));
                           items.add(const PopupMenuItem(
                             value: 'password_reset',
                             child: Text('Enviar reset de contraseña',
                                 style: TextStyle(
-                                    fontFamily: 'Inter', fontSize: 13)),
+                                    fontFamily: 'Geist', fontSize: 13)),
                           ));
                           items.add(const PopupMenuItem(
                             value: 'suspend',
                             child: Text('Suspender',
                                 style: TextStyle(
-                                    fontFamily: 'Inter', fontSize: 13)),
+                                    fontFamily: 'Geist', fontSize: 13)),
                           ));
                         } else if (_status == 'suspended') {
                           items.add(const PopupMenuItem(
                             value: 'edit',
                             child: Text('Editar',
                                 style: TextStyle(
-                                    fontFamily: 'Inter', fontSize: 13)),
+                                    fontFamily: 'Geist', fontSize: 13)),
                           ));
                           items.add(const PopupMenuItem(
                             value: 'role',
                             child: Text('Cambiar rol',
                                 style: TextStyle(
-                                    fontFamily: 'Inter', fontSize: 13)),
+                                    fontFamily: 'Geist', fontSize: 13)),
                           ));
                           items.add(const PopupMenuItem(
                             value: 'reactivate',
                             child: Text('Reactivar',
                                 style: TextStyle(
-                                    fontFamily: 'Inter', fontSize: 13)),
+                                    fontFamily: 'Geist', fontSize: 13)),
                           ));
                         } else if (_status == 'invited') {
                           items.add(const PopupMenuItem(
                             value: 'resend',
                             child: Text('Reenviar invitación',
                                 style: TextStyle(
-                                    fontFamily: 'Inter', fontSize: 13)),
+                                    fontFamily: 'Geist', fontSize: 13)),
                           ));
                         }
                         return items;
@@ -1114,7 +1114,7 @@ class _RoleBadge extends StatelessWidget {
       child: Text(
         role,
         style: const TextStyle(
-          fontFamily: 'Inter',
+          fontFamily: 'Geist',
           fontSize: 11,
           fontWeight: FontWeight.w500,
           color: AppColors.ctText2,
@@ -1157,7 +1157,7 @@ class _StatusBadge extends StatelessWidget {
       child: Text(
         label,
         style: TextStyle(
-          fontFamily: 'Inter',
+          fontFamily: 'Geist',
           fontSize: 11,
           fontWeight: FontWeight.w600,
           color: textColor,
@@ -1254,7 +1254,7 @@ class _EditUserDialogState extends State<_EditUserDialog> {
               const Text(
                 'Editar usuario',
                 style: TextStyle(
-                  fontFamily: 'Inter',
+                  fontFamily: 'Geist',
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
                   color: AppColors.ctText,
@@ -1394,7 +1394,7 @@ class _ChangeRoleDialogState extends ConsumerState<_ChangeRoleDialog> {
               const Text(
                 'Cambiar rol',
                 style: TextStyle(
-                  fontFamily: 'Inter',
+                  fontFamily: 'Geist',
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
                   color: AppColors.ctText,
@@ -1426,7 +1426,7 @@ class _ChangeRoleDialogState extends ConsumerState<_ChangeRoleDialog> {
                       isExpanded: true,
                       isDense: true,
                       style: const TextStyle(
-                        fontFamily: 'Inter',
+                        fontFamily: 'Geist',
                         fontSize: 13,
                         color: AppColors.ctText,
                       ),
@@ -1596,7 +1596,7 @@ class _InviteUserDialogState extends ConsumerState<_InviteUserDialog> {
               const Text(
                 'Invitar usuario',
                 style: TextStyle(
-                  fontFamily: 'Inter',
+                  fontFamily: 'Geist',
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
                   color: AppColors.ctText,
@@ -1625,7 +1625,7 @@ class _InviteUserDialogState extends ConsumerState<_InviteUserDialog> {
               const Text(
                 'Rol',
                 style: TextStyle(
-                  fontFamily: 'Inter',
+                  fontFamily: 'Geist',
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
                   color: AppColors.ctText,
@@ -1663,7 +1663,7 @@ class _InviteUserDialogState extends ConsumerState<_InviteUserDialog> {
                           isExpanded: true,
                           isDense: true,
                           style: const TextStyle(
-                            fontFamily: 'Inter',
+                            fontFamily: 'Geist',
                             fontSize: 13,
                             color: AppColors.ctText,
                           ),
@@ -1784,7 +1784,7 @@ class _CommunicationSectionState
           const Text(
             'Configuración de mensajes',
             style: TextStyle(
-              fontFamily: 'Inter',
+              fontFamily: 'Geist',
               fontSize: 14,
               fontWeight: FontWeight.w700,
               color: AppColors.ctText,
@@ -1809,7 +1809,7 @@ class _CommunicationSectionState
                       const Text(
                         'Mostrar nombre del usuario en mensajes salientes',
                         style: TextStyle(
-                          fontFamily: 'Inter',
+                          fontFamily: 'Geist',
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
                           color: AppColors.ctText,
@@ -1821,7 +1821,7 @@ class _CommunicationSectionState
                             ? 'El nombre del supervisor aparecerá antes del mensaje'
                             : 'Los mensajes se envían sin identificar al supervisor',
                         style: const TextStyle(
-                          fontFamily: 'Inter',
+                          fontFamily: 'Geist',
                           fontSize: 11,
                           color: AppColors.ctText2,
                         ),
@@ -1851,7 +1851,7 @@ class _CommunicationSectionState
                   const Text(
                     'Vista previa',
                     style: TextStyle(
-                      fontFamily: 'Inter',
+                      fontFamily: 'Geist',
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
                       color: AppColors.ctText2,
@@ -1879,7 +1879,7 @@ class _CommunicationSectionState
                             ? 'Pedro: Buenos días, ¿cómo van con la ruta?'
                             : 'Buenos días, ¿cómo van con la ruta?',
                         style: const TextStyle(
-                          fontFamily: 'Inter',
+                          fontFamily: 'Geist',
                           fontSize: 13,
                           color: Color(0xFF111827),
                         ),
@@ -1890,7 +1890,7 @@ class _CommunicationSectionState
                   const Text(
                     'Así verán tus operadores los mensajes enviados desde la plataforma',
                     style: TextStyle(
-                      fontFamily: 'Inter',
+                      fontFamily: 'Geist',
                       fontSize: 11,
                       color: AppColors.ctText2,
                     ),
@@ -1941,7 +1941,7 @@ class _SectionCard extends StatelessWidget {
           Text(
             title,
             style: const TextStyle(
-              fontFamily: 'Inter',
+              fontFamily: 'Geist',
               fontSize: 14,
               fontWeight: FontWeight.w700,
               color: AppColors.ctText,
@@ -2017,7 +2017,7 @@ class _Field extends StatelessWidget {
         Text(
           label,
           style: const TextStyle(
-            fontFamily: 'Inter',
+            fontFamily: 'Geist',
             fontSize: 12,
             fontWeight: FontWeight.w600,
             color: AppColors.ctText,
@@ -2026,10 +2026,10 @@ class _Field extends StatelessWidget {
         const SizedBox(height: 6),
         TextField(
           controller: ctrl,
-          style: const TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppColors.ctText),
+          style: const TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText),
           decoration: InputDecoration(
             hintText: placeholder,
-            hintStyle: const TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppColors.ctText3),
+            hintStyle: const TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText3),
             filled: true,
             fillColor: AppColors.ctSurface2,
             contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -2080,7 +2080,7 @@ class _FeedbackBanner extends StatelessWidget {
           Expanded(
             child: Text(
               message,
-              style: TextStyle(fontFamily: 'Inter', fontSize: 13, color: textColor),
+              style: TextStyle(fontFamily: 'Geist', fontSize: 13, color: textColor),
             ),
           ),
         ],
@@ -2130,7 +2130,7 @@ class _PrimaryButtonState extends State<_PrimaryButton> {
               : Text(
                   widget.label,
                   style: const TextStyle(
-                    fontFamily: 'Inter', fontSize: 13,
+                    fontFamily: 'Geist', fontSize: 13,
                     fontWeight: FontWeight.w600, color: AppColors.ctNavy,
                   ),
                 ),
@@ -2171,7 +2171,7 @@ class _OutlineButtonState extends State<_OutlineButton> {
           child: Text(
             widget.label,
             style: const TextStyle(
-              fontFamily: 'Inter', fontSize: 13,
+              fontFamily: 'Geist', fontSize: 13,
               fontWeight: FontWeight.w500, color: AppColors.ctText2,
             ),
           ),
@@ -2211,7 +2211,7 @@ class _SmallButtonState extends State<_SmallButton> {
           child: Text(
             widget.label,
             style: const TextStyle(
-              fontFamily: 'Inter', fontSize: 12,
+              fontFamily: 'Geist', fontSize: 12,
               fontWeight: FontWeight.w600, color: AppColors.ctNavy,
             ),
           ),
@@ -2224,7 +2224,7 @@ class _SmallButtonState extends State<_SmallButton> {
 // ── Helper global ─────────────────────────────────────────────────────────────
 
 SnackBar _errorSnack(String msg) => SnackBar(
-      content: Text(msg, style: const TextStyle(fontFamily: 'Inter', fontSize: 13)),
+      content: Text(msg, style: const TextStyle(fontFamily: 'Geist', fontSize: 13)),
       backgroundColor: AppColors.ctNavy,
       behavior: SnackBarBehavior.floating,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),

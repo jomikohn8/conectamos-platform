@@ -150,7 +150,7 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen>
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(msg,
-            style: const TextStyle(fontFamily: 'Inter', fontSize: 13)),
+            style: const TextStyle(fontFamily: 'Geist', fontSize: 13)),
         backgroundColor: AppColors.ctDanger,
         duration: const Duration(seconds: 3),
       ),
@@ -161,7 +161,7 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen>
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(msg,
-            style: const TextStyle(fontFamily: 'Inter', fontSize: 13)),
+            style: const TextStyle(fontFamily: 'Geist', fontSize: 13)),
         backgroundColor: AppColors.ctOk,
         duration: const Duration(seconds: 2),
       ),
@@ -183,7 +183,7 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen>
         body: Center(
           child: Text('Error: $_error',
               style: const TextStyle(
-                  fontFamily: 'Inter', fontSize: 13, color: AppColors.ctDanger)),
+                  fontFamily: 'Geist', fontSize: 13, color: AppColors.ctDanger)),
         ),
       );
     }
@@ -220,7 +220,7 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen>
                       Text(
                         ch['display_name'] as String? ?? widget.channelId,
                         style: const TextStyle(
-                          fontFamily: 'Inter',
+                          fontFamily: 'Geist',
                           fontSize: 16,
                           fontWeight: FontWeight.w700,
                           color: AppColors.ctText,
@@ -262,12 +262,12 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen>
                   isScrollable: true,
                   tabAlignment: TabAlignment.start,
                   labelStyle: const TextStyle(
-                    fontFamily: 'Inter',
+                    fontFamily: 'Geist',
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                   ),
                   unselectedLabelStyle: const TextStyle(
-                    fontFamily: 'Inter',
+                    fontFamily: 'Geist',
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
                   ),
@@ -339,7 +339,7 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen>
       title: Text(
         name,
         style: const TextStyle(
-          fontFamily: 'Inter',
+          fontFamily: 'Geist',
           fontSize: 15,
           fontWeight: FontWeight.w600,
           color: AppColors.ctText,
@@ -478,7 +478,7 @@ class _InfoTabState extends State<_InfoTab> {
                     child: Text(
                       'Sin operadores asignados.',
                       style: TextStyle(
-                          fontFamily: 'Inter',
+                          fontFamily: 'Geist',
                           fontSize: 13,
                           color: AppColors.ctText2),
                     ),
@@ -619,7 +619,7 @@ class _CredentialsTabState extends State<_CredentialsTab> {
                   child: const Text(
                     'Requiere certificación Tech Provider',
                     style: TextStyle(
-                      fontFamily: 'Inter',
+                      fontFamily: 'Geist',
                       fontSize: 10,
                       fontWeight: FontWeight.w600,
                       color: AppColors.ctTealDark,
@@ -655,7 +655,7 @@ class _CredentialsTabState extends State<_CredentialsTab> {
                             child: const Text(
                               'f',
                               style: TextStyle(
-                                fontFamily: 'Inter',
+                                fontFamily: 'Geist',
                                 fontSize: 20,
                                 fontWeight: FontWeight.w900,
                                 color: Colors.white,
@@ -666,7 +666,7 @@ class _CredentialsTabState extends State<_CredentialsTab> {
                           const Text(
                             'Conectar con WhatsApp Business',
                             style: TextStyle(
-                              fontFamily: 'Inter',
+                              fontFamily: 'Geist',
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
                               color: Colors.white,
@@ -727,7 +727,7 @@ class _CredentialsTabState extends State<_CredentialsTab> {
                             children: [
                               SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.ctNavy)),
                               SizedBox(width: 8),
-                              Text('Verificando...', style: TextStyle(fontFamily: 'Inter', fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.ctNavy)),
+                              Text('Verificando...', style: TextStyle(fontFamily: 'Geist', fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.ctNavy)),
                             ],
                           ),
                         )
@@ -742,7 +742,7 @@ class _CredentialsTabState extends State<_CredentialsTab> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(color: AppColors.ctRedBg, borderRadius: BorderRadius.circular(8)),
-                    child: Text(_verifyError!, style: const TextStyle(fontFamily: 'Inter', fontSize: 12, color: AppColors.ctRedText)),
+                    child: Text(_verifyError!, style: const TextStyle(fontFamily: 'Geist', fontSize: 12, color: AppColors.ctRedText)),
                   ),
                 ],
               ],
@@ -841,7 +841,7 @@ class _TemplatesTabState extends State<_TemplatesTab> {
               Text(
                 '${_templates.length} plantillas',
                 style: const TextStyle(
-                  fontFamily: 'Inter',
+                  fontFamily: 'Geist',
                   fontSize: 13,
                   color: AppColors.ctText2,
                 ),
@@ -869,7 +869,7 @@ class _TemplatesTabState extends State<_TemplatesTab> {
                       child: Text(
                         'Sin plantillas. Sincroniza para obtenerlas.',
                         style: TextStyle(
-                          fontFamily: 'Inter',
+                          fontFamily: 'Geist',
                           fontSize: 13,
                           color: AppColors.ctText2,
                         ),
@@ -899,7 +899,7 @@ class _TemplatesTabState extends State<_TemplatesTab> {
                                     Text(
                                       t['name'] as String? ?? '—',
                                       style: const TextStyle(
-                                        fontFamily: 'Inter',
+                                        fontFamily: 'Geist',
                                         fontSize: 13,
                                         fontWeight: FontWeight.w600,
                                         color: AppColors.ctText,
@@ -913,7 +913,7 @@ class _TemplatesTabState extends State<_TemplatesTab> {
                                           maxLines: 2,
                                           overflow: TextOverflow.ellipsis,
                                           style: const TextStyle(
-                                            fontFamily: 'Inter',
+                                            fontFamily: 'Geist',
                                             fontSize: 12,
                                             color: AppColors.ctText2,
                                           ),
@@ -936,7 +936,7 @@ class _TemplatesTabState extends State<_TemplatesTab> {
                                     child: Text(
                                       style.label,
                                       style: TextStyle(
-                                        fontFamily: 'Inter',
+                                        fontFamily: 'Geist',
                                         fontSize: 11,
                                         fontWeight: FontWeight.w600,
                                         color: style.fg,
@@ -949,7 +949,7 @@ class _TemplatesTabState extends State<_TemplatesTab> {
                                       child: Text(
                                         t['language'] as String,
                                         style: const TextStyle(
-                                          fontFamily: 'Inter',
+                                          fontFamily: 'Geist',
                                           fontSize: 11,
                                           color: AppColors.ctText3,
                                         ),
@@ -1055,7 +1055,7 @@ class _WelcomeTabState extends State<_WelcomeTab> {
             const Text(
               'Se envía automáticamente cuando un usuario escribe por primera vez.',
               style: TextStyle(
-                fontFamily: 'Inter',
+                fontFamily: 'Geist',
                 fontSize: 12,
                 color: AppColors.ctText2,
               ),
@@ -1076,7 +1076,7 @@ class _WelcomeTabState extends State<_WelcomeTab> {
                     Expanded(
                       child: Text(
                         'No hay plantilla de bienvenida configurada.',
-                        style: TextStyle(fontFamily: 'Inter', fontSize: 12, color: Color(0xFF92400E)),
+                        style: TextStyle(fontFamily: 'Geist', fontSize: 12, color: Color(0xFF92400E)),
                       ),
                     ),
                   ],
@@ -1090,7 +1090,7 @@ class _WelcomeTabState extends State<_WelcomeTab> {
               const Text(
                 'No hay plantillas aprobadas. Sincroniza en la pestaña Plantillas.',
                 style: TextStyle(
-                  fontFamily: 'Inter',
+                  fontFamily: 'Geist',
                   fontSize: 13,
                   color: AppColors.ctText2,
                 ),
@@ -1110,7 +1110,7 @@ class _WelcomeTabState extends State<_WelcomeTab> {
                     hint: const Text(
                       'Selecciona una plantilla',
                       style: TextStyle(
-                        fontFamily: 'Inter',
+                        fontFamily: 'Geist',
                         fontSize: 13,
                         color: AppColors.ctText2,
                       ),
@@ -1122,7 +1122,7 @@ class _WelcomeTabState extends State<_WelcomeTab> {
                           child: Text(
                             t['name'] as String? ?? t['id'].toString(),
                             style: const TextStyle(
-                              fontFamily: 'Inter',
+                              fontFamily: 'Geist',
                               fontSize: 13,
                               color: AppColors.ctText,
                             ),
@@ -1150,7 +1150,7 @@ class _WelcomeTabState extends State<_WelcomeTab> {
                 child: Text(
                   _preview!['body_text'] as String? ?? '(sin texto de cuerpo)',
                   style: const TextStyle(
-                    fontFamily: 'Inter',
+                    fontFamily: 'Geist',
                     fontSize: 13,
                     color: AppColors.ctText,
                   ),
@@ -1203,7 +1203,7 @@ class _SectionCard extends StatelessWidget {
                 Text(
                   title,
                   style: const TextStyle(
-                    fontFamily: 'Inter',
+                    fontFamily: 'Geist',
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
                     color: AppColors.ctText,
@@ -1232,7 +1232,7 @@ class _FieldLabel extends StatelessWidget {
     return Text(
       label,
       style: const TextStyle(
-        fontFamily: 'Inter',
+        fontFamily: 'Geist',
         fontSize: 12,
         fontWeight: FontWeight.w600,
         color: AppColors.ctText2,
@@ -1259,11 +1259,11 @@ class _StyledTextField extends StatelessWidget {
       controller: controller,
       obscureText: obscure,
       style: const TextStyle(
-          fontFamily: 'Inter', fontSize: 13, color: AppColors.ctText),
+          fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText),
       decoration: InputDecoration(
         hintText: hint,
         hintStyle: const TextStyle(
-            fontFamily: 'Inter', fontSize: 13, color: AppColors.ctText3),
+            fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText3),
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         filled: true,
@@ -1346,7 +1346,7 @@ class _WorkerDropdown extends StatelessWidget {
           hint: const Text(
             'Sin worker asignado',
             style: TextStyle(
-                fontFamily: 'Inter', fontSize: 13, color: AppColors.ctText2),
+                fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText2),
           ),
           items: [
             for (final w in workers)
@@ -1355,7 +1355,7 @@ class _WorkerDropdown extends StatelessWidget {
                 child: Text(
                   w['display_name'] as String? ?? w['id'].toString(),
                   style: const TextStyle(
-                      fontFamily: 'Inter',
+                      fontFamily: 'Geist',
                       fontSize: 13,
                       color: AppColors.ctText),
                 ),
@@ -1388,7 +1388,7 @@ class _OperatorRow extends StatelessWidget {
             child: Text(
               name.isNotEmpty ? name[0].toUpperCase() : '?',
               style: const TextStyle(
-                fontFamily: 'Inter',
+                fontFamily: 'Geist',
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
                 color: AppColors.ctTealDark,
@@ -1400,7 +1400,7 @@ class _OperatorRow extends StatelessWidget {
             child: Text(
               name,
               style: const TextStyle(
-                fontFamily: 'Inter',
+                fontFamily: 'Geist',
                 fontSize: 13,
                 color: AppColors.ctText,
               ),
@@ -1430,7 +1430,7 @@ class _TypeChip extends StatelessWidget {
       child: Text(
         cfg.label,
         style: TextStyle(
-          fontFamily: 'Inter',
+          fontFamily: 'Geist',
           fontSize: 11,
           fontWeight: FontWeight.w600,
           color: cfg.fg,
@@ -1455,7 +1455,7 @@ class _StatusChip extends StatelessWidget {
       child: Text(
         isActive ? 'Activo' : 'Inactivo',
         style: TextStyle(
-          fontFamily: 'Inter',
+          fontFamily: 'Geist',
           fontSize: 11,
           fontWeight: FontWeight.w600,
           color: isActive ? AppColors.ctOkText : AppColors.ctText2,
@@ -1511,7 +1511,7 @@ class _PrimaryButtonState extends State<_PrimaryButton> {
               : Text(
                   widget.label,
                   style: TextStyle(
-                    fontFamily: 'Inter',
+                    fontFamily: 'Geist',
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                     color:
@@ -1565,7 +1565,7 @@ class _OutlineButtonState extends State<_OutlineButton> {
           child: Text(
             widget.label,
             style: TextStyle(
-              fontFamily: 'Inter',
+              fontFamily: 'Geist',
               fontSize: 13,
               fontWeight: FontWeight.w600,
               color: textColor,

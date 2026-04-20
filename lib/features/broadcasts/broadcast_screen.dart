@@ -493,7 +493,7 @@ class _BroadcastHeader extends StatelessWidget {
                 Text(
                   'Nuevo broadcast',
                   style: TextStyle(
-                    fontFamily: 'Inter',
+                    fontFamily: 'Geist',
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
                     color: AppColors.ctText,
@@ -503,7 +503,7 @@ class _BroadcastHeader extends StatelessWidget {
                 Text(
                   'Envía un mensaje masivo a tus operadores',
                   style: TextStyle(
-                    fontFamily: 'Inter',
+                    fontFamily: 'Geist',
                     fontSize: 11,
                     color: AppColors.ctText2,
                   ),
@@ -651,7 +651,7 @@ class _FormColumn extends StatelessWidget {
                   const Text(
                     'No hay plantillas APPROVED disponibles.',
                     style: TextStyle(
-                      fontFamily: 'Inter',
+                      fontFamily: 'Geist',
                       fontSize: 12,
                       color: AppColors.ctText2,
                     ),
@@ -746,7 +746,7 @@ class _FormColumn extends StatelessWidget {
                     Text(
                       '$filteredCount operador${filteredCount != 1 ? 'es' : ''} seleccionado${filteredCount != 1 ? 's' : ''}',
                       style: TextStyle(
-                        fontFamily: 'Inter',
+                        fontFamily: 'Geist',
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                         color: filteredCount > 0
@@ -834,7 +834,7 @@ class _PreviewColumn extends StatelessWidget {
                 const Text(
                   'El mensaje aparecerá aquí...',
                   style: TextStyle(
-                    fontFamily: 'Inter',
+                    fontFamily: 'Geist',
                     fontSize: 12,
                     color: AppColors.ctText3,
                     fontStyle: FontStyle.italic,
@@ -859,7 +859,7 @@ class _PreviewColumn extends StatelessWidget {
                     child: Text(
                       previewText,
                       style: const TextStyle(
-                        fontFamily: 'Inter',
+                        fontFamily: 'Geist',
                         fontSize: 13,
                         color: Color(0xFF111827),
                       ),
@@ -885,7 +885,7 @@ class _PreviewColumn extends StatelessWidget {
                   Text(
                     '${filtered.length}',
                     style: const TextStyle(
-                      fontFamily: 'Inter',
+                      fontFamily: 'Geist',
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
                       color: AppColors.ctTeal,
@@ -898,7 +898,7 @@ class _PreviewColumn extends StatelessWidget {
                 const Text(
                   'Ningún operador coincide con los filtros.',
                   style: TextStyle(
-                    fontFamily: 'Inter',
+                    fontFamily: 'Geist',
                     fontSize: 12,
                     color: AppColors.ctText2,
                   ),
@@ -925,7 +925,7 @@ class _PreviewColumn extends StatelessWidget {
                                 ? name[0].toUpperCase()
                                 : '?',
                             style: const TextStyle(
-                              fontFamily: 'Inter',
+                              fontFamily: 'Geist',
                               fontSize: 13,
                               fontWeight: FontWeight.w700,
                               color: AppColors.ctText2,
@@ -940,7 +940,7 @@ class _PreviewColumn extends StatelessWidget {
                               Text(
                                 name,
                                 style: const TextStyle(
-                                  fontFamily: 'Inter',
+                                  fontFamily: 'Geist',
                                   fontSize: 13,
                                   fontWeight: FontWeight.w500,
                                   color: AppColors.ctText,
@@ -950,7 +950,7 @@ class _PreviewColumn extends StatelessWidget {
                                 Text(
                                   phone,
                                   style: const TextStyle(
-                                    fontFamily: 'Inter',
+                                    fontFamily: 'Geist',
                                     fontSize: 11,
                                     color: AppColors.ctText2,
                                   ),
@@ -966,7 +966,7 @@ class _PreviewColumn extends StatelessWidget {
                   Text(
                     'y $remaining más...',
                     style: const TextStyle(
-                      fontFamily: 'Inter',
+                      fontFamily: 'Geist',
                       fontSize: 12,
                       color: AppColors.ctText2,
                       fontStyle: FontStyle.italic,
@@ -1019,7 +1019,7 @@ class _HistorySection extends ConsumerWidget {
                     child: Text(
                       'Broadcasts anteriores',
                       style: TextStyle(
-                        fontFamily: 'Inter',
+                        fontFamily: 'Geist',
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
                         color: AppColors.ctText,
@@ -1052,7 +1052,7 @@ class _HistorySection extends ConsumerWidget {
                 error: (e, _) => Text(
                   'Error al cargar historial: $e',
                   style: const TextStyle(
-                    fontFamily: 'Inter',
+                    fontFamily: 'Geist',
                     fontSize: 12,
                     color: AppColors.ctText2,
                   ),
@@ -1061,7 +1061,7 @@ class _HistorySection extends ConsumerWidget {
                     ? const Text(
                         'No hay broadcasts enviados aún.',
                         style: TextStyle(
-                          fontFamily: 'Inter',
+                          fontFamily: 'Geist',
                           fontSize: 13,
                           color: AppColors.ctText2,
                         ),
@@ -1126,7 +1126,7 @@ class _HistoryItem extends StatelessWidget {
                     Text(
                       preview,
                       style: const TextStyle(
-                        fontFamily: 'Inter',
+                        fontFamily: 'Geist',
                         fontSize: 13,
                         color: AppColors.ctText,
                       ),
@@ -1135,7 +1135,7 @@ class _HistoryItem extends StatelessWidget {
                   Text(
                     dateStr,
                     style: const TextStyle(
-                      fontFamily: 'Inter',
+                      fontFamily: 'Geist',
                       fontSize: 11,
                       color: AppColors.ctText2,
                     ),
@@ -1152,7 +1152,7 @@ class _HistoryItem extends StatelessWidget {
                 Text(
                   '$sent enviados · $failed fallaron',
                   style: const TextStyle(
-                    fontFamily: 'Inter',
+                    fontFamily: 'Geist',
                     fontSize: 11,
                     color: AppColors.ctText2,
                   ),
@@ -1207,7 +1207,7 @@ class _BroadcastDetailDialog extends StatelessWidget {
                     child: Text(
                       'Detalle del broadcast',
                       style: TextStyle(
-                        fontFamily: 'Inter',
+                        fontFamily: 'Geist',
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
                         color: AppColors.ctText,
@@ -1235,7 +1235,7 @@ class _BroadcastDetailDialog extends StatelessWidget {
                       const Text(
                         'Mensaje',
                         style: TextStyle(
-                          fontFamily: 'Inter',
+                          fontFamily: 'Geist',
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
                           color: AppColors.ctText2,
@@ -1252,7 +1252,7 @@ class _BroadcastDetailDialog extends StatelessWidget {
                         child: Text(
                           msgText,
                           style: const TextStyle(
-                            fontFamily: 'Inter',
+                            fontFamily: 'Geist',
                             fontSize: 13,
                             color: AppColors.ctText,
                           ),
@@ -1264,7 +1264,7 @@ class _BroadcastDetailDialog extends StatelessWidget {
                       const Text(
                         'Destinatarios',
                         style: TextStyle(
-                          fontFamily: 'Inter',
+                          fontFamily: 'Geist',
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
                           color: AppColors.ctText2,
@@ -1283,7 +1283,7 @@ class _BroadcastDetailDialog extends StatelessWidget {
                                 child: Text(
                                   name,
                                   style: const TextStyle(
-                                    fontFamily: 'Inter',
+                                    fontFamily: 'Geist',
                                     fontSize: 13,
                                     color: AppColors.ctText,
                                   ),
@@ -1336,7 +1336,7 @@ class _SectionTitle extends StatelessWidget {
     return Text(
       label,
       style: const TextStyle(
-        fontFamily: 'Inter',
+        fontFamily: 'Geist',
         fontSize: 14,
         fontWeight: FontWeight.w700,
         color: AppColors.ctText,
@@ -1354,7 +1354,7 @@ class _Label extends StatelessWidget {
     return Text(
       text,
       style: const TextStyle(
-        fontFamily: 'Inter',
+        fontFamily: 'Geist',
         fontSize: 12,
         fontWeight: FontWeight.w600,
         color: AppColors.ctText,
@@ -1420,7 +1420,7 @@ class _ToggleItem extends StatelessWidget {
         child: Text(
           label,
           style: TextStyle(
-            fontFamily: 'Inter',
+            fontFamily: 'Geist',
             fontSize: 12,
             fontWeight: FontWeight.w600,
             color: active ? AppColors.ctNavy : AppColors.ctText2,
@@ -1442,11 +1442,11 @@ class _BuildTextField extends StatelessWidget {
       maxLines: 5,
       minLines: 3,
       style: const TextStyle(
-          fontFamily: 'Inter', fontSize: 13, color: AppColors.ctText),
+          fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText),
       decoration: InputDecoration(
         hintText: 'Escribe el mensaje que recibirán todos los operadores...',
         hintStyle: const TextStyle(
-            fontFamily: 'Inter', fontSize: 13, color: AppColors.ctText3),
+            fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText3),
         filled: true,
         fillColor: AppColors.ctSurface2,
         contentPadding:
@@ -1501,10 +1501,10 @@ class _TemplateDropdown extends StatelessWidget {
           hint: const Text(
             'Selecciona una plantilla',
             style: TextStyle(
-                fontFamily: 'Inter', fontSize: 13, color: AppColors.ctText3),
+                fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText3),
           ),
           style: const TextStyle(
-              fontFamily: 'Inter', fontSize: 13, color: AppColors.ctText),
+              fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText),
           icon: const Icon(
             Icons.keyboard_arrow_down_rounded,
             size: 16,
@@ -1552,7 +1552,7 @@ class _FilterChip extends StatelessWidget {
         child: Text(
           label,
           style: TextStyle(
-            fontFamily: 'Inter',
+            fontFamily: 'Geist',
             fontSize: 12,
             fontWeight: FontWeight.w600,
             color: selected ? AppColors.ctTeal : AppColors.ctText2,
@@ -1617,7 +1617,7 @@ class _SendButtonState extends State<_SendButton> {
                       ? 'Enviar broadcast a ${widget.count} operadores'
                       : 'Enviar broadcast',
                   style: const TextStyle(
-                    fontFamily: 'Inter',
+                    fontFamily: 'Geist',
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                     color: AppColors.ctNavy,
@@ -1662,7 +1662,7 @@ class _ConfirmBox extends StatelessWidget {
                 child: Text(
                   '¿Enviar a $count operador${count != 1 ? 'es' : ''}?',
                   style: const TextStyle(
-                    fontFamily: 'Inter',
+                    fontFamily: 'Geist',
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                     color: Color(0xFF92400E),
@@ -1712,7 +1712,7 @@ class _WarningBanner extends StatelessWidget {
             child: Text(
               message,
               style: const TextStyle(
-                fontFamily: 'Inter',
+                fontFamily: 'Geist',
                 fontSize: 11,
                 color: Color(0xFF92400E),
               ),
@@ -1766,7 +1766,7 @@ class _ResultBanner extends StatelessWidget {
         Expanded(
           child: Text(
             message,
-            style: TextStyle(fontFamily: 'Inter', fontSize: 13, color: textColor),
+            style: TextStyle(fontFamily: 'Geist', fontSize: 13, color: textColor),
           ),
         ),
       ],
@@ -1804,7 +1804,7 @@ class _ResultBanner extends StatelessWidget {
           initiallyExpanded: false,
           subtitle: Text(
             'Ver detalle de errores (${errors.length})',
-            style: TextStyle(fontFamily: 'Inter', fontSize: 11, color: textColor.withValues(alpha: 0.8)),
+            style: TextStyle(fontFamily: 'Geist', fontSize: 11, color: textColor.withValues(alpha: 0.8)),
           ),
           children: errors.map((e) {
             final phone   = e['phone']?.toString() ?? e['to']?.toString() ?? '—';
@@ -1819,7 +1819,7 @@ class _ResultBanner extends StatelessWidget {
                   Expanded(
                     child: Text(
                       '$phone — $errMsg',
-                      style: TextStyle(fontFamily: 'Inter', fontSize: 11, color: textColor),
+                      style: TextStyle(fontFamily: 'Geist', fontSize: 11, color: textColor),
                     ),
                   ),
                 ],
@@ -1870,7 +1870,7 @@ class _StatusBadge extends StatelessWidget {
       child: Text(
         label,
         style: TextStyle(
-          fontFamily: 'Inter',
+          fontFamily: 'Geist',
           fontSize: 11,
           fontWeight: FontWeight.w600,
           color: textColor,
@@ -1929,7 +1929,7 @@ class _PrimaryButtonState extends State<_PrimaryButton> {
               : Text(
                   widget.label,
                   style: const TextStyle(
-                    fontFamily: 'Inter',
+                    fontFamily: 'Geist',
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                     color: AppColors.ctNavy,
@@ -1973,7 +1973,7 @@ class _OutlineButtonState extends State<_OutlineButton> {
           child: Text(
             widget.label,
             style: const TextStyle(
-              fontFamily: 'Inter',
+              fontFamily: 'Geist',
               fontSize: 13,
               fontWeight: FontWeight.w500,
               color: AppColors.ctText2,

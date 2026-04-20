@@ -77,7 +77,7 @@ class _ActionBar extends StatelessWidget {
                 Text(
                   'Conversaciones',
                   style: TextStyle(
-                    fontFamily: 'Inter',
+                    fontFamily: 'Geist',
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
                     color: AppColors.ctText,
@@ -87,7 +87,7 @@ class _ActionBar extends StatelessWidget {
                 Text(
                   'Canal WhatsApp · Mensajes en tiempo real',
                   style: TextStyle(
-                    fontFamily: 'Inter',
+                    fontFamily: 'Geist',
                     fontSize: 11,
                     color: AppColors.ctText2,
                   ),
@@ -144,7 +144,7 @@ class _ActionBarGhostButtonState extends State<_ActionBarGhostButton> {
           child: Text(
             widget.label,
             style: const TextStyle(
-              fontFamily: 'Inter',
+              fontFamily: 'Geist',
               fontSize: 12,
               fontWeight: FontWeight.w500,
               color: AppColors.ctText,
@@ -186,7 +186,7 @@ class _PrimaryButtonState extends State<_PrimaryButton> {
           child: Text(
             widget.label,
             style: const TextStyle(
-              fontFamily: 'Inter',
+              fontFamily: 'Geist',
               fontSize: 12,
               fontWeight: FontWeight.w600,
               color: AppColors.ctNavy,
@@ -305,7 +305,7 @@ class _TabPill extends StatelessWidget {
           child: Text(
             label,
             style: TextStyle(
-              fontFamily: 'Inter',
+              fontFamily: 'Geist',
               fontSize: 13,
               fontWeight:
                   selected ? FontWeight.w600 : FontWeight.w500,
@@ -440,7 +440,7 @@ class _OriginBadge extends StatelessWidget {
       child: Text(
         label,
         style: TextStyle(
-          fontFamily: 'Inter',
+          fontFamily: 'Geist',
           fontSize: 9,
           fontWeight: FontWeight.w600,
           color: fg,
@@ -574,14 +574,14 @@ class _ConvoListState extends ConsumerState<_ConvoList> {
       child: TextField(
         onChanged: (v) => setState(() => _search = v),
         style: const TextStyle(
-          fontFamily: 'Inter',
+          fontFamily: 'Geist',
           fontSize: 13,
           color: AppColors.ctText,
         ),
         decoration: InputDecoration(
           hintText: 'Buscar operador…',
           hintStyle: const TextStyle(
-            fontFamily: 'Inter',
+            fontFamily: 'Geist',
             fontSize: 13,
             color: AppColors.ctText3,
           ),
@@ -655,7 +655,7 @@ class _ConvoListState extends ConsumerState<_ConvoList> {
                 child: Text(
                   'No hay operadores registrados',
                   style: TextStyle(
-                    fontFamily: 'Inter',
+                    fontFamily: 'Geist',
                     fontSize: 12,
                     color: AppColors.ctText3,
                   ),
@@ -787,7 +787,7 @@ class _ApiConvoItemState extends State<_ApiConvoItem> {
                 child: Text(
                   _initials(widget.name),
                   style: const TextStyle(
-                    fontFamily: 'Inter',
+                    fontFamily: 'Geist',
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
                     color: AppColors.ctTealDark,
@@ -806,7 +806,7 @@ class _ApiConvoItemState extends State<_ApiConvoItem> {
                           child: Text(
                             widget.name,
                             style: TextStyle(
-                              fontFamily: 'Inter',
+                              fontFamily: 'Geist',
                               fontSize: 12,
                               fontWeight: widget.isSelected
                                   ? FontWeight.w600
@@ -819,7 +819,7 @@ class _ApiConvoItemState extends State<_ApiConvoItem> {
                         Text(
                           widget.time,
                           style: const TextStyle(
-                            fontFamily: 'Inter',
+                            fontFamily: 'Geist',
                             fontSize: 10,
                             color: AppColors.ctText3,
                           ),
@@ -850,7 +850,7 @@ class _ApiConvoItemState extends State<_ApiConvoItem> {
                           child: Text(
                             widget.preview,
                             style: const TextStyle(
-                              fontFamily: 'Inter',
+                              fontFamily: 'Geist',
                               fontSize: 11,
                               color: AppColors.ctText2,
                             ),
@@ -872,7 +872,7 @@ class _ApiConvoItemState extends State<_ApiConvoItem> {
                                   ? '99+'
                                   : '${widget.unreadCount}',
                               style: const TextStyle(
-                                fontFamily: 'Inter',
+                                fontFamily: 'Geist',
                                 fontSize: 10,
                                 fontWeight: FontWeight.w700,
                                 color: Color(0xFF0F2937),
@@ -1506,7 +1506,7 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
               SizedBox(height: 12),
               Text(
                 'Suelta para adjuntar',
-                style: TextStyle(fontFamily: 'Inter', fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.ctTeal),
+                style: TextStyle(fontFamily: 'Geist', fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.ctTeal),
               ),
             ],
           ),
@@ -1847,7 +1847,7 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
           Text(
             'Selecciona una conversación',
             style: TextStyle(
-              fontFamily: 'Inter',
+              fontFamily: 'Geist',
               fontSize: 14,
               color: AppColors.ctText3,
             ),
@@ -1967,7 +1967,7 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
                     const Text(
                       'No se pudieron cargar los mensajes',
                       style: TextStyle(
-                        fontFamily: 'Inter',
+                        fontFamily: 'Geist',
                         fontSize: 13,
                         color: AppColors.ctText3,
                       ),
@@ -1977,7 +1977,7 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
                       onPressed: () => _subscribeToMessages(chatId),
                       icon: const Icon(Icons.refresh_rounded, size: 16),
                       label: const Text('Reintentar',
-                          style: TextStyle(fontFamily: 'Inter', fontSize: 13)),
+                          style: TextStyle(fontFamily: 'Geist', fontSize: 13)),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppColors.ctTeal,
                         side: const BorderSide(color: AppColors.ctTeal),
@@ -2024,7 +2024,7 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
                               child: Text(
                                 'Mensajes nuevos',
                                 style: TextStyle(
-                                  fontFamily: 'Inter',
+                                  fontFamily: 'Geist',
                                   fontSize: 11,
                                   color: Color(0xFF2DD4BF),
                                   fontWeight: FontWeight.w600,
@@ -2067,7 +2067,7 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
                   child: Text(
                     'Ventana de 24hrs cerrada. Solo puedes enviar plantillas aprobadas.',
                     style: TextStyle(
-                      fontFamily: 'Inter',
+                      fontFamily: 'Geist',
                       fontSize: 11,
                       color: Color(0xFF92400E),
                     ),
@@ -2111,7 +2111,7 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
                   Text(
                     'Nuevo mensaje',
                     style: TextStyle(
-                      fontFamily: 'Inter',
+                      fontFamily: 'Geist',
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                       color: AppColors.ctTealDark,
@@ -2223,7 +2223,7 @@ class _ChannelTabBar extends StatelessWidget {
                     Text(
                       label,
                       style: TextStyle(
-                        fontFamily: 'Inter',
+                        fontFamily: 'Geist',
                         fontSize: 12,
                         fontWeight: isSelected
                             ? FontWeight.w600
@@ -2289,7 +2289,7 @@ class _InterveneButtonState extends State<_InterveneButton> {
               Text(
                 label,
                 style: TextStyle(
-                  fontFamily: 'Inter',
+                  fontFamily: 'Geist',
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
                   color: iconColor,
@@ -2345,7 +2345,7 @@ class _ApiChatHeader extends StatelessWidget {
             child: Text(
               _initials(name),
               style: const TextStyle(
-                fontFamily: 'Inter',
+                fontFamily: 'Geist',
                 fontSize: 11,
                 fontWeight: FontWeight.w700,
                 color: AppColors.ctTealDark,
@@ -2366,7 +2366,7 @@ class _ApiChatHeader extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                          fontFamily: 'Inter',
+                          fontFamily: 'Geist',
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
                           color: AppColors.ctText,
@@ -2387,7 +2387,7 @@ class _ApiChatHeader extends StatelessWidget {
                         child: Text(
                           windowOpen! ? 'Ventana abierta' : 'Ventana cerrada',
                           style: TextStyle(
-                            fontFamily: 'Inter',
+                            fontFamily: 'Geist',
                             fontSize: 10,
                             fontWeight: FontWeight.w500,
                             color: windowOpen!
@@ -2403,7 +2403,7 @@ class _ApiChatHeader extends StatelessWidget {
                       ? '$channelName${workerName != null ? ' · $workerName' : ''}'
                       : 'WhatsApp · Sin canal asignado',
                   style: const TextStyle(
-                    fontFamily: 'Inter',
+                    fontFamily: 'Geist',
                     fontSize: 11,
                     color: AppColors.ctText2,
                   ),
@@ -2536,7 +2536,7 @@ class _ApiMessageBubbleState extends State<_ApiMessageBubble> {
           Text(
             name,
             style: const TextStyle(
-              fontFamily: 'Inter',
+              fontFamily: 'Geist',
               fontSize: 10,
               fontWeight: FontWeight.w600,
               color: Color(0xFF2DD4BF),
@@ -2596,7 +2596,7 @@ class _ApiMessageBubbleState extends State<_ApiMessageBubble> {
   Widget _fallback(String label) => Text(
         label,
         style: const TextStyle(
-            fontFamily: 'Inter', fontSize: 13, color: Color(0xFF667781)),
+            fontFamily: 'Geist', fontSize: 13, color: Color(0xFF667781)),
       );
 
   Future<void> _openUrl(String url) async {
@@ -2643,7 +2643,7 @@ class _ApiMessageBubbleState extends State<_ApiMessageBubble> {
             child: Text(
               caption,
               style: const TextStyle(
-                fontFamily: 'Inter',
+                fontFamily: 'Geist',
                 fontSize: 13,
                 color: Color(0xFF111B21),
                 height: 1.4,
@@ -2726,7 +2726,7 @@ class _ApiMessageBubbleState extends State<_ApiMessageBubble> {
             child: Text(
               caption,
               style: const TextStyle(
-                fontFamily: 'Inter',
+                fontFamily: 'Geist',
                 fontSize: 13,
                 color: Color(0xFF111B21),
                 height: 1.4,
@@ -2755,7 +2755,7 @@ class _ApiMessageBubbleState extends State<_ApiMessageBubble> {
             Flexible(
               child: Text(fileName,
                   style: const TextStyle(
-                      fontFamily: 'Inter', fontSize: 12, color: Color(0xFF111B21)),
+                      fontFamily: 'Geist', fontSize: 12, color: Color(0xFF111B21)),
                   overflow: TextOverflow.ellipsis),
             ),
             const SizedBox(width: 8),
@@ -2763,7 +2763,7 @@ class _ApiMessageBubbleState extends State<_ApiMessageBubble> {
               onTap: () => _openUrl(mUrl),
               child: const Text('Abrir',
                   style: TextStyle(
-                      fontFamily: 'Inter',
+                      fontFamily: 'Geist',
                       fontSize: 12,
                       color: Color(0xFF53BDEB),
                       fontWeight: FontWeight.w600)),
@@ -2776,7 +2776,7 @@ class _ApiMessageBubbleState extends State<_ApiMessageBubble> {
             child: Text(
               caption,
               style: const TextStyle(
-                fontFamily: 'Inter',
+                fontFamily: 'Geist',
                 fontSize: 13,
                 color: Color(0xFF111B21),
                 height: 1.4,
@@ -2824,7 +2824,7 @@ class _ApiMessageBubbleState extends State<_ApiMessageBubble> {
             Flexible(
               child: Text(locName,
                   style: const TextStyle(
-                      fontFamily: 'Inter',
+                      fontFamily: 'Geist',
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                       color: Color(0xFF111B21))),
@@ -2836,7 +2836,7 @@ class _ApiMessageBubbleState extends State<_ApiMessageBubble> {
             padding: const EdgeInsets.only(top: 2, left: 24),
             child: Text('$lat, $lng',
                 style: const TextStyle(
-                    fontFamily: 'Inter', fontSize: 11, color: Color(0xFF667781))),
+                    fontFamily: 'Geist', fontSize: 11, color: Color(0xFF667781))),
           ),
         const SizedBox(height: 6),
         GestureDetector(
@@ -2849,7 +2849,7 @@ class _ApiMessageBubbleState extends State<_ApiMessageBubble> {
             ),
             child: const Text('Ver en mapa',
                 style: TextStyle(
-                    fontFamily: 'Inter',
+                    fontFamily: 'Geist',
                     fontSize: 12,
                     color: Color(0xFF53BDEB),
                     fontWeight: FontWeight.w600)),
@@ -2863,7 +2863,7 @@ class _ApiMessageBubbleState extends State<_ApiMessageBubble> {
     return Text(
       widget.body,
       style: const TextStyle(
-          fontFamily: 'Inter',
+          fontFamily: 'Geist',
           fontSize: 13,
           color: Color(0xFF111B21),
           height: 1.4),
@@ -2934,7 +2934,7 @@ class _ApiMessageBubbleState extends State<_ApiMessageBubble> {
                   Text(
                     widget.senderName,
                     style: TextStyle(
-                      fontFamily: 'Inter',
+                      fontFamily: 'Geist',
                       fontSize: 10,
                       fontWeight: FontWeight.w600,
                       color: widget.senderNameColor ?? timeColor,
@@ -2964,7 +2964,7 @@ class _ApiMessageBubbleState extends State<_ApiMessageBubble> {
                 Text(
                   widget.time,
                   style: const TextStyle(
-                    fontFamily: 'Inter',
+                    fontFamily: 'Geist',
                     fontSize: 10,
                     color: timeColor,
                   ),
@@ -2977,7 +2977,7 @@ class _ApiMessageBubbleState extends State<_ApiMessageBubble> {
             Text(
               widget.time,
               style: const TextStyle(
-                fontFamily: 'Inter',
+                fontFamily: 'Geist',
                 fontSize: 10,
                 color: timeColor,
               ),
@@ -3095,7 +3095,7 @@ class _ReplyBar extends StatelessWidget {
                     Text(
                       'Respondiendo a $name',
                       style: const TextStyle(
-                        fontFamily: 'Inter',
+                        fontFamily: 'Geist',
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
                         color: Color(0xFF2DD4BF),
@@ -3304,7 +3304,7 @@ class _ChatInputState extends State<_ChatInput>
           const SizedBox(width: 10),
           Text(label,
               style: const TextStyle(
-                  fontFamily: 'Inter',
+                  fontFamily: 'Geist',
                   fontSize: 13,
                   color: AppColors.ctNavy)),
         ],
@@ -3348,7 +3348,7 @@ class _ChatInputState extends State<_ChatInput>
               child: Text(
                 'Grabando… ${_formatDuration(widget.recordingSeconds)}',
                 style: const TextStyle(
-                  fontFamily: 'Inter',
+                  fontFamily: 'Geist',
                   fontSize: 13,
                   color: AppColors.ctText,
                 ),
@@ -3369,7 +3369,7 @@ class _ChatInputState extends State<_ChatInput>
               label: const Text(
                 'Detener',
                 style: TextStyle(
-                    fontFamily: 'Inter',
+                    fontFamily: 'Geist',
                     fontSize: 13,
                     color: AppColors.ctNavy,
                     fontWeight: FontWeight.w600),
@@ -3439,7 +3439,7 @@ class _ChatInputState extends State<_ChatInput>
                   minLines: 1,
                   maxLines: 5,
                   style: const TextStyle(
-                    fontFamily: 'Inter',
+                    fontFamily: 'Geist',
                     fontSize: 13,
                     color: AppColors.ctText,
                   ),
@@ -3450,7 +3450,7 @@ class _ChatInputState extends State<_ChatInput>
                         ? 'Escribe un mensaje…'
                         : 'Ventana de 24h cerrada — usa una plantilla',
                     hintStyle: const TextStyle(
-                      fontFamily: 'Inter',
+                      fontFamily: 'Geist',
                       fontSize: 13,
                       color: AppColors.ctText3,
                     ),
@@ -3751,7 +3751,7 @@ class _TabFeedState extends ConsumerState<_TabFeed> {
                       content: Text(
                         '${_selectedIds.length} mensajes seleccionados para reprocesar',
                         style: const TextStyle(
-                            fontFamily: 'Inter', fontSize: 13),
+                            fontFamily: 'Geist', fontSize: 13),
                       ),
                       duration: const Duration(seconds: 2),
                       backgroundColor: AppColors.ctNavy,
@@ -3977,14 +3977,14 @@ class _FeedFiltersState extends State<_FeedFilters> {
               child: TextField(
                 controller: _keywordCtrl,
                 style: const TextStyle(
-                  fontFamily: 'Inter',
+                  fontFamily: 'Geist',
                   fontSize: 12,
                   color: AppColors.ctText,
                 ),
                 decoration: InputDecoration(
                   hintText: 'Buscar…',
                   hintStyle: const TextStyle(
-                    fontFamily: 'Inter',
+                    fontFamily: 'Geist',
                     fontSize: 12,
                     color: AppColors.ctText3,
                   ),
@@ -4111,7 +4111,7 @@ class _FeedMessages extends StatelessWidget {
           child: const Text(
             'Sin mensajes',
             style: TextStyle(
-              fontFamily: 'Inter',
+              fontFamily: 'Geist',
               fontSize: 13,
               color: Color(0xFF9CA3AF),
             ),
@@ -4163,7 +4163,7 @@ class _FeedMessages extends StatelessWidget {
                     style: const TextStyle(
                       fontSize: 11,
                       color: Color(0xFF6B7280),
-                      fontFamily: 'Inter',
+                      fontFamily: 'Geist',
                     ),
                   ),
                 ),
@@ -4262,7 +4262,7 @@ Widget _buildFeedBody(String body, String? messageType, String direction) {
               child: Text(
                 locName,
                 style: TextStyle(
-                    fontFamily: 'Inter',
+                    fontFamily: 'Geist',
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                     color: textColor),
@@ -4276,7 +4276,7 @@ Widget _buildFeedBody(String body, String? messageType, String direction) {
             child: Text(
               '$lat, $lng',
               style: TextStyle(
-                  fontFamily: 'Inter',
+                  fontFamily: 'Geist',
                   fontSize: 11,
                   color: textColor.withValues(alpha: 0.6)),
             ),
@@ -4294,7 +4294,7 @@ Widget _buildFeedBody(String body, String? messageType, String direction) {
             child: const Text(
               'Ver en mapa',
               style: TextStyle(
-                  fontFamily: 'Inter',
+                  fontFamily: 'Geist',
                   fontSize: 12,
                   color: Color(0xFF53BDEB),
                   fontWeight: FontWeight.w600),
@@ -4310,7 +4310,7 @@ Widget _buildFeedBody(String body, String? messageType, String direction) {
     style: TextStyle(
       fontSize: 13,
       color: textColor,
-      fontFamily: 'Inter',
+      fontFamily: 'Geist',
       height: 1.4,
     ),
   );
@@ -4389,7 +4389,7 @@ class _FeedInboundBubble extends StatelessWidget {
                   fontSize: 10,
                   fontWeight: FontWeight.w600,
                   color: avatarTextColor,
-                  fontFamily: 'Inter',
+                  fontFamily: 'Geist',
                 ),
               ),
             ),
@@ -4403,7 +4403,7 @@ class _FeedInboundBubble extends StatelessWidget {
                     style: const TextStyle(
                       fontSize: 10,
                       color: Color(0xFF9CA3AF),
-                      fontFamily: 'Inter',
+                      fontFamily: 'Geist',
                     ),
                   ),
                   const SizedBox(height: 2),
@@ -4441,7 +4441,7 @@ class _FeedInboundBubble extends StatelessWidget {
                             style: const TextStyle(
                               fontSize: 10,
                               color: Color(0xFF9CA3AF),
-                              fontFamily: 'Inter',
+                              fontFamily: 'Geist',
                             ),
                           ),
                         ),
@@ -4530,7 +4530,7 @@ class _FeedOutboundBubble extends StatelessWidget {
                     style: const TextStyle(
                       fontSize: 10,
                       color: Color(0xFF9CA3AF),
-                      fontFamily: 'Inter',
+                      fontFamily: 'Geist',
                     ),
                   ),
                   const SizedBox(height: 2),
@@ -4569,7 +4569,7 @@ class _FeedOutboundBubble extends StatelessWidget {
                                 fontSize: 10,
                                 color: const Color(0xFF0F2937)
                                     .withValues(alpha: 0.7),
-                                fontFamily: 'Inter',
+                                fontFamily: 'Geist',
                               ),
                             ),
                             const SizedBox(width: 3),
@@ -4662,7 +4662,7 @@ class _GhostButtonState extends State<_GhostButton> {
               Text(
                 widget.label,
                 style: TextStyle(
-                  fontFamily: 'Inter',
+                  fontFamily: 'Geist',
                   fontSize: 12,
                   color: widget.active
                       ? AppColors.ctTeal
@@ -4727,7 +4727,7 @@ class _ReprocesarBtnState extends State<_ReprocesarBtn> {
                 Text(
                   'Reprocesar',
                   style: TextStyle(
-                    fontFamily: 'Inter',
+                    fontFamily: 'Geist',
                     fontSize: 11,
                     fontWeight: FontWeight.w500,
                     color: AppColors.ctText2,
@@ -4771,7 +4771,7 @@ class _FilterDropdown extends StatelessWidget {
           value: value,
           isDense: true,
           style: const TextStyle(
-            fontFamily: 'Inter',
+            fontFamily: 'Geist',
             fontSize: 12,
             color: AppColors.ctText,
           ),
@@ -4869,7 +4869,7 @@ class _DateFilterModalState extends State<_DateFilterModal> {
               const Text(
                 'Filtrar por fecha y hora',
                 style: TextStyle(
-                  fontFamily: 'Inter',
+                  fontFamily: 'Geist',
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                   color: AppColors.ctText,
@@ -4887,7 +4887,7 @@ class _DateFilterModalState extends State<_DateFilterModal> {
                         const Text(
                           'Desde',
                           style: TextStyle(
-                            fontFamily: 'Inter',
+                            fontFamily: 'Geist',
                             fontSize: 11,
                             fontWeight: FontWeight.w500,
                             color: Color(0xFF6B7280),
@@ -4922,7 +4922,7 @@ class _DateFilterModalState extends State<_DateFilterModal> {
                         const Text(
                           'Hasta',
                           style: TextStyle(
-                            fontFamily: 'Inter',
+                            fontFamily: 'Geist',
                             fontSize: 11,
                             fontWeight: FontWeight.w500,
                             color: Color(0xFF6B7280),
@@ -4966,7 +4966,7 @@ class _DateFilterModalState extends State<_DateFilterModal> {
                       label: Text(
                         _timeLabel(_fromTime, 'Hora desde'),
                         style: const TextStyle(
-                          fontFamily: 'Inter',
+                          fontFamily: 'Geist',
                           fontSize: 12,
                         ),
                       ),
@@ -4989,7 +4989,7 @@ class _DateFilterModalState extends State<_DateFilterModal> {
                       label: Text(
                         _timeLabel(_toTime, 'Hora hasta'),
                         style: const TextStyle(
-                          fontFamily: 'Inter',
+                          fontFamily: 'Geist',
                           fontSize: 12,
                         ),
                       ),
@@ -5007,7 +5007,7 @@ class _DateFilterModalState extends State<_DateFilterModal> {
                     child: const Text(
                       'Limpiar',
                       style: TextStyle(
-                        fontFamily: 'Inter',
+                        fontFamily: 'Geist',
                         fontSize: 12,
                         color: Color(0xFF6B7280),
                       ),
@@ -5019,7 +5019,7 @@ class _DateFilterModalState extends State<_DateFilterModal> {
                     child: const Text(
                       'Cancelar',
                       style: TextStyle(
-                        fontFamily: 'Inter',
+                        fontFamily: 'Geist',
                         fontSize: 12,
                       ),
                     ),
@@ -5032,7 +5032,7 @@ class _DateFilterModalState extends State<_DateFilterModal> {
                     child: const Text(
                       'Aplicar',
                       style: TextStyle(
-                        fontFamily: 'Inter',
+                        fontFamily: 'Geist',
                         fontSize: 12,
                         color: AppColors.ctNavy,
                       ),
@@ -5293,7 +5293,7 @@ class _NewMessageDialogState extends ConsumerState<_NewMessageDialog> {
               const Expanded(
                 child: Text(
                   'Nuevo mensaje',
-                  style: TextStyle(fontFamily: 'Inter', fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.ctNavy),
+                  style: TextStyle(fontFamily: 'Geist', fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.ctNavy),
                 ),
               ),
               IconButton(
@@ -5312,10 +5312,10 @@ class _NewMessageDialogState extends ConsumerState<_NewMessageDialog> {
           child: TextField(
             controller: _searchCtrl,
             onChanged: (_) => setState(() {}),
-            style: const TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppColors.ctNavy),
+            style: const TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctNavy),
             decoration: InputDecoration(
               hintText: 'Buscar por nombre o teléfono…',
-              hintStyle: const TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppColors.ctText3),
+              hintStyle: const TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText3),
               prefixIcon: const Icon(Icons.search, size: 16, color: AppColors.ctText3),
               filled: true,
               fillColor: AppColors.ctSurface2,
@@ -5330,7 +5330,7 @@ class _NewMessageDialogState extends ConsumerState<_NewMessageDialog> {
           child: _loadingAll
               ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
               : _loadError != null
-                  ? Center(child: Text(_loadError!, style: const TextStyle(fontFamily: 'Inter', fontSize: 12, color: Colors.red)))
+                  ? Center(child: Text(_loadError!, style: const TextStyle(fontFamily: 'Geist', fontSize: 12, color: Colors.red)))
                   : ListView(
                       padding: const EdgeInsets.only(bottom: 12),
                       children: [
@@ -5359,7 +5359,7 @@ class _NewMessageDialogState extends ConsumerState<_NewMessageDialog> {
                         if (_filteredOps.isEmpty && _filteredIam.isEmpty)
                           const Padding(
                             padding: EdgeInsets.all(24),
-                            child: Center(child: Text('Sin resultados', style: TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppColors.ctText3))),
+                            child: Center(child: Text('Sin resultados', style: TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText3))),
                           ),
                       ],
                     ),
@@ -5397,7 +5397,7 @@ class _NewMessageDialogState extends ConsumerState<_NewMessageDialog> {
               const Expanded(
                 child: Text(
                   'Nuevo mensaje',
-                  style: TextStyle(fontFamily: 'Inter', fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.ctNavy),
+                  style: TextStyle(fontFamily: 'Geist', fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.ctNavy),
                 ),
               ),
               IconButton(
@@ -5423,16 +5423,16 @@ class _NewMessageDialogState extends ConsumerState<_NewMessageDialog> {
                   backgroundColor: AppColors.ctTeal.withValues(alpha: 0.15),
                   child: Text(
                     name.isNotEmpty ? name[0].toUpperCase() : '?',
-                    style: const TextStyle(fontFamily: 'Inter', fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.ctTeal),
+                    style: const TextStyle(fontFamily: 'Geist', fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.ctTeal),
                   ),
                 ),
                 const SizedBox(width: 10),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(name, style: const TextStyle(fontFamily: 'Inter', fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.ctNavy)),
+                    Text(name, style: const TextStyle(fontFamily: 'Geist', fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.ctNavy)),
                     if (phone.isNotEmpty)
-                      Text(phone, style: const TextStyle(fontFamily: 'Inter', fontSize: 11, color: AppColors.ctText3)),
+                      Text(phone, style: const TextStyle(fontFamily: 'Geist', fontSize: 11, color: AppColors.ctText3)),
                   ],
                 ),
               ],
@@ -5446,7 +5446,7 @@ class _NewMessageDialogState extends ConsumerState<_NewMessageDialog> {
               child: Row(children: [
                 SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)),
                 SizedBox(width: 8),
-                Text('Verificando ventana de 24h…', style: TextStyle(fontFamily: 'Inter', fontSize: 11, color: AppColors.ctText3)),
+                Text('Verificando ventana de 24h…', style: TextStyle(fontFamily: 'Geist', fontSize: 11, color: AppColors.ctText3)),
               ]),
             )
           else
@@ -5472,7 +5472,7 @@ class _NewMessageDialogState extends ConsumerState<_NewMessageDialog> {
                           ? 'Ventana de 24h abierta — puedes enviar texto libre.'
                           : 'Ventana cerrada — solo puedes enviar plantillas aprobadas.',
                       style: TextStyle(
-                        fontFamily: 'Inter',
+                        fontFamily: 'Geist',
                         fontSize: 11,
                         color: _windowOpen ? const Color(0xFF065F46) : const Color(0xFF92400E),
                       ),
@@ -5514,10 +5514,10 @@ class _NewMessageDialogState extends ConsumerState<_NewMessageDialog> {
                 TextField(
                   controller: _msgCtrl,
                   maxLines: 4,
-                  style: const TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppColors.ctNavy),
+                  style: const TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctNavy),
                   decoration: InputDecoration(
                     hintText: 'Escribe tu mensaje…',
-                    hintStyle: const TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppColors.ctText3),
+                    hintStyle: const TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText3),
                     filled: true,
                     fillColor: AppColors.ctSurface2,
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
@@ -5529,10 +5529,10 @@ class _NewMessageDialogState extends ConsumerState<_NewMessageDialog> {
               TextField(
                 controller: _msgCtrl,
                 maxLines: 4,
-                style: const TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppColors.ctNavy),
+                style: const TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctNavy),
                 decoration: InputDecoration(
                   hintText: 'Escribe tu mensaje…',
-                  hintStyle: const TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppColors.ctText3),
+                  hintStyle: const TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText3),
                   filled: true,
                   fillColor: AppColors.ctSurface2,
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
@@ -5553,7 +5553,7 @@ class _NewMessageDialogState extends ConsumerState<_NewMessageDialog> {
                 ),
                 child: Text(
                   _resolvePreview(tpl),
-                  style: const TextStyle(fontFamily: 'Inter', fontSize: 12, color: AppColors.ctNavy),
+                  style: const TextStyle(fontFamily: 'Geist', fontSize: 12, color: AppColors.ctNavy),
                 ),
               ),
             ],
@@ -5564,7 +5564,7 @@ class _NewMessageDialogState extends ConsumerState<_NewMessageDialog> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(color: const Color(0xFFFEE2E2), borderRadius: BorderRadius.circular(6)),
-              child: Text(_sendError!, style: const TextStyle(fontFamily: 'Inter', fontSize: 11, color: Color(0xFF991B1B))),
+              child: Text(_sendError!, style: const TextStyle(fontFamily: 'Geist', fontSize: 11, color: Color(0xFF991B1B))),
             ),
           ],
           const SizedBox(height: 16),
@@ -5574,7 +5574,7 @@ class _NewMessageDialogState extends ConsumerState<_NewMessageDialog> {
             children: [
               TextButton(
                 onPressed: _sending ? null : () => Navigator.of(context).pop(),
-                child: const Text('Cancelar', style: TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppColors.ctText3)),
+                child: const Text('Cancelar', style: TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText3)),
               ),
               const SizedBox(width: 8),
               FilledButton(
@@ -5582,7 +5582,7 @@ class _NewMessageDialogState extends ConsumerState<_NewMessageDialog> {
                 style: FilledButton.styleFrom(backgroundColor: AppColors.ctTeal),
                 child: _sending
                     ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : const Text('Enviar', style: TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppColors.ctNavy, fontWeight: FontWeight.w600)),
+                    : const Text('Enviar', style: TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctNavy, fontWeight: FontWeight.w600)),
               ),
             ],
           ),
@@ -5604,7 +5604,7 @@ class _NmSectionHeader extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
       child: Text(
         label,
-        style: const TextStyle(fontFamily: 'Inter', fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.ctText3, letterSpacing: 0.3),
+        style: const TextStyle(fontFamily: 'Geist', fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.ctText3, letterSpacing: 0.3),
       ),
     );
   }
@@ -5640,16 +5640,16 @@ class _NmRecipientItemState extends State<_NmRecipientItem> {
                 backgroundColor: AppColors.ctTeal.withValues(alpha: 0.12),
                 child: Text(
                   widget.name.isNotEmpty ? widget.name[0].toUpperCase() : '?',
-                  style: const TextStyle(fontFamily: 'Inter', fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.ctTeal),
+                  style: const TextStyle(fontFamily: 'Geist', fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.ctTeal),
                 ),
               ),
               const SizedBox(width: 10),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(widget.name, style: const TextStyle(fontFamily: 'Inter', fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.ctNavy)),
+                  Text(widget.name, style: const TextStyle(fontFamily: 'Geist', fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.ctNavy)),
                   if (widget.phone.isNotEmpty)
-                    Text(widget.phone, style: const TextStyle(fontFamily: 'Inter', fontSize: 11, color: AppColors.ctText3)),
+                    Text(widget.phone, style: const TextStyle(fontFamily: 'Geist', fontSize: 11, color: AppColors.ctText3)),
                 ],
               ),
               const Spacer(),
@@ -5681,7 +5681,7 @@ class _NmToggleBtn extends StatelessWidget {
         child: Text(
           label,
           style: TextStyle(
-            fontFamily: 'Inter',
+            fontFamily: 'Geist',
             fontSize: 12,
             fontWeight: FontWeight.w500,
             color: active ? AppColors.ctNavy : AppColors.ctText3,
@@ -5704,12 +5704,12 @@ class _NmTemplateDropdown extends StatelessWidget {
       return Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(color: AppColors.ctSurface2, borderRadius: BorderRadius.circular(8)),
-        child: const Text('No hay plantillas disponibles.', style: TextStyle(fontFamily: 'Inter', fontSize: 12, color: AppColors.ctText3)),
+        child: const Text('No hay plantillas disponibles.', style: TextStyle(fontFamily: 'Geist', fontSize: 12, color: AppColors.ctText3)),
       );
     }
     return DropdownButtonFormField<String>(
       initialValue: selectedId,
-      hint: const Text('Seleccionar plantilla…', style: TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppColors.ctText3)),
+      hint: const Text('Seleccionar plantilla…', style: TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText3)),
       decoration: InputDecoration(
         filled: true,
         fillColor: AppColors.ctSurface2,
@@ -5719,11 +5719,11 @@ class _NmTemplateDropdown extends StatelessWidget {
       items: templates.map((t) {
         final id = (t['id'] ?? t['template_id'])?.toString() ?? '';
         final name = (t['name'] ?? t['template_name'] ?? id).toString();
-        return DropdownMenuItem(value: id, child: Text(name, style: const TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppColors.ctNavy)));
+        return DropdownMenuItem(value: id, child: Text(name, style: const TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctNavy)));
       }).toList(),
       onChanged: onChanged,
       dropdownColor: AppColors.ctSurface,
-      style: const TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppColors.ctNavy),
+      style: const TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctNavy),
     );
   }
 }
@@ -5804,7 +5804,7 @@ class _MediaPreviewDialogState extends State<_MediaPreviewDialog> {
             children: [
               const Text(
                 'Vista previa',
-                style: TextStyle(fontFamily: 'Inter', fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.ctNavy),
+                style: TextStyle(fontFamily: 'Geist', fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.ctNavy),
               ),
               const SizedBox(height: 16),
               // Preview area
@@ -5833,13 +5833,13 @@ class _MediaPreviewDialogState extends State<_MediaPreviewDialog> {
                           children: [
                             Text(
                               widget.filename,
-                              style: const TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppColors.ctNavy),
+                              style: const TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctNavy),
                               overflow: TextOverflow.ellipsis,
                             ),
                             if (widget.audioDuration != null)
                               Text(
                                 '${widget.audioDuration! ~/ 60}:${(widget.audioDuration! % 60).toString().padLeft(2, '0')}',
-                                style: const TextStyle(fontFamily: 'Inter', fontSize: 11, color: AppColors.ctText3),
+                                style: const TextStyle(fontFamily: 'Geist', fontSize: 11, color: AppColors.ctText3),
                               ),
                           ],
                         ),
@@ -5864,12 +5864,12 @@ class _MediaPreviewDialogState extends State<_MediaPreviewDialog> {
                           children: [
                             Text(
                               widget.filename,
-                              style: const TextStyle(fontFamily: 'Inter', fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.ctNavy),
+                              style: const TextStyle(fontFamily: 'Geist', fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.ctNavy),
                               overflow: TextOverflow.ellipsis,
                             ),
                             Text(
                               _sizeLabel,
-                              style: const TextStyle(fontFamily: 'Inter', fontSize: 11, color: AppColors.ctText3),
+                              style: const TextStyle(fontFamily: 'Geist', fontSize: 11, color: AppColors.ctText3),
                             ),
                           ],
                         ),
@@ -5882,12 +5882,12 @@ class _MediaPreviewDialogState extends State<_MediaPreviewDialog> {
                 const SizedBox(height: 12),
                 TextField(
                   controller: _captionCtrl,
-                  style: const TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppColors.ctNavy),
+                  style: const TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctNavy),
                   textInputAction: TextInputAction.send,
                   onSubmitted: (_) => _handleSend(),
                   decoration: InputDecoration(
                     hintText: 'Agregar caption…',
-                    hintStyle: const TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppColors.ctText3),
+                    hintStyle: const TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText3),
                     filled: true,
                     fillColor: AppColors.ctSurface2,
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
@@ -5902,14 +5902,14 @@ class _MediaPreviewDialogState extends State<_MediaPreviewDialog> {
                 children: [
                   TextButton(
                     onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('Cancelar', style: TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppColors.ctText3)),
+                    child: const Text('Cancelar', style: TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText3)),
                   ),
                   const SizedBox(width: 8),
                   FilledButton.icon(
                     onPressed: _handleSend,
                     style: FilledButton.styleFrom(backgroundColor: AppColors.ctTeal),
                     icon: const Icon(Icons.send_rounded, size: 16, color: AppColors.ctNavy),
-                    label: const Text('Enviar', style: TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppColors.ctNavy, fontWeight: FontWeight.w600)),
+                    label: const Text('Enviar', style: TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctNavy, fontWeight: FontWeight.w600)),
                   ),
                 ],
               ),
@@ -5949,7 +5949,7 @@ class _LocationDialogState extends State<_LocationDialog> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       title: const Text(
         'Enviar ubicación',
-        style: TextStyle(fontFamily: 'Inter', fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.ctNavy),
+        style: TextStyle(fontFamily: 'Geist', fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.ctNavy),
       ),
       content: SizedBox(
         width: 380,
@@ -5957,10 +5957,10 @@ class _LocationDialogState extends State<_LocationDialog> {
           controller: _urlCtrl,
           onChanged: (_) => setState(() {}),
           autofocus: true,
-          style: const TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppColors.ctNavy),
+          style: const TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctNavy),
           decoration: InputDecoration(
             hintText: 'Pega una URL de Google Maps…',
-            hintStyle: const TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppColors.ctText3),
+            hintStyle: const TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText3),
             prefixIcon: const Icon(Icons.location_on_rounded, size: 18, color: AppColors.ctText3),
             filled: true,
             fillColor: AppColors.ctSurface2,
@@ -5972,7 +5972,7 @@ class _LocationDialogState extends State<_LocationDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancelar', style: TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppColors.ctText3)),
+          child: const Text('Cancelar', style: TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText3)),
         ),
         FilledButton(
           onPressed: canSend ? () => widget.onSend(_urlCtrl.text.trim()) : null,
@@ -5982,7 +5982,7 @@ class _LocationDialogState extends State<_LocationDialog> {
           ),
           child: const Text(
             'Enviar',
-            style: TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppColors.ctNavy, fontWeight: FontWeight.w600),
+            style: TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctNavy, fontWeight: FontWeight.w600),
           ),
         ),
       ],

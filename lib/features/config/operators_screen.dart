@@ -157,7 +157,7 @@ class _ActionBar extends StatelessWidget {
                 Text(
                   'Operadores',
                   style: TextStyle(
-                    fontFamily: 'Inter',
+                    fontFamily: 'Geist',
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
                     color: AppColors.ctText,
@@ -167,7 +167,7 @@ class _ActionBar extends StatelessWidget {
                 Text(
                   'Gestiona los operadores y sus permisos de acceso',
                   style: TextStyle(
-                    fontFamily: 'Inter',
+                    fontFamily: 'Geist',
                     fontSize: 11,
                     color: AppColors.ctText2,
                   ),
@@ -241,7 +241,7 @@ class _OperatorsBodyState extends State<_OperatorsBody> {
   }
 
   static const _headerStyle = TextStyle(
-    fontFamily: 'Inter',
+    fontFamily: 'Geist',
     fontSize: 10,
     fontWeight: FontWeight.w600,
     color: AppColors.ctText2,
@@ -338,7 +338,7 @@ class _OperatorsBodyState extends State<_OperatorsBody> {
                     child: Text(
                       'Sin resultados para los filtros aplicados.',
                       style: TextStyle(
-                        fontFamily: 'Inter',
+                        fontFamily: 'Geist',
                         fontSize: 13,
                         color: AppColors.ctText2,
                       ),
@@ -370,7 +370,7 @@ class _OperatorsBodyState extends State<_OperatorsBody> {
           child: Text(
             '${rows.length} de ${widget.operators.length} operadores',
             style: const TextStyle(
-              fontFamily: 'Inter',
+              fontFamily: 'Geist',
               fontSize: 12,
               color: AppColors.ctText2,
             ),
@@ -457,7 +457,7 @@ class _OperatorRowState extends State<_OperatorRow> {
                     child: Text(
                       _initials(name),
                       style: const TextStyle(
-                        fontFamily: 'Inter',
+                        fontFamily: 'Geist',
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
                         color: AppColors.ctTealDark,
@@ -473,7 +473,7 @@ class _OperatorRowState extends State<_OperatorRow> {
                         Text(
                           name,
                           style: const TextStyle(
-                            fontFamily: 'Inter',
+                            fontFamily: 'Geist',
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
                             color: AppColors.ctText,
@@ -494,7 +494,7 @@ class _OperatorRowState extends State<_OperatorRow> {
                               Text(
                                 'WhatsApp verificado',
                                 style: TextStyle(
-                                  fontFamily: 'Inter',
+                                  fontFamily: 'Geist',
                                   fontSize: 11,
                                   color: AppColors.ctText2,
                                 ),
@@ -512,7 +512,7 @@ class _OperatorRowState extends State<_OperatorRow> {
                             child: const Text(
                               'Pendiente verificación',
                               style: TextStyle(
-                                fontFamily: 'Inter',
+                                fontFamily: 'Geist',
                                 fontSize: 10,
                                 fontWeight: FontWeight.w600,
                                 color: Color(0xFF9A3412),
@@ -532,7 +532,7 @@ class _OperatorRowState extends State<_OperatorRow> {
               child: Text(
                 phone,
                 style: const TextStyle(
-                  fontFamily: 'Inter',
+                  fontFamily: 'Geist',
                   fontSize: 13,
                   color: AppColors.ctText,
                 ),
@@ -570,7 +570,7 @@ class _OperatorRowState extends State<_OperatorRow> {
               child: Text(
                 _formatLastEvent(lastEventAt),
                 style: const TextStyle(
-                  fontFamily: 'Inter',
+                  fontFamily: 'Geist',
                   fontSize: 12,
                   color: AppColors.ctText2,
                 ),
@@ -719,7 +719,7 @@ class _OperatorFormDialogState extends ConsumerState<_OperatorFormDialog> {
           SnackBar(
             content: Text(
               widget.isEdit ? 'Operador actualizado.' : 'Operador creado. Mensaje de bienvenida enviado.',
-              style: const TextStyle(fontFamily: 'Inter', fontSize: 13),
+              style: const TextStyle(fontFamily: 'Geist', fontSize: 13),
             ),
             backgroundColor: AppColors.ctNavy,
             duration: const Duration(seconds: 3),
@@ -759,7 +759,7 @@ class _OperatorFormDialogState extends ConsumerState<_OperatorFormDialog> {
               Text(
                 widget.isEdit ? 'Editar operador' : 'Agregar operador',
                 style: const TextStyle(
-                  fontFamily: 'Inter',
+                  fontFamily: 'Geist',
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
                   color: AppColors.ctText,
@@ -787,7 +787,7 @@ class _OperatorFormDialogState extends ConsumerState<_OperatorFormDialog> {
               // Flujos
               const Text(
                 'Flujos asignados',
-                style: TextStyle(fontFamily: 'Inter', fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.ctText),
+                style: TextStyle(fontFamily: 'Geist', fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.ctText),
               ),
               const SizedBox(height: 6),
               if (_flowsLoading)
@@ -799,7 +799,7 @@ class _OperatorFormDialogState extends ConsumerState<_OperatorFormDialog> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                   decoration: BoxDecoration(border: Border.all(color: AppColors.ctBorder), borderRadius: BorderRadius.circular(8)),
-                  child: const Text('No hay flujos disponibles en este tenant.', style: TextStyle(fontFamily: 'Inter', fontSize: 12, color: AppColors.ctText2)),
+                  child: const Text('No hay flujos disponibles en este tenant.', style: TextStyle(fontFamily: 'Geist', fontSize: 12, color: AppColors.ctText2)),
                 )
               else
                 Container(
@@ -848,9 +848,9 @@ class _OperatorFormDialogState extends ConsumerState<_OperatorFormDialog> {
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        Text(flowName, style: const TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppColors.ctText)),
+                                        Text(flowName, style: const TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText)),
                                         if (workerName.isNotEmpty)
-                                          Text(workerName, style: const TextStyle(fontFamily: 'Inter', fontSize: 11, color: AppColors.ctText2)),
+                                          Text(workerName, style: const TextStyle(fontFamily: 'Geist', fontSize: 11, color: AppColors.ctText2)),
                                       ],
                                     ),
                                   ),
@@ -862,7 +862,7 @@ class _OperatorFormDialogState extends ConsumerState<_OperatorFormDialog> {
                                     ),
                                     child: Text(
                                       isFlowActive ? 'Activo' : 'Inactivo',
-                                      style: TextStyle(fontFamily: 'Inter', fontSize: 10, fontWeight: FontWeight.w600, color: isFlowActive ? AppColors.ctOkText : AppColors.ctText2),
+                                      style: TextStyle(fontFamily: 'Geist', fontSize: 10, fontWeight: FontWeight.w600, color: isFlowActive ? AppColors.ctOkText : AppColors.ctText2),
                                     ),
                                   ),
                                 ],
@@ -889,7 +889,7 @@ class _OperatorFormDialogState extends ConsumerState<_OperatorFormDialog> {
                   child: Text(
                     _errorMsg!,
                     style: const TextStyle(
-                      fontFamily: 'Inter',
+                      fontFamily: 'Geist',
                       fontSize: 12,
                       color: AppColors.ctRedText,
                     ),
@@ -958,7 +958,7 @@ class _DialogField extends StatelessWidget {
         Text(
           label,
           style: const TextStyle(
-            fontFamily: 'Inter',
+            fontFamily: 'Geist',
             fontSize: 13,
             fontWeight: FontWeight.w500,
             color: AppColors.ctText,
@@ -969,14 +969,14 @@ class _DialogField extends StatelessWidget {
           controller: controller,
           keyboardType: keyboardType,
           style: const TextStyle(
-            fontFamily: 'Inter',
+            fontFamily: 'Geist',
             fontSize: 13,
             color: AppColors.ctText,
           ),
           decoration: InputDecoration(
             hintText: placeholder,
             hintStyle: const TextStyle(
-              fontFamily: 'Inter',
+              fontFamily: 'Geist',
               fontSize: 13,
               color: AppColors.ctText3,
             ),
@@ -1017,14 +1017,14 @@ class _SearchField extends StatelessWidget {
     return TextField(
       onChanged: onChanged,
       style: const TextStyle(
-        fontFamily: 'Inter',
+        fontFamily: 'Geist',
         fontSize: 13,
         color: AppColors.ctText,
       ),
       decoration: InputDecoration(
         hintText: 'Buscar por nombre o teléfono...',
         hintStyle: const TextStyle(
-          fontFamily: 'Inter',
+          fontFamily: 'Geist',
           fontSize: 13,
           color: AppColors.ctText3,
         ),
@@ -1085,7 +1085,7 @@ class _FilterDropdown extends StatelessWidget {
             isDense: true,
             isExpanded: true,
             style: const TextStyle(
-              fontFamily: 'Inter',
+              fontFamily: 'Geist',
               fontSize: 13,
               color: AppColors.ctText,
             ),
@@ -1130,7 +1130,7 @@ class _StatusBadge extends StatelessWidget {
       child: Text(
         label,
         style: TextStyle(
-          fontFamily: 'Inter',
+          fontFamily: 'Geist',
           fontSize: 11,
           fontWeight: FontWeight.w600,
           color: textColor,
@@ -1159,7 +1159,7 @@ class _FlowBadge extends StatelessWidget {
         child: Text(
           label,
           style: const TextStyle(
-            fontFamily: 'Inter',
+            fontFamily: 'Geist',
             fontSize: 10,
             fontWeight: FontWeight.w600,
             color: AppColors.ctInfoText,
@@ -1213,7 +1213,7 @@ class _ActionButtonState extends State<_ActionButton> {
           child: Text(
             widget.label,
             style: TextStyle(
-              fontFamily: 'Inter',
+              fontFamily: 'Geist',
               fontSize: 11,
               fontWeight: FontWeight.w500,
               color: widget.color,
@@ -1258,7 +1258,7 @@ class _PrimaryButtonState extends State<_PrimaryButton> {
           child: Text(
             widget.label,
             style: const TextStyle(
-              fontFamily: 'Inter',
+              fontFamily: 'Geist',
               fontSize: 12,
               fontWeight: FontWeight.w600,
               color: AppColors.ctNavy,
@@ -1304,7 +1304,7 @@ class _GhostButtonState extends State<_GhostButton> {
           child: Text(
             widget.label,
             style: const TextStyle(
-              fontFamily: 'Inter',
+              fontFamily: 'Geist',
               fontSize: 12,
               fontWeight: FontWeight.w500,
               color: AppColors.ctText2,

@@ -23,7 +23,7 @@ class ConnectionsScreen extends StatelessWidget {
                 const Text(
                   'Canales de comunicación',
                   style: TextStyle(
-                    fontFamily: 'Inter',
+                    fontFamily: 'Geist',
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
                     color: AppColors.ctText,
@@ -33,7 +33,7 @@ class ConnectionsScreen extends StatelessWidget {
                 const Text(
                   'Gestiona los canales por los que recibes y envías mensajes.',
                   style: TextStyle(
-                    fontFamily: 'Inter',
+                    fontFamily: 'Geist',
                     fontSize: 12,
                     color: AppColors.ctText2,
                   ),
@@ -82,7 +82,7 @@ class ConnectionsScreen extends StatelessWidget {
                 const Text(
                   'Integraciones de datos',
                   style: TextStyle(
-                    fontFamily: 'Inter',
+                    fontFamily: 'Geist',
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
                     color: AppColors.ctText,
@@ -92,7 +92,7 @@ class ConnectionsScreen extends StatelessWidget {
                 const Text(
                   'Conecta tu CRM, ERP u otras fuentes de datos.',
                   style: TextStyle(
-                    fontFamily: 'Inter',
+                    fontFamily: 'Geist',
                     fontSize: 12,
                     color: AppColors.ctText2,
                   ),
@@ -133,7 +133,7 @@ class _ActionBar extends StatelessWidget {
               Text(
                 'Conexiones',
                 style: TextStyle(
-                  fontFamily: 'Inter',
+                  fontFamily: 'Geist',
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
                   color: AppColors.ctText,
@@ -143,7 +143,7 @@ class _ActionBar extends StatelessWidget {
               Text(
                 'Canales de comunicación e integraciones',
                 style: TextStyle(
-                  fontFamily: 'Inter',
+                  fontFamily: 'Geist',
                   fontSize: 11,
                   color: AppColors.ctText2,
                 ),
@@ -221,7 +221,7 @@ class _ChannelCardState extends State<_ChannelCard> {
                   Text(
                     widget.title,
                     style: const TextStyle(
-                      fontFamily: 'Inter',
+                      fontFamily: 'Geist',
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
                       color: AppColors.ctText,
@@ -231,7 +231,7 @@ class _ChannelCardState extends State<_ChannelCard> {
                   Text(
                     widget.subtitle,
                     style: const TextStyle(
-                      fontFamily: 'Inter',
+                      fontFamily: 'Geist',
                       fontSize: 12,
                       color: AppColors.ctText2,
                     ),
@@ -288,7 +288,7 @@ class _DashedCard extends StatelessWidget {
           Text(
             label,
             style: const TextStyle(
-              fontFamily: 'Inter',
+              fontFamily: 'Geist',
               fontSize: 13,
               color: AppColors.ctText3,
             ),
@@ -318,7 +318,7 @@ class _Badge extends StatelessWidget {
       child: Text(
         label,
         style: TextStyle(
-          fontFamily: 'Inter',
+          fontFamily: 'Geist',
           fontSize: 11,
           fontWeight: FontWeight.w600,
           color: textColor,
@@ -358,7 +358,7 @@ class _ActionButtonState extends State<_ActionButton> {
           child: Text(
             widget.label,
             style: const TextStyle(
-              fontFamily: 'Inter',
+              fontFamily: 'Geist',
               fontSize: 12,
               fontWeight: FontWeight.w600,
               color: AppColors.ctNavy,

@@ -245,7 +245,7 @@ class _ActionBar extends StatelessWidget {
                 Text(
                   'Flujos de trabajo',
                   style: TextStyle(
-                    fontFamily: 'Inter',
+                    fontFamily: 'Geist',
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
                     color: AppColors.ctText,
@@ -335,7 +335,7 @@ class _FlowCardState extends State<_FlowCard> {
                   child: Text(
                     '${widget.index + 1}',
                     style: const TextStyle(
-                      fontFamily: 'Inter',
+                      fontFamily: 'Geist',
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
                       color: AppColors.ctTealDark,
@@ -353,7 +353,7 @@ class _FlowCardState extends State<_FlowCard> {
                       Text(
                         name,
                         style: const TextStyle(
-                          fontFamily: 'Inter',
+                          fontFamily: 'Geist',
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
                           color: AppColors.ctText,
@@ -754,7 +754,7 @@ class _FlowFormDialogState extends State<_FlowFormDialog> {
               Text(
                 _isEdit ? 'Editar flujo' : 'Nuevo flujo',
                 style: const TextStyle(
-                  fontFamily: 'Inter',
+                  fontFamily: 'Geist',
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
                   color: AppColors.ctText,
@@ -1125,7 +1125,7 @@ class _PrimaryButton extends StatelessWidget {
         child: Text(
           label,
           style: const TextStyle(
-            fontFamily: 'Inter',
+            fontFamily: 'Geist',
             fontSize: 13,
             fontWeight: FontWeight.w600,
             color: AppColors.ctNavy,

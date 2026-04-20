@@ -52,7 +52,7 @@ class _ActionBar extends StatelessWidget {
                 Text(
                   'Sesión · $operatorName',
                   style: const TextStyle(
-                    fontFamily: 'Inter',
+                    fontFamily: 'Geist',
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
                     color: AppColors.ctText,
@@ -62,7 +62,7 @@ class _ActionBar extends StatelessWidget {
                 const Text(
                   'Hoy · Turno iniciado 07:03 · En curso',
                   style: TextStyle(
-                    fontFamily: 'Inter',
+                    fontFamily: 'Geist',
                     fontSize: 11,
                     color: AppColors.ctText2,
                   ),
@@ -116,7 +116,7 @@ class _GhostButtonState extends State<_GhostButton> {
           child: Text(
             widget.label,
             style: const TextStyle(
-              fontFamily: 'Inter',
+              fontFamily: 'Geist',
               fontSize: 12,
               fontWeight: FontWeight.w500,
               color: AppColors.ctText2,
@@ -208,7 +208,7 @@ class _KpiValueText extends StatelessWidget {
     return Text(
       value,
       style: const TextStyle(
-        fontFamily: 'Inter',
+        fontFamily: 'Geist',
         fontSize: 28,
         fontWeight: FontWeight.w700,
         color: AppColors.ctText,
@@ -257,7 +257,7 @@ class _SessionKpiCard extends StatelessWidget {
           Text(
             label,
             style: const TextStyle(
-              fontFamily: 'Inter',
+              fontFamily: 'Geist',
               fontSize: 10,
               fontWeight: FontWeight.w600,
               color: AppColors.ctText2,
@@ -270,7 +270,7 @@ class _SessionKpiCard extends StatelessWidget {
           Text(
             subtext,
             style: const TextStyle(
-              fontFamily: 'Inter',
+              fontFamily: 'Geist',
               fontSize: 11,
               color: AppColors.ctText3,
             ),
@@ -351,7 +351,7 @@ class _Timeline extends StatelessWidget {
           const Text(
             'LÍNEA DE TIEMPO',
             style: TextStyle(
-              fontFamily: 'Inter',
+              fontFamily: 'Geist',
               fontSize: 10,
               fontWeight: FontWeight.w600,
               color: AppColors.ctText3,
@@ -426,7 +426,7 @@ class _TimelineItem extends StatelessWidget {
                         child: Text(
                           event.title,
                           style: TextStyle(
-                            fontFamily: 'Inter',
+                            fontFamily: 'Geist',
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
                             color: event.faded
@@ -438,7 +438,7 @@ class _TimelineItem extends StatelessWidget {
                       Text(
                         event.time,
                         style: const TextStyle(
-                          fontFamily: 'Inter',
+                          fontFamily: 'Geist',
                           fontSize: 10,
                           color: AppColors.ctText3,
                         ),
@@ -450,7 +450,7 @@ class _TimelineItem extends StatelessWidget {
                     Text(
                       event.detail,
                       style: const TextStyle(
-                        fontFamily: 'Inter',
+                        fontFamily: 'Geist',
                         fontSize: 11,
                         color: AppColors.ctText2,
                         height: 1.4,
@@ -480,7 +480,7 @@ class _FlowPanels extends StatelessWidget {
         Text(
           'IDs POR FLUJO',
           style: TextStyle(
-            fontFamily: 'Inter',
+            fontFamily: 'Geist',
             fontSize: 10,
             fontWeight: FontWeight.w600,
             color: AppColors.ctText3,
@@ -528,7 +528,7 @@ class _FlowPanel extends StatelessWidget {
           Text(
             title,
             style: const TextStyle(
-              fontFamily: 'Inter',
+              fontFamily: 'Geist',
               fontSize: 11,
               fontWeight: FontWeight.w600,
               color: AppColors.ctText,
@@ -559,7 +559,7 @@ class _FlowTurnoContent extends StatelessWidget {
             Text(
               'Inicio: ✓ 07:03',
               style: TextStyle(
-                fontFamily: 'Inter',
+                fontFamily: 'Geist',
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
                 color: AppColors.ctOk,
@@ -575,7 +575,7 @@ class _FlowTurnoContent extends StatelessWidget {
             Text(
               'Cierre: Pendiente',
               style: TextStyle(
-                fontFamily: 'Inter',
+                fontFamily: 'Geist',
                 fontSize: 12,
                 color: AppColors.ctText3,
               ),
@@ -638,7 +638,7 @@ class _FlowRegistrosContent extends StatelessWidget {
             const Text(
               '3',
               style: TextStyle(
-                fontFamily: 'Inter',
+                fontFamily: 'Geist',
                 fontSize: 22,
                 fontWeight: FontWeight.w700,
                 color: AppColors.ctText,
@@ -649,7 +649,7 @@ class _FlowRegistrosContent extends StatelessWidget {
             const Text(
               'IDs generados',
               style: TextStyle(
-                fontFamily: 'Inter',
+                fontFamily: 'Geist',
                 fontSize: 11,
                 color: AppColors.ctText2,
               ),
@@ -665,7 +665,7 @@ class _FlowRegistrosContent extends StatelessWidget {
               child: const Text(
                 '2 cerrados',
                 style: TextStyle(
-                  fontFamily: 'Inter',
+                  fontFamily: 'Geist',
                   fontSize: 10,
                   fontWeight: FontWeight.w600,
                   color: AppColors.ctOkText,
@@ -724,7 +724,7 @@ class _IdRowState extends State<_IdRow> {
                 child: Text(
                   widget.entry.id,
                   style: const TextStyle(
-                    fontFamily: 'Inter',
+                    fontFamily: 'Geist',
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
                     color: AppColors.ctText,
@@ -741,7 +741,7 @@ class _IdRowState extends State<_IdRow> {
                 child: Text(
                   widget.entry.statusLabel,
                   style: TextStyle(
-                    fontFamily: 'Inter',
+                    fontFamily: 'Geist',
                     fontSize: 10,
                     fontWeight: FontWeight.w600,
                     color: widget.entry.statusTextColor,
@@ -771,7 +771,7 @@ class _FlowIncidenciasContent extends StatelessWidget {
         Text(
           'Sin incidencias ✓',
           style: TextStyle(
-            fontFamily: 'Inter',
+            fontFamily: 'Geist',
             fontSize: 12,
             fontWeight: FontWeight.w500,
             color: AppColors.ctOk,

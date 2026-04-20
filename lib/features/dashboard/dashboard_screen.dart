@@ -54,7 +54,7 @@ class _ActionBar extends ConsumerWidget {
                 Text(
                   'Dashboard',
                   style: TextStyle(
-                    fontFamily: 'Inter',
+                    fontFamily: 'Geist',
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
                     color: AppColors.ctText,
@@ -64,7 +64,7 @@ class _ActionBar extends ConsumerWidget {
                 Text(
                   'Configura las métricas que quieres ver',
                   style: TextStyle(
-                    fontFamily: 'Inter',
+                    fontFamily: 'Geist',
                     fontSize: 11,
                     color: AppColors.ctText2,
                   ),
@@ -130,7 +130,7 @@ class _GhostButtonState extends State<_GhostButton> {
               Text(
                 widget.label,
                 style: const TextStyle(
-                  fontFamily: 'Inter',
+                  fontFamily: 'Geist',
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
                   color: AppColors.ctText2,
@@ -209,7 +209,7 @@ class _EmptyViewState extends ConsumerState<_EmptyView> {
             const Text(
               'Tu dashboard está vacío',
               style: TextStyle(
-                fontFamily: 'Inter',
+                fontFamily: 'Geist',
                 fontSize: 15,
                 fontWeight: FontWeight.w700,
                 color: AppColors.ctText,
@@ -224,7 +224,7 @@ class _EmptyViewState extends ConsumerState<_EmptyView> {
                 'Dinos qué métricas te importan y generamos tu vista en segundos.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontFamily: 'Inter',
+                  fontFamily: 'Geist',
                   fontSize: 12,
                   color: AppColors.ctText2,
                   height: 1.5,
@@ -290,7 +290,7 @@ class _PromptBoxState extends State<_PromptBox> {
             const Text(
               '¿Qué quieres monitorear?',
               style: TextStyle(
-                fontFamily: 'Inter',
+                fontFamily: 'Geist',
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
                 color: AppColors.ctText,
@@ -306,7 +306,7 @@ class _PromptBoxState extends State<_PromptBox> {
               enabled: !widget.loading,
               onSubmitted: (_) => widget.onSubmit(),
               style: const TextStyle(
-                fontFamily: 'Inter',
+                fontFamily: 'Geist',
                 fontSize: 13,
                 color: AppColors.ctText,
                 height: 1.5,
@@ -315,7 +315,7 @@ class _PromptBoxState extends State<_PromptBox> {
                 hintText:
                     'Ej: "Quiero ver operadores activos, sesiones abiertas y las últimas alertas del día"',
                 hintStyle: const TextStyle(
-                  fontFamily: 'Inter',
+                  fontFamily: 'Geist',
                   fontSize: 13,
                   color: AppColors.ctText3,
                   height: 1.5,
@@ -360,7 +360,7 @@ class _PromptBoxState extends State<_PromptBox> {
                   child: Text(
                     'Generación automática con IA · solo datos de tu operación',
                     style: TextStyle(
-                      fontFamily: 'Inter',
+                      fontFamily: 'Geist',
                       fontSize: 11,
                       color: AppColors.ctText3,
                     ),
@@ -411,7 +411,7 @@ class _PromptBoxState extends State<_PromptBox> {
                           Text(
                             widget.loading ? 'Generando…' : 'Generar',
                             style: const TextStyle(
-                              fontFamily: 'Inter',
+                              fontFamily: 'Geist',
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
                               color: AppColors.ctNavy,
@@ -453,7 +453,7 @@ class _QuickSuggestions extends StatelessWidget {
           const Text(
             'SUGERENCIAS',
             style: TextStyle(
-              fontFamily: 'Inter',
+              fontFamily: 'Geist',
               fontSize: 10,
               fontWeight: FontWeight.w600,
               color: AppColors.ctText3,
@@ -516,7 +516,7 @@ class _SuggestionChipState extends State<_SuggestionChip> {
               Text(
                 widget.label,
                 style: const TextStyle(
-                  fontFamily: 'Inter',
+                  fontFamily: 'Geist',
                   fontSize: 12,
                   color: AppColors.ctText2,
                 ),
@@ -635,7 +635,7 @@ class _PromptBanner extends StatelessWidget {
             child: RichText(
               text: TextSpan(
                 style: const TextStyle(
-                  fontFamily: 'Inter',
+                  fontFamily: 'Geist',
                   fontSize: 12,
                   color: AppColors.ctTealDark,
                 ),
@@ -753,7 +753,7 @@ class _DashKpiCard extends StatelessWidget {
                 child: Text(
                   label,
                   style: const TextStyle(
-                    fontFamily: 'Inter',
+                    fontFamily: 'Geist',
                     fontSize: 10,
                     fontWeight: FontWeight.w600,
                     color: AppColors.ctText2,
@@ -767,7 +767,7 @@ class _DashKpiCard extends StatelessWidget {
           Text(
             value,
             style: const TextStyle(
-              fontFamily: 'Inter',
+              fontFamily: 'Geist',
               fontSize: 26,
               fontWeight: FontWeight.w700,
               color: AppColors.ctText,
@@ -778,7 +778,7 @@ class _DashKpiCard extends StatelessWidget {
           Text(
             sub,
             style: const TextStyle(
-              fontFamily: 'Inter',
+              fontFamily: 'Geist',
               fontSize: 11,
               color: AppColors.ctText3,
             ),
@@ -843,7 +843,7 @@ class _AlertasCard extends StatelessWidget {
         child: const Text(
           '2 activas',
           style: TextStyle(
-            fontFamily: 'Inter',
+            fontFamily: 'Geist',
             fontSize: 11,
             fontWeight: FontWeight.w600,
             color: AppColors.ctRedText,
@@ -898,7 +898,7 @@ class _AlertaRowState extends State<_AlertaRow> {
               child: Text(
                 a.severityLabel,
                 style: TextStyle(
-                  fontFamily: 'Inter',
+                  fontFamily: 'Geist',
                   fontSize: 10,
                   fontWeight: FontWeight.w600,
                   color: a.severityText,
@@ -913,7 +913,7 @@ class _AlertaRowState extends State<_AlertaRow> {
                   Text(
                     a.operator,
                     style: const TextStyle(
-                      fontFamily: 'Inter',
+                      fontFamily: 'Geist',
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                       color: AppColors.ctText,
@@ -923,7 +923,7 @@ class _AlertaRowState extends State<_AlertaRow> {
                   Text(
                     a.desc,
                     style: const TextStyle(
-                      fontFamily: 'Inter',
+                      fontFamily: 'Geist',
                       fontSize: 11,
                       color: AppColors.ctText2,
                     ),
@@ -934,7 +934,7 @@ class _AlertaRowState extends State<_AlertaRow> {
             Text(
               a.time,
               style: const TextStyle(
-                fontFamily: 'Inter',
+                fontFamily: 'Geist',
                 fontSize: 11,
                 color: AppColors.ctText3,
               ),
@@ -1032,7 +1032,7 @@ class _SesionesCard extends StatelessWidget {
       trailing: Text(
         '${_kSesiones.length} activas',
         style: const TextStyle(
-          fontFamily: 'Inter',
+          fontFamily: 'Geist',
           fontSize: 11,
           color: AppColors.ctText2,
         ),
@@ -1065,7 +1065,7 @@ class _SesionRow extends StatelessWidget {
             child: Text(
               item.initials,
               style: TextStyle(
-                fontFamily: 'Inter',
+                fontFamily: 'Geist',
                 fontSize: 10,
                 fontWeight: FontWeight.w700,
                 color: item.avatarTextColor,
@@ -1080,7 +1080,7 @@ class _SesionRow extends StatelessWidget {
                 Text(
                   item.name,
                   style: const TextStyle(
-                    fontFamily: 'Inter',
+                    fontFamily: 'Geist',
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
                     color: AppColors.ctText,
@@ -1090,7 +1090,7 @@ class _SesionRow extends StatelessWidget {
                 Text(
                   'desde ${item.since}',
                   style: const TextStyle(
-                    fontFamily: 'Inter',
+                    fontFamily: 'Geist',
                     fontSize: 10,
                     color: AppColors.ctText3,
                   ),
@@ -1108,7 +1108,7 @@ class _SesionRow extends StatelessWidget {
             child: Text(
               item.status,
               style: TextStyle(
-                fontFamily: 'Inter',
+                fontFamily: 'Geist',
                 fontSize: 10,
                 fontWeight: FontWeight.w600,
                 color: item.statusTextColor,
@@ -1149,7 +1149,7 @@ class _EventosCard extends StatelessWidget {
       trailing: const Text(
         '143 hoy',
         style: TextStyle(
-          fontFamily: 'Inter',
+          fontFamily: 'Geist',
           fontSize: 11,
           color: AppColors.ctText2,
         ),
@@ -1197,7 +1197,7 @@ class _BarChart extends StatelessWidget {
                 labels[i],
                 textAlign: TextAlign.center,
                 style: const TextStyle(
-                  fontFamily: 'Inter',
+                  fontFamily: 'Geist',
                   fontSize: 9,
                   color: AppColors.ctText3,
                 ),
@@ -1319,7 +1319,7 @@ class _FlujoRow extends StatelessWidget {
                 child: Text(
                   item.name,
                   style: const TextStyle(
-                    fontFamily: 'Inter',
+                    fontFamily: 'Geist',
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
                     color: AppColors.ctText,
@@ -1329,7 +1329,7 @@ class _FlujoRow extends StatelessWidget {
               Text(
                 '${item.active} activos',
                 style: TextStyle(
-                  fontFamily: 'Inter',
+                  fontFamily: 'Geist',
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
                   color: item.color,
@@ -1339,7 +1339,7 @@ class _FlujoRow extends StatelessWidget {
               Text(
                 '· ${item.completed} completados',
                 style: const TextStyle(
-                  fontFamily: 'Inter',
+                  fontFamily: 'Geist',
                   fontSize: 11,
                   color: AppColors.ctText3,
                 ),
@@ -1393,7 +1393,7 @@ class _DashCard extends StatelessWidget {
               Text(
                 title,
                 style: const TextStyle(
-                  fontFamily: 'Inter',
+                  fontFamily: 'Geist',
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                   color: AppColors.ctText,

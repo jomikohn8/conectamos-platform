@@ -174,7 +174,7 @@ class _AiWorkersScreenState extends ConsumerState<AiWorkersScreen> {
                           Text(
                             _error!,
                             style: const TextStyle(
-                              fontFamily: 'Inter',
+                              fontFamily: 'Geist',
                               fontSize: 13,
                               color: AppColors.ctDanger,
                             ),
@@ -228,7 +228,7 @@ class _ActionBar extends StatelessWidget {
                 Text(
                   'Mis Workers',
                   style: TextStyle(
-                    fontFamily: 'Inter',
+                    fontFamily: 'Geist',
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
                     color: AppColors.ctText,
@@ -238,7 +238,7 @@ class _ActionBar extends StatelessWidget {
                 Text(
                   'Workers de IA contratados para tu operación',
                   style: TextStyle(
-                    fontFamily: 'Inter',
+                    fontFamily: 'Geist',
                     fontSize: 11,
                     color: AppColors.ctText2,
                   ),
@@ -274,7 +274,7 @@ class _EmptyState extends StatelessWidget {
             const Text(
               'No tienes workers contratados aún.',
               style: TextStyle(
-                fontFamily: 'Inter',
+                fontFamily: 'Geist',
                 fontSize: 13,
                 color: AppColors.ctText2,
               ),
@@ -301,7 +301,7 @@ class _WorkersBody extends StatelessWidget {
   final void Function(Map<String, dynamic>) onRename;
 
   static const _headerStyle = TextStyle(
-    fontFamily: 'Inter',
+    fontFamily: 'Geist',
     fontSize: 10,
     fontWeight: FontWeight.w600,
     color: AppColors.ctText2,
@@ -425,7 +425,7 @@ class _WorkerRowState extends State<_WorkerRow> {
                         Text(
                           displayName,
                           style: const TextStyle(
-                            fontFamily: 'Inter',
+                            fontFamily: 'Geist',
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
                             color: AppColors.ctText,
@@ -492,7 +492,7 @@ class _WorkerRowState extends State<_WorkerRow> {
                   child: Text(
                     isActive ? 'Activo' : 'Inactivo',
                     style: TextStyle(
-                      fontFamily: 'Inter',
+                      fontFamily: 'Geist',
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
                       color: isActive ? AppColors.ctOkText : AppColors.ctText2,
@@ -613,7 +613,7 @@ class _RenameDialogState extends State<_RenameDialog> {
               const Text(
                 'Renombrar worker',
                 style: TextStyle(
-                  fontFamily: 'Inter',
+                  fontFamily: 'Geist',
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
                   color: AppColors.ctText,
@@ -624,7 +624,7 @@ class _RenameDialogState extends State<_RenameDialog> {
                 Text(
                   'Nombre original: $originalName',
                   style: const TextStyle(
-                    fontFamily: 'Inter',
+                    fontFamily: 'Geist',
                     fontSize: 12,
                     color: AppColors.ctText2,
                   ),
@@ -634,7 +634,7 @@ class _RenameDialogState extends State<_RenameDialog> {
               const Text(
                 'Nombre personalizado',
                 style: TextStyle(
-                  fontFamily: 'Inter',
+                  fontFamily: 'Geist',
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
                   color: AppColors.ctText,
@@ -645,14 +645,14 @@ class _RenameDialogState extends State<_RenameDialog> {
                 controller: _nameCtrl,
                 autofocus: true,
                 style: const TextStyle(
-                  fontFamily: 'Inter',
+                  fontFamily: 'Geist',
                   fontSize: 13,
                   color: AppColors.ctText,
                 ),
                 decoration: InputDecoration(
                   hintText: 'Ej: Worker Logística Norte',
                   hintStyle: const TextStyle(
-                    fontFamily: 'Inter',
+                    fontFamily: 'Geist',
                     fontSize: 13,
                     color: AppColors.ctText3,
                   ),
@@ -688,7 +688,7 @@ class _RenameDialogState extends State<_RenameDialog> {
                   child: Text(
                     _errorMsg!,
                     style: const TextStyle(
-                      fontFamily: 'Inter',
+                      fontFamily: 'Geist',
                       fontSize: 12,
                       color: AppColors.ctRedText,
                     ),
@@ -809,7 +809,7 @@ class _CatalogDialogState extends State<_CatalogDialog> {
                   Text(
                     'Catálogo de Workers',
                     style: TextStyle(
-                      fontFamily: 'Inter',
+                      fontFamily: 'Geist',
                       fontSize: 15,
                       fontWeight: FontWeight.w700,
                       color: AppColors.ctText,
@@ -819,7 +819,7 @@ class _CatalogDialogState extends State<_CatalogDialog> {
                   Text(
                     'Selecciona un worker para agregarlo a tu operación.',
                     style: TextStyle(
-                      fontFamily: 'Inter',
+                      fontFamily: 'Geist',
                       fontSize: 12,
                       color: AppColors.ctText2,
                     ),
@@ -839,7 +839,7 @@ class _CatalogDialogState extends State<_CatalogDialog> {
                         child: Text(
                           'No hay workers en el catálogo.',
                           style: TextStyle(
-                            fontFamily: 'Inter',
+                            fontFamily: 'Geist',
                             fontSize: 13,
                             color: AppColors.ctText2,
                           ),
@@ -885,7 +885,7 @@ class _CatalogDialogState extends State<_CatalogDialog> {
                                 child: Text(
                                   _initials(name),
                                   style: const TextStyle(
-                                    fontFamily: 'Inter',
+                                    fontFamily: 'Geist',
                                     fontSize: 13,
                                     fontWeight: FontWeight.w700,
                                     color: Colors.white,
@@ -902,7 +902,7 @@ class _CatalogDialogState extends State<_CatalogDialog> {
                                     Text(
                                       name,
                                       style: const TextStyle(
-                                        fontFamily: 'Inter',
+                                        fontFamily: 'Geist',
                                         fontSize: 14,
                                         fontWeight: FontWeight.w600,
                                         color: AppColors.ctText,
@@ -966,7 +966,7 @@ class _CatalogDialogState extends State<_CatalogDialog> {
                                       child: const Text(
                                         'Próximamente',
                                         style: TextStyle(
-                                          fontFamily: 'Inter',
+                                          fontFamily: 'Geist',
                                           fontSize: 11,
                                           fontWeight: FontWeight.w500,
                                           color: AppColors.ctText2,
@@ -984,7 +984,7 @@ class _CatalogDialogState extends State<_CatalogDialog> {
                                       child: const Text(
                                         'Contratado',
                                         style: TextStyle(
-                                          fontFamily: 'Inter',
+                                          fontFamily: 'Geist',
                                           fontSize: 11,
                                           fontWeight: FontWeight.w600,
                                           color: AppColors.ctOkText,
@@ -1056,7 +1056,7 @@ class _TypeBadge extends StatelessWidget {
       child: Text(
         label,
         style: TextStyle(
-          fontFamily: 'Inter',
+          fontFamily: 'Geist',
           fontSize: 11,
           fontWeight: FontWeight.w600,
           color: fg,
@@ -1120,7 +1120,7 @@ class _PrimaryBtnState extends State<_PrimaryBtn> {
           child: Text(
             widget.label,
             style: TextStyle(
-              fontFamily: 'Inter',
+              fontFamily: 'Geist',
               fontSize: 13,
               fontWeight: FontWeight.w600,
               color: widget.disabled ? AppColors.ctText3 : AppColors.ctNavy,
@@ -1163,7 +1163,7 @@ class _GhostBtnState extends State<_GhostBtn> {
           child: Text(
             widget.label,
             style: const TextStyle(
-              fontFamily: 'Inter',
+              fontFamily: 'Geist',
               fontSize: 13,
               fontWeight: FontWeight.w500,
               color: AppColors.ctText2,
@@ -1212,7 +1212,7 @@ class _ActionBtnState extends State<_ActionBtn> {
           child: Text(
             widget.label,
             style: TextStyle(
-              fontFamily: 'Inter',
+              fontFamily: 'Geist',
               fontSize: 12,
               fontWeight: FontWeight.w500,
               color: widget.color,

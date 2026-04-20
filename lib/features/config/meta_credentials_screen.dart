@@ -49,7 +49,7 @@ class _ActionBar extends StatelessWidget {
               Text(
                 'Credenciales Meta',
                 style: TextStyle(
-                  fontFamily: 'Inter',
+                  fontFamily: 'Geist',
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
                   color: AppColors.ctText,
@@ -59,7 +59,7 @@ class _ActionBar extends StatelessWidget {
               Text(
                 'Conecta tu cuenta de Meta Business para usar WhatsApp API',
                 style: TextStyle(
-                  fontFamily: 'Inter',
+                  fontFamily: 'Geist',
                   fontSize: 11,
                   color: AppColors.ctText2,
                 ),
@@ -109,7 +109,7 @@ class _StatusCard extends StatelessWidget {
               const Text(
                 'Cuenta de Meta Business',
                 style: TextStyle(
-                  fontFamily: 'Inter',
+                  fontFamily: 'Geist',
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
                   color: AppColors.ctText,
@@ -147,7 +147,7 @@ class _StatusCard extends StatelessWidget {
                 Text(
                   'Tu cuenta de Meta Business está activa y verificada',
                   style: TextStyle(
-                    fontFamily: 'Inter',
+                    fontFamily: 'Geist',
                     fontSize: 13,
                     color: AppColors.ctOkText,
                   ),
@@ -249,7 +249,7 @@ class _PhoneNumbersTable extends StatelessWidget {
   const _PhoneNumbersTable();
 
   static const _headerStyle = TextStyle(
-    fontFamily: 'Inter',
+    fontFamily: 'Geist',
     fontSize: 10,
     fontWeight: FontWeight.w600,
     color: AppColors.ctText2,
@@ -269,7 +269,7 @@ class _PhoneNumbersTable extends StatelessWidget {
                 child: Text(
                   'Números de WhatsApp',
                   style: TextStyle(
-                    fontFamily: 'Inter',
+                    fontFamily: 'Geist',
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
                     color: AppColors.ctText,
@@ -392,7 +392,7 @@ class _PhoneRowState extends State<_PhoneRow> {
               child: Text(
                 widget.number,
                 style: const TextStyle(
-                  fontFamily: 'Inter',
+                  fontFamily: 'Geist',
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
                   color: AppColors.ctText,
@@ -405,7 +405,7 @@ class _PhoneRowState extends State<_PhoneRow> {
               child: Text(
                 widget.profile,
                 style: const TextStyle(
-                  fontFamily: 'Inter',
+                  fontFamily: 'Geist',
                   fontSize: 13,
                   color: AppColors.ctText,
                 ),
@@ -481,7 +481,7 @@ class _TokenCardState extends State<_TokenCard> {
             Text(
               'Token copiado',
               style: TextStyle(
-                fontFamily: 'Inter',
+                fontFamily: 'Geist',
                 fontSize: 13,
               ),
             ),
@@ -511,7 +511,7 @@ class _TokenCardState extends State<_TokenCard> {
                 child: Text(
                   'Token de acceso',
                   style: TextStyle(
-                    fontFamily: 'Inter',
+                    fontFamily: 'Geist',
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
                     color: AppColors.ctText,
@@ -531,7 +531,7 @@ class _TokenCardState extends State<_TokenCard> {
           const Text(
             'Token activo',
             style: TextStyle(
-              fontFamily: 'Inter',
+              fontFamily: 'Geist',
               fontSize: 11,
               fontWeight: FontWeight.w500,
               color: AppColors.ctText2,
@@ -600,7 +600,7 @@ class _TokenCardState extends State<_TokenCard> {
                   child: Text(
                     'El token se usa para autenticar las llamadas a la API de WhatsApp Business. Mantenlo seguro.',
                     style: TextStyle(
-                      fontFamily: 'Inter',
+                      fontFamily: 'Geist',
                       fontSize: 11,
                       color: AppColors.ctText2,
                       height: 1.5,
@@ -658,7 +658,7 @@ class _Badge extends StatelessWidget {
       child: Text(
         label,
         style: TextStyle(
-          fontFamily: 'Inter',
+          fontFamily: 'Geist',
           fontSize: 11,
           fontWeight: FontWeight.w600,
           color: textColor,
@@ -686,7 +686,7 @@ class _DataField extends StatelessWidget {
         Text(
           label,
           style: const TextStyle(
-            fontFamily: 'Inter',
+            fontFamily: 'Geist',
             fontSize: 11,
             fontWeight: FontWeight.w500,
             color: AppColors.ctText2,
@@ -697,7 +697,7 @@ class _DataField extends StatelessWidget {
             Text(
               value!,
               style: const TextStyle(
-                fontFamily: 'Inter',
+                fontFamily: 'Geist',
                 fontSize: 13,
                 fontWeight: FontWeight.w500,
                 color: AppColors.ctText,
@@ -739,7 +739,7 @@ class _PrimaryButtonState extends State<_PrimaryButton> {
           child: Text(
             widget.label,
             style: const TextStyle(
-              fontFamily: 'Inter',
+              fontFamily: 'Geist',
               fontSize: 12,
               fontWeight: FontWeight.w600,
               color: AppColors.ctNavy,
@@ -790,7 +790,7 @@ class _GhostButtonState extends State<_GhostButton> {
               Text(
                 widget.label,
                 style: const TextStyle(
-                  fontFamily: 'Inter',
+                  fontFamily: 'Geist',
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
                   color: AppColors.ctText2,
@@ -851,7 +851,7 @@ class _DangerGhostButtonState extends State<_DangerGhostButton> {
               Text(
                 widget.label,
                 style: TextStyle(
-                  fontFamily: 'Inter',
+                  fontFamily: 'Geist',
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
                   color: _hovered
@@ -903,7 +903,7 @@ class _TableGhostButtonState extends State<_TableGhostButton> {
           child: Text(
             widget.label,
             style: const TextStyle(
-              fontFamily: 'Inter',
+              fontFamily: 'Geist',
               fontSize: 11,
               fontWeight: FontWeight.w500,
               color: AppColors.ctText2,

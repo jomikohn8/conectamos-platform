@@ -145,7 +145,7 @@ class _ActionBar extends StatelessWidget {
                 Text(
                   'Grupos WhatsApp',
                   style: TextStyle(
-                    fontFamily: 'Inter',
+                    fontFamily: 'Geist',
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
                     color: AppColors.ctText,
@@ -155,7 +155,7 @@ class _ActionBar extends StatelessWidget {
                 Text(
                   'Configura los grupos de salida para notificaciones y reportes',
                   style: TextStyle(
-                    fontFamily: 'Inter',
+                    fontFamily: 'Geist',
                     fontSize: 11,
                     color: AppColors.ctText2,
                   ),
@@ -221,7 +221,7 @@ class _InfoBanner extends StatelessWidget {
             child: Text(
               'Los grupos de salida reciben reportes automáticos generados por ConectamOS. Los operadores no son miembros de estos grupos.',
               style: TextStyle(
-                fontFamily: 'Inter',
+                fontFamily: 'Geist',
                 fontSize: 12,
                 color: AppColors.ctInfoText,
                 height: 1.5,
@@ -283,7 +283,7 @@ class _GroupCard extends StatelessWidget {
                       Text(
                         g.name,
                         style: const TextStyle(
-                          fontFamily: 'Inter',
+                          fontFamily: 'Geist',
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
                           color: AppColors.ctText,
@@ -293,7 +293,7 @@ class _GroupCard extends StatelessWidget {
                       Text(
                         g.description,
                         style: const TextStyle(
-                          fontFamily: 'Inter',
+                          fontFamily: 'Geist',
                           fontSize: 12,
                           color: AppColors.ctText2,
                         ),
@@ -310,7 +310,7 @@ class _GroupCard extends StatelessWidget {
                           Text(
                             g.phone,
                             style: const TextStyle(
-                              fontFamily: 'Inter',
+                              fontFamily: 'Geist',
                               fontSize: 11,
                               color: AppColors.ctText3,
                             ),
@@ -336,7 +336,7 @@ class _GroupCard extends StatelessWidget {
                       child: Text(
                         g.statusLabel,
                         style: TextStyle(
-                          fontFamily: 'Inter',
+                          fontFamily: 'Geist',
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
                           color: g.statusTextColor,
@@ -391,7 +391,7 @@ class _GroupCard extends StatelessWidget {
                 const Text(
                   'MIEMBROS',
                   style: TextStyle(
-                    fontFamily: 'Inter',
+                    fontFamily: 'Geist',
                     fontSize: 10,
                     fontWeight: FontWeight.w600,
                     color: AppColors.ctText3,
@@ -438,7 +438,7 @@ class _GroupMember extends StatelessWidget {
           child: Text(
             member.initials,
             style: const TextStyle(
-              fontFamily: 'Inter',
+              fontFamily: 'Geist',
               fontSize: 10,
               fontWeight: FontWeight.w600,
               color: AppColors.ctText2,
@@ -452,7 +452,7 @@ class _GroupMember extends StatelessWidget {
             Text(
               member.name,
               style: const TextStyle(
-                fontFamily: 'Inter',
+                fontFamily: 'Geist',
                 fontSize: 11,
                 fontWeight: FontWeight.w500,
                 color: AppColors.ctText,
@@ -461,7 +461,7 @@ class _GroupMember extends StatelessWidget {
             Text(
               member.role,
               style: const TextStyle(
-                fontFamily: 'Inter',
+                fontFamily: 'Geist',
                 fontSize: 10,
                 color: AppColors.ctText3,
               ),
@@ -532,7 +532,7 @@ class _CreateGroupDialogState extends State<_CreateGroupDialog> {
               const Text(
                 'Crear grupo de WhatsApp',
                 style: TextStyle(
-                  fontFamily: 'Inter',
+                  fontFamily: 'Geist',
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
                   color: AppColors.ctText,
@@ -578,7 +578,7 @@ class _CreateGroupDialogState extends State<_CreateGroupDialog> {
               const Text(
                 'Tipo de reporte',
                 style: TextStyle(
-                  fontFamily: 'Inter',
+                  fontFamily: 'Geist',
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
                   color: AppColors.ctText,
@@ -636,7 +636,7 @@ class _CreateGroupDialogState extends State<_CreateGroupDialog> {
                                 Text(
                                   _reportTypes[i],
                                   style: const TextStyle(
-                                    fontFamily: 'Inter',
+                                    fontFamily: 'Geist',
                                     fontSize: 13,
                                     color: AppColors.ctText,
                                   ),
@@ -696,7 +696,7 @@ class _MetadataChip extends StatelessWidget {
       child: Text(
         label,
         style: const TextStyle(
-          fontFamily: 'Inter',
+          fontFamily: 'Geist',
           fontSize: 11,
           color: AppColors.ctText2,
         ),
@@ -761,7 +761,7 @@ class _GhostButtonState extends State<_GhostButton> {
               Text(
                 widget.label,
                 style: TextStyle(
-                  fontFamily: 'Inter',
+                  fontFamily: 'Geist',
                   fontSize: 11,
                   fontWeight: FontWeight.w500,
                   color: _hovered ? widget.color : AppColors.ctText2,
@@ -793,7 +793,7 @@ class _DialogField extends StatelessWidget {
         Text(
           label,
           style: const TextStyle(
-            fontFamily: 'Inter',
+            fontFamily: 'Geist',
             fontSize: 13,
             fontWeight: FontWeight.w500,
             color: AppColors.ctText,
@@ -803,14 +803,14 @@ class _DialogField extends StatelessWidget {
         TextField(
           controller: controller,
           style: const TextStyle(
-            fontFamily: 'Inter',
+            fontFamily: 'Geist',
             fontSize: 13,
             color: AppColors.ctText,
           ),
           decoration: InputDecoration(
             hintText: placeholder,
             hintStyle: const TextStyle(
-              fontFamily: 'Inter',
+              fontFamily: 'Geist',
               fontSize: 13,
               color: AppColors.ctText3,
             ),
@@ -858,7 +858,7 @@ class _DialogSelect extends StatelessWidget {
         Text(
           label,
           style: const TextStyle(
-            fontFamily: 'Inter',
+            fontFamily: 'Geist',
             fontSize: 13,
             fontWeight: FontWeight.w500,
             color: AppColors.ctText,
@@ -879,7 +879,7 @@ class _DialogSelect extends StatelessWidget {
               isExpanded: true,
               isDense: true,
               style: const TextStyle(
-                fontFamily: 'Inter',
+                fontFamily: 'Geist',
                 fontSize: 13,
                 color: AppColors.ctText,
               ),
@@ -933,7 +933,7 @@ class _PrimaryButtonState extends State<_PrimaryButton> {
           child: Text(
             widget.label,
             style: const TextStyle(
-              fontFamily: 'Inter',
+              fontFamily: 'Geist',
               fontSize: 12,
               fontWeight: FontWeight.w600,
               color: AppColors.ctNavy,
@@ -977,7 +977,7 @@ class _OutlineButtonState extends State<_OutlineButton> {
           child: Text(
             widget.label,
             style: const TextStyle(
-              fontFamily: 'Inter',
+              fontFamily: 'Geist',
               fontSize: 12,
               fontWeight: FontWeight.w500,
               color: AppColors.ctText2,
