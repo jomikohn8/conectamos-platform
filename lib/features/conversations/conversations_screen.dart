@@ -17,6 +17,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/api/api_client.dart';
+import '../../core/api/channels_api.dart';
 import '../../core/api/messages_api.dart';
 import '../../core/api/operators_api.dart';
 import '../../core/api/sessions_api.dart';
@@ -27,8 +28,9 @@ import '../../core/theme/app_theme.dart';
 
 // ── Providers ─────────────────────────────────────────────────────────────────
 
-final selectedConvoTabProvider = StateProvider<int>((ref) => 0);
-final selectedChatIdProvider = StateProvider<String?>((ref) => null);
+final selectedChannelIdProvider  = StateProvider<String?>((ref) => null);
+final selectedChannelTabProvider = StateProvider<int>((ref) => 0);
+final selectedChatIdProvider     = StateProvider<String?>((ref) => null);
 final selectedChatNameProvider = StateProvider<String?>((ref) => null);
 final selectedOperatorChannelsProvider =
     StateProvider<List<Map<String, dynamic>>>((ref) => []);
@@ -200,17 +202,86 @@ class _PrimaryButtonState extends State<_PrimaryButton> {
 
 // ── Cuerpo con tabs ───────────────────────────────────────────────────────────
 
-class _ConversationsBody extends ConsumerWidget {
+class _ConversationsBody extends ConsumerStatefulWidget {
   const _ConversationsBody();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final tab = ref.watch(selectedConvoTabProvider);
+  ConsumerState<_ConversationsBody> createState() => _ConversationsBodyState();
+}
+
+class _ConversationsBodyState extends ConsumerState<_ConversationsBody> {
+  List<Map<String, dynamic>> _channels = [];
+  bool _loadingChannels = true;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadChannels());
+  }
+
+  Future<void> _loadChannels() async {
+    if (!mounted) return;
+    setState(() => _loadingChannels = true);
+    final tenantId = ref.read(activeTenantIdProvider);
+    try {
+      final all = await ChannelsApi.listChannels(tenantId: tenantId);
+      final active = all
+          .where((c) => c['is_active'] as bool? ?? false)
+          .toList()
+        ..sort((a, b) => (a['created_at'] as String? ?? '')
+            .compareTo(b['created_at'] as String? ?? ''));
+      if (!mounted) return;
+      setState(() { _channels = active; _loadingChannels = false; });
+      if (active.isNotEmpty && ref.read(selectedChannelIdProvider) == null) {
+        ref.read(selectedChannelIdProvider.notifier).state =
+            active.first['id'] as String?;
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loadingChannels = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    ref.listen<String>(activeTenantIdProvider, (prev, next) {
+      if (prev != null && prev != next) {
+        ref.read(selectedChannelIdProvider.notifier).state = null;
+        ref.read(selectedChannelTabProvider.notifier).state = 0;
+        ref.read(selectedChatIdProvider.notifier).state = null;
+        ref.read(selectedChatNameProvider.notifier).state = null;
+        ref.read(selectedOperatorChannelsProvider.notifier).state = [];
+        ref.read(replyingToProvider.notifier).state = null;
+        setState(() { _channels = []; _loadingChannels = true; });
+        _loadChannels();
+      }
+    });
+
+    ref.listen<int>(channelStateVersionProvider, (prev, next) {
+      if (prev != null && prev != next) _loadChannels();
+    });
+
+    final tab = ref.watch(selectedChannelTabProvider);
+    final selectedChannelId = ref.watch(selectedChannelIdProvider);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Pill tab bar
+        // Nivel 1 — Canal selector (solo si hay más de 1 canal)
+        if (!_loadingChannels && _channels.length > 1)
+          _ChannelSelectorBar(
+            channels: _channels,
+            selectedChannelId: selectedChannelId,
+            onChannelSelected: (id) {
+              ref.read(selectedChannelIdProvider.notifier).state = id;
+              ref.read(selectedChannelTabProvider.notifier).state = 0;
+              ref.read(selectedChatIdProvider.notifier).state = null;
+              ref.read(selectedChatNameProvider.notifier).state = null;
+              ref.read(selectedOperatorChannelsProvider.notifier).state = [];
+              ref.read(replyingToProvider.notifier).state = null;
+            },
+          ),
+
+        // Nivel 2 — Pill tab bar (Conversaciones / Feed global)
         Padding(
           padding: const EdgeInsets.fromLTRB(22, 14, 22, 0),
           child: _TabBar(selectedIndex: tab),
@@ -251,17 +322,17 @@ class _TabBar extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             _TabPill(
-              label: 'Por operador',
+              label: 'Conversaciones',
               selected: selectedIndex == 0,
               onTap: () =>
-                  ref.read(selectedConvoTabProvider.notifier).state = 0,
+                  ref.read(selectedChannelTabProvider.notifier).state = 0,
             ),
             const SizedBox(width: 2),
             _TabPill(
               label: 'Feed global',
               selected: selectedIndex == 1,
               onTap: () =>
-                  ref.read(selectedConvoTabProvider.notifier).state = 1,
+                  ref.read(selectedChannelTabProvider.notifier).state = 1,
             ),
           ],
         ),
@@ -313,6 +384,85 @@ class _TabPill extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+// ── Channel selector bar (Nivel 1) ────────────────────────────────────────────
+
+class _ChannelSelectorBar extends StatelessWidget {
+  const _ChannelSelectorBar({
+    required this.channels,
+    required this.selectedChannelId,
+    required this.onChannelSelected,
+  });
+  final List<Map<String, dynamic>> channels;
+  final String? selectedChannelId;
+  final ValueChanged<String> onChannelSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 40,
+      decoration: const BoxDecoration(
+        color: AppColors.ctSurface,
+        border: Border(bottom: BorderSide(color: AppColors.ctBorder)),
+      ),
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        itemCount: channels.length,
+        itemBuilder: (context, i) {
+          final ch = channels[i];
+          final chId = ch['id'] as String?;
+          final isSelected = chId == selectedChannelId;
+          final color = _hexColor(ch['color'] as String?);
+          final label = ch['display_name'] as String? ?? 'Canal ${i + 1}';
+          return MouseRegion(
+            cursor: SystemMouseCursors.click,
+            child: GestureDetector(
+              onTap: () { if (chId != null) onChannelSelected(chId); },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 120),
+                alignment: Alignment.center,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                decoration: BoxDecoration(
+                  color: isSelected ? AppColors.ctSurface : Colors.transparent,
+                  border: isSelected
+                      ? Border(bottom: BorderSide(color: color, width: 2))
+                      : null,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: color,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      label,
+                      style: TextStyle(
+                        fontFamily: 'Geist',
+                        fontSize: 12,
+                        fontWeight:
+                            isSelected ? FontWeight.w600 : FontWeight.w500,
+                        color: isSelected
+                            ? AppColors.ctText
+                            : AppColors.ctText2,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -625,6 +775,7 @@ class _ConvoListState extends ConsumerState<_ConvoList> {
         ref.read(selectedChatNameProvider.notifier).state = null;
         ref.read(selectedOperatorChannelsProvider.notifier).state = [];
         ref.read(selectedChannelIndexProvider.notifier).state = 0;
+        ref.read(selectedChannelIdProvider.notifier).state = null;
         ref.read(replyingToProvider.notifier).state = null;
       }
     });
@@ -633,8 +784,19 @@ class _ConvoListState extends ConsumerState<_ConvoList> {
       if (prev != null && prev != next) _fetchOperators();
     });
 
-    final selectedChatId = ref.watch(selectedChatIdProvider);
+    final selectedChatId    = ref.watch(selectedChatIdProvider);
+    final selectedChannelId = ref.watch(selectedChannelIdProvider);
     final filtered = _operators.where((op) {
+      // Nivel 3 — filtrar por canal seleccionado
+      if (selectedChannelId != null) {
+        final opChannels = List<Map<String, dynamic>>.from(
+          (op['channels'] as List?) ?? [],
+        );
+        final hasChannel = opChannels.any(
+          (c) => (c['channel_id'] as String?) == selectedChannelId,
+        );
+        if (!hasChannel) return false;
+      }
       final name = op['display_name'] as String? ??
           op['phone'] as String? ?? '';
       return name.toLowerCase().contains(_search.toLowerCase());
@@ -1040,10 +1202,7 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
   }
 
   String? _activeChannelId() {
-    final channels = ref.read(selectedOperatorChannelsProvider);
-    final idx = ref.read(selectedChannelIndexProvider).clamp(
-        0, channels.isEmpty ? 0 : channels.length - 1);
-    return channels.isNotEmpty ? channels[idx]['channel_id'] as String? : null;
+    return ref.read(selectedChannelIdProvider);
   }
 
   Future<void> _sendReadReceipts(List<Map<String, dynamic>> messages) async {
@@ -1567,12 +1726,10 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
           ? DateTime.tryParse(lastInbound['received_at'] as String? ?? '')
           : null;
       final chs = ref.read(selectedOperatorChannelsProvider);
-      final chIdx = ref.read(selectedChannelIndexProvider)
-          .clamp(0, chs.isEmpty ? 0 : chs.length - 1);
-      final activeCh = chs.isNotEmpty
-          ? chs.firstWhere((c) => c['is_active'] as bool? ?? false,
-              orElse: () => chs[chIdx])
-          : null;
+      final activeChId = ref.read(selectedChannelIdProvider);
+      final activeCh = chs
+          .where((c) => (c['channel_id'] as String?) == activeChId)
+          .firstOrNull;
       final channelType = activeCh?['channel_type'] as String?;
       final hasRecentInbound = receivedAt != null &&
           DateTime.now().toUtc().difference(receivedAt.toUtc()).inHours < 24;
@@ -1882,17 +2039,11 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
 
     if (chatId == null) return _emptyState();
 
-    final channels = ref.watch(selectedOperatorChannelsProvider);
-    final activeChannelIdx = ref.watch(selectedChannelIndexProvider);
-    final safeIdx =
-        channels.isEmpty ? 0 : activeChannelIdx.clamp(0, channels.length - 1);
-    final activeChannel = channels.isNotEmpty
-        ? channels.firstWhere(
-            (c) => c['is_active'] as bool? ?? false,
-            orElse: () => channels[safeIdx],
-          )
-        : null;
-    final activeChannelId = activeChannel?['channel_id'] as String?;
+    final channels       = ref.watch(selectedOperatorChannelsProvider);
+    final activeChannelId = ref.watch(selectedChannelIdProvider);
+    final activeChannel   = channels
+        .where((c) => (c['channel_id'] as String?) == activeChannelId)
+        .firstOrNull;
 
     final channelFiltered = activeChannelId != null
         ? _apiMessages.where((m) {
@@ -1929,14 +2080,6 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
 
     final body = Column(
       children: [
-        // Channel tabs (solo cuando hay más de un canal)
-        if (channels.length > 1)
-          _ChannelTabBar(
-            channels: channels,
-            selectedIndex: safeIdx,
-            onTap: (i) =>
-                ref.read(selectedChannelIndexProvider.notifier).state = i,
-          ),
         // Header
         _ApiChatHeader(
           name: chatName ?? chatId,
@@ -2155,90 +2298,6 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
           body,
           if (_isDragOver) _buildDragOverlay(),
         ],
-      ),
-    );
-  }
-}
-
-// ── Channel tab bar ───────────────────────────────────────────────────────────
-
-class _ChannelTabBar extends StatelessWidget {
-  const _ChannelTabBar({
-    required this.channels,
-    required this.selectedIndex,
-    required this.onTap,
-  });
-
-  final List<Map<String, dynamic>> channels;
-  final int selectedIndex;
-  final ValueChanged<int> onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 40,
-      decoration: const BoxDecoration(
-        color: Color(0xFFF9FAFB),
-        border: Border(bottom: BorderSide(color: AppColors.ctBorder)),
-      ),
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        itemCount: channels.length,
-        itemBuilder: (context, i) {
-          final ch = channels[i];
-          final isSelected = i == selectedIndex;
-          final color = _hexColor(ch['color'] as String?);
-          final label = ch['worker_name'] as String? ??
-              ch['name'] as String? ??
-              'Canal ${i + 1}';
-          return MouseRegion(
-            cursor: SystemMouseCursors.click,
-            child: GestureDetector(
-              onTap: () => onTap(i),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 120),
-                alignment: Alignment.center,
-                padding: const EdgeInsets.symmetric(horizontal: 14),
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? AppColors.ctSurface
-                      : const Color(0xFFF9FAFB),
-                  border: isSelected
-                      ? Border(bottom: BorderSide(color: color, width: 2))
-                      : null,
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        color: color,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      label,
-                      style: TextStyle(
-                        fontFamily: 'Geist',
-                        fontSize: 12,
-                        fontWeight: isSelected
-                            ? FontWeight.w600
-                            : FontWeight.w500,
-                        color: isSelected
-                            ? AppColors.ctText
-                            : AppColors.ctText2,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        },
       ),
     );
   }
@@ -3627,6 +3686,11 @@ class _TabFeedState extends ConsumerState<_TabFeed> {
   }
 
   bool _matchesFilters(Map<String, dynamic> msg) {
+    final selectedChannelId = ref.read(selectedChannelIdProvider);
+    if (selectedChannelId != null) {
+      final msgChannelId = msg['channel_id'] as String?;
+      if (msgChannelId != null && msgChannelId != selectedChannelId) return false;
+    }
     if (_filterContact.isNotEmpty) {
       final direction = msg['direction'] as String?;
       final fromPhone = msg['from_phone'] as String? ?? '';
@@ -3691,9 +3755,12 @@ class _TabFeedState extends ConsumerState<_TabFeed> {
 
   @override
   Widget build(BuildContext context) {
-    // Reinicia el feed cuando cambia el tenant
+    // Reinicia el feed cuando cambia el tenant o el canal seleccionado
     ref.listen<String>(activeTenantIdProvider, (prev, next) {
       if (prev != null && prev != next) _resubscribe();
+    });
+    ref.listen<String?>(selectedChannelIdProvider, (prev, next) {
+      if (prev != next) _resubscribe();
     });
 
     return Column(
@@ -5220,7 +5287,7 @@ class _NewMessageDialogState extends ConsumerState<_NewMessageDialog> {
       }
       if (mounted) {
         Navigator.of(context).pop();
-        ref.read(selectedConvoTabProvider.notifier).state = 0;
+        ref.read(selectedChannelTabProvider.notifier).state = 0;
         ref.read(selectedChatIdProvider.notifier).state = phone;
         ref.read(selectedChatNameProvider.notifier).state = name;
       }
