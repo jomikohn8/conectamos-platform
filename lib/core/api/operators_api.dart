@@ -21,6 +21,7 @@ class OperatorsApi {
     required String phone,
     required List<String> flows,
     String tenantId = 'default',
+    String? telegramChatId,
   }) async {
     final response = await ApiClient.instance.post(
       '/operators',
@@ -29,6 +30,7 @@ class OperatorsApi {
         'phone': phone,
         'flows': flows,
         'tenant_id': tenantId,
+        'metadata': {'telegram_chat_id': telegramChatId},
       },
     );
     return Map<String, dynamic>.from(response.data);
@@ -39,6 +41,7 @@ class OperatorsApi {
     required String displayName,
     required String phone,
     required List<String> flows,
+    String? telegramChatId,
   }) async {
     final response = await ApiClient.instance.put(
       '/operators/$id',
@@ -46,6 +49,7 @@ class OperatorsApi {
         'display_name': displayName,
         'phone': phone,
         'flows': flows,
+        'metadata': {'telegram_chat_id': telegramChatId},
       },
     );
     return Map<String, dynamic>.from(response.data);

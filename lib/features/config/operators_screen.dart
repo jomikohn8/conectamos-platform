@@ -604,6 +604,7 @@ class _OperatorRowState extends State<_OperatorRow> {
                                 initialName: name,
                                 initialPhone: phone,
                                 initialFlows: flows.map((f) => f['id'] as String? ?? '').where((s) => s.isNotEmpty).toList(),
+                                initialTelegramChatId: (op['metadata'] as Map<String, dynamic>?)?['telegram_chat_id'] as String?,
                                 onSaved: widget.onRefresh,
                               ),
                             );
@@ -641,6 +642,7 @@ class _OperatorFormDialog extends ConsumerStatefulWidget {
     this.initialName,
     this.initialPhone,
     this.initialFlows,
+    this.initialTelegramChatId,
     required this.onSaved,
   });
 
@@ -648,6 +650,7 @@ class _OperatorFormDialog extends ConsumerStatefulWidget {
   final String? initialName;
   final String? initialPhone;
   final List<String>? initialFlows;
+  final String? initialTelegramChatId;
   final VoidCallback onSaved;
 
   bool get isEdit => operatorId != null;
@@ -659,6 +662,7 @@ class _OperatorFormDialog extends ConsumerStatefulWidget {
 class _OperatorFormDialogState extends ConsumerState<_OperatorFormDialog> {
   late final TextEditingController _nameCtrl;
   late final TextEditingController _phoneCtrl;
+  late final TextEditingController _telegramCtrl;
   bool _saving = false;
   String? _errorMsg;
 
@@ -671,8 +675,9 @@ class _OperatorFormDialogState extends ConsumerState<_OperatorFormDialog> {
   @override
   void initState() {
     super.initState();
-    _nameCtrl = TextEditingController(text: widget.initialName ?? '');
-    _phoneCtrl = TextEditingController(text: widget.initialPhone ?? '');
+    _nameCtrl     = TextEditingController(text: widget.initialName ?? '');
+    _phoneCtrl    = TextEditingController(text: widget.initialPhone ?? '');
+    _telegramCtrl = TextEditingController(text: widget.initialTelegramChatId ?? '');
     _selectedFlowIds = Set<String>.from(widget.initialFlows ?? []);
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadFlows());
   }
@@ -693,6 +698,7 @@ class _OperatorFormDialogState extends ConsumerState<_OperatorFormDialog> {
   void dispose() {
     _nameCtrl.dispose();
     _phoneCtrl.dispose();
+    _telegramCtrl.dispose();
     super.dispose();
   }
 
@@ -703,16 +709,37 @@ class _OperatorFormDialogState extends ConsumerState<_OperatorFormDialog> {
       setState(() => _errorMsg = 'Nombre y teléfono son obligatorios.');
       return;
     }
+
+    // Validar telegram_chat_id si hay flujos Telegram seleccionados
+    final hasTelegramFlow = _availableFlows
+        .where((f) => _selectedFlowIds.contains(f['id']))
+        .any((f) {
+          final types = f['channel_types'];
+          return types is List && types.contains('telegram');
+        });
+
+    if (hasTelegramFlow && _telegramCtrl.text.trim().isEmpty) {
+      setState(() {
+        _errorMsg = 'Este operador tiene flujos de canal Telegram asignados. '
+            'Ingresa su Telegram Chat ID para continuar.';
+      });
+      return;
+    }
+
     setState(() { _saving = true; _errorMsg = null; });
 
     try {
       final flows = _selectedFlowIds.toList();
+      final tgId = _telegramCtrl.text.trim().isEmpty
+          ? null
+          : _telegramCtrl.text.trim();
       if (widget.isEdit) {
         await OperatorsApi.updateOperator(
           id: widget.operatorId!,
           displayName: name,
           phone: phone,
           flows: flows,
+          telegramChatId: tgId,
         );
       } else {
         final tenantId = ref.read(activeTenantIdProvider);
@@ -721,6 +748,7 @@ class _OperatorFormDialogState extends ConsumerState<_OperatorFormDialog> {
           phone: phone,
           flows: flows,
           tenantId: tenantId.isNotEmpty ? tenantId : 'default',
+          telegramChatId: tgId,
         );
       }
       if (mounted) {
@@ -791,6 +819,15 @@ class _OperatorFormDialogState extends ConsumerState<_OperatorFormDialog> {
                 label: 'Número de WhatsApp',
                 controller: _phoneCtrl,
                 placeholder: '521XXXXXXXXXX',
+                keyboardType: TextInputType.number,
+              ),
+              const SizedBox(height: 14),
+
+              // Telegram Chat ID
+              _DialogField(
+                label: 'Telegram Chat ID',
+                controller: _telegramCtrl,
+                placeholder: 'Ej: 123456789',
                 keyboardType: TextInputType.number,
               ),
               const SizedBox(height: 18),
