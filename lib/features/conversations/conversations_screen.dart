@@ -75,12 +75,12 @@ class _ActionBar extends ConsumerWidget {
       padding: const EdgeInsets.symmetric(horizontal: 22),
       child: Row(
         children: [
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(
+                const Text(
                   'Conversaciones',
                   style: TextStyle(
                     fontFamily: 'Geist',
@@ -89,10 +89,15 @@ class _ActionBar extends ConsumerWidget {
                     color: AppColors.ctText,
                   ),
                 ),
-                SizedBox(height: 1),
+                const SizedBox(height: 1),
                 Text(
-                  'Canal WhatsApp · Mensajes en tiempo real',
-                  style: TextStyle(
+                  () {
+                    final ct = ref.watch(selectedChannelTypeProvider);
+                    if (ct == 'telegram') return 'Canal Telegram · Mensajes en tiempo real';
+                    if (ct == 'whatsapp') return 'Canal WhatsApp · Mensajes en tiempo real';
+                    return 'Mensajes en tiempo real';
+                  }(),
+                  style: const TextStyle(
                     fontFamily: 'Geist',
                     fontSize: 11,
                     color: AppColors.ctText2,
@@ -1884,6 +1889,26 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
           }
         });
       }
+    } on DioException catch (e) {
+      if (mounted) {
+        setState(() => _sending = false);
+        final String msg;
+        if (e.response?.statusCode == 422) {
+          final data = e.response?.data;
+          final detail = data is Map ? data['detail']?.toString() : null;
+          msg = detail?.isNotEmpty == true
+              ? detail!
+              : 'No se pudo enviar el mensaje. Verifica la configuración del canal.';
+        } else {
+          msg = 'Error al enviar: ${e.message ?? e.toString()}';
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(msg),
+            backgroundColor: const Color(0xFFEF4444),
+          ),
+        );
+      }
     } catch (e) {
       if (mounted) {
         setState(() => _sending = false);
@@ -2079,6 +2104,7 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
         _ApiChatHeader(
           name: chatName ?? chatId,
           windowOpen: _windowOpen,
+          channelType: ref.read(selectedChannelTypeProvider),
           channelName: activeChannel?['name'] as String?,
           workerName: activeChannel?['worker_name'] as String?,
           channelColor: activeChannel?['color'] as String?,
@@ -2365,6 +2391,7 @@ class _ApiChatHeader extends StatelessWidget {
   const _ApiChatHeader({
     required this.name,
     required this.windowOpen,
+    this.channelType,
     this.channelName,
     this.workerName,
     this.channelColor,
@@ -2373,6 +2400,7 @@ class _ApiChatHeader extends StatelessWidget {
   });
   final String name;
   final bool? windowOpen;
+  final String? channelType;
   final String? channelName;
   final String? workerName;
   final String? channelColor;
@@ -2430,7 +2458,7 @@ class _ApiChatHeader extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    if (windowOpen != null)
+                    if (windowOpen != null && channelType == 'whatsapp')
                       Container(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 7, vertical: 2),
