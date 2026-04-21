@@ -436,7 +436,7 @@ class _CreateChannelStepperState extends State<_CreateChannelStepper> {
             }
           }, {
             scope: 'whatsapp_business_management,whatsapp_business_messaging',
-            config_id: '1290590206469350',
+            config_id: '2145617199565998',
             response_type: 'code'
           });
         };
