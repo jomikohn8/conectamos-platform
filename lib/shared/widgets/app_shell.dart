@@ -49,6 +49,19 @@ class _AppShellState extends ConsumerState<AppShell> {
 
   @override
   Widget build(BuildContext context) {
+    // Covers fresh-login case: currentUserProvider is a synchronous Provider
+    // that caches null and is never invalidated by auth changes.
+    // Listening here ensures load() is called when sign-in completes.
+    ref.listen(authStateProvider, (prev, next) {
+      next.whenData((authState) {
+        if (authState.event == AuthChangeEvent.signedIn) {
+          final email = authState.session?.user.email ?? '';
+          if (email.isNotEmpty) {
+            ref.read(tenantNotifierProvider.notifier).load(email);
+          }
+        }
+      });
+    });
     return Scaffold(
       backgroundColor: AppColors.ctBg,
       body: Column(
