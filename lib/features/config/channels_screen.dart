@@ -398,6 +398,7 @@ class _CreateChannelStepperState extends State<_CreateChannelStepper> {
   // Step 1
   String  _channelType = 'whatsapp';
   String? _workerId;
+  String? _botUsername;
 
   // Step 2
   late final TextEditingController _nameCtrl;
@@ -436,8 +437,13 @@ class _CreateChannelStepperState extends State<_CreateChannelStepper> {
   }
 
   bool get _canNext {
-    if (_step == 0) return _channelType == 'whatsapp' && _workerId != null && widget.workers.isNotEmpty;
-    if (_step == 1) return _nameCtrl.text.trim().isNotEmpty && _phoneCtrl.text.trim().isNotEmpty && _wabaCtrl.text.trim().isNotEmpty && _tokenCtrl.text.trim().isNotEmpty;
+    if (_step == 0) return _workerId != null && widget.workers.isNotEmpty;
+    if (_step == 1) {
+      if (_channelType == 'telegram') {
+        return _nameCtrl.text.trim().isNotEmpty && _tokenCtrl.text.trim().isNotEmpty;
+      }
+      return _nameCtrl.text.trim().isNotEmpty && _phoneCtrl.text.trim().isNotEmpty && _wabaCtrl.text.trim().isNotEmpty && _tokenCtrl.text.trim().isNotEmpty;
+    }
     return true;
   }
 
@@ -445,22 +451,35 @@ class _CreateChannelStepperState extends State<_CreateChannelStepper> {
     if (_creating) return;
     setState(() { _creating = true; _createError = null; });
     try {
-      final result = await ChannelsApi.createChannel(
-        tenantId:      widget.tenantId,
-        tenantWorkerId: _workerId!,
-        displayName:   _nameCtrl.text.trim(),
-        color:         _color,
-        channelType:   _channelType,
-        phoneNumberId: _phoneCtrl.text.trim().isEmpty ? null : _phoneCtrl.text.trim(),
-        wabaId:        _wabaCtrl.text.trim().isEmpty  ? null : _wabaCtrl.text.trim(),
-        waToken:       _tokenCtrl.text.trim().isEmpty ? null : _tokenCtrl.text.trim(),
-      );
+      final Map<String, dynamic> result;
+      if (_channelType == 'telegram') {
+        result = await ChannelsApi.createChannel(
+          tenantId:       widget.tenantId,
+          tenantWorkerId: _workerId!,
+          displayName:    _nameCtrl.text.trim(),
+          color:          _color,
+          channelType:    'telegram',
+          channelConfig:  {'credentials': {'bot_token': _tokenCtrl.text.trim()}},
+        );
+      } else {
+        result = await ChannelsApi.createChannel(
+          tenantId:       widget.tenantId,
+          tenantWorkerId: _workerId!,
+          displayName:    _nameCtrl.text.trim(),
+          color:          _color,
+          channelType:    _channelType,
+          phoneNumberId:  _phoneCtrl.text.trim().isEmpty ? null : _phoneCtrl.text.trim(),
+          wabaId:         _wabaCtrl.text.trim().isEmpty  ? null : _wabaCtrl.text.trim(),
+          waToken:        _tokenCtrl.text.trim().isEmpty ? null : _tokenCtrl.text.trim(),
+        );
+        final id = result['id'] as String? ?? result['channel_id'] as String? ?? '';
+        if (id.isNotEmpty) {
+          ChannelsApi.syncTemplates(channelId: id)
+              .catchError((e) => <String, dynamic>{});
+        }
+      }
       if (!mounted) return;
       final newId = result['id'] as String? ?? result['channel_id'] as String? ?? '';
-      if (newId.isNotEmpty) {
-        ChannelsApi.syncTemplates(channelId: newId)
-            .catchError((e) => <String, dynamic>{});
-      }
       Navigator.of(context).pop(newId);
     } catch (e) {
       if (!mounted) return;
@@ -472,15 +491,24 @@ class _CreateChannelStepperState extends State<_CreateChannelStepper> {
     if (_verifying) return;
     setState(() { _verifying = true; _verifyError = null; });
     try {
-      await ChannelsApi.verifyCredentials(
-        phoneNumberId: _phoneCtrl.text.trim(),
-        accessToken:   _tokenCtrl.text.trim(),
-      );
-      if (!mounted) return;
-      setState(() { _verifying = false; _step++; });
+      if (_channelType == 'telegram') {
+        final result = await ChannelsApi.verifyTelegramToken(_tokenCtrl.text.trim());
+        if (!mounted) return;
+        setState(() { _verifying = false; _botUsername = result['username'] as String?; _step++; });
+      } else {
+        await ChannelsApi.verifyCredentials(
+          phoneNumberId: _phoneCtrl.text.trim(),
+          accessToken:   _tokenCtrl.text.trim(),
+        );
+        if (!mounted) return;
+        setState(() { _verifying = false; _step++; });
+      }
     } catch (e) {
       if (!mounted) return;
-      setState(() { _verifying = false; _verifyError = _dioError(e); });
+      final msg = e is Exception
+          ? e.toString().replaceFirst('Exception: ', '')
+          : _dioError(e);
+      setState(() { _verifying = false; _verifyError = msg; });
     }
   }
 
@@ -566,7 +594,7 @@ class _CreateChannelStepperState extends State<_CreateChannelStepper> {
           children: [
             Expanded(child: _TypeCard(type: 'whatsapp', selected: _channelType == 'whatsapp', onTap: () => setState(() => _channelType = 'whatsapp'))),
             const SizedBox(width: 12),
-            const Expanded(child: _TypeCard(type: 'telegram', disabled: true)),
+            Expanded(child: _TypeCard(type: 'telegram', selected: _channelType == 'telegram', onTap: () => setState(() => _channelType = 'telegram'))),
           ],
         ),
         const SizedBox(height: 12),
@@ -633,12 +661,7 @@ class _CreateChannelStepperState extends State<_CreateChannelStepper> {
   // ── Step 2 ───────────────────────────────────────────────────────────────
 
   Widget _buildStep2() {
-    if (_channelType != 'whatsapp') {
-      return const Center(child: Padding(
-        padding: EdgeInsets.symmetric(vertical: 40),
-        child: Text('Configuración próximamente disponible para este tipo de canal.', style: TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText2), textAlign: TextAlign.center),
-      ));
-    }
+    if (_channelType == 'telegram') return _buildStep2Telegram();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -745,6 +768,90 @@ class _CreateChannelStepperState extends State<_CreateChannelStepper> {
     );
   }
 
+  // ── Step 2 Telegram ──────────────────────────────────────────────────────
+
+  Widget _buildStep2Telegram() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Text('Configura tu canal de Telegram', style: TextStyle(fontFamily: 'Geist', fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.ctText)),
+        const SizedBox(height: 24),
+
+        _label('Nombre del canal *'),
+        TextField(controller: _nameCtrl, style: const TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText), decoration: _fieldDec('Ej: Soporte Telegram')),
+        const SizedBox(height: 14),
+
+        _label('Bot Token *'),
+        TextField(
+          controller: _tokenCtrl,
+          obscureText: !_tokenVisible,
+          style: const TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText),
+          decoration: _fieldDec('Ej: 123456:ABC-DEF...').copyWith(
+            suffixIcon: IconButton(
+              icon: Icon(_tokenVisible ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 18, color: AppColors.ctText3),
+              onPressed: () => setState(() => _tokenVisible = !_tokenVisible),
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
+
+        ExpansionTile(
+          tilePadding: EdgeInsets.zero,
+          title: const Text('¿Cómo obtengo mi Bot Token?', style: TextStyle(fontFamily: 'Geist', fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.ctTeal)),
+          iconColor: AppColors.ctTeal,
+          collapsedIconColor: AppColors.ctTeal,
+          children: const [
+            ListTile(
+              dense: true,
+              leading: CircleAvatar(radius: 10, backgroundColor: AppColors.ctTeal, child: Text('1', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: AppColors.ctNavy))),
+              title: Text('Abre Telegram y busca @BotFather', style: TextStyle(fontFamily: 'Geist', fontSize: 12, color: AppColors.ctText2)),
+            ),
+            ListTile(
+              dense: true,
+              leading: CircleAvatar(radius: 10, backgroundColor: AppColors.ctTeal, child: Text('2', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: AppColors.ctNavy))),
+              title: Text('Envía /newbot y sigue las instrucciones', style: TextStyle(fontFamily: 'Geist', fontSize: 12, color: AppColors.ctText2)),
+            ),
+            ListTile(
+              dense: true,
+              leading: CircleAvatar(radius: 10, backgroundColor: AppColors.ctTeal, child: Text('3', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: AppColors.ctNavy))),
+              title: Text('Al finalizar, BotFather te dará un token como 123456:ABC-DEF...', style: TextStyle(fontFamily: 'Geist', fontSize: 12, color: AppColors.ctText2)),
+            ),
+            ListTile(
+              dense: true,
+              leading: CircleAvatar(radius: 10, backgroundColor: AppColors.ctTeal, child: Text('4', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: AppColors.ctNavy))),
+              title: Text('Copia ese token en el campo de arriba', style: TextStyle(fontFamily: 'Geist', fontSize: 12, color: AppColors.ctText2)),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+
+        _label('Color del canal'),
+        Row(
+          children: _kColorPalette.map((hex) {
+            final selected = _color == hex;
+            final c = _hexColor(hex);
+            return GestureDetector(
+              onTap: () => setState(() => _color = hex),
+              child: MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: Container(
+                  width: 28, height: 28,
+                  margin: const EdgeInsets.only(right: 10),
+                  decoration: BoxDecoration(
+                    color: c, shape: BoxShape.circle,
+                    border: selected ? Border.all(color: AppColors.ctNavy, width: 2) : null,
+                    boxShadow: selected ? [BoxShadow(color: c.withValues(alpha: 0.4), blurRadius: 6, spreadRadius: 1)] : null,
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
   // ── Step 3 ───────────────────────────────────────────────────────────────
 
   Widget _buildStep3() {
@@ -753,6 +860,49 @@ class _CreateChannelStepperState extends State<_CreateChannelStepper> {
       orElse: () => {},
     );
     final workerName = worker['display_name'] as String? ?? worker['catalog_name'] as String? ?? '—';
+
+    final errorBox = _createError != null
+        ? Column(children: [
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(color: AppColors.ctRedBg, borderRadius: BorderRadius.circular(8)),
+              child: Text(_createError!, style: const TextStyle(fontFamily: 'Geist', fontSize: 12, color: AppColors.ctRedText)),
+            ),
+          ])
+        : const SizedBox.shrink();
+
+    if (_channelType == 'telegram') {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text('Revisa antes de crear', style: TextStyle(fontFamily: 'Geist', fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.ctText)),
+          const SizedBox(height: 4),
+          const Text('Verifica que la información sea correcta.', style: TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText2)),
+          const SizedBox(height: 24),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(color: AppColors.ctSurface2, borderRadius: BorderRadius.circular(10), border: Border.all(color: AppColors.ctBorder)),
+            child: Column(
+              children: [
+                _reviewRow('Tipo de canal', _buildTypeChip()),
+                const Divider(height: 20, color: AppColors.ctBorder),
+                _reviewRow('Nombre', Text(_nameCtrl.text.trim(), style: const TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText))),
+                const Divider(height: 20, color: AppColors.ctBorder),
+                _reviewRow('Username', Text('@${_botUsername ?? '—'}', style: const TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText))),
+                const Divider(height: 20, color: AppColors.ctBorder),
+                _reviewRow('Worker', Text(workerName, style: const TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText))),
+                const Divider(height: 20, color: AppColors.ctBorder),
+                _reviewRow('Token', const Text('••••••••', style: TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText2))),
+              ],
+            ),
+          ),
+          errorBox,
+        ],
+      );
+    }
+
     final phone      = _phoneCtrl.text.trim();
     final maskedPhone = phone.length > 4 ? '${'*' * (phone.length - 4)}${phone.substring(phone.length - 4)}' : phone;
 
@@ -783,14 +933,7 @@ class _CreateChannelStepperState extends State<_CreateChannelStepper> {
             ],
           ),
         ),
-        if (_createError != null) ...[
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(color: AppColors.ctRedBg, borderRadius: BorderRadius.circular(8)),
-            child: Text(_createError!, style: const TextStyle(fontFamily: 'Geist', fontSize: 12, color: AppColors.ctRedText)),
-          ),
-        ],
+        errorBox,
       ],
     );
   }
@@ -806,15 +949,29 @@ class _CreateChannelStepperState extends State<_CreateChannelStepper> {
   }
 
   Widget _buildTypeChip() {
+    if (_channelType == 'telegram') {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(color: const Color(0xFFEDE9FE), borderRadius: BorderRadius.circular(20)),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(width: 8, height: 8, child: DecoratedBox(decoration: BoxDecoration(color: Color(0xFF229ED9), shape: BoxShape.circle))),
+            SizedBox(width: 5),
+            Text('Telegram', style: TextStyle(fontFamily: 'Geist', fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF6D28D9))),
+          ],
+        ),
+      );
+    }
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(color: const Color(0xFFDCFCE7), borderRadius: BorderRadius.circular(20)),
-      child: Row(
+      child: const Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(width: 8, height: 8, decoration: const BoxDecoration(color: Color(0xFF25D366), shape: BoxShape.circle)),
-          const SizedBox(width: 5),
-          const Text('WhatsApp', style: TextStyle(fontFamily: 'Geist', fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF16A34A))),
+          SizedBox(width: 8, height: 8, child: DecoratedBox(decoration: BoxDecoration(color: Color(0xFF25D366), shape: BoxShape.circle))),
+          SizedBox(width: 5),
+          Text('WhatsApp', style: TextStyle(fontFamily: 'Geist', fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF16A34A))),
         ],
       ),
     );
@@ -827,7 +984,7 @@ class _CreateChannelStepperState extends State<_CreateChannelStepper> {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         _step > 0
-            ? _GhostBtn(label: '← Atrás', onTap: () => setState(() { _step--; _createError = null; _verifyError = null; }))
+            ? _GhostBtn(label: '← Atrás', onTap: () => setState(() { _step--; _createError = null; _verifyError = null; if (_step == 1) _botUsername = null; }))
             : _GhostBtn(label: 'Cancelar', onTap: () => Navigator.pop(context)),
         if (_step == 0)
           _PrimaryBtn(label: 'Siguiente →', onTap: _canNext ? () => setState(() => _step++) : (() {}), disabled: !_canNext)

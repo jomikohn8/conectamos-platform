@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:conectamos_platform/core/api/api_client.dart';
 
 class ChannelsApi {
@@ -31,11 +32,18 @@ class ChannelsApi {
     String? phoneNumberId,
     String? wabaId,
     String? waToken,
+    Map<String, dynamic>? channelConfig,
   }) async {
-    final creds = <String, dynamic>{};
-    if (phoneNumberId != null) creds['phone_number_id'] = phoneNumberId;
-    if (wabaId != null)        creds['waba_id']         = wabaId;
-    if (waToken != null)       creds['access_token']    = waToken;
+    final Map<String, dynamic>? config;
+    if (channelConfig != null) {
+      config = channelConfig;
+    } else {
+      final creds = <String, dynamic>{};
+      if (phoneNumberId != null) creds['phone_number_id'] = phoneNumberId;
+      if (wabaId != null)        creds['waba_id']         = wabaId;
+      if (waToken != null)       creds['access_token']    = waToken;
+      config = creds.isNotEmpty ? {'credentials': creds} : null;
+    }
 
     final response = await ApiClient.instance.post('/channels', data: {
       'tenant_id':        tenantId,
@@ -43,7 +51,7 @@ class ChannelsApi {
       'display_name':     displayName,
       'color':            color,
       'channel_type':     channelType,
-      if (creds.isNotEmpty) 'channel_config': {'credentials': creds},
+      'channel_config': ?config,
     });
     return Map<String, dynamic>.from(response.data);
   }
@@ -109,6 +117,33 @@ class ChannelsApi {
       },
     );
     // 422 lanzado por Dio como DioException — dejar que suba
+  }
+
+  static Future<Map<String, dynamic>> verifyTelegramToken(String botToken) async {
+    final dio = Dio(BaseOptions(
+      connectTimeout: const Duration(seconds: 10),
+      receiveTimeout: const Duration(seconds: 10),
+    ));
+    try {
+      final response = await dio.get('https://api.telegram.org/bot$botToken/getMe');
+      final data = response.data;
+      if (data is Map && data['ok'] == true) {
+        final result = (data['result'] as Map?)?.cast<String, dynamic>();
+        final username = result?['username'] as String? ?? '';
+        return {'ok': true, 'username': username};
+      }
+      final description = data is Map
+          ? (data['description'] as String? ?? 'Token inválido')
+          : 'Token inválido';
+      throw Exception(description);
+    } on DioException catch (e) {
+      final data = e.response?.data;
+      if (data is Map) {
+        final desc = data['description'] as String?;
+        if (desc != null) throw Exception(desc);
+      }
+      throw Exception('No se pudo verificar el token de Telegram');
+    }
   }
 
   static Future<void> activateChannel({
