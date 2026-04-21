@@ -60,11 +60,11 @@ class ConversationsScreen extends ConsumerWidget {
 
 // ── Action bar ────────────────────────────────────────────────────────────────
 
-class _ActionBar extends StatelessWidget {
+class _ActionBar extends ConsumerWidget {
   const _ActionBar();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Container(
       height: 48,
       width: double.infinity,
@@ -103,7 +103,11 @@ class _ActionBar extends StatelessWidget {
           ),
           _ActionBarGhostButton(
             label: '📢  Broadcast a todos',
-            onTap: () => context.go('/broadcast'),
+            onTap: () {
+              final channelId   = ref.read(selectedChannelIdProvider)   ?? '';
+              final channelType = ref.read(selectedChannelTypeProvider) ?? 'whatsapp';
+              context.go('/broadcast?channel_id=$channelId&channel_type=$channelType');
+            },
           ),
           const SizedBox(width: 8),
           _PrimaryButton(

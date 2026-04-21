@@ -140,6 +140,10 @@ class BroadcastScreen extends ConsumerStatefulWidget {
 }
 
 class _BroadcastScreenState extends ConsumerState<BroadcastScreen> {
+  // Canal activo (leído de query params en build)
+  String _channelId   = '';
+  String _channelType = 'whatsapp';
+
   // Mensaje
   bool _useTemplate = false;
   final _msgCtrl = TextEditingController();
@@ -191,6 +195,14 @@ class _BroadcastScreenState extends ConsumerState<BroadcastScreen> {
   Future<void> _sendBroadcast(
       List<Map<String, dynamic>> filtered,
       List<Map<String, dynamic>> templates) async {
+    if (_channelId.isEmpty) {
+      setState(() {
+        _result     = 'No hay canal activo. Regresa y selecciona un canal.';
+        _resultType = _BroadcastResultType.error;
+      });
+      return;
+    }
+
     setState(() { _sending = true; _result = null; });
     try {
       final userId =
@@ -208,6 +220,7 @@ class _BroadcastScreenState extends ConsumerState<BroadcastScreen> {
       final body = <String, dynamic>{
         'tenant_id':          tenantId,
         'sent_by_user_id':    userId,
+        'channel_id':         _channelId,
         'message_text':       _useTemplate ? null : _msgCtrl.text.trim(),
         'template_id':        _useTemplate ? _selectedTemplateId : null,
         'template_variables': _useTemplate && selectedTemplate != null
@@ -304,6 +317,15 @@ class _BroadcastScreenState extends ConsumerState<BroadcastScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Leer canal activo desde query params (go_router los expone automáticamente)
+    final params = GoRouterState.of(context).uri.queryParameters;
+    _channelId   = params['channel_id']   ?? '';
+    _channelType = params['channel_type'] ?? 'whatsapp';
+
+    // Telegram no usa templates
+    final isTelegram = _channelType == 'telegram';
+    if (isTelegram && _useTemplate) _useTemplate = false;
+
     final tenantId       = ref.watch(activeTenantIdProvider);
     final operatorsAsync = ref.watch(_bcastOperatorsProvider(tenantId));
     final templatesAsync = ref.watch(_bcastTemplatesProvider(tenantId));
@@ -371,6 +393,8 @@ class _BroadcastScreenState extends ConsumerState<BroadcastScreen> {
                 resultType: _resultType,
                 resultErrors: _resultErrors,
                 showWabaWarning: showWabaWarning,
+                channelId: _channelId,
+                channelType: _channelType,
                 onToggleMode: (v) => setState(() {
                   _useTemplate = v;
                   _selectedTemplateId = null;
@@ -576,6 +600,8 @@ class _FormColumn extends StatelessWidget {
     required this.resultType,
     required this.resultErrors,
     required this.showWabaWarning,
+    required this.channelId,
+    required this.channelType,
     required this.onToggleMode,
     required this.onSelectTemplate,
     required this.onToggleStatus,
@@ -601,6 +627,8 @@ class _FormColumn extends StatelessWidget {
   final _BroadcastResultType resultType;
   final List<Map<String, dynamic>> resultErrors;
   final bool showWabaWarning;
+  final String channelId;
+  final String channelType;
   final ValueChanged<bool> onToggleMode;
   final ValueChanged<String?> onSelectTemplate;
   final ValueChanged<String> onToggleStatus;
@@ -611,9 +639,66 @@ class _FormColumn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isTelegram = channelType == 'telegram';
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // ── Canal activo (read-only) ───────────────────────────────────────
+        Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: channelId.isEmpty
+                ? const Color(0xFFFEF3C7)
+                : (isTelegram
+                    ? const Color(0xFFEDE9FE)
+                    : const Color(0xFFD1FAE5)),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: channelId.isEmpty
+                  ? const Color(0xFFFCD34D)
+                  : (isTelegram
+                      ? const Color(0xFFA78BFA)
+                      : AppColors.ctTeal),
+              width: 1,
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                channelId.isEmpty
+                    ? Icons.warning_amber_rounded
+                    : (isTelegram
+                        ? Icons.send_rounded
+                        : Icons.chat_bubble_outline_rounded),
+                size: 14,
+                color: channelId.isEmpty
+                    ? const Color(0xFF92400E)
+                    : (isTelegram
+                        ? const Color(0xFF7C3AED)
+                        : const Color(0xFF065F46)),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                channelId.isEmpty
+                    ? 'No hay canal seleccionado'
+                    : 'Enviando a canal ${isTelegram ? 'Telegram' : 'WhatsApp'}',
+                style: TextStyle(
+                  fontFamily: 'Geist',
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: channelId.isEmpty
+                      ? const Color(0xFF92400E)
+                      : (isTelegram
+                          ? const Color(0xFF7C3AED)
+                          : const Color(0xFF065F46)),
+                ),
+              ),
+            ],
+          ),
+        ),
+
         // ── Sección Mensaje ────────────────────────────────────────────────
         _Card(
           child: Column(
@@ -622,17 +707,19 @@ class _FormColumn extends StatelessWidget {
               const _SectionTitle(label: 'Mensaje'),
               const SizedBox(height: 14),
 
-              // Toggle segmentado
-              _ModeToggle(
-                useTemplate: useTemplate,
-                onChanged: onToggleMode,
-              ),
-              const SizedBox(height: 16),
+              if (!isTelegram) ...[
+                // Toggle segmentado (solo WhatsApp)
+                _ModeToggle(
+                  useTemplate: useTemplate,
+                  onChanged: onToggleMode,
+                ),
+                const SizedBox(height: 16),
+              ],
 
-              if (!useTemplate) ...[
+              if (!useTemplate || isTelegram) ...[
                 // Texto libre
                 _BuildTextField(ctrl: msgCtrl),
-                if (closedWindowCount > 0) ...[
+                if (closedWindowCount > 0 && !isTelegram) ...[
                   const SizedBox(height: 10),
                   _WarningBanner(
                     message:
@@ -647,7 +734,7 @@ class _FormColumn extends StatelessWidget {
                   ),
                   const SizedBox(height: 10),
                 ],
-                // Selector de plantilla
+                // Selector de plantilla (solo WhatsApp)
                 if (templates.isEmpty)
                   const Text(
                     'No hay plantillas APPROVED disponibles.',
