@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/config.dart';
 import '../../core/providers/auth_provider.dart';
+import '../../core/providers/permissions_provider.dart';
 import '../../core/providers/tenant_provider.dart';
 import '../../core/theme/app_theme.dart';
 
@@ -607,46 +608,52 @@ class _Sidebar extends ConsumerWidget {
                           currentRoute: currentRoute,
                           collapsed: collapsed,
                         ),
-                        _NavItem(
-                          icon: Icons.account_tree_outlined,
-                          label: 'Flujos de trabajo',
-                          route: '/flows',
-                          currentRoute: currentRoute,
-                          collapsed: collapsed,
-                        ),
+                        if (hasPermission(ref, 'flows', 'view'))
+                          _NavItem(
+                            icon: Icons.account_tree_outlined,
+                            label: 'Flujos de trabajo',
+                            route: '/flows',
+                            currentRoute: currentRoute,
+                            collapsed: collapsed,
+                          ),
                         const SizedBox(height: 4),
-                        _NavSection(
-                          label: 'Configuración',
-                          collapsed: collapsed,
-                        ),
-                        _NavItem(
-                          icon: Icons.router_rounded,
-                          label: 'Canales',
-                          route: '/channels',
-                          currentRoute: currentRoute,
-                          collapsed: collapsed,
-                        ),
-                        _NavItem(
-                          icon: Icons.people_outline_rounded,
-                          label: 'Operadores',
-                          route: '/operators',
-                          currentRoute: currentRoute,
-                          collapsed: collapsed,
-                        ),
-                        _NavItem(
-                          icon: Icons.cable_outlined,
-                          label: 'Conexiones',
-                          route: '/connections',
-                          currentRoute: currentRoute,
-                          collapsed: collapsed,
-                        ),
-                        _NavItem(
-                          icon: Icons.settings_outlined,
-                          label: 'Ajustes',
-                          route: '/settings',
-                          currentRoute: currentRoute,
-                          collapsed: collapsed,
-                        ),
+                        if (hasPermission(ref, 'settings', 'view')) ...[
+                          _NavSection(
+                            label: 'Configuración',
+                            collapsed: collapsed,
+                          ),
+                          _NavItem(
+                            icon: Icons.router_rounded,
+                            label: 'Canales',
+                            route: '/channels',
+                            currentRoute: currentRoute,
+                            collapsed: collapsed,
+                          ),
+                        ],
+                        if (hasPermission(ref, 'operators', 'view'))
+                          _NavItem(
+                            icon: Icons.people_outline_rounded,
+                            label: 'Operadores',
+                            route: '/operators',
+                            currentRoute: currentRoute,
+                            collapsed: collapsed,
+                          ),
+                        if (hasPermission(ref, 'settings', 'view')) ...[
+                          _NavItem(
+                            icon: Icons.cable_outlined,
+                            label: 'Conexiones',
+                            route: '/connections',
+                            currentRoute: currentRoute,
+                            collapsed: collapsed,
+                          ),
+                          _NavItem(
+                            icon: Icons.settings_outlined,
+                            label: 'Ajustes',
+                            route: '/settings',
+                            currentRoute: currentRoute,
+                            collapsed: collapsed,
+                          ),
+                        ],
                         const SizedBox(height: 4),
                         _NavSection(
                           label: 'Próximamente',

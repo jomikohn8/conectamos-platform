@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/api/flows_api.dart';
 import '../../core/api/operators_api.dart';
+import '../../core/providers/permissions_provider.dart';
 import '../../core/providers/tenant_provider.dart';
 import '../../core/theme/app_theme.dart';
 
@@ -103,9 +104,11 @@ class _OperatorsScreenState extends ConsumerState<OperatorsScreen> {
       if (prev != null && prev != next) _fetchOperators();
     });
 
+    final canManage = hasPermission(ref, 'operators', 'manage');
     return Column(
       children: [
         _ActionBar(
+          canManage: canManage,
           onAdd: () async {
             await showDialog(
               context: context,
@@ -123,6 +126,7 @@ class _OperatorsScreenState extends ConsumerState<OperatorsScreen> {
                   child: _OperatorsBody(
                     operators: _operators,
                     onRefresh: _fetchOperators,
+                    canManage: canManage,
                   ),
                 ),
         ),
@@ -134,8 +138,9 @@ class _OperatorsScreenState extends ConsumerState<OperatorsScreen> {
 // ── Action bar ────────────────────────────────────────────────────────────────
 
 class _ActionBar extends StatelessWidget {
-  const _ActionBar({required this.onAdd});
+  const _ActionBar({required this.onAdd, required this.canManage});
   final VoidCallback onAdd;
+  final bool canManage;
 
   @override
   Widget build(BuildContext context) {
@@ -175,7 +180,7 @@ class _ActionBar extends StatelessWidget {
               ],
             ),
           ),
-          _PrimaryButton(label: '+ Agregar operador', onTap: onAdd),
+          if (canManage) _PrimaryButton(label: '+ Agregar operador', onTap: onAdd),
         ],
       ),
     );
@@ -188,9 +193,11 @@ class _OperatorsBody extends StatefulWidget {
   const _OperatorsBody({
     required this.operators,
     required this.onRefresh,
+    required this.canManage,
   });
   final List<Map<String, dynamic>> operators;
   final VoidCallback onRefresh;
+  final bool canManage;
 
   @override
   State<_OperatorsBody> createState() => _OperatorsBodyState();
@@ -353,6 +360,7 @@ class _OperatorsBodyState extends State<_OperatorsBody> {
                       _OperatorRow(
                         op: entry.value,
                         onRefresh: widget.onRefresh,
+                        canManage: widget.canManage,
                       ),
                       if (!isLast)
                         const Divider(
@@ -384,9 +392,10 @@ class _OperatorsBodyState extends State<_OperatorsBody> {
 // ── Fila de operador ──────────────────────────────────────────────────────────
 
 class _OperatorRow extends StatefulWidget {
-  const _OperatorRow({required this.op, required this.onRefresh});
+  const _OperatorRow({required this.op, required this.onRefresh, required this.canManage});
   final Map<String, dynamic> op;
   final VoidCallback onRefresh;
+  final bool canManage;
 
   @override
   State<_OperatorRow> createState() => _OperatorRowState();
@@ -580,40 +589,42 @@ class _OperatorRowState extends State<_OperatorRow> {
             // Acciones
             Expanded(
               flex: 2,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _ActionButton(
-                    label: 'Editar',
-                    color: AppColors.ctInfo,
-                    onTap: () async {
-                      await showDialog(
-                        context: context,
-                        builder: (_) => _OperatorFormDialog(
-                          operatorId: id,
-                          initialName: name,
-                          initialPhone: phone,
-                          initialFlows: flows.map((f) => f['id'] as String? ?? '').where((s) => s.isNotEmpty).toList(),
-                          onSaved: widget.onRefresh,
+              child: widget.canManage
+                  ? Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _ActionButton(
+                          label: 'Editar',
+                          color: AppColors.ctInfo,
+                          onTap: () async {
+                            await showDialog(
+                              context: context,
+                              builder: (_) => _OperatorFormDialog(
+                                operatorId: id,
+                                initialName: name,
+                                initialPhone: phone,
+                                initialFlows: flows.map((f) => f['id'] as String? ?? '').where((s) => s.isNotEmpty).toList(),
+                                onSaved: widget.onRefresh,
+                              ),
+                            );
+                          },
                         ),
-                      );
-                    },
-                  ),
-                  const SizedBox(width: 6),
-                  if (status == 'active' || status == 'incident')
-                    _ActionButton(
-                      label: 'Suspender',
-                      color: AppColors.ctDanger,
-                      onTap: () => _patchStatus(context, 'suspended'),
+                        const SizedBox(width: 6),
+                        if (status == 'active' || status == 'incident')
+                          _ActionButton(
+                            label: 'Suspender',
+                            color: AppColors.ctDanger,
+                            onTap: () => _patchStatus(context, 'suspended'),
+                          )
+                        else
+                          _ActionButton(
+                            label: 'Reactivar',
+                            color: AppColors.ctOk,
+                            onTap: () => _patchStatus(context, 'active'),
+                          ),
+                      ],
                     )
-                  else
-                    _ActionButton(
-                      label: 'Reactivar',
-                      color: AppColors.ctOk,
-                      onTap: () => _patchStatus(context, 'active'),
-                    ),
-                ],
-              ),
+                  : const SizedBox.shrink(),
             ),
           ],
         ),

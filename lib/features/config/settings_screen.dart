@@ -5,34 +5,45 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/api/api_client.dart';
 import '../../core/api/channels_api.dart';
 import '../../core/api/iam_api.dart';
+import '../../core/providers/permissions_provider.dart';
 import '../../core/providers/tenant_provider.dart';
 import '../../core/theme/app_theme.dart';
+import 'role_permissions_panel.dart';
 
 // ── Enum de secciones ─────────────────────────────────────────────────────────
 
-enum _Section { general, billing, users, communication }
+enum _Section { general, billing, users, communication, permissions }
 
 // ── Pantalla principal ────────────────────────────────────────────────────────
 
-class SettingsScreen extends StatefulWidget {
+class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
   @override
-  State<SettingsScreen> createState() => _SettingsScreenState();
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-class _SettingsScreenState extends State<SettingsScreen> {
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   _Section _active = _Section.general;
-
-  static const _items = [
-    (section: _Section.general,       label: 'Información general', icon: Icons.business_outlined),
-    (section: _Section.billing,       label: 'Facturación',         icon: Icons.receipt_long_outlined),
-    (section: _Section.users,         label: 'Usuarios',            icon: Icons.group_outlined),
-    (section: _Section.communication, label: 'Comunicación',        icon: Icons.chat_bubble_outline_rounded),
-  ];
 
   @override
   Widget build(BuildContext context) {
+    final canManageSettings = hasPermission(ref, 'settings', 'manage');
+
+    final items = [
+      (section: _Section.general,       label: 'Información general', icon: Icons.business_outlined),
+      (section: _Section.billing,       label: 'Facturación',         icon: Icons.receipt_long_outlined),
+      (section: _Section.users,         label: 'Usuarios',            icon: Icons.group_outlined),
+      (section: _Section.communication, label: 'Comunicación',        icon: Icons.chat_bubble_outline_rounded),
+      if (canManageSettings)
+        (section: _Section.permissions, label: 'Permisos',            icon: Icons.security_outlined),
+    ];
+
+    // Reset to general if active tab was removed (e.g., permissions lost)
+    if (!items.any((i) => i.section == _active)) {
+      _active = _Section.general;
+    }
+
     return Column(
       children: [
         _ActionBar(),
@@ -50,7 +61,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: _items.map((item) => _NavItem(
+                  children: items.map((item) => _NavItem(
                     label: item.label,
                     icon: item.icon,
                     active: _active == item.section,
@@ -160,6 +171,10 @@ class _SectionPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (active == _Section.permissions) {
+      return const _PermissionsSection();
+    }
+
     final Widget content;
     switch (active) {
       case _Section.general:
@@ -170,6 +185,8 @@ class _SectionPanel extends StatelessWidget {
         content = const _UsersCard();
       case _Section.communication:
         content = const _CommunicationSection();
+      case _Section.permissions:
+        content = const SizedBox.shrink(); // handled above
     }
 
     return SingleChildScrollView(
@@ -178,6 +195,99 @@ class _SectionPanel extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [content],
       ),
+    );
+  }
+}
+
+// ── Sección Permisos ──────────────────────────────────────────────────────────
+
+class _PermissionsSection extends ConsumerWidget {
+  const _PermissionsSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final rolesAsync = ref.watch(roleListProvider);
+
+    return rolesAsync.when(
+      loading: () => const Center(
+        child: CircularProgressIndicator(color: AppColors.ctTeal, strokeWidth: 2),
+      ),
+      error: (e, _) => Center(
+        child: Text(
+          'Error al cargar roles: $e',
+          style: const TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctDanger),
+        ),
+      ),
+      data: (roles) {
+        // Ensure order: admin → supervisor → viewer
+        final ordered = ['admin', 'supervisor', 'viewer'];
+        final sorted = [
+          for (final name in ordered)
+            ...roles.where((r) => r.name == name),
+          // any extra roles not in ordered list
+          ...roles.where((r) => !ordered.contains(r.name)),
+        ];
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header
+            Container(
+              padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Gestión de permisos por rol',
+                    style: TextStyle(
+                      fontFamily: 'Onest',
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.ctText,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Define qué puede hacer cada rol en tu organización. Los cambios del rol admin no pueden modificarse.',
+                    style: TextStyle(
+                      fontFamily: 'Geist',
+                      fontSize: 12,
+                      color: AppColors.ctText2,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                ],
+              ),
+            ),
+            // Columnas
+            Expanded(
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+                  child: IntrinsicHeight(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        for (int i = 0; i < sorted.length; i++) ...[
+                          SizedBox(
+                            width: 300,
+                            child: RolePermissionsPanel(
+                              roleId:   sorted[i].id,
+                              roleName: sorted[i].name,
+                            ),
+                          ),
+                          if (i < sorted.length - 1) const SizedBox(width: 16),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }
@@ -1013,6 +1123,7 @@ class _UserRowState extends ConsumerState<_UserRow> {
                       ),
                       itemBuilder: (_) {
                         final items = <PopupMenuEntry<String>>[];
+                        final canManageUsers = hasPermission(ref, 'users', 'manage');
                         if (_status == 'active') {
                           items.add(const PopupMenuItem(
                             value: 'edit',
@@ -1020,24 +1131,26 @@ class _UserRowState extends ConsumerState<_UserRow> {
                                 style: TextStyle(
                                     fontFamily: 'Geist', fontSize: 13)),
                           ));
-                          items.add(const PopupMenuItem(
-                            value: 'role',
-                            child: Text('Cambiar rol',
-                                style: TextStyle(
-                                    fontFamily: 'Geist', fontSize: 13)),
-                          ));
-                          items.add(const PopupMenuItem(
-                            value: 'password_reset',
-                            child: Text('Enviar reset de contraseña',
-                                style: TextStyle(
-                                    fontFamily: 'Geist', fontSize: 13)),
-                          ));
-                          items.add(const PopupMenuItem(
-                            value: 'suspend',
-                            child: Text('Suspender',
-                                style: TextStyle(
-                                    fontFamily: 'Geist', fontSize: 13)),
-                          ));
+                          if (canManageUsers) {
+                            items.add(const PopupMenuItem(
+                              value: 'role',
+                              child: Text('Cambiar rol',
+                                  style: TextStyle(
+                                      fontFamily: 'Geist', fontSize: 13)),
+                            ));
+                            items.add(const PopupMenuItem(
+                              value: 'password_reset',
+                              child: Text('Enviar reset de contraseña',
+                                  style: TextStyle(
+                                      fontFamily: 'Geist', fontSize: 13)),
+                            ));
+                            items.add(const PopupMenuItem(
+                              value: 'suspend',
+                              child: Text('Suspender',
+                                  style: TextStyle(
+                                      fontFamily: 'Geist', fontSize: 13)),
+                            ));
+                          }
                         } else if (_status == 'suspended') {
                           items.add(const PopupMenuItem(
                             value: 'edit',
@@ -1045,25 +1158,29 @@ class _UserRowState extends ConsumerState<_UserRow> {
                                 style: TextStyle(
                                     fontFamily: 'Geist', fontSize: 13)),
                           ));
-                          items.add(const PopupMenuItem(
-                            value: 'role',
-                            child: Text('Cambiar rol',
-                                style: TextStyle(
-                                    fontFamily: 'Geist', fontSize: 13)),
-                          ));
-                          items.add(const PopupMenuItem(
-                            value: 'reactivate',
-                            child: Text('Reactivar',
-                                style: TextStyle(
-                                    fontFamily: 'Geist', fontSize: 13)),
-                          ));
+                          if (canManageUsers) {
+                            items.add(const PopupMenuItem(
+                              value: 'role',
+                              child: Text('Cambiar rol',
+                                  style: TextStyle(
+                                      fontFamily: 'Geist', fontSize: 13)),
+                            ));
+                            items.add(const PopupMenuItem(
+                              value: 'reactivate',
+                              child: Text('Reactivar',
+                                  style: TextStyle(
+                                      fontFamily: 'Geist', fontSize: 13)),
+                            ));
+                          }
                         } else if (_status == 'invited') {
-                          items.add(const PopupMenuItem(
-                            value: 'resend',
-                            child: Text('Reenviar invitación',
-                                style: TextStyle(
-                                    fontFamily: 'Geist', fontSize: 13)),
-                          ));
+                          if (canManageUsers) {
+                            items.add(const PopupMenuItem(
+                              value: 'resend',
+                              child: Text('Reenviar invitación',
+                                  style: TextStyle(
+                                      fontFamily: 'Geist', fontSize: 13)),
+                            ));
+                          }
                         }
                         if (_role.toLowerCase() != 'admin') {
                           items.add(const PopupMenuItem(

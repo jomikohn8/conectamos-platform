@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/api/api_client.dart';
+import '../../core/providers/permissions_provider.dart';
 import '../../core/providers/tenant_provider.dart';
 import '../../core/theme/app_theme.dart';
 
@@ -393,7 +394,7 @@ class _BroadcastScreenState extends ConsumerState<BroadcastScreen> {
                   }
                   _result = null;
                 }),
-                onSend: (!_canSend || filtered.isEmpty || _sending)
+                onSend: (!_canSend || filtered.isEmpty || _sending || !hasPermission(ref, 'broadcasts', 'send'))
                     ? null
                     : () => setState(() { _confirming = true; }),
                 onConfirm: () => _sendBroadcast(filtered, templates),

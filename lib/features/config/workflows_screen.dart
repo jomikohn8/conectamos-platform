@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api/ai_workers_api.dart';
 import '../../core/api/flows_api.dart';
+import '../../core/providers/permissions_provider.dart';
 import '../../core/providers/tenant_provider.dart';
 import '../../core/theme/app_theme.dart';
 
@@ -149,15 +150,16 @@ class _WorkflowsScreenState extends ConsumerState<WorkflowsScreen> {
       if (next.isNotEmpty && next != prev) _fetchAll();
     });
 
+    final canManage = hasPermission(ref, 'flows', 'manage');
     return Column(
       children: [
-        _ActionBar(onNew: () => _openForm()),
-        Expanded(child: _buildBody()),
+        _ActionBar(onNew: () => _openForm(), canManage: canManage),
+        Expanded(child: _buildBody(canManage)),
       ],
     );
   }
 
-  Widget _buildBody() {
+  Widget _buildBody(bool canManage) {
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -195,7 +197,7 @@ class _WorkflowsScreenState extends ConsumerState<WorkflowsScreen> {
               ),
             ),
             const SizedBox(height: 12),
-            _PrimaryButton(label: '+ Crear primer flujo', onTap: () => _openForm()),
+            if (canManage) _PrimaryButton(label: '+ Crear primer flujo', onTap: () => _openForm()),
           ],
         ),
       );
@@ -211,6 +213,7 @@ class _WorkflowsScreenState extends ConsumerState<WorkflowsScreen> {
               index: entry.key,
               onToggle: () => _toggleActive(entry.value),
               onEdit: () => _openForm(flow: entry.value),
+              canManage: canManage,
             ),
           );
         }).toList(),
@@ -222,8 +225,9 @@ class _WorkflowsScreenState extends ConsumerState<WorkflowsScreen> {
 // ── Action bar ────────────────────────────────────────────────────────────────
 
 class _ActionBar extends StatelessWidget {
-  const _ActionBar({required this.onNew});
+  const _ActionBar({required this.onNew, required this.canManage});
   final VoidCallback onNew;
+  final bool canManage;
 
   @override
   Widget build(BuildContext context) {
@@ -263,7 +267,7 @@ class _ActionBar extends StatelessWidget {
               ],
             ),
           ),
-          _PrimaryButton(label: '+ Nuevo flujo', onTap: onNew),
+          if (canManage) _PrimaryButton(label: '+ Nuevo flujo', onTap: onNew),
         ],
       ),
     );
@@ -278,11 +282,13 @@ class _FlowCard extends StatefulWidget {
     required this.index,
     required this.onToggle,
     required this.onEdit,
+    required this.canManage,
   });
   final Map<String, dynamic> flow;
   final int index;
   final VoidCallback onToggle;
   final VoidCallback onEdit;
+  final bool canManage;
 
   @override
   State<_FlowCard> createState() => _FlowCardState();
@@ -423,7 +429,7 @@ class _FlowCardState extends State<_FlowCard> {
                           scale: 0.8,
                           child: Switch(
                             value: isActive,
-                            onChanged: (_) => widget.onToggle(),
+                            onChanged: widget.canManage ? (_) => widget.onToggle() : null,
                             activeThumbColor: AppColors.ctTeal,
                             activeTrackColor:
                                 AppColors.ctTeal.withValues(alpha: 0.3),
@@ -434,7 +440,7 @@ class _FlowCardState extends State<_FlowCard> {
                       ],
                     ),
                     const SizedBox(height: 8),
-                    _EditButton(onTap: widget.onEdit),
+                    if (widget.canManage) _EditButton(onTap: widget.onEdit),
                   ],
                 ),
               ],

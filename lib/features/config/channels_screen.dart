@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/api/ai_workers_api.dart';
 import '../../core/api/channels_api.dart';
+import '../../core/providers/permissions_provider.dart';
 import '../../core/providers/tenant_provider.dart';
 import '../../core/theme/app_theme.dart';
 
@@ -139,7 +140,7 @@ class _ChannelsScreenState extends ConsumerState<ChannelsScreen> {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        _ActionBar(loading: _loading, onAdd: _openCreate),
+        _ActionBar(loading: _loading, onAdd: _openCreate, canManage: hasPermission(ref, 'settings', 'manage')),
         Expanded(
           child: _loading
               ? const Center(child: CircularProgressIndicator(color: AppColors.ctTeal, strokeWidth: 2))
@@ -160,6 +161,7 @@ class _ChannelsScreenState extends ConsumerState<ChannelsScreen> {
                         channels: _channels,
                         onEdit: _openEdit,
                         onToggleActive: _toggleActive,
+                        canManage: hasPermission(ref, 'settings', 'manage'),
                       ),
                     ),
         ),
@@ -171,9 +173,10 @@ class _ChannelsScreenState extends ConsumerState<ChannelsScreen> {
 // ── Action bar ────────────────────────────────────────────────────────────────
 
 class _ActionBar extends StatelessWidget {
-  const _ActionBar({required this.loading, required this.onAdd});
+  const _ActionBar({required this.loading, required this.onAdd, required this.canManage});
   final bool loading;
   final VoidCallback onAdd;
+  final bool canManage;
 
   @override
   Widget build(BuildContext context) {
@@ -198,7 +201,7 @@ class _ActionBar extends StatelessWidget {
               ],
             ),
           ),
-          _PrimaryBtn(label: '+ Nuevo canal', onTap: onAdd, disabled: loading),
+          if (canManage) _PrimaryBtn(label: '+ Nuevo canal', onTap: onAdd, disabled: loading),
         ],
       ),
     );
@@ -212,10 +215,12 @@ class _ChannelsBody extends StatelessWidget {
     required this.channels,
     required this.onEdit,
     required this.onToggleActive,
+    required this.canManage,
   });
   final List<Map<String, dynamic>> channels;
   final void Function(Map<String, dynamic>) onEdit;
   final void Function(Map<String, dynamic>) onToggleActive;
+  final bool canManage;
 
   static const _headerStyle = TextStyle(fontFamily: 'Geist', fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.ctText2, letterSpacing: 0.4);
 
@@ -250,6 +255,7 @@ class _ChannelsBody extends StatelessWidget {
                   channel: entry.value,
                   onEdit: () => onEdit(entry.value),
                   onToggleActive: () => onToggleActive(entry.value),
+                  canManage: canManage,
                 ),
                 if (!isLast) const Divider(height: 1, color: AppColors.ctBorder),
               ]);
@@ -263,10 +269,11 @@ class _ChannelsBody extends StatelessWidget {
 // ── Channel row ───────────────────────────────────────────────────────────────
 
 class _ChannelRow extends StatefulWidget {
-  const _ChannelRow({required this.channel, required this.onEdit, required this.onToggleActive});
+  const _ChannelRow({required this.channel, required this.onEdit, required this.onToggleActive, required this.canManage});
   final Map<String, dynamic> channel;
   final VoidCallback onEdit;
   final VoidCallback onToggleActive;
+  final bool canManage;
 
   @override
   State<_ChannelRow> createState() => _ChannelRowState();
@@ -352,14 +359,16 @@ class _ChannelRowState extends State<_ChannelRow> {
             ),
             Expanded(
               flex: 2,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _ActionBtn(label: 'Editar', color: AppColors.ctInfo, onTap: widget.onEdit),
-                  const SizedBox(width: 4),
-                  _ActionBtn(label: isActive ? 'Desactivar' : 'Activar', color: isActive ? AppColors.ctDanger : AppColors.ctOk, onTap: widget.onToggleActive),
-                ],
-              ),
+              child: widget.canManage
+                  ? Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _ActionBtn(label: 'Editar', color: AppColors.ctInfo, onTap: widget.onEdit),
+                        const SizedBox(width: 4),
+                        _ActionBtn(label: isActive ? 'Desactivar' : 'Activar', color: isActive ? AppColors.ctDanger : AppColors.ctOk, onTap: widget.onToggleActive),
+                      ],
+                    )
+                  : const SizedBox.shrink(),
             ),
           ],
         ),

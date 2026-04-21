@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../config.dart';
+import '../providers/permissions_provider.dart';
 import '../../features/auth/activate_screen.dart';
 import '../../features/auth/forgot_password_screen.dart';
 import '../../features/auth/login_screen.dart';
@@ -22,9 +23,24 @@ import '../../features/overview/overview_screen.dart';
 import '../../features/sessions/sessions_screen.dart';
 import '../../shared/widgets/app_shell.dart';
 
+// Mapa de ruta → permiso requerido
+const _kRoutePermissions = {
+  '/operators':   'operators.view',
+  '/flows':       'flows.view',
+  '/channels':    'settings.view',
+  '/connections': 'settings.view',
+  '/settings':    'settings.view',
+  '/broadcast':   'broadcasts.send',
+};
+
 final routerProvider = Provider<GoRouter>((ref) {
+  // Refresca el router cuando cargan los permisos
+  final refresher = ValueNotifier<int>(0);
+  ref.listen(userPermissionsProvider, (prev, next) => refresher.value++);
+
   return GoRouter(
     initialLocation: '/overview',
+    refreshListenable: refresher,
     redirect: (context, state) {
       if (kMockMode) {
         if (state.matchedLocation == '/login') return null;
@@ -47,6 +63,17 @@ final routerProvider = Provider<GoRouter>((ref) {
 
       if (user == null && !isLoggingIn) return '/login';
       if (user != null && isLoggingIn) return '/overview';
+
+      // Guard de permisos (solo cuando ya cargaron)
+      final perms = ref.read(userPermissionsProvider).valueOrNull;
+      if (perms != null) {
+        for (final entry in _kRoutePermissions.entries) {
+          if (loc.startsWith(entry.key) && !perms.contains(entry.value)) {
+            return '/overview';
+          }
+        }
+      }
+
       return null;
     },
     routes: [

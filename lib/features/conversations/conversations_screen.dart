@@ -24,6 +24,7 @@ import '../../core/api/operators_api.dart';
 import '../../core/api/sessions_api.dart';
 import '../../core/api/supabase_messages.dart';
 import '../../core/api/supabase_read_receipts.dart';
+import '../../core/providers/permissions_provider.dart';
 import '../../core/providers/tenant_provider.dart';
 import '../../core/theme/app_theme.dart';
 
@@ -2077,7 +2078,9 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
           channelName: activeChannel?['name'] as String?,
           workerName: activeChannel?['worker_name'] as String?,
           channelColor: activeChannel?['color'] as String?,
-          onIntervene: !_isSupervisorMode ? _intervene : _stopIntervening,
+          onIntervene: hasPermission(ref, 'conversations', 'send')
+              ? (!_isSupervisorMode ? _intervene : _stopIntervening)
+              : null,
           isSupervisorMode: _isSupervisorMode,
         ),
 
