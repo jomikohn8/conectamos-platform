@@ -475,7 +475,8 @@ class _CreateChannelStepperState extends State<_CreateChannelStepper> {
   String? _verifyError;
 
   // Step 3
-  bool    _creating   = false;
+  bool    _creating                = false;
+  bool    _embeddedSignupInProgress = false;
   String? _createError;
 
   @override
@@ -575,6 +576,8 @@ class _CreateChannelStepperState extends State<_CreateChannelStepper> {
   }
 
   Future<void> _callEmbeddedSignup(String code) async {
+    if (_embeddedSignupInProgress) return;
+    _embeddedSignupInProgress = true;
     try {
       final result = await ChannelsApi.embeddedSignup(
         code:     code,
@@ -605,6 +608,8 @@ class _CreateChannelStepperState extends State<_CreateChannelStepper> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.toString()), backgroundColor: const Color(0xFFEF4444)),
       );
+    } finally {
+      _embeddedSignupInProgress = false;
     }
   }
 
