@@ -25,7 +25,9 @@ final userRoleProvider = FutureProvider.autoDispose<String?>((ref) async {
   if (kMockMode) return kMockUser.role;
   final user = ref.watch(currentUserProvider);
   if (user == null) return null;
+  // BUG 1: esperar a que activeTenantIdProvider tenga valor antes de llamar al backend
   final tenantId = ref.watch(activeTenantIdProvider);
+  if (tenantId.isEmpty) return null;
   final res = await ApiClient.instance.get(
     '/iam/users',
     queryParameters: {'tenant_id': tenantId},
@@ -40,16 +42,19 @@ final userRoleProvider = FutureProvider.autoDispose<String?>((ref) async {
   }
   final match = users.firstWhere(
     (u) =>
-        (u['user_id']         as String?) == user.id ||
-        (u['id']              as String?) == user.id ||
+        (u['user_id']          as String?) == user.id ||
+        (u['id']               as String?) == user.id ||
         (u['supabase_user_id'] as String?) == user.id ||
-        (u['email']           as String?) == user.email,
+        (u['email']            as String?) == user.email,
     orElse: () => {},
   );
   if (match.isEmpty) {
     debugPrint('[userRoleProvider] no se encontró match para id=${user.id} email=${user.email}');
     return null;
   }
+  // BUG 2: leer roles.name como primera opción, con fallback a role
+  final rolesField = match['roles'];
+  if (rolesField is Map) return rolesField['name'] as String?;
   final roleField = match['role'];
   if (roleField is Map) return roleField['name'] as String?;
   return roleField as String?;
