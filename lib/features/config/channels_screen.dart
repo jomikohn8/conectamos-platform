@@ -1,3 +1,7 @@
+// ignore: avoid_web_libraries_in_flutter, deprecated_member_use
+import 'dart:html' as html;
+import 'dart:js_interop';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,6 +12,11 @@ import '../../core/api/channels_api.dart';
 import '../../core/providers/permissions_provider.dart';
 import '../../core/providers/tenant_provider.dart';
 import '../../core/theme/app_theme.dart';
+
+/// JS bridge injected by [_CreateChannelStepperState._initFbSdk].
+/// Calls FB.login() and forwards the OAuth code (or cancellation) to Dart.
+@JS('_fbLaunchSignup')
+external void _fbLaunchSignup(JSFunction onCode, JSFunction onCancel);
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -122,6 +131,16 @@ class _ChannelsScreenState extends ConsumerState<ChannelsScreen> {
     if (!mounted) return;
     if (result == '_workers') {
       context.go('/workers');
+      return;
+    }
+    if (result == 'embedded_ok') {
+      _fetchAll();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Canal conectado correctamente'),
+          backgroundColor: Color(0xFF10B981),
+        ),
+      );
       return;
     }
     if (result != null && result.isNotEmpty) {
@@ -393,6 +412,48 @@ class _CreateChannelStepper extends StatefulWidget {
 }
 
 class _CreateChannelStepperState extends State<_CreateChannelStepper> {
+  // ── FB SDK (WhatsApp Embedded Signup) ──────────────────────────────────────
+  static bool _fbSdkInitialized = false;
+
+  static void _initFbSdk() {
+    if (_fbSdkInitialized) return;
+    _fbSdkInitialized = true;
+
+    // Inject a JS helper that wraps FB.init + FB.login so Dart never needs
+    // to touch dart:js directly — only dart:js_interop is used at call site.
+    final helper = html.ScriptElement()
+      ..text = '''
+        window.fbAsyncInit = function() {
+          FB.init({ appId: '4149613485350757', cookie: true, xfbml: false, version: 'v19.0' });
+        };
+        window._fbLaunchSignup = function(onCode, onCancel) {
+          if (typeof FB === 'undefined') { onCancel('not_ready'); return; }
+          FB.login(function(r) {
+            if (r && r.authResponse && r.authResponse.code) {
+              onCode(r.authResponse.code);
+            } else {
+              onCancel('cancelled');
+            }
+          }, {
+            scope: 'whatsapp_business_management,whatsapp_business_messaging',
+            config_id: '1290590206469350',
+            response_type: 'code'
+          });
+        };
+      ''';
+    html.document.head!.append(helper);
+
+    // Inject FB SDK script once
+    if (html.document.getElementById('facebook-jssdk') == null) {
+      final script = html.ScriptElement()
+        ..id    = 'facebook-jssdk'
+        ..async = true
+        ..src   = 'https://connect.facebook.net/en_US/sdk.js';
+      html.document.body!.append(script);
+    }
+  }
+
+  // ── Stepper state ──────────────────────────────────────────────────────────
   int _step = 0;
 
   // Step 1
@@ -419,6 +480,7 @@ class _CreateChannelStepperState extends State<_CreateChannelStepper> {
   @override
   void initState() {
     super.initState();
+    _initFbSdk(); // pre-load FB SDK so it's ready when user reaches step 2
     if (widget.workers.isNotEmpty) {
       _workerId = widget.workers.first['id'] as String?;
     }
@@ -486,6 +548,66 @@ class _CreateChannelStepperState extends State<_CreateChannelStepper> {
       setState(() { _creating = false; _createError = _dioError(e); });
     }
   }
+
+  // ── Embedded Signup ──────────────────────────────────────────────────────
+
+  /// Called directly from onTap — must NOT have any async gap before FB.login().
+  void _launchEmbeddedSignup() {
+    setState(() { _creating = true; _createError = null; });
+    try {
+      _fbLaunchSignup(
+        // onCode: JS calls this with the OAuth code string
+        ((JSString jsCode) {
+          _callEmbeddedSignup(jsCode.toDart);
+        }).toJS,
+        // onCancel: user dismissed popup or SDK not ready
+        ((JSString reason) {
+          if (mounted) setState(() => _creating = false);
+        }).toJS,
+      );
+    } catch (_) {
+      setState(() => _creating = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Facebook SDK aún cargando, intenta en un momento.')),
+      );
+    }
+  }
+
+  Future<void> _callEmbeddedSignup(String code) async {
+    try {
+      final result = await ChannelsApi.embeddedSignup(
+        code:     code,
+        tenantId: widget.tenantId,
+      );
+      if (!mounted) return;
+      setState(() => _creating = false);
+      final newId = result['id'] as String? ?? result['channel_id'] as String? ?? '';
+      Navigator.of(context).pop(newId.isNotEmpty ? newId : 'embedded_ok');
+    } on DioException catch (e) {
+      if (!mounted) return;
+      setState(() => _creating = false);
+      final statusCode = e.response?.statusCode;
+      final String msg;
+      if (statusCode == 409) {
+        msg = 'Este número ya está registrado como canal';
+      } else if (statusCode == 400) {
+        msg = 'El código de Meta expiró. Intenta de nuevo';
+      } else {
+        msg = _dioError(e);
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(msg), backgroundColor: const Color(0xFFEF4444)),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _creating = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString()), backgroundColor: const Color(0xFFEF4444)),
+      );
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
 
   Future<void> _verifyAndNext() async {
     if (_verifying) return;
@@ -672,36 +794,29 @@ class _CreateChannelStepperState extends State<_CreateChannelStepper> {
         // ── Embedded Signup ──────────────────────────────────────────────
         const Text('Conexión automática', style: TextStyle(fontFamily: 'Geist', fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.ctText)),
         const SizedBox(height: 8),
-        Align(
-          alignment: Alignment.centerLeft,
+        GestureDetector(
+          onTap: _creating ? null : _launchEmbeddedSignup,
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            decoration: BoxDecoration(color: AppColors.ctTealLight, borderRadius: BorderRadius.circular(20)),
-            child: const Text('Requiere certificación Tech Provider', style: TextStyle(fontFamily: 'Geist', fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.ctTealDark)),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Tooltip(
-          message: 'Disponible cuando Conectamos obtenga certificación Meta Tech Provider',
-          child: Opacity(
-            opacity: 0.5,
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(color: const Color(0xFF1877F2), borderRadius: BorderRadius.circular(8)),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 20, height: 20,
-                    decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-                    alignment: Alignment.center,
-                    child: const Text('f', style: TextStyle(fontFamily: 'Geist', fontSize: 13, fontWeight: FontWeight.w900, color: Color(0xFF1877F2))),
-                  ),
-                  const SizedBox(width: 12),
-                  const Text('Conectar con WhatsApp Business', style: TextStyle(fontFamily: 'Geist', fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white)),
-                ],
-              ),
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: _creating ? const Color(0xFF1877F2).withValues(alpha: 0.7) : const Color(0xFF1877F2),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 20, height: 20,
+                  decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                  alignment: Alignment.center,
+                  child: _creating
+                      ? const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF1877F2)))
+                      : const Text('f', style: TextStyle(fontFamily: 'Geist', fontSize: 13, fontWeight: FontWeight.w900, color: Color(0xFF1877F2))),
+                ),
+                const SizedBox(width: 12),
+                const Text('Conectar con WhatsApp Business', style: TextStyle(fontFamily: 'Geist', fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white)),
+              ],
             ),
           ),
         ),
