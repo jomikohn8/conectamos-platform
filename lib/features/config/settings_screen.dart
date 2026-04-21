@@ -1022,6 +1022,7 @@ class _UserRowState extends ConsumerState<_UserRow> {
 
   @override
   Widget build(BuildContext context) {
+    final canManageUsers = hasPermission(ref, 'users', 'manage');
     final borderRadius = widget.isLast
         ? const BorderRadius.only(
             bottomLeft: Radius.circular(7),
@@ -1123,7 +1124,6 @@ class _UserRowState extends ConsumerState<_UserRow> {
                       ),
                       itemBuilder: (_) {
                         final items = <PopupMenuEntry<String>>[];
-                        final canManageUsers = hasPermission(ref, 'users', 'manage');
                         if (_status == 'active') {
                           items.add(const PopupMenuItem(
                             value: 'edit',

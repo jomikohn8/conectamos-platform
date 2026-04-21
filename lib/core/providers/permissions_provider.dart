@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../api/api_client.dart';
@@ -34,13 +35,21 @@ final userRoleProvider = FutureProvider.autoDispose<String?>((ref) async {
       ? data
       : (data['users'] ?? data['items'] ?? []) as List;
   final users = raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+  if (users.isNotEmpty) {
+    debugPrint('[userRoleProvider] primer usuario: ${users.first}');
+  }
   final match = users.firstWhere(
     (u) =>
-        (u['user_id'] as String?) == user.id ||
-        (u['email'] as String?) == user.email,
+        (u['user_id']         as String?) == user.id ||
+        (u['id']              as String?) == user.id ||
+        (u['supabase_user_id'] as String?) == user.id ||
+        (u['email']           as String?) == user.email,
     orElse: () => {},
   );
-  if (match.isEmpty) return null;
+  if (match.isEmpty) {
+    debugPrint('[userRoleProvider] no se encontró match para id=${user.id} email=${user.email}');
+    return null;
+  }
   final roleField = match['role'];
   if (roleField is Map) return roleField['name'] as String?;
   return roleField as String?;
@@ -91,10 +100,11 @@ final userPermissionsProvider = FutureProvider.autoDispose<Set<String>>((ref) as
 // ── Helper síncrono para widgets ──────────────────────────────────────────────
 
 /// Devuelve true si el usuario tiene el permiso `module.action`.
-/// Mientras el provider esté cargando (null) devuelve false → oculta la acción.
+/// Usa ref.watch → el widget se reconstruye cuando los permisos cargan.
+/// Solo llamar desde dentro de un build() de ConsumerWidget o ConsumerState.
 bool hasPermission(WidgetRef ref, String module, String action) {
   return ref
-          .read(userPermissionsProvider)
+          .watch(userPermissionsProvider)
           .valueOrNull
           ?.contains('$module.$action') ??
       false;
