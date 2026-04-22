@@ -974,20 +974,24 @@ class _OperatorFormDialogState extends ConsumerState<_OperatorFormDialog> {
         });
       }
     } on DioException catch (e) {
-      final detail = e.response?.data is Map
-          ? e.response!.data['detail']?.toString()
-          : null;
+      final statusCode = e.response?.statusCode;
+      final String errorMsg;
+      if (statusCode == 409) {
+        errorMsg = 'Este operador ya tiene Telegram vinculado. Borra el Chat ID actual y guarda para poder reenviar la invitación.';
+      } else {
+        errorMsg = 'No se pudo enviar la invitación. Intenta de nuevo.';
+      }
       if (mounted) {
         setState(() {
           _sendingInvite = false;
-          _inviteResults = ['✗ ${detail ?? 'Error al enviar invitación'}'];
+          _inviteResults = ['✗ $errorMsg'];
         });
       }
     } catch (e) {
       if (mounted) {
         setState(() {
           _sendingInvite = false;
-          _inviteResults = ['✗ ${e.toString()}'];
+          _inviteResults = ['✗ No se pudo enviar la invitación. Intenta de nuevo.'];
         });
       }
     }
