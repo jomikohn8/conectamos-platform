@@ -30,7 +30,8 @@ class OperatorsApi {
         'phone': phone,
         'flows': flows,
         'tenant_id': tenantId,
-        'metadata': {'telegram_chat_id': telegramChatId},
+        if (telegramChatId != null)
+          'metadata': {'telegram_chat_id': telegramChatId},
       },
     );
     return Map<String, dynamic>.from(response.data);
@@ -49,7 +50,8 @@ class OperatorsApi {
         'display_name': displayName,
         'phone': phone,
         'flows': flows,
-        'metadata': {'telegram_chat_id': telegramChatId},
+        if (telegramChatId != null)
+          'metadata': {'telegram_chat_id': telegramChatId},
       },
     );
     return Map<String, dynamic>.from(response.data);
