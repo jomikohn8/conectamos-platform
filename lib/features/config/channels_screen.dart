@@ -438,7 +438,12 @@ class _CreateChannelStepperState extends State<_CreateChannelStepper> {
             scope: 'whatsapp_business_management,whatsapp_business_messaging',
             config_id: '2145617199565998',
             response_type: 'code',
-            override_default_response_type: true
+            override_default_response_type: true,
+            extras: {
+              setup: {},
+              featureType: 'whatsapp_business_app_onboarding', 
+              sessionInfoVersion: '3'
+            }
           });
         };
       ''';
