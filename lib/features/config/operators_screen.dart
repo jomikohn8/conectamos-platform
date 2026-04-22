@@ -431,10 +431,11 @@ class _OperatorRowState extends State<_OperatorRow> {
     final phone = op['phone'] as String? ?? '—';
     final status = op['status'] as String?;
     final verified = op['whatsapp_verified'] as bool? ?? false;
-    final flows = (op['flows'] as List? ?? [])
-        .whereType<Map>()
-        .map((e) => Map<String, dynamic>.from(e))
-        .toList();
+    final flows = (op['flows'] as List? ?? []).map((f) {
+      if (f is Map) return Map<String, dynamic>.from(f);
+      // Backend may return plain UUID strings instead of objects
+      return <String, dynamic>{'id': f.toString()};
+    }).toList();
     final lastEventAt = op['last_event_at'] as String?;
     final id = op['id'] as String? ?? '';
     final st = _statusStyle(status);
