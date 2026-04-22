@@ -119,6 +119,22 @@ class ChannelsApi {
     // 422 lanzado por Dio como DioException — dejar que suba
   }
 
+  static Future<void> activateWhatsapp({
+    required String phoneNumberId,
+    required String wabaId,
+    required String accessToken,
+  }) async {
+    await ApiClient.instance.post(
+      '/channels/activate-whatsapp',
+      data: {
+        'phone_number_id': phoneNumberId,
+        'waba_id':         wabaId,
+        'access_token':    accessToken,
+      },
+    );
+    // 422 lanzado por Dio como DioException — dejar que suba
+  }
+
   static Future<Map<String, dynamic>> verifyTelegramToken(String botToken) async {
     final dio = Dio(BaseOptions(
       connectTimeout: const Duration(seconds: 10),

@@ -629,6 +629,12 @@ class _CreateChannelStepperState extends State<_CreateChannelStepper> {
           accessToken:   _tokenCtrl.text.trim(),
         );
         if (!mounted) return;
+        await ChannelsApi.activateWhatsapp(
+          phoneNumberId: _phoneCtrl.text.trim(),
+          wabaId:        _wabaCtrl.text.trim(),
+          accessToken:   _tokenCtrl.text.trim(),
+        );
+        if (!mounted) return;
         setState(() { _verifying = false; _step++; });
       }
     } catch (e) {

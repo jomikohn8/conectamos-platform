@@ -575,8 +575,20 @@ class _CredentialsTabState extends State<_CredentialsTab> {
       return;
     }
     if (!mounted) return;
+    // Step 2: activate WhatsApp channel on Meta
+    try {
+      await ChannelsApi.activateWhatsapp(
+        phoneNumberId: phone,
+        wabaId:        waba,
+        accessToken:   token,
+      );
+    } catch (e) {
+      if (mounted) setState(() { _verifying = false; _verifyError = _dioError(e); });
+      return;
+    }
+    if (!mounted) return;
     setState(() { _verifying = false; _saving = true; });
-    // Step 2: persist credentials
+    // Step 3: persist credentials
     try {
       final updated = await ChannelsApi.updateChannel(
         channelId: widget.channel['id'] as String,
