@@ -94,4 +94,16 @@ class OperatorsApi {
   }) async {
     await ApiClient.instance.delete('/operators/$operatorId/flows/$flowDefinitionId');
   }
+
+  /// Sends a Telegram invite to the operator via the given channel.
+  /// Auth is handled automatically by [ApiClient]'s interceptor.
+  static Future<void> sendTelegramInvite({
+    required String operatorId,
+    required String channelId,
+  }) async {
+    await ApiClient.instance.post(
+      '/operators/$operatorId/send-telegram-invite',
+      data: {'channel_id': channelId},
+    );
+  }
 }

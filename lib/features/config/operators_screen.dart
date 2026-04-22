@@ -667,6 +667,10 @@ class _OperatorFormDialogState extends ConsumerState<_OperatorFormDialog> {
   bool _saving = false;
   String? _errorMsg;
 
+  // Telegram invite
+  bool _sendingInvite = false;
+  List<String> _inviteResults = [];
+
   // Flows loaded from API
   List<Map<String, dynamic>> _availableFlows = [];
   bool _flowsLoading = true;
@@ -722,9 +726,9 @@ class _OperatorFormDialogState extends ConsumerState<_OperatorFormDialog> {
     if (hasTelegramFlow && _telegramCtrl.text.trim().isEmpty) {
       setState(() {
         _errorMsg = 'Este operador tiene flujos de canal Telegram asignados. '
-            'Ingresa su Telegram Chat ID para continuar.';
+            'Ingresa su Telegram Chat ID o usa el botón "Vincular vía Telegram".';
       });
-      return;
+      // Warning only — do NOT block the save
     }
 
     setState(() { _saving = true; _errorMsg = null; });
@@ -779,8 +783,60 @@ class _OperatorFormDialogState extends ConsumerState<_OperatorFormDialog> {
     }
   }
 
+  Future<void> _sendInvites() async {
+    if (_sendingInvite || widget.operatorId == null) return;
+    // Collect unique Telegram channel_ids from selected flows
+    final channelIds = <String>{};
+    final channelLabels = <String, String>{};
+    for (final fId in _selectedFlowIds) {
+      final flow = _availableFlows.cast<Map<String, dynamic>?>().firstWhere(
+        (f) => f?['id']?.toString() == fId,
+        orElse: () => null,
+      );
+      if (flow == null) continue;
+      final types = flow['channel_types'];
+      if (types is! List || !types.contains('telegram')) continue;
+      final chId = flow['channel_id'] as String?;
+      if (chId == null || chId.isEmpty) continue;
+      channelIds.add(chId);
+      channelLabels[chId] = flow['channel_name'] as String?
+          ?? flow['display_name'] as String?
+          ?? chId;
+    }
+    if (channelIds.isEmpty) {
+      setState(() => _inviteResults = ['⚠ No se encontraron canales Telegram en los flujos seleccionados.']);
+      return;
+    }
+    setState(() { _sendingInvite = true; _inviteResults = []; });
+    final results = <String>[];
+    for (final chId in channelIds) {
+      try {
+        await OperatorsApi.sendTelegramInvite(
+          operatorId: widget.operatorId!,
+          channelId: chId,
+        );
+        results.add('✓ Invitación enviada (${channelLabels[chId] ?? chId})');
+      } on DioException catch (e) {
+        final detail = e.response?.data is Map
+            ? e.response!.data['detail']?.toString()
+            : null;
+        results.add('✗ Error (${channelLabels[chId] ?? chId}): ${detail ?? 'Error al enviar'}');
+      } catch (e) {
+        results.add('✗ Error (${channelLabels[chId] ?? chId}): ${e.toString()}');
+      }
+    }
+    if (mounted) setState(() { _sendingInvite = false; _inviteResults = results; });
+  }
+
   @override
   Widget build(BuildContext context) {
+    final hasTelegramFlow = _availableFlows
+        .where((f) => _selectedFlowIds.contains(f['id']))
+        .any((f) {
+          final types = f['channel_types'];
+          return types is List && types.contains('telegram');
+        });
+
     return Dialog(
       backgroundColor: AppColors.ctSurface,
       shape: RoundedRectangleBorder(
@@ -944,6 +1000,48 @@ class _OperatorFormDialogState extends ConsumerState<_OperatorFormDialog> {
                     ),
                   ),
                 ),
+              ],
+
+              // Vincular vía Telegram
+              if (hasTelegramFlow && _telegramCtrl.text.trim().isEmpty && widget.operatorId != null) ...[
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  height: 36,
+                  child: _sendingInvite
+                      ? const Center(
+                          child: SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        )
+                      : OutlinedButton.icon(
+                          onPressed: _sendInvites,
+                          icon: const Icon(Icons.telegram, size: 16),
+                          label: const Text(
+                            'Vincular vía Telegram',
+                            style: TextStyle(fontFamily: 'Geist', fontSize: 13),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFF229ED9),
+                            side: const BorderSide(color: Color(0xFF229ED9)),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                        ),
+                ),
+                if (_inviteResults.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  ..._inviteResults.map(
+                    (r) => Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Text(
+                        r,
+                        style: const TextStyle(fontFamily: 'Geist', fontSize: 11, color: AppColors.ctText2),
+                      ),
+                    ),
+                  ),
+                ],
               ],
 
               const SizedBox(height: 24),
