@@ -1,6 +1,9 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/api/flows_api.dart';
 import '../../core/api/operators_api.dart';
 import '../../core/providers/permissions_provider.dart';
@@ -8,6 +11,25 @@ import '../../core/providers/tenant_provider.dart';
 import '../../core/theme/app_theme.dart';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
+
+bool _isTelegramExpired(String? expiresAt) {
+  if (expiresAt == null) return false;
+  try {
+    return DateTime.now().toUtc().isAfter(DateTime.parse(expiresAt).toUtc());
+  } catch (_) {
+    return false;
+  }
+}
+
+String _formatTelegramExpiry(String iso) {
+  try {
+    final dt = DateTime.parse(iso).toLocal();
+    return '${dt.day}/${dt.month}/${dt.year} '
+        '${dt.hour}:${dt.minute.toString().padLeft(2, '0')}';
+  } catch (_) {
+    return iso;
+  }
+}
 
 String _initials(String name) {
   final parts = name.trim().split(' ').where((p) => p.isNotEmpty).toList();
@@ -97,6 +119,15 @@ class _OperatorsScreenState extends ConsumerState<OperatorsScreen> {
     }
   }
 
+  void _updateOperatorMetadata(String operatorId, Map<String, dynamic> metadata) {
+    setState(() {
+      _operators = _operators.map((op) {
+        if (op['id'] == operatorId) return {...op, 'metadata': metadata};
+        return op;
+      }).toList();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     // Recarga operadores cuando cambia el tenant
@@ -127,6 +158,7 @@ class _OperatorsScreenState extends ConsumerState<OperatorsScreen> {
                     operators: _operators,
                     onRefresh: _fetchOperators,
                     canManage: canManage,
+                    onOperatorMetadataUpdated: _updateOperatorMetadata,
                   ),
                 ),
         ),
@@ -194,10 +226,13 @@ class _OperatorsBody extends StatefulWidget {
     required this.operators,
     required this.onRefresh,
     required this.canManage,
+    this.onOperatorMetadataUpdated,
   });
   final List<Map<String, dynamic>> operators;
   final VoidCallback onRefresh;
   final bool canManage;
+  final void Function(String id, Map<String, dynamic> metadata)?
+      onOperatorMetadataUpdated;
 
   @override
   State<_OperatorsBody> createState() => _OperatorsBodyState();
@@ -361,6 +396,8 @@ class _OperatorsBodyState extends State<_OperatorsBody> {
                         op: entry.value,
                         onRefresh: widget.onRefresh,
                         canManage: widget.canManage,
+                        onOperatorMetadataUpdated:
+                            widget.onOperatorMetadataUpdated,
                       ),
                       if (!isLast)
                         const Divider(
@@ -392,10 +429,17 @@ class _OperatorsBodyState extends State<_OperatorsBody> {
 // ── Fila de operador ──────────────────────────────────────────────────────────
 
 class _OperatorRow extends StatefulWidget {
-  const _OperatorRow({required this.op, required this.onRefresh, required this.canManage});
+  const _OperatorRow({
+    required this.op,
+    required this.onRefresh,
+    required this.canManage,
+    this.onOperatorMetadataUpdated,
+  });
   final Map<String, dynamic> op;
   final VoidCallback onRefresh;
   final bool canManage;
+  final void Function(String id, Map<String, dynamic> metadata)?
+      onOperatorMetadataUpdated;
 
   @override
   State<_OperatorRow> createState() => _OperatorRowState();
@@ -439,6 +483,25 @@ class _OperatorRowState extends State<_OperatorRow> {
     final lastEventAt = op['last_event_at'] as String?;
     final id = op['id'] as String? ?? '';
     final st = _statusStyle(status);
+    final metadata = op['metadata'] as Map<String, dynamic>? ?? {};
+    final tgStatus = metadata['telegram_link_status'] as String?;
+    final tgExpiresAt = metadata['telegram_link_expires_at'] as String?;
+    final hasTelegramFlow = flows.any((f) {
+      final types = f['channel_types'];
+      return types is List && types.contains('telegram');
+    });
+    _TelegramBadge? tgBadge;
+    if (hasTelegramFlow && tgStatus != null && tgStatus != 'none') {
+      final expired = tgStatus == 'expired' ||
+          (tgStatus == 'pending' && _isTelegramExpired(tgExpiresAt));
+      if (tgStatus == 'linked') {
+        tgBadge = const _TelegramBadge(status: 'linked');
+      } else if (expired) {
+        tgBadge = const _TelegramBadge(status: 'expired');
+      } else if (tgStatus == 'pending') {
+        tgBadge = const _TelegramBadge(status: 'pending');
+      }
+    }
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
@@ -529,6 +592,10 @@ class _OperatorRowState extends State<_OperatorRow> {
                               ),
                             ),
                           ),
+                        if (tgBadge != null) ...[
+                          const SizedBox(height: 3),
+                          tgBadge,
+                        ],
                       ],
                     ),
                   ),
@@ -605,8 +672,11 @@ class _OperatorRowState extends State<_OperatorRow> {
                                 initialName: name,
                                 initialPhone: phone,
                                 initialFlows: flows.map((f) => f['id'] as String? ?? '').where((s) => s.isNotEmpty).toList(),
-                                initialTelegramChatId: (op['metadata'] as Map<String, dynamic>?)?['telegram_chat_id'] as String?,
+                                initialTelegramChatId: metadata['telegram_chat_id'] as String?,
+                                initialMetadata: metadata,
                                 onSaved: widget.onRefresh,
+                                onOperatorMetadataUpdated:
+                                    widget.onOperatorMetadataUpdated,
                               ),
                             );
                           },
@@ -644,7 +714,9 @@ class _OperatorFormDialog extends ConsumerStatefulWidget {
     this.initialPhone,
     this.initialFlows,
     this.initialTelegramChatId,
+    this.initialMetadata,
     required this.onSaved,
+    this.onOperatorMetadataUpdated,
   });
 
   final String? operatorId;
@@ -652,7 +724,10 @@ class _OperatorFormDialog extends ConsumerStatefulWidget {
   final String? initialPhone;
   final List<String>? initialFlows;
   final String? initialTelegramChatId;
+  final Map<String, dynamic>? initialMetadata;
   final VoidCallback onSaved;
+  final void Function(String id, Map<String, dynamic> metadata)?
+      onOperatorMetadataUpdated;
 
   bool get isEdit => operatorId != null;
 
@@ -671,6 +746,16 @@ class _OperatorFormDialogState extends ConsumerState<_OperatorFormDialog> {
   bool _sendingInvite = false;
   List<String> _inviteResults = [];
 
+  // Telegram linking state (from metadata + updated locally)
+  String _telegramLinkStatus = 'none';
+  String? _telegramLinkExpiresAt;
+
+  // Resolved channel from GET /flows/telegram-channels
+  String? _telegramChannelId;
+
+  // Supabase Realtime channel for this operator
+  RealtimeChannel? _realtimeChannel;
+
   // Flows loaded from API
   List<Map<String, dynamic>> _availableFlows = [];
   bool _flowsLoading = true;
@@ -684,7 +769,65 @@ class _OperatorFormDialogState extends ConsumerState<_OperatorFormDialog> {
     _phoneCtrl    = TextEditingController(text: widget.initialPhone ?? '');
     _telegramCtrl = TextEditingController(text: widget.initialTelegramChatId ?? '');
     _selectedFlowIds = Set<String>.from(widget.initialFlows ?? []);
+
+    // Init link state from metadata
+    final meta = widget.initialMetadata ?? {};
+    _telegramLinkStatus =
+        (meta['telegram_link_status'] as String?) ?? 'none';
+    _telegramLinkExpiresAt =
+        meta['telegram_link_expires_at'] as String?;
+
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadFlows());
+
+    // Realtime: subscribe to this operator's row updates
+    if (widget.isEdit && widget.operatorId != null) {
+      _realtimeChannel = Supabase.instance.client
+          .channel('op_${widget.operatorId}')
+          .onPostgresChanges(
+            event: PostgresChangeEvent.update,
+            schema: 'public',
+            table: 'operators',
+            filter: PostgresChangeFilter(
+              type: PostgresChangeFilterType.eq,
+              column: 'id',
+              value: widget.operatorId!,
+            ),
+            callback: _handleRealtimeUpdate,
+          )
+          .subscribe();
+    }
+  }
+
+  void _handleRealtimeUpdate(PostgresChangePayload payload) {
+    if (!mounted) return;
+    final row = payload.newRecord;
+    final rawMeta = row['metadata'];
+    Map<String, dynamic> meta;
+    if (rawMeta is Map) {
+      meta = Map<String, dynamic>.from(rawMeta);
+    } else if (rawMeta is String) {
+      try {
+        meta = Map<String, dynamic>.from(json.decode(rawMeta) as Map);
+      } catch (_) {
+        meta = {};
+      }
+    } else {
+      meta = {};
+    }
+
+    final newChatId = meta['telegram_chat_id'] as String?;
+    final newStatus = (meta['telegram_link_status'] as String?) ?? 'none';
+    final newExpiresAt = meta['telegram_link_expires_at'] as String?;
+
+    setState(() {
+      if (newChatId != null && newChatId.isNotEmpty) {
+        _telegramCtrl.text = newChatId;
+      }
+      _telegramLinkStatus = newStatus;
+      _telegramLinkExpiresAt = newExpiresAt;
+    });
+
+    widget.onOperatorMetadataUpdated?.call(widget.operatorId!, meta);
   }
 
   Future<void> _loadFlows() async {
@@ -693,9 +836,31 @@ class _OperatorFormDialogState extends ConsumerState<_OperatorFormDialog> {
       final flows = await FlowsApi.listFlows(
         tenantId: tenantId.isNotEmpty ? tenantId : 'default',
       );
-      if (mounted) setState(() { _availableFlows = flows; _flowsLoading = false; });
+      if (mounted) {
+        setState(() { _availableFlows = flows; _flowsLoading = false; });
+        _fetchTelegramChannels();
+      }
     } catch (_) {
       if (mounted) setState(() => _flowsLoading = false);
+    }
+  }
+
+  Future<void> _fetchTelegramChannels() async {
+    final flowIds = _selectedFlowIds.toList();
+    if (flowIds.isEmpty) {
+      if (mounted) setState(() => _telegramChannelId = null);
+      return;
+    }
+    try {
+      final channels = await OperatorsApi.getTelegramChannels(flowIds: flowIds);
+      if (!mounted) return;
+      setState(() {
+        _telegramChannelId = channels.isNotEmpty
+            ? channels.first['channel_id'] as String?
+            : null;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _telegramChannelId = null);
     }
   }
 
@@ -704,6 +869,9 @@ class _OperatorFormDialogState extends ConsumerState<_OperatorFormDialog> {
     _nameCtrl.dispose();
     _phoneCtrl.dispose();
     _telegramCtrl.dispose();
+    if (_realtimeChannel != null) {
+      Supabase.instance.client.removeChannel(_realtimeChannel!);
+    }
     super.dispose();
   }
 
@@ -783,60 +951,50 @@ class _OperatorFormDialogState extends ConsumerState<_OperatorFormDialog> {
     }
   }
 
-  Future<void> _sendInvites() async {
+  Future<void> _sendInvite() async {
     if (_sendingInvite || widget.operatorId == null) return;
-    // Collect unique Telegram channel_ids from selected flows
-    final channelIds = <String>{};
-    final channelLabels = <String, String>{};
-    for (final fId in _selectedFlowIds) {
-      final flow = _availableFlows.cast<Map<String, dynamic>?>().firstWhere(
-        (f) => f?['id']?.toString() == fId,
-        orElse: () => null,
-      );
-      if (flow == null) continue;
-      final types = flow['channel_types'];
-      if (types is! List || !types.contains('telegram')) continue;
-      final chId = flow['channel_id'] as String?;
-      if (chId == null || chId.isEmpty) continue;
-      channelIds.add(chId);
-      channelLabels[chId] = flow['channel_name'] as String?
-          ?? flow['display_name'] as String?
-          ?? chId;
-    }
-    if (channelIds.isEmpty) {
+    if (_telegramChannelId == null) {
       setState(() => _inviteResults = ['⚠ No se encontraron canales Telegram en los flujos seleccionados.']);
       return;
     }
     setState(() { _sendingInvite = true; _inviteResults = []; });
-    final results = <String>[];
-    for (final chId in channelIds) {
-      try {
-        await OperatorsApi.sendTelegramInvite(
-          operatorId: widget.operatorId!,
-          channelId: chId,
-        );
-        results.add('✓ Invitación enviada (${channelLabels[chId] ?? chId})');
-      } on DioException catch (e) {
-        final detail = e.response?.data is Map
-            ? e.response!.data['detail']?.toString()
-            : null;
-        results.add('✗ Error (${channelLabels[chId] ?? chId}): ${detail ?? 'Error al enviar'}');
-      } catch (e) {
-        results.add('✗ Error (${channelLabels[chId] ?? chId}): ${e.toString()}');
+    try {
+      final result = await OperatorsApi.sendTelegramInvite(
+        operatorId: widget.operatorId!,
+        channelId: _telegramChannelId!,
+        phone: _phoneCtrl.text.trim(),
+      );
+      final expiresAt = result['expires_at'] as String?;
+      if (mounted) {
+        setState(() {
+          _sendingInvite = false;
+          _telegramLinkStatus = 'pending';
+          if (expiresAt != null) _telegramLinkExpiresAt = expiresAt;
+          _inviteResults = ['✓ Invitación enviada'];
+        });
+      }
+    } on DioException catch (e) {
+      final detail = e.response?.data is Map
+          ? e.response!.data['detail']?.toString()
+          : null;
+      if (mounted) {
+        setState(() {
+          _sendingInvite = false;
+          _inviteResults = ['✗ ${detail ?? 'Error al enviar invitación'}'];
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _sendingInvite = false;
+          _inviteResults = ['✗ ${e.toString()}'];
+        });
       }
     }
-    if (mounted) setState(() { _sendingInvite = false; _inviteResults = results; });
   }
 
   @override
   Widget build(BuildContext context) {
-    final hasTelegramFlow = _availableFlows
-        .where((f) => _selectedFlowIds.contains(f['id']))
-        .any((f) {
-          final types = f['channel_types'];
-          return types is List && types.contains('telegram');
-        });
-
     return Dialog(
       backgroundColor: AppColors.ctSurface,
       shape: RoundedRectangleBorder(
@@ -881,12 +1039,57 @@ class _OperatorFormDialogState extends ConsumerState<_OperatorFormDialog> {
               const SizedBox(height: 14),
 
               // Telegram Chat ID
-              _DialogField(
-                label: 'Telegram Chat ID',
-                controller: _telegramCtrl,
-                placeholder: 'Ej: 123456789',
-                keyboardType: TextInputType.number,
-              ),
+              if (_telegramLinkStatus == 'linked') ...[
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Telegram Chat ID',
+                      style: TextStyle(
+                        fontFamily: 'Geist',
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.ctText,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: AppColors.ctSurface2,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppColors.ctBorder2),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              _telegramCtrl.text,
+                              style: const TextStyle(
+                                fontFamily: 'Geist',
+                                fontSize: 13,
+                                color: AppColors.ctText,
+                              ),
+                            ),
+                          ),
+                          const Icon(
+                            Icons.check_circle_rounded,
+                            size: 16,
+                            color: AppColors.ctTeal,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ] else
+                _DialogField(
+                  label: 'Telegram Chat ID',
+                  controller: _telegramCtrl,
+                  placeholder: 'Ej: 123456789',
+                  keyboardType: TextInputType.number,
+                ),
               const SizedBox(height: 18),
 
               // Flujos
@@ -925,10 +1128,13 @@ class _OperatorFormDialogState extends ConsumerState<_OperatorFormDialog> {
                             borderRadius: isLast
                                 ? const BorderRadius.only(bottomLeft: Radius.circular(7), bottomRight: Radius.circular(7))
                                 : BorderRadius.zero,
-                            onTap: () => setState(() {
-                              if (isSelected) { _selectedFlowIds.remove(flowId); }
-                              else { _selectedFlowIds.add(flowId); }
-                            }),
+                            onTap: () {
+                              setState(() {
+                                if (isSelected) { _selectedFlowIds.remove(flowId); }
+                                else { _selectedFlowIds.add(flowId); }
+                              });
+                              _fetchTelegramChannels();
+                            },
                             child: Padding(
                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                               child: Row(
@@ -937,10 +1143,13 @@ class _OperatorFormDialogState extends ConsumerState<_OperatorFormDialog> {
                                     width: 20, height: 20,
                                     child: Checkbox(
                                       value: isSelected,
-                                      onChanged: (v) => setState(() {
-                                        if (v == true) { _selectedFlowIds.add(flowId); }
-                                        else { _selectedFlowIds.remove(flowId); }
-                                      }),
+                                      onChanged: (v) {
+                                        setState(() {
+                                          if (v == true) { _selectedFlowIds.add(flowId); }
+                                          else { _selectedFlowIds.remove(flowId); }
+                                        });
+                                        _fetchTelegramChannels();
+                                      },
                                       activeColor: AppColors.ctTeal,
                                       checkColor: AppColors.ctNavy,
                                       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -1003,33 +1212,81 @@ class _OperatorFormDialogState extends ConsumerState<_OperatorFormDialog> {
               ],
 
               // Vincular vía Telegram
-              if (hasTelegramFlow && _telegramCtrl.text.trim().isEmpty && widget.operatorId != null) ...[
+              if (_telegramChannelId != null &&
+                  _telegramLinkStatus != 'linked' &&
+                  widget.isEdit) ...[
                 const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  height: 36,
-                  child: _sendingInvite
-                      ? const Center(
-                          child: SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
+                Builder(builder: (ctx) {
+                  final isExpired = _telegramLinkStatus == 'expired' ||
+                      (_telegramLinkStatus == 'pending' &&
+                          _isTelegramExpired(_telegramLinkExpiresAt));
+                  final isPendingActive = _telegramLinkStatus == 'pending' &&
+                      !isExpired &&
+                      _telegramLinkExpiresAt != null;
+                  final btnLabel = _telegramLinkStatus == 'none'
+                      ? 'Vincular vía Telegram'
+                      : 'Reenviar invitación';
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (isExpired)
+                        const Padding(
+                          padding: EdgeInsets.only(bottom: 6),
+                          child: Text(
+                            'Invitación expirada',
+                            style: TextStyle(
+                              fontFamily: 'Geist',
+                              fontSize: 11,
+                              color: AppColors.ctDanger,
+                            ),
                           ),
                         )
-                      : OutlinedButton.icon(
-                          onPressed: _sendInvites,
-                          icon: const Icon(Icons.telegram, size: 16),
-                          label: const Text(
-                            'Vincular vía Telegram',
-                            style: TextStyle(fontFamily: 'Geist', fontSize: 13),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: const Color(0xFF229ED9),
-                            side: const BorderSide(color: Color(0xFF229ED9)),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      else if (isPendingActive)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 6),
+                          child: Text(
+                            'SMS enviado · expira ${_formatTelegramExpiry(_telegramLinkExpiresAt!)}',
+                            style: const TextStyle(
+                              fontFamily: 'Geist',
+                              fontSize: 11,
+                              color: AppColors.ctText2,
+                            ),
                           ),
                         ),
-                ),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 36,
+                        child: _sendingInvite
+                            ? const Center(
+                                child: SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2),
+                                ),
+                              )
+                            : OutlinedButton.icon(
+                                onPressed: _sendInvite,
+                                icon: const Icon(Icons.telegram, size: 16),
+                                label: Text(
+                                  btnLabel,
+                                  style: const TextStyle(
+                                      fontFamily: 'Geist', fontSize: 13),
+                                ),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: const Color(0xFF229ED9),
+                                  side: const BorderSide(
+                                      color: Color(0xFF229ED9)),
+                                  shape: RoundedRectangleBorder(
+                                      borderRadius:
+                                          BorderRadius.circular(8)),
+                                ),
+                              ),
+                      ),
+                    ],
+                  );
+                }),
                 if (_inviteResults.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   ..._inviteResults.map(
@@ -1037,7 +1294,10 @@ class _OperatorFormDialogState extends ConsumerState<_OperatorFormDialog> {
                       padding: const EdgeInsets.only(bottom: 4),
                       child: Text(
                         r,
-                        style: const TextStyle(fontFamily: 'Geist', fontSize: 11, color: AppColors.ctText2),
+                        style: const TextStyle(
+                            fontFamily: 'Geist',
+                            fontSize: 11,
+                            color: AppColors.ctText2),
                       ),
                     ),
                   ),
@@ -1281,6 +1541,49 @@ class _StatusBadge extends StatelessWidget {
           fontSize: 11,
           fontWeight: FontWeight.w600,
           color: textColor,
+        ),
+      ),
+    );
+  }
+}
+
+class _TelegramBadge extends StatelessWidget {
+  const _TelegramBadge({required this.status});
+  // status: 'linked' | 'pending' | 'expired'
+  final String status;
+
+  @override
+  Widget build(BuildContext context) {
+    final Color bg;
+    final Color fg;
+    final String label;
+    switch (status) {
+      case 'linked':
+        bg = AppColors.ctTealLight;
+        fg = AppColors.ctTealDark;
+        label = '✓ Telegram vinculado';
+      case 'pending':
+        bg = AppColors.ctWarnBg;
+        fg = AppColors.ctWarnText;
+        label = '⏳ Vinculación pendiente';
+      default: // expired
+        bg = AppColors.ctWarnBg;
+        fg = AppColors.ctWarnText;
+        label = '⚠ Invitación expirada';
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontFamily: 'Geist',
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+          color: fg,
         ),
       ),
     );

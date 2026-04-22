@@ -96,14 +96,38 @@ class OperatorsApi {
   }
 
   /// Sends a Telegram invite to the operator via the given channel.
-  /// Auth is handled automatically by [ApiClient]'s interceptor.
-  static Future<void> sendTelegramInvite({
+  /// Returns the response body (may include expires_at).
+  static Future<Map<String, dynamic>> sendTelegramInvite({
     required String operatorId,
     required String channelId,
+    String? phone,
   }) async {
-    await ApiClient.instance.post(
+    final response = await ApiClient.instance.post(
       '/operators/$operatorId/send-telegram-invite',
-      data: {'channel_id': channelId},
+      data: {
+        'channel_id': channelId,
+        if (phone != null && phone.isNotEmpty) 'phone': phone,
+      },
     );
+    return response.data is Map
+        ? Map<String, dynamic>.from(response.data as Map)
+        : {};
+  }
+
+  /// GET /flows/telegram-channels?flow_ids=uuid1,uuid2
+  /// Returns channels list: [{ "channel_id": "uuid", "bot_username": "..." }]
+  static Future<List<Map<String, dynamic>>> getTelegramChannels({
+    required List<String> flowIds,
+  }) async {
+    if (flowIds.isEmpty) return [];
+    final response = await ApiClient.instance.get(
+      '/flows/telegram-channels',
+      queryParameters: {'flow_ids': flowIds.join(',')},
+    );
+    final data = response.data;
+    if (data is Map && data['channels'] is List) {
+      return List<Map<String, dynamic>>.from(data['channels'] as List);
+    }
+    return [];
   }
 }
