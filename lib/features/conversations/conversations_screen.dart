@@ -922,6 +922,7 @@ class _ConvoListState extends ConsumerState<_ConvoList> {
                       setLastRead(chatId, DateTime.now().toUtc(),
                           ref.read(activeTenantIdProvider));
                       setState(() { _unreadOverride[chatId] = 0; });
+                      // read-receipts dispatched in _ChatPanelState._sendReadReceipts
                       ref.read(selectedChatIdProvider.notifier).state = chatId;
                       ref.read(selectedChatNameProvider.notifier).state = name;
                       ref.read(selectedOperatorChannelsProvider.notifier).state = [];
@@ -1231,12 +1232,14 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
     if (!_scrollCtrl.hasClients) return;
 
     if (_firstUnreadMessageId == null) {
-      _scrollCtrl.jumpTo(_scrollCtrl.position.maxScrollExtent);
-      // ListView.builder solo mide ítems visibles en el primer frame; maxScrollExtent
-      // puede estar subestimado. Un segundo jump tras el re-layout alcanza el fondo real.
+      // Un único jump diferido 50ms permite que ListView termine de medir
+      // todos sus ítems antes de saltar, evitando el rebote visible del doble-jump.
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted || !_scrollCtrl.hasClients) return;
-        _scrollCtrl.jumpTo(_scrollCtrl.position.maxScrollExtent);
+        Future.delayed(const Duration(milliseconds: 50), () {
+          if (mounted && _scrollCtrl.hasClients) {
+            _scrollCtrl.jumpTo(_scrollCtrl.position.maxScrollExtent);
+          }
+        });
       });
       return;
     }
@@ -2215,13 +2218,24 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
 
     final replyingTo = ref.watch(replyingToProvider);
 
+    final channelType = ref.read(selectedChannelTypeProvider);
+    final isWhatsapp = (channelType ?? 'whatsapp') == 'whatsapp';
+    final String inputHint;
+    if (!_isSupervisorMode) {
+      inputHint = 'Toca "Intervenir" para escribir';
+    } else if (isWhatsapp && _windowOpen == false) {
+      inputHint = 'Ventana de 24h cerrada · Usa una plantilla';
+    } else {
+      inputHint = 'Escribe un mensaje…';
+    }
+
     final body = Column(
       children: [
         // Header
         _ApiChatHeader(
           name: chatName ?? chatId,
           windowOpen: _windowOpen,
-          channelType: ref.read(selectedChannelTypeProvider),
+          channelType: channelType,
           channelName: activeChannel?['name'] as String?,
           workerName: activeChannel?['worker_name'] as String?,
           channelColor: activeChannel?['color'] as String?,
@@ -2335,8 +2349,8 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
             ),
           ),
 
-        // Banner ventana cerrada
-        if (_windowOpen == false)
+        // Banner ventana cerrada (solo WhatsApp, supervisor mode activo)
+        if (_isSupervisorMode && isWhatsapp && _windowOpen == false)
           Container(
             padding: const EdgeInsets.symmetric(
                 horizontal: 16, vertical: 8),
@@ -2348,7 +2362,7 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
                 SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Ventana de 24hrs cerrada. Solo puedes enviar plantillas aprobadas.',
+                    'Ventana de 24h cerrada. Solo puedes enviar plantillas aprobadas.',
                     style: TextStyle(
                       fontFamily: 'Geist',
                       fontSize: 11,
@@ -2412,6 +2426,7 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
           onTyping: (_windowOpen == true && _isSupervisorMode) ? _handleTyping : null,
           sending: _sending,
           enabled: _windowOpen == true && _isSupervisorMode,
+          hintText: inputHint,
           onAttach: _handleAttach,
           onMic: (_windowOpen == true && _isSupervisorMode) ? _startVoiceRecording : null,
           isRecording: _isRecording,
@@ -2602,7 +2617,7 @@ class _ApiChatHeader extends StatelessWidget {
                 Text(
                   channelName != null
                       ? '$channelName${workerName != null ? ' · $workerName' : ''}'
-                      : 'WhatsApp · Sin canal asignado',
+                      : 'Sin canal asignado',
                   style: const TextStyle(
                     fontFamily: 'Geist',
                     fontSize: 11,
@@ -3413,6 +3428,7 @@ class _ChatInput extends StatefulWidget {
     this.onTyping,
     this.sending = false,
     this.enabled = true,
+    this.hintText,
     this.onAttach,
     this.onMic,
     this.isRecording = false,
@@ -3425,6 +3441,7 @@ class _ChatInput extends StatefulWidget {
   final VoidCallback? onTyping;
   final bool sending;
   final bool enabled;
+  final String? hintText;
   final void Function(String type)? onAttach;
   final VoidCallback? onMic;
   final bool isRecording;
@@ -3458,7 +3475,11 @@ class _ChatInputState extends State<_ChatInput>
           !HardwareKeyboard.instance.isShiftPressed) {
         final canSend =
             widget.onSend != null && !widget.sending && widget.enabled;
-        if (canSend) widget.onSend!();
+        if (canSend) {
+          widget.onSend!().then((_) {
+            if (mounted) _focusNode.requestFocus();
+          });
+        }
         return KeyEventResult.handled; // previene inserción de newline
       }
       return KeyEventResult.ignored;
@@ -3647,9 +3668,7 @@ class _ChatInputState extends State<_ChatInput>
                   enabled: widget.enabled && !widget.sending,
                   onChanged: widget.enabled ? _onChanged : null,
                   decoration: InputDecoration(
-                    hintText: widget.enabled
-                        ? 'Escribe un mensaje…'
-                        : 'Ventana de 24h cerrada — usa una plantilla',
+                    hintText: widget.hintText ?? 'Escribe un mensaje…',
                     hintStyle: const TextStyle(
                       fontFamily: 'Geist',
                       fontSize: 13,
@@ -3723,7 +3742,13 @@ class _ChatInputState extends State<_ChatInput>
                       ? SystemMouseCursors.click
                       : SystemMouseCursors.basic,
                   child: GestureDetector(
-                    onTap: canSend ? widget.onSend : null,
+                    onTap: canSend
+                        ? () {
+                            widget.onSend!().then((_) {
+                              if (mounted) _focusNode.requestFocus();
+                            });
+                          }
+                        : null,
                     child: SizedBox(
                       width: 44,
                       height: 44,
