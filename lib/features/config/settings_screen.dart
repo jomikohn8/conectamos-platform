@@ -1,8 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
-
 import '../../core/api/api_client.dart';
 import '../../core/api/channels_api.dart';
 import '../../core/api/iam_api.dart';
@@ -10,10 +8,11 @@ import '../../core/providers/permissions_provider.dart';
 import '../../core/providers/tenant_provider.dart';
 import '../../core/theme/app_theme.dart';
 import 'role_permissions_panel.dart';
+import '../settings/operator_fields_screen.dart';
 
 // ── Enum de secciones ─────────────────────────────────────────────────────────
 
-enum _Section { general, billing, users, communication, permissions }
+enum _Section { general, billing, users, communication, permissions, operatorFields }
 
 // ── Pantalla principal ────────────────────────────────────────────────────────
 
@@ -41,7 +40,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     ];
 
     // Reset to general if active tab was removed (e.g., permissions lost)
-    if (!items.any((i) => i.section == _active)) {
+    final validSection = items.any((i) => i.section == _active) ||
+        (_active == _Section.operatorFields && canManageSettings);
+    if (!validSection) {
       _active = _Section.general;
     }
 
@@ -74,8 +75,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       _NavItem(
                         label: 'Campos de operador',
                         icon: Icons.dashboard_customize,
-                        active: false,
-                        onTap: () => context.go('/settings/operator-fields'),
+                        active: _active == _Section.operatorFields,
+                        onTap: () => setState(() => _active = _Section.operatorFields),
                       ),
                     ],
                   ],
@@ -186,6 +187,9 @@ class _SectionPanel extends StatelessWidget {
     if (active == _Section.permissions) {
       return const _PermissionsSection();
     }
+    if (active == _Section.operatorFields) {
+      return const OperatorFieldsBody();
+    }
 
     final Widget content;
     switch (active) {
@@ -198,6 +202,8 @@ class _SectionPanel extends StatelessWidget {
       case _Section.communication:
         content = const _CommunicationSection();
       case _Section.permissions:
+        content = const SizedBox.shrink(); // handled above
+      case _Section.operatorFields:
         content = const SizedBox.shrink(); // handled above
     }
 

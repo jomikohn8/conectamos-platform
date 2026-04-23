@@ -33,18 +33,49 @@ const _kTypeIcons = {
 String _typeLabel(String key) => _kTypeLabels[key] ?? key;
 IconData _typeIcon(String key) => _kTypeIcons[key] ?? Icons.help_outline;
 
-// ── Screen ─────────────────────────────────────────────────────────────────────
+// ── Standalone screen (route /settings/operator-fields) ───────────────────────
 
-class OperatorFieldsScreen extends ConsumerStatefulWidget {
+class OperatorFieldsScreen extends StatelessWidget {
   const OperatorFieldsScreen({super.key});
 
   @override
-  ConsumerState<OperatorFieldsScreen> createState() =>
-      _OperatorFieldsScreenState();
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.ctBg,
+      appBar: AppBar(
+        backgroundColor: AppColors.ctSurface,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: AppColors.ctText),
+          onPressed: () => context.go('/settings'),
+        ),
+        title: const Text('Campos de operador',
+            style: TextStyle(
+              fontFamily: 'Geist',
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: AppColors.ctText,
+            )),
+        bottom: const PreferredSize(
+          preferredSize: Size.fromHeight(1),
+          child: Divider(height: 1, color: AppColors.ctBorder),
+        ),
+      ),
+      body: const OperatorFieldsBody(),
+    );
+  }
 }
 
-class _OperatorFieldsScreenState
-    extends ConsumerState<OperatorFieldsScreen> {
+// ── Embeddable body (used in settings panel + standalone screen) ───────────────
+
+class OperatorFieldsBody extends ConsumerStatefulWidget {
+  const OperatorFieldsBody({super.key});
+
+  @override
+  ConsumerState<OperatorFieldsBody> createState() => _OperatorFieldsBodyState();
+}
+
+class _OperatorFieldsBodyState extends ConsumerState<OperatorFieldsBody> {
   List<Map<String, dynamic>> _fields = [];
   bool _loading = true;
   String? _error;
@@ -144,7 +175,9 @@ class _OperatorFieldsScreenState
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Este campo tiene datos en $withData operador${withData == 1 ? '' : 'es'}. Los datos no se perderán.',
+                      'Este campo tiene datos en $withData '
+                      'operador${withData == 1 ? '' : 'es'}. '
+                      'Los datos no se perderán.',
                       style: const TextStyle(
                           fontFamily: 'Geist',
                           fontSize: 13,
@@ -188,7 +221,8 @@ class _OperatorFieldsScreenState
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: Text(
               'Campo desactivado. Tenía datos en $withDataResponse '
-              'operador${withDataResponse == 1 ? '' : 'es'}. Los datos no se perderán.',
+              'operador${withDataResponse == 1 ? '' : 'es'}. '
+              'Los datos no se perderán.',
             ),
             backgroundColor: AppColors.ctWarn,
             duration: const Duration(seconds: 4),
@@ -232,83 +266,62 @@ class _OperatorFieldsScreenState
   Widget build(BuildContext context) {
     final canManage = hasPermission(ref, 'settings', 'manage');
     final tenantId = ref.read(activeTenantIdProvider);
+    final effectiveTenantId = tenantId.isNotEmpty ? tenantId : 'default';
 
-    return Scaffold(
-      backgroundColor: AppColors.ctBg,
-      appBar: AppBar(
-        backgroundColor: AppColors.ctSurface,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.ctText),
-          onPressed: () => context.go('/settings'),
-        ),
-        title: const Text('Campos de operador',
-            style: TextStyle(
-              fontFamily: 'Geist',
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
-              color: AppColors.ctText,
-            )),
-        actions: [
-          if (canManage)
-            Padding(
-              padding: const EdgeInsets.only(right: 16),
-              child: SizedBox(
-                height: 34,
-                child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.ctTeal,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 14),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8)),
-                    textStyle: const TextStyle(
-                        fontFamily: 'Geist',
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600),
-                  ),
-                  icon: const Icon(Icons.add, size: 16),
-                  label: const Text('Agregar campo'),
-                  onPressed: () => _openCreate(
-                      tenantId.isNotEmpty ? tenantId : 'default'),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Header bar: subtitle + action button
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+          color: AppColors.ctSurface,
+          child: Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Define campos adicionales para los perfiles de tus operadores. '
+                  'Arrastra para cambiar el orden.',
+                  style: TextStyle(
+                      fontFamily: 'Geist',
+                      fontSize: 13,
+                      color: AppColors.ctText2),
                 ),
               ),
-            ),
-        ],
-        bottom: const PreferredSize(
-          preferredSize: Size.fromHeight(1),
-          child: Divider(height: 1, color: AppColors.ctBorder),
-        ),
-      ),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Subtitle bar
-          Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-            color: AppColors.ctSurface,
-            child: const Text(
-              'Define campos adicionales para los perfiles de tus operadores. '
-              'Arrastra para cambiar el orden.',
-              style: TextStyle(
-                  fontFamily: 'Geist',
-                  fontSize: 13,
-                  color: AppColors.ctText2),
-            ),
+              if (canManage) ...[
+                const SizedBox(width: 16),
+                SizedBox(
+                  height: 34,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.ctTeal,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: 14),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8)),
+                      textStyle: const TextStyle(
+                          fontFamily: 'Geist',
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600),
+                    ),
+                    icon: const Icon(Icons.add, size: 16),
+                    label: const Text('Agregar campo'),
+                    onPressed: () => _openCreate(effectiveTenantId),
+                  ),
+                ),
+              ],
+            ],
           ),
-          const Divider(height: 1, color: AppColors.ctBorder),
+        ),
+        const Divider(height: 1, color: AppColors.ctBorder),
 
-          // Content
-          Expanded(child: _buildBody(canManage, tenantId)),
-        ],
-      ),
+        Expanded(child: _buildContent(canManage, effectiveTenantId)),
+      ],
     );
   }
 
-  Widget _buildBody(bool canManage, String tenantId) {
+  Widget _buildContent(bool canManage, String tenantId) {
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -318,7 +331,8 @@ class _OperatorFieldsScreenState
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.error_outline, size: 48, color: AppColors.ctDanger),
+            const Icon(Icons.error_outline,
+                size: 48, color: AppColors.ctDanger),
             const SizedBox(height: 12),
             Text(_error!,
                 style: const TextStyle(
@@ -372,8 +386,7 @@ class _OperatorFieldsScreenState
                 ),
                 icon: const Icon(Icons.add, size: 18),
                 label: const Text('Agregar primer campo'),
-                onPressed: () => _openCreate(
-                    tenantId.isNotEmpty ? tenantId : 'default'),
+                onPressed: () => _openCreate(tenantId),
               ),
             ],
           ],
