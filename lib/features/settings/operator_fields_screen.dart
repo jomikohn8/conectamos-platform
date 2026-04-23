@@ -1,0 +1,539 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../core/api/operator_fields_api.dart';
+import '../../core/providers/permissions_provider.dart';
+import '../../core/providers/tenant_provider.dart';
+import '../../core/theme/app_theme.dart';
+import 'widgets/operator_field_form_dialog.dart';
+
+// ── Field type helpers ─────────────────────────────────────────────────────────
+
+const _kTypeLabels = {
+  'text':     'Texto',
+  'number':   'Número',
+  'date':     'Fecha',
+  'boolean':  'Sí / No',
+  'select':   'Selección',
+  'photo':    'Foto',
+  'document': 'Documento',
+};
+
+const _kTypeIcons = {
+  'text':     Icons.text_fields,
+  'number':   Icons.tag,
+  'date':     Icons.calendar_today,
+  'boolean':  Icons.toggle_on_outlined,
+  'select':   Icons.list_alt_outlined,
+  'photo':    Icons.photo_camera_outlined,
+  'document': Icons.attach_file,
+};
+
+String _typeLabel(String key) => _kTypeLabels[key] ?? key;
+IconData _typeIcon(String key) => _kTypeIcons[key] ?? Icons.help_outline;
+
+// ── Screen ─────────────────────────────────────────────────────────────────────
+
+class OperatorFieldsScreen extends ConsumerStatefulWidget {
+  const OperatorFieldsScreen({super.key});
+
+  @override
+  ConsumerState<OperatorFieldsScreen> createState() =>
+      _OperatorFieldsScreenState();
+}
+
+class _OperatorFieldsScreenState
+    extends ConsumerState<OperatorFieldsScreen> {
+  List<Map<String, dynamic>> _fields = [];
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+  }
+
+  Future<void> _load() async {
+    if (!mounted) return;
+    setState(() { _loading = true; _error = null; });
+    try {
+      final tenantId = ref.read(activeTenantIdProvider);
+      final fields = await OperatorFieldsApi.getOperatorFields(
+          tenantId: tenantId.isNotEmpty ? tenantId : 'default');
+      if (mounted) {
+        setState(() {
+          _fields = List.from(fields)
+            ..sort((a, b) =>
+                ((a['display_order'] as int?) ?? 0)
+                    .compareTo((b['display_order'] as int?) ?? 0));
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() { _error = e.toString(); _loading = false; });
+    }
+  }
+
+  void _onReorder(int oldIndex, int newIndex) {
+    if (newIndex > oldIndex) newIndex--;
+    setState(() {
+      final item = _fields.removeAt(oldIndex);
+      _fields.insert(newIndex, item);
+    });
+    _saveReorder();
+  }
+
+  Future<void> _saveReorder() async {
+    final order = _fields.asMap().entries.map((e) => {
+          'id': e.value['id'] as String,
+          'display_order': e.key + 1,
+        }).toList();
+    try {
+      await OperatorFieldsApi.reorderOperatorFields(order);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Error al guardar el orden'),
+          backgroundColor: AppColors.ctDanger,
+        ));
+        _load();
+      }
+    }
+  }
+
+  Future<void> _confirmDeactivate(Map<String, dynamic> field) async {
+    final label = field['label'] as String? ?? 'este campo';
+    final withData = field['operators_with_data'] as int? ?? 0;
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.ctSurface,
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: Text('¿Desactivar "$label"?',
+            style: const TextStyle(
+                fontFamily: 'Geist',
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: AppColors.ctText)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'El campo dejará de aparecer en el formulario de operadores.',
+              style: TextStyle(
+                  fontFamily: 'Geist',
+                  fontSize: 14,
+                  color: AppColors.ctText2),
+            ),
+            if (withData > 0) ...[
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.ctWarnBg,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(children: [
+                  const Icon(Icons.info_outline,
+                      size: 15, color: AppColors.ctWarn),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Este campo tiene datos en $withData operador${withData == 1 ? '' : 'es'}. Los datos no se perderán.',
+                      style: const TextStyle(
+                          fontFamily: 'Geist',
+                          fontSize: 13,
+                          color: AppColors.ctWarnText),
+                    ),
+                  ),
+                ]),
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar',
+                style: TextStyle(
+                    fontFamily: 'Geist', color: AppColors.ctText2)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Desactivar',
+                style: TextStyle(
+                  fontFamily: 'Geist',
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.ctDanger,
+                )),
+          ),
+        ],
+      ),
+    );
+
+    if (ok != true || !mounted) return;
+
+    try {
+      await OperatorFieldsApi.deleteOperatorField(
+          field['id'] as String);
+      _load();
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Error al desactivar el campo'),
+          backgroundColor: AppColors.ctDanger,
+        ));
+      }
+    }
+  }
+
+  void _openCreate(String tenantId) {
+    showDialog(
+      context: context,
+      builder: (_) => OperatorFieldFormDialog(
+        tenantId: tenantId,
+        onSaved: _load,
+      ),
+    );
+  }
+
+  void _openEdit(Map<String, dynamic> field) {
+    showDialog(
+      context: context,
+      builder: (_) => OperatorFieldFormDialog(
+        tenantId: '',
+        field: field,
+        onSaved: _load,
+      ),
+    );
+  }
+
+  // ── Build ────────────────────────────────────────────────────────────────────
+
+  @override
+  Widget build(BuildContext context) {
+    final canManage = hasPermission(ref, 'settings', 'manage');
+    final tenantId = ref.read(activeTenantIdProvider);
+
+    return Scaffold(
+      backgroundColor: AppColors.ctBg,
+      appBar: AppBar(
+        backgroundColor: AppColors.ctSurface,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: AppColors.ctText),
+          onPressed: () => context.go('/settings'),
+        ),
+        title: const Text('Campos de operador',
+            style: TextStyle(
+              fontFamily: 'Geist',
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: AppColors.ctText,
+            )),
+        actions: [
+          if (canManage)
+            Padding(
+              padding: const EdgeInsets.only(right: 16),
+              child: SizedBox(
+                height: 34,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.ctTeal,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 14),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8)),
+                    textStyle: const TextStyle(
+                        fontFamily: 'Geist',
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600),
+                  ),
+                  icon: const Icon(Icons.add, size: 16),
+                  label: const Text('Agregar campo'),
+                  onPressed: () => _openCreate(
+                      tenantId.isNotEmpty ? tenantId : 'default'),
+                ),
+              ),
+            ),
+        ],
+        bottom: const PreferredSize(
+          preferredSize: Size.fromHeight(1),
+          child: Divider(height: 1, color: AppColors.ctBorder),
+        ),
+      ),
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Subtitle bar
+          Container(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+            color: AppColors.ctSurface,
+            child: const Text(
+              'Define campos adicionales para los perfiles de tus operadores. '
+              'Arrastra para cambiar el orden.',
+              style: TextStyle(
+                  fontFamily: 'Geist',
+                  fontSize: 13,
+                  color: AppColors.ctText2),
+            ),
+          ),
+          const Divider(height: 1, color: AppColors.ctBorder),
+
+          // Content
+          Expanded(child: _buildBody(canManage, tenantId)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBody(bool canManage, String tenantId) {
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_error != null) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.error_outline, size: 48, color: AppColors.ctDanger),
+            const SizedBox(height: 12),
+            Text(_error!,
+                style: const TextStyle(
+                    fontFamily: 'Geist', color: AppColors.ctText2)),
+            const SizedBox(height: 16),
+            TextButton(onPressed: _load, child: const Text('Reintentar')),
+          ],
+        ),
+      );
+    }
+
+    if (_fields.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.dashboard_customize_outlined,
+                size: 56, color: AppColors.ctText3),
+            const SizedBox(height: 16),
+            const Text('Sin campos definidos',
+                style: TextStyle(
+                  fontFamily: 'Geist',
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.ctText,
+                )),
+            const SizedBox(height: 6),
+            const Text(
+              'Agrega campos personalizados para enriquecer los perfiles de tus operadores',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  fontFamily: 'Geist',
+                  fontSize: 13,
+                  color: AppColors.ctText2),
+            ),
+            if (canManage) ...[
+              const SizedBox(height: 20),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.ctTeal,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 20, vertical: 10),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
+                  textStyle: const TextStyle(
+                      fontFamily: 'Geist',
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600),
+                ),
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('Agregar primer campo'),
+                onPressed: () => _openCreate(
+                    tenantId.isNotEmpty ? tenantId : 'default'),
+              ),
+            ],
+          ],
+        ),
+      );
+    }
+
+    return ReorderableListView.builder(
+      padding: const EdgeInsets.all(20),
+      buildDefaultDragHandles: false,
+      itemCount: _fields.length,
+      onReorder: canManage ? _onReorder : (oldIndex, newIndex) {},
+      itemBuilder: (context, i) {
+        final field = _fields[i];
+        final id = field['id'] as String? ?? i.toString();
+        return _FieldCard(
+          key: ValueKey(id),
+          field: field,
+          index: i,
+          canManage: canManage,
+          onEdit: () => _openEdit(field),
+          onDeactivate: () => _confirmDeactivate(field),
+        );
+      },
+    );
+  }
+}
+
+// ── Field card ─────────────────────────────────────────────────────────────────
+
+class _FieldCard extends StatelessWidget {
+  const _FieldCard({
+    super.key,
+    required this.field,
+    required this.index,
+    required this.canManage,
+    required this.onEdit,
+    required this.onDeactivate,
+  });
+
+  final Map<String, dynamic> field;
+  final int index;
+  final bool canManage;
+  final VoidCallback onEdit;
+  final VoidCallback onDeactivate;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = field['label'] as String? ?? '—';
+    final fieldType = field['field_type'] as String? ?? 'text';
+    final fieldKey = field['field_key'] as String? ?? '';
+    final isRequired = field['required'] as bool? ?? false;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.ctSurface,
+        border: Border.all(color: AppColors.ctBorder),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          // Drag handle
+          if (canManage) ...[
+            ReorderableDragStartListener(
+              index: index,
+              child: const MouseRegion(
+                cursor: SystemMouseCursors.grab,
+                child: Icon(Icons.drag_handle,
+                    size: 20, color: AppColors.ctText3),
+              ),
+            ),
+            const SizedBox(width: 10),
+          ],
+
+          // Type icon
+          Container(
+            width: 34,
+            height: 34,
+            decoration: const BoxDecoration(
+              color: AppColors.ctSurface2,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(_typeIcon(fieldType),
+                size: 16, color: AppColors.ctText2),
+          ),
+          const SizedBox(width: 12),
+
+          // Label + meta
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label,
+                    style: const TextStyle(
+                      fontFamily: 'Geist',
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.ctText,
+                    )),
+                const SizedBox(height: 4),
+                Row(children: [
+                  _Chip(
+                    label: _typeLabel(fieldType),
+                    bg: AppColors.ctInfoBg,
+                    fg: AppColors.ctInfoText,
+                  ),
+                  if (isRequired) ...[
+                    const SizedBox(width: 6),
+                    const _Chip(
+                      label: 'Requerido',
+                      bg: AppColors.ctWarnBg,
+                      fg: AppColors.ctWarnText,
+                    ),
+                  ],
+                  if (fieldKey.isNotEmpty) ...[
+                    const SizedBox(width: 8),
+                    Text(fieldKey,
+                        style: const TextStyle(
+                            fontFamily: 'Geist',
+                            fontSize: 11,
+                            color: AppColors.ctText3)),
+                  ],
+                ]),
+              ],
+            ),
+          ),
+
+          // Actions
+          if (canManage) ...[
+            IconButton(
+              icon: const Icon(Icons.edit_outlined,
+                  size: 18, color: AppColors.ctText2),
+              tooltip: 'Editar',
+              onPressed: onEdit,
+              padding: const EdgeInsets.all(6),
+              constraints: const BoxConstraints(),
+            ),
+            const SizedBox(width: 4),
+            IconButton(
+              icon: const Icon(Icons.toggle_off_outlined,
+                  size: 20, color: AppColors.ctText2),
+              tooltip: 'Desactivar',
+              onPressed: onDeactivate,
+              padding: const EdgeInsets.all(6),
+              constraints: const BoxConstraints(),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _Chip extends StatelessWidget {
+  const _Chip({required this.label, required this.bg, required this.fg});
+  final String label;
+  final Color bg;
+  final Color fg;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      decoration:
+          BoxDecoration(color: bg, borderRadius: BorderRadius.circular(20)),
+      child: Text(label,
+          style: TextStyle(
+              fontFamily: 'Geist',
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: fg)),
+    );
+  }
+}

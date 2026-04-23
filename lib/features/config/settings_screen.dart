@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/api/api_client.dart';
 import '../../core/api/channels_api.dart';
@@ -61,12 +62,23 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: items.map((item) => _NavItem(
-                    label: item.label,
-                    icon: item.icon,
-                    active: _active == item.section,
-                    onTap: () => setState(() => _active = item.section),
-                  )).toList(),
+                  children: [
+                    ...items.map((item) => _NavItem(
+                          label: item.label,
+                          icon: item.icon,
+                          active: _active == item.section,
+                          onTap: () => setState(() => _active = item.section),
+                        )),
+                    if (canManageSettings) ...[
+                      const Divider(height: 1, color: AppColors.ctBorder),
+                      _NavItem(
+                        label: 'Campos de operador',
+                        icon: Icons.dashboard_customize,
+                        active: false,
+                        onTap: () => context.go('/settings/operator-fields'),
+                      ),
+                    ],
+                  ],
                 ),
               ),
               // ── Panel derecho ────────────────────────────────────────────
