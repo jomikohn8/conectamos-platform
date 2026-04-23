@@ -781,20 +781,25 @@ class _OperatorFormDialogState extends ConsumerState<_OperatorFormDialog> {
 
     // Realtime: subscribe to this operator's row updates
     if (widget.isEdit && widget.operatorId != null) {
-      _realtimeChannel = Supabase.instance.client
-          .channel('op_${widget.operatorId}')
-          .onPostgresChanges(
-            event: PostgresChangeEvent.update,
-            schema: 'public',
-            table: 'operators',
-            filter: PostgresChangeFilter(
-              type: PostgresChangeFilterType.eq,
-              column: 'id',
-              value: widget.operatorId!,
-            ),
-            callback: _handleRealtimeUpdate,
-          )
-          .subscribe();
+      try {
+        _realtimeChannel = Supabase.instance.client
+            .channel('op_${widget.operatorId}')
+            .onPostgresChanges(
+              event: PostgresChangeEvent.update,
+              schema: 'public',
+              table: 'operators',
+              filter: PostgresChangeFilter(
+                type: PostgresChangeFilterType.eq,
+                column: 'id',
+                value: widget.operatorId!,
+              ),
+              callback: _handleRealtimeUpdate,
+            )
+            .subscribe();
+      } catch (e) {
+        debugPrint('[Realtime] subscribe error: $e');
+        _realtimeChannel = null;
+      }
     }
   }
 
@@ -822,9 +827,12 @@ class _OperatorFormDialogState extends ConsumerState<_OperatorFormDialog> {
     setState(() {
       if (newChatId != null && newChatId.isNotEmpty) {
         _telegramCtrl.text = newChatId;
+        _telegramLinkStatus = 'linked';
+        _telegramLinkExpiresAt = null;
+      } else {
+        _telegramLinkStatus = newStatus;
+        _telegramLinkExpiresAt = newExpiresAt;
       }
-      _telegramLinkStatus = newStatus;
-      _telegramLinkExpiresAt = newExpiresAt;
     });
 
     widget.onOperatorMetadataUpdated?.call(widget.operatorId!, meta);
@@ -870,7 +878,12 @@ class _OperatorFormDialogState extends ConsumerState<_OperatorFormDialog> {
     _phoneCtrl.dispose();
     _telegramCtrl.dispose();
     if (_realtimeChannel != null) {
-      Supabase.instance.client.removeChannel(_realtimeChannel!);
+      Supabase.instance.client
+          .removeChannel(_realtimeChannel!)
+          .catchError((e) {
+        debugPrint('[Realtime] removeChannel error: $e');
+        return 'error';
+      });
     }
     super.dispose();
   }
