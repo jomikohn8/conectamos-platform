@@ -178,10 +178,23 @@ class _OperatorFieldsScreenState
 
     if (ok != true || !mounted) return;
 
+    final fieldId = field['id'] as String? ?? '';
     try {
-      await OperatorFieldsApi.deleteOperatorField(
-          field['id'] as String);
-      _load();
+      final res = await OperatorFieldsApi.deleteOperatorField(fieldId);
+      final withDataResponse = res['operators_with_data'] as int? ?? 0;
+      if (mounted) {
+        setState(() => _fields.removeWhere((f) => f['id'] == fieldId));
+        if (withDataResponse > 0) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(
+              'Campo desactivado. Tenía datos en $withDataResponse '
+              'operador${withDataResponse == 1 ? '' : 'es'}. Los datos no se perderán.',
+            ),
+            backgroundColor: AppColors.ctWarn,
+            duration: const Duration(seconds: 4),
+          ));
+        }
+      }
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
