@@ -37,6 +37,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       (section: _Section.communication, label: 'Comunicación',        icon: Icons.chat_bubble_outline_rounded),
       if (canManageSettings)
         (section: _Section.permissions, label: 'Permisos',            icon: Icons.security_outlined),
+      if (canManageSettings)
+        (section: _Section.operatorFields, label: 'Operador',         icon: Icons.dashboard_customize),
     ];
 
     // Reset to general if active tab was removed (e.g., permissions lost)
@@ -70,15 +72,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           active: _active == item.section,
                           onTap: () => setState(() => _active = item.section),
                         )),
-                    if (canManageSettings) ...[
-                      const Divider(height: 1, color: AppColors.ctBorder),
-                      _NavItem(
-                        label: 'Campos de operador',
-                        icon: Icons.dashboard_customize,
-                        active: _active == _Section.operatorFields,
-                        onTap: () => setState(() => _active = _Section.operatorFields),
-                      ),
-                    ],
                   ],
                 ),
               ),
