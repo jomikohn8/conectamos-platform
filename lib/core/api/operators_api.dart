@@ -24,6 +24,7 @@ class OperatorsApi {
     String? telegramChatId,
     String? email,
     String? nationality,
+    String? identityType,
     String? identityNumber,
     String? profilePictureUrl,
     List<Map<String, dynamic>>? phoneSecondary,
@@ -46,6 +47,7 @@ class OperatorsApi {
         if (email != null && email.isNotEmpty) 'email': email,
         if (nationality != null && nationality.isNotEmpty)
           'nationality': nationality,
+        'identity_type': ?identityType,
         if (identityNumber != null && identityNumber.isNotEmpty)
           'identity_number': identityNumber,
         if (profilePictureUrl != null && profilePictureUrl.isNotEmpty)
@@ -64,6 +66,7 @@ class OperatorsApi {
     String? telegramChatId,
     String? email,
     String? nationality,
+    String? identityType,
     String? identityNumber,
     String? profilePictureUrl,
     List<Map<String, dynamic>>? phoneSecondary,
@@ -82,6 +85,7 @@ class OperatorsApi {
         'telegram_chat_id': telegramChatId ?? '',
         'email':                ?email,
         'nationality':          ?nationality,
+        'identity_type':        ?identityType,
         'identity_number':      ?identityNumber,
         'profile_picture_url':  ?profilePictureUrl,
         if (extraMeta.isNotEmpty) 'extra_metadata': extraMeta,

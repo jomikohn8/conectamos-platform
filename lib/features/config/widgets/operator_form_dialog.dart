@@ -12,6 +12,7 @@ import '../../../core/api/flows_api.dart';
 import '../../../core/api/operators_api.dart';
 import '../../../core/providers/tenant_provider.dart';
 import '../../../core/theme/colors.dart';
+import '../../../core/utils/identity_config.dart';
 import '../../../core/utils/phone_normalizer.dart';
 import 'nationality_identity_widget.dart';
 import 'phone_field_widget.dart';
@@ -421,6 +422,13 @@ class _OperatorFormDialogState extends ConsumerState<OperatorFormDialog> {
         metadata['phone_secondary'] = _phoneSecondary;
       }
 
+      final bothPresent =
+          _nationalityIso.isNotEmpty && _identityNumber.isNotEmpty;
+      final identityType = bothPresent
+          ? (getIdentityConfig(_nationalityIso)?.type ?? 'other')
+          : null;
+      final identityNumber = bothPresent ? _identityNumber : null;
+
       if (widget.isEdit) {
         await OperatorsApi.updateOperator(
           id: widget.operatorId!,
@@ -431,8 +439,8 @@ class _OperatorFormDialogState extends ConsumerState<OperatorFormDialog> {
           email: email.isNotEmpty ? email : null,
           nationality:
               _nationalityIso.isNotEmpty ? _nationalityIso : null,
-          identityNumber:
-              _identityNumber.isNotEmpty ? _identityNumber : null,
+          identityType: identityType,
+          identityNumber: identityNumber,
           phoneSecondary:
               _phoneSecondary.isNotEmpty ? _phoneSecondary : null,
           profilePictureUrl: _profilePictureUrl,
@@ -448,8 +456,8 @@ class _OperatorFormDialogState extends ConsumerState<OperatorFormDialog> {
           email: email.isNotEmpty ? email : null,
           nationality:
               _nationalityIso.isNotEmpty ? _nationalityIso : null,
-          identityNumber:
-              _identityNumber.isNotEmpty ? _identityNumber : null,
+          identityType: identityType,
+          identityNumber: identityNumber,
           phoneSecondary:
               _phoneSecondary.isNotEmpty ? _phoneSecondary : null,
           profilePictureUrl: _profilePictureUrl,
