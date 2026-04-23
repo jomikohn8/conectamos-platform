@@ -470,6 +470,10 @@ class _OperatorRowState extends State<_OperatorRow> {
     final id = op['id'] as String? ?? '';
     final st = _statusStyle(status);
     final metadata = op['metadata'] as Map<String, dynamic>? ?? {};
+    final profilePictureUrl = op['profile_picture_url'] as String?;
+    final email = op['email'] as String?;
+    final nationality = op['nationality'] as String?;
+    final identityNumber = op['identity_number'] as String?;
     final tgStatus = metadata['telegram_link_status'] as String?;
     final tgExpiresAt = metadata['telegram_link_expires_at'] as String?;
     final hasTelegramFlow = flows.any((f) {
@@ -505,24 +509,30 @@ class _OperatorRowState extends State<_OperatorRow> {
               flex: 3,
               child: Row(
                 children: [
-                  Container(
-                    width: 32,
-                    height: 32,
-                    decoration: const BoxDecoration(
-                      color: AppColors.ctTealLight,
-                      shape: BoxShape.circle,
-                    ),
-                    alignment: Alignment.center,
-                    child: Text(
-                      _initials(name),
-                      style: const TextStyle(
-                        fontFamily: 'Geist',
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.ctTealDark,
-                      ),
-                    ),
-                  ),
+                  (profilePictureUrl != null && profilePictureUrl.isNotEmpty)
+                      ? CircleAvatar(
+                          radius: 16,
+                          backgroundImage: NetworkImage(profilePictureUrl),
+                          backgroundColor: AppColors.ctSurface2,
+                        )
+                      : Container(
+                          width: 32,
+                          height: 32,
+                          decoration: const BoxDecoration(
+                            color: AppColors.ctTealLight,
+                            shape: BoxShape.circle,
+                          ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            _initials(name),
+                            style: const TextStyle(
+                              fontFamily: 'Geist',
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.ctTealDark,
+                            ),
+                          ),
+                        ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Column(
@@ -660,6 +670,10 @@ class _OperatorRowState extends State<_OperatorRow> {
                                 initialFlows: flows.map((f) => f['id'] as String? ?? '').where((s) => s.isNotEmpty).toList(),
                                 initialTelegramChatId: metadata['telegram_chat_id'] as String?,
                                 initialMetadata: metadata,
+                                initialEmail: email,
+                                initialNationality: nationality,
+                                initialIdentityNumber: identityNumber,
+                                initialProfilePictureUrl: profilePictureUrl,
                                 onSaved: widget.onRefresh,
                                 onOperatorMetadataUpdated:
                                     widget.onOperatorMetadataUpdated,

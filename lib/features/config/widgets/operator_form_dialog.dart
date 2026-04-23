@@ -73,6 +73,10 @@ class OperatorFormDialog extends ConsumerStatefulWidget {
     this.initialFlows,
     this.initialTelegramChatId,
     this.initialMetadata,
+    this.initialEmail,
+    this.initialNationality,
+    this.initialIdentityNumber,
+    this.initialProfilePictureUrl,
     required this.onSaved,
     this.onOperatorMetadataUpdated,
   });
@@ -83,6 +87,10 @@ class OperatorFormDialog extends ConsumerStatefulWidget {
   final List<String>? initialFlows;
   final String? initialTelegramChatId;
   final Map<String, dynamic>? initialMetadata;
+  final String? initialEmail;
+  final String? initialNationality;
+  final String? initialIdentityNumber;
+  final String? initialProfilePictureUrl;
   final VoidCallback onSaved;
   final void Function(String id, Map<String, dynamic> metadata)?
       onOperatorMetadataUpdated;
@@ -146,8 +154,11 @@ class _OperatorFormDialogState extends ConsumerState<OperatorFormDialog> {
   void initState() {
     super.initState();
     _nameCtrl = TextEditingController(text: widget.initialName ?? '');
+    // email: prefer dedicated param (top-level column), fall back to metadata
     _emailCtrl = TextEditingController(
-      text: (widget.initialMetadata?['email'] as String?) ?? '',
+      text: widget.initialEmail ??
+          (widget.initialMetadata?['email'] as String?) ??
+          '',
     );
     _telegramCtrl =
         TextEditingController(text: widget.initialTelegramChatId ?? '');
@@ -162,14 +173,19 @@ class _OperatorFormDialogState extends ConsumerState<OperatorFormDialog> {
       _phoneE164 = PhoneNormalizer.formatToE164(local, iso);
     }
 
-    // Identity fields from metadata
+    // Identity / nationality: prefer dedicated params (top-level columns),
+    // fall back to metadata for backward compatibility.
     final meta = widget.initialMetadata ?? {};
     _telegramLinkStatus =
         (meta['telegram_link_status'] as String?) ?? 'none';
     _telegramLinkExpiresAt =
         meta['telegram_link_expires_at'] as String?;
-    _nationalityIso = meta['nationality'] as String? ?? '';
-    _identityNumber = meta['identity_number'] as String? ?? '';
+    _nationalityIso = widget.initialNationality ??
+        (meta['nationality'] as String? ?? '');
+    _identityNumber = widget.initialIdentityNumber ??
+        (meta['identity_number'] as String? ?? '');
+    _profilePictureUrl = widget.initialProfilePictureUrl ??
+        (meta['profile_picture_url'] as String?);
     _phoneSecondary = ((meta['phone_secondary'] as List?) ?? [])
         .map((e) => Map<String, dynamic>.from(e as Map))
         .toList();
@@ -697,13 +713,19 @@ class _OperatorFormDialogState extends ConsumerState<OperatorFormDialog> {
                             children: [
                               CircleAvatar(
                                 radius: 36,
-                                backgroundColor: _profileBytes == null
-                                    ? _avatarColor(
-                                        _nameCtrl.text.trim())
-                                    : AppColors.ctSurface2,
+                                backgroundColor: (_profileBytes != null ||
+                                        (_profilePictureUrl != null &&
+                                            _profilePictureUrl!.isNotEmpty))
+                                    ? AppColors.ctSurface2
+                                    : _avatarColor(
+                                        _nameCtrl.text.trim()),
                                 backgroundImage: _profileBytes != null
                                     ? MemoryImage(_profileBytes!)
-                                    : null,
+                                        as ImageProvider
+                                    : (_profilePictureUrl != null &&
+                                            _profilePictureUrl!.isNotEmpty)
+                                        ? NetworkImage(_profilePictureUrl!)
+                                        : null,
                                 child: _uploadingPhoto
                                     ? const SizedBox(
                                         width: 24,
@@ -713,7 +735,9 @@ class _OperatorFormDialogState extends ConsumerState<OperatorFormDialog> {
                                           color: Colors.white,
                                         ),
                                       )
-                                    : _profileBytes == null
+                                    : (_profileBytes == null &&
+                                            (_profilePictureUrl == null ||
+                                                _profilePictureUrl!.isEmpty))
                                         ? ListenableBuilder(
                                             listenable: _nameCtrl,
                                             builder: (context, child) =>
