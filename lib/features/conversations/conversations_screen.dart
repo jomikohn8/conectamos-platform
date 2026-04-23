@@ -254,8 +254,33 @@ class _ConversationsBodyState extends ConsumerState<_ConversationsBody> {
         ref.read(selectedChannelTypeProvider.notifier).state =
             active.first['channel_type'] as String?;
       }
+      _loadAllChannelUnreads(active, tenantId);
     } catch (_) {
       if (mounted) setState(() => _loadingChannels = false);
+    }
+  }
+
+  Future<void> _loadAllChannelUnreads(
+      List<Map<String, dynamic>> channels, String tenantId) async {
+    if (channels.isEmpty) return;
+    try {
+      final results = await Future.wait(
+        channels.map((ch) => ConversationsApi.listConversations(
+          channelId: ch['id'] as String,
+          tenantId: tenantId.isNotEmpty ? tenantId : 'default',
+        )),
+      );
+      if (!mounted) return;
+      final Map<String, int> totals = {};
+      for (int i = 0; i < channels.length; i++) {
+        final channelId = channels[i]['id'] as String;
+        final convs = results[i];
+        totals[channelId] = convs.fold<int>(
+            0, (sum, c) => sum + ((c['unread_count'] as int?) ?? 0));
+      }
+      ref.read(channelUnreadProvider.notifier).state = totals;
+    } catch (_) {
+      // Non-critical — badges just won't show for other channels
     }
   }
 
@@ -864,6 +889,19 @@ class _ConvoListState extends ConsumerState<_ConvoList> {
     };
 
     final selectedChatId = ref.read(selectedChatIdProvider);
+    final activeChannelId = ref.read(selectedChannelIdProvider);
+    final msgChannelId = msg['channel_id'] as String?;
+
+    // Message from a different channel (defensive — stream is scoped to active channel)
+    if (msgChannelId != null && msgChannelId != activeChannelId) {
+      final current = ref.read(channelUnreadProvider);
+      ref.read(channelUnreadProvider.notifier).state = {
+        ...current,
+        msgChannelId: (current[msgChannelId] ?? 0) + 1,
+      };
+      return;
+    }
+
     setState(() {
       if (selectedChatId != chatId) {
         final current = _unreadOverride[chatId]
