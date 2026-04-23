@@ -1280,34 +1280,76 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
 
   Future<void> _sendReaction(
       Map<String, dynamic> msg, String emoji) async {
-    final waId = msg['wa_message_id'] as String?;
-    if (waId == null || waId.isEmpty) return;
     final chatId = ref.read(selectedChatIdProvider) ?? '';
     final tenantId = ref.read(activeTenantIdProvider);
     final channelId = msg['channel_id'] as String? ?? '';
     if (channelId.isEmpty) {
-      debugPrint('[_sendReaction] SKIP — no channel_id for $waId');
+      debugPrint('[_sendReaction] SKIP — no channel_id');
       return;
     }
-    // Optimistic: mostrar reacción antes de que el POST confirme
-    if (mounted) {
+    final sentByUserId = Supabase.instance.client.auth.currentUser?.id;
+    final channelType = ref.read(selectedChannelTypeProvider) ?? 'whatsapp';
+
+    // Optimistic key: wa_message_id for WA, msg id for Telegram
+    final waId = msg['wa_message_id'] as String?;
+    final optimisticKey = waId?.isNotEmpty == true
+        ? waId!
+        : (msg['id'] as String? ?? '');
+    if (optimisticKey.isNotEmpty && mounted) {
       setState(() {
-        final existing = _pendingReactions.putIfAbsent(waId, () => []);
+        final existing = _pendingReactions.putIfAbsent(optimisticKey, () => []);
         if (!existing.contains(emoji)) existing.add(emoji);
       });
     }
+
     try {
-      await MessagesApi.sendReaction(
-        messageId: waId,
-        emoji: emoji,
-        toPhone: chatId,
-        tenantId: tenantId,
-        channelId: channelId,
-      );
+      if (channelType == 'telegram') {
+        final rawPayload = msg['raw_payload'];
+        Map<String, dynamic> payload = {};
+        if (rawPayload is String) {
+          try { payload = json.decode(rawPayload) as Map<String, dynamic>; } catch (_) {}
+        } else if (rawPayload is Map) {
+          payload = Map<String, dynamic>.from(rawPayload);
+        }
+        final tgMessageId = payload['message_id'];
+        if (tgMessageId == null) {
+          debugPrint('[_sendReaction] SKIP — no message_id in raw_payload');
+          if (mounted) setState(() => _pendingReactions[optimisticKey]?.remove(emoji));
+          return;
+        }
+        final toChatId = int.tryParse(chatId);
+        if (toChatId == null) {
+          debugPrint('[_sendReaction] SKIP — chatId not parseable as int: $chatId');
+          if (mounted) setState(() => _pendingReactions[optimisticKey]?.remove(emoji));
+          return;
+        }
+        await MessagesApi.sendTelegramReaction(
+          channelId: channelId,
+          tenantId: tenantId,
+          toChatId: toChatId,
+          messageId: tgMessageId is int
+              ? tgMessageId
+              : int.parse(tgMessageId.toString()),
+          emoji: emoji,
+          sentByUserId: sentByUserId,
+        );
+      } else {
+        // WhatsApp — comportamiento original
+        if (waId == null || waId.isEmpty) {
+          if (mounted) setState(() => _pendingReactions[optimisticKey]?.remove(emoji));
+          return;
+        }
+        await MessagesApi.sendReaction(
+          messageId: waId,
+          emoji: emoji,
+          toPhone: chatId,
+          tenantId: tenantId,
+          channelId: channelId,
+        );
+      }
     } catch (e) {
       if (mounted) {
-        // Revertir actualización optimista
-        setState(() => _pendingReactions[waId]?.remove(emoji));
+        setState(() => _pendingReactions[optimisticKey]?.remove(emoji));
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text('Error al enviar reacción: $e'),
           backgroundColor: AppColors.ctDanger,

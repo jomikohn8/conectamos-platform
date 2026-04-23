@@ -135,6 +135,28 @@ class MessagesApi {
     );
   }
 
+  /// Envía una reacción emoji sobre un mensaje de Telegram.
+  static Future<void> sendTelegramReaction({
+    required String channelId,
+    required String tenantId,
+    required int toChatId,
+    required int messageId,
+    required String emoji,
+    String? sentByUserId,
+  }) async {
+    await ApiClient.instance.post(
+      '/messages/send/reaction/telegram',
+      data: {
+        'channel_id':   channelId,
+        'tenant_id':    tenantId,
+        'to_chat_id':   toChatId,
+        'message_id':   messageId,
+        'emoji':        emoji,
+        'sent_by_user_id': ?sentByUserId,
+      },
+    );
+  }
+
   /// Envía un archivo multimedia (imagen, audio, documento) vía multipart.
   static Future<void> sendMedia({
     required String to,
