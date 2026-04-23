@@ -1,5 +1,6 @@
 // ignore: avoid_web_libraries_in_flutter, deprecated_member_use
 import 'dart:html' as html;
+import 'dart:ui_web' as ui;
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -1076,6 +1077,132 @@ class _SessionFields extends StatelessWidget {
   }
 }
 
+// ── Document viewer ────────────────────────────────────────────────────────────
+
+void _openDocumentViewer(BuildContext context, String url) {
+  final isImage = RegExp(
+    r'\.(jpg|jpeg|png|webp|gif)(\?|$)',
+    caseSensitive: false,
+  ).hasMatch(url);
+
+  showDialog<void>(
+    context: context,
+    builder: (ctx) => Dialog(
+      backgroundColor: AppColors.ctSurface,
+      shape:
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 800, maxHeight: 620),
+        child: Column(
+          children: [
+            // Header
+            Container(
+              padding: const EdgeInsets.fromLTRB(20, 14, 12, 14),
+              decoration: const BoxDecoration(
+                border:
+                    Border(bottom: BorderSide(color: AppColors.ctBorder)),
+              ),
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Text('Documento',
+                        style: TextStyle(
+                          fontFamily: 'Geist',
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.ctText,
+                        )),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close,
+                        size: 18, color: AppColors.ctText3),
+                    onPressed: () => Navigator.pop(ctx),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                ],
+              ),
+            ),
+            // Content
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: isImage
+                    ? InteractiveViewer(
+                        child: Image.network(
+                          url,
+                          fit: BoxFit.contain,
+                          errorBuilder: (context, error, stackTrace) =>
+                              const Center(
+                            child: Icon(Icons.broken_image_outlined,
+                                size: 48, color: AppColors.ctText3),
+                          ),
+                        ),
+                      )
+                    : _IframeView(url: url),
+              ),
+            ),
+            // Footer
+            Container(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 16, vertical: 10),
+              decoration: const BoxDecoration(
+                border:
+                    Border(top: BorderSide(color: AppColors.ctBorder)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton.icon(
+                    onPressed: () => html.window.open(url, '_blank'),
+                    icon: const Icon(Icons.download_outlined, size: 16),
+                    label: const Text('Descargar',
+                        style: TextStyle(
+                            fontFamily: 'Geist', fontSize: 13)),
+                    style: TextButton.styleFrom(
+                        foregroundColor: AppColors.ctText2),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+class _IframeView extends StatefulWidget {
+  const _IframeView({required this.url});
+  final String url;
+
+  @override
+  State<_IframeView> createState() => _IframeViewState();
+}
+
+class _IframeViewState extends State<_IframeView> {
+  late final String _viewId;
+
+  @override
+  void initState() {
+    super.initState();
+    _viewId = 'doc-iframe-${DateTime.now().millisecondsSinceEpoch}';
+    ui.platformViewRegistry.registerViewFactory(_viewId, (int id) {
+      // ignore: avoid_web_libraries_in_flutter, deprecated_member_use
+      return html.IFrameElement()
+        ..src = widget.url
+        ..style.border = 'none'
+        ..style.width = '100%'
+        ..style.height = '100%';
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return HtmlElementView(viewType: _viewId);
+  }
+}
+
 // ── Custom field read-only row ─────────────────────────────────────────────────
 
 class _CustomFieldReadRow extends StatelessWidget {
@@ -1120,7 +1247,7 @@ class _CustomFieldReadRow extends StatelessWidget {
     } else if (type == 'document') {
       final url = value.toString();
       valueWidget = GestureDetector(
-        onTap: () => html.window.open(url, '_blank'),
+        onTap: () => _openDocumentViewer(context, url),
         child: MouseRegion(
           cursor: SystemMouseCursors.click,
           child: Container(

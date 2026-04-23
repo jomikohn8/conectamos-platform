@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/api/api_client.dart';
 import '../../core/api/operator_fields_api.dart';
 import '../../core/providers/permissions_provider.dart';
 import '../../core/providers/tenant_provider.dart';
@@ -76,7 +77,8 @@ class OperatorFieldsBody extends ConsumerStatefulWidget {
 }
 
 class _OperatorFieldsBodyState extends ConsumerState<OperatorFieldsBody> {
-  List<Map<String, dynamic>> _fields = [];
+  List<Map<String, dynamic>> _fields = [];         // active (is_active=true)
+  List<Map<String, dynamic>> _inactiveFields = []; // disabled (is_active=false)
   bool _loading = true;
   String? _error;
 
@@ -91,14 +93,32 @@ class _OperatorFieldsBodyState extends ConsumerState<OperatorFieldsBody> {
     setState(() { _loading = true; _error = null; });
     try {
       final tenantId = ref.read(activeTenantIdProvider);
-      final fields = await OperatorFieldsApi.getOperatorFields(
-          tenantId: tenantId.isNotEmpty ? tenantId : 'default');
+      final effectiveId = tenantId.isNotEmpty ? tenantId : 'default';
+
+      // Fetch all fields including inactive ones
+      final res = await ApiClient.instance.get(
+        '/operator-fields',
+        queryParameters: {
+          'tenant_id': effectiveId,
+          'include_inactive': true,
+        },
+      );
+      final data = res.data;
+      final List raw = data is List
+          ? data
+          : (data is Map ? (data['fields'] ?? data['items'] ?? []) : []) as List;
+      final all = raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+
+      final active = all.where((f) => f['is_active'] != false).toList()
+        ..sort((a, b) =>
+            ((a['display_order'] as int?) ?? 0)
+                .compareTo((b['display_order'] as int?) ?? 0));
+      final inactive = all.where((f) => f['is_active'] == false).toList();
+
       if (mounted) {
         setState(() {
-          _fields = List.from(fields)
-            ..sort((a, b) =>
-                ((a['display_order'] as int?) ?? 0)
-                    .compareTo((b['display_order'] as int?) ?? 0));
+          _fields = active;
+          _inactiveFields = inactive;
           _loading = false;
         });
       }
@@ -144,7 +164,7 @@ class _OperatorFieldsBodyState extends ConsumerState<OperatorFieldsBody> {
         backgroundColor: AppColors.ctSurface,
         shape:
             RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: Text('¿Desactivar "$label"?',
+        title: Text('¿Deshabilitar "$label"?',
             style: const TextStyle(
                 fontFamily: 'Geist',
                 fontSize: 16,
@@ -198,7 +218,7 @@ class _OperatorFieldsBodyState extends ConsumerState<OperatorFieldsBody> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Desactivar',
+            child: const Text('Deshabilitar',
                 style: TextStyle(
                   fontFamily: 'Geist',
                   fontWeight: FontWeight.w600,
@@ -216,11 +236,14 @@ class _OperatorFieldsBodyState extends ConsumerState<OperatorFieldsBody> {
       final res = await OperatorFieldsApi.deleteOperatorField(fieldId);
       final withDataResponse = res['operators_with_data'] as int? ?? 0;
       if (mounted) {
-        setState(() => _fields.removeWhere((f) => f['id'] == fieldId));
+        setState(() {
+          _fields.removeWhere((f) => f['id'] == fieldId);
+          _inactiveFields.add({...field, 'is_active': false});
+        });
         if (withDataResponse > 0) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: Text(
-              'Campo desactivado. Tenía datos en $withDataResponse '
+              'Campo deshabilitado. Tenía datos en $withDataResponse '
               'operador${withDataResponse == 1 ? '' : 'es'}. '
               'Los datos no se perderán.',
             ),
@@ -232,11 +255,88 @@ class _OperatorFieldsBodyState extends ConsumerState<OperatorFieldsBody> {
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Error al desactivar el campo'),
+          content: Text('Error al deshabilitar el campo'),
           backgroundColor: AppColors.ctDanger,
         ));
       }
     }
+  }
+
+  Future<void> _rehabilitate(Map<String, dynamic> field) async {
+    final fieldId = field['id'] as String? ?? '';
+    final label = field['label'] as String? ?? 'este campo';
+    try {
+      await OperatorFieldsApi.updateOperatorField(fieldId, isActive: true);
+      if (mounted) {
+        setState(() {
+          _inactiveFields.removeWhere((f) => f['id'] == fieldId);
+          _fields.add({...field, 'is_active': true});
+          _fields.sort((a, b) =>
+              ((a['display_order'] as int?) ?? 0)
+                  .compareTo((b['display_order'] as int?) ?? 0));
+        });
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('"$label" habilitado'),
+          backgroundColor: AppColors.ctOk,
+        ));
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Error al rehabilitar el campo'),
+          backgroundColor: AppColors.ctDanger,
+        ));
+      }
+    }
+  }
+
+  Future<void> _confirmDeletePermanent(Map<String, dynamic> field) async {
+    final label = field['label'] as String? ?? 'este campo';
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.ctSurface,
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: Text('¿Eliminar "$label" permanentemente?',
+            style: const TextStyle(
+                fontFamily: 'Geist',
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: AppColors.ctText)),
+        content: const Text(
+          'Esta acción no se puede deshacer.',
+          style: TextStyle(
+              fontFamily: 'Geist', fontSize: 14, color: AppColors.ctText2),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar',
+                style: TextStyle(
+                    fontFamily: 'Geist', color: AppColors.ctText2)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Eliminar',
+                style: TextStyle(
+                  fontFamily: 'Geist',
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.ctDanger,
+                )),
+          ),
+        ],
+      ),
+    );
+
+    if (ok != true || !mounted) return;
+
+    // Hard delete endpoint not yet available in backend
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+      content: Text('Funcionalidad disponible próximamente'),
+      duration: Duration(seconds: 3),
+    ));
   }
 
   void _openCreate(String tenantId) {
@@ -344,7 +444,7 @@ class _OperatorFieldsBodyState extends ConsumerState<OperatorFieldsBody> {
       );
     }
 
-    if (_fields.isEmpty) {
+    if (_fields.isEmpty && _inactiveFields.isEmpty) {
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -394,28 +494,74 @@ class _OperatorFieldsBodyState extends ConsumerState<OperatorFieldsBody> {
       );
     }
 
-    return ReorderableListView.builder(
-      padding: const EdgeInsets.all(20),
-      buildDefaultDragHandles: false,
-      itemCount: _fields.length,
-      onReorder: canManage ? _onReorder : (oldIndex, newIndex) {},
-      itemBuilder: (context, i) {
-        final field = _fields[i];
-        final id = field['id'] as String? ?? i.toString();
-        return _FieldCard(
-          key: ValueKey(id),
-          field: field,
-          index: i,
-          canManage: canManage,
-          onEdit: () => _openEdit(field),
-          onDeactivate: () => _confirmDeactivate(field),
-        );
-      },
+    return CustomScrollView(
+      slivers: [
+        // ── ACTIVOS (reorderable) ─────────────────────────────────────────────
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+          sliver: SliverReorderableList(
+            itemCount: _fields.length,
+            onReorder: canManage ? _onReorder : (oldIndex, newIndex) {},
+            itemBuilder: (context, i) {
+              final field = _fields[i];
+              final id = field['id'] as String? ?? i.toString();
+              return _FieldCard(
+                key: ValueKey(id),
+                field: field,
+                index: i,
+                canManage: canManage,
+                onEdit: () => _openEdit(field),
+                onDeactivate: () => _confirmDeactivate(field),
+              );
+            },
+          ),
+        ),
+
+        // ── DESHABILITADOS ────────────────────────────────────────────────────
+        if (_inactiveFields.isNotEmpty) ...[
+          const SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(20, 28, 20, 8),
+              child: Text(
+                'DESHABILITADOS',
+                style: TextStyle(
+                  fontFamily: 'Geist',
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.6,
+                  color: AppColors.ctText2,
+                ),
+              ),
+            ),
+          ),
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+            sliver: SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (context, i) {
+                  final field = _inactiveFields[i];
+                  final id = field['id'] as String? ?? i.toString();
+                  return _InactiveFieldCard(
+                    key: ValueKey('inactive_$id'),
+                    field: field,
+                    canManage: canManage,
+                    onReactivate: () => _rehabilitate(field),
+                    onDelete: () => _confirmDeletePermanent(field),
+                  );
+                },
+                childCount: _inactiveFields.length,
+              ),
+            ),
+          ),
+        ],
+
+        const SliverToBoxAdapter(child: SizedBox(height: 20)),
+      ],
     );
   }
 }
 
-// ── Field card ─────────────────────────────────────────────────────────────────
+// ── Active field card ──────────────────────────────────────────────────────────
 
 class _FieldCard extends StatelessWidget {
   const _FieldCard({
@@ -530,7 +676,7 @@ class _FieldCard extends StatelessWidget {
             IconButton(
               icon: const Icon(Icons.toggle_off_outlined,
                   size: 20, color: AppColors.ctText2),
-              tooltip: 'Desactivar',
+              tooltip: 'Deshabilitar',
               onPressed: onDeactivate,
               padding: const EdgeInsets.all(6),
               constraints: const BoxConstraints(),
@@ -541,6 +687,121 @@ class _FieldCard extends StatelessWidget {
     );
   }
 }
+
+// ── Inactive field card ────────────────────────────────────────────────────────
+
+class _InactiveFieldCard extends StatelessWidget {
+  const _InactiveFieldCard({
+    super.key,
+    required this.field,
+    required this.canManage,
+    required this.onReactivate,
+    required this.onDelete,
+  });
+
+  final Map<String, dynamic> field;
+  final bool canManage;
+  final VoidCallback onReactivate;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = field['label'] as String? ?? '—';
+    final fieldType = field['field_type'] as String? ?? 'text';
+    final fieldKey = field['field_key'] as String? ?? '';
+    final withData = field['operators_with_data'] as int? ?? 0;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.ctSurface2,
+        border: Border.all(color: AppColors.ctBorder),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          // Type icon (grayed)
+          Container(
+            width: 34,
+            height: 34,
+            decoration: const BoxDecoration(
+              color: AppColors.ctBg,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(_typeIcon(fieldType),
+                size: 16, color: AppColors.ctText3),
+          ),
+          const SizedBox(width: 12),
+
+          // Label + meta (grayed)
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label,
+                    style: const TextStyle(
+                      fontFamily: 'Geist',
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.ctText2,
+                    )),
+                const SizedBox(height: 4),
+                Row(children: [
+                  _Chip(
+                    label: _typeLabel(fieldType),
+                    bg: AppColors.ctSurface,
+                    fg: AppColors.ctText3,
+                  ),
+                  if (fieldKey.isNotEmpty) ...[
+                    const SizedBox(width: 8),
+                    Text(fieldKey,
+                        style: const TextStyle(
+                            fontFamily: 'Geist',
+                            fontSize: 11,
+                            color: AppColors.ctText3)),
+                  ],
+                ]),
+              ],
+            ),
+          ),
+
+          // Actions
+          if (canManage) ...[
+            // Rehabilitar
+            IconButton(
+              icon: const Icon(Icons.toggle_on_outlined,
+                  size: 20, color: AppColors.ctTeal),
+              tooltip: 'Rehabilitar',
+              onPressed: onReactivate,
+              padding: const EdgeInsets.all(6),
+              constraints: const BoxConstraints(),
+            ),
+            const SizedBox(width: 4),
+            // Eliminar
+            Tooltip(
+              message: withData > 0
+                  ? 'Tiene datos en operadores'
+                  : 'Eliminar permanentemente',
+              child: IconButton(
+                icon: Icon(Icons.delete_outline,
+                    size: 18,
+                    color: withData > 0
+                        ? AppColors.ctText3
+                        : AppColors.ctDanger),
+                onPressed: withData > 0 ? null : onDelete,
+                padding: const EdgeInsets.all(6),
+                constraints: const BoxConstraints(),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// ── Shared chip ────────────────────────────────────────────────────────────────
 
 class _Chip extends StatelessWidget {
   const _Chip({required this.label, required this.bg, required this.fg});
