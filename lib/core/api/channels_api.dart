@@ -123,6 +123,7 @@ class ChannelsApi {
     required String phoneNumberId,
     required String wabaId,
     required String accessToken,
+    required String pin,
   }) async {
     await ApiClient.instance.post(
       '/channels/activate-whatsapp',
@@ -130,6 +131,7 @@ class ChannelsApi {
         'phone_number_id': phoneNumberId,
         'waba_id':         wabaId,
         'access_token':    accessToken,
+        'pin':             pin,
       },
     );
     // 422 lanzado por Dio como DioException — dejar que suba

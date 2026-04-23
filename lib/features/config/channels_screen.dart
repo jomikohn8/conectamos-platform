@@ -472,8 +472,12 @@ class _CreateChannelStepperState extends State<_CreateChannelStepper> {
   late final TextEditingController _phoneCtrl;
   late final TextEditingController _wabaCtrl;
   late final TextEditingController _tokenCtrl;
-  String _color        = _kColorPalette.first;
-  bool   _tokenVisible = false;
+  late final TextEditingController _pinCtrl;
+  late final TextEditingController _pinConfirmCtrl;
+  String _color             = _kColorPalette.first;
+  bool   _tokenVisible      = false;
+  bool   _pinVisible        = false;
+  bool   _pinConfirmVisible = false;
 
   // Step 2 verify
   bool    _verifying  = false;
@@ -491,10 +495,12 @@ class _CreateChannelStepperState extends State<_CreateChannelStepper> {
     if (widget.workers.isNotEmpty) {
       _workerId = widget.workers.first['id'] as String?;
     }
-    _nameCtrl  = TextEditingController()..addListener(_rebuild);
-    _phoneCtrl = TextEditingController()..addListener(_rebuild);
-    _wabaCtrl  = TextEditingController()..addListener(_rebuild);
-    _tokenCtrl = TextEditingController()..addListener(_rebuild);
+    _nameCtrl       = TextEditingController()..addListener(_rebuild);
+    _phoneCtrl      = TextEditingController()..addListener(_rebuild);
+    _wabaCtrl       = TextEditingController()..addListener(_rebuild);
+    _tokenCtrl      = TextEditingController()..addListener(_rebuild);
+    _pinCtrl        = TextEditingController()..addListener(_rebuild);
+    _pinConfirmCtrl = TextEditingController()..addListener(_rebuild);
   }
 
   void _rebuild() => setState(() {});
@@ -502,7 +508,13 @@ class _CreateChannelStepperState extends State<_CreateChannelStepper> {
   @override
   void dispose() {
     _nameCtrl.dispose(); _phoneCtrl.dispose(); _wabaCtrl.dispose(); _tokenCtrl.dispose();
+    _pinCtrl.dispose(); _pinConfirmCtrl.dispose();
     super.dispose();
+  }
+
+  bool get _isPinValid {
+    final pin = _pinCtrl.text.trim();
+    return pin.length == 6 && RegExp(r'^\d{6}$').hasMatch(pin) && pin == _pinConfirmCtrl.text.trim();
   }
 
   bool get _canNext {
@@ -511,7 +523,11 @@ class _CreateChannelStepperState extends State<_CreateChannelStepper> {
       if (_channelType == 'telegram') {
         return _nameCtrl.text.trim().isNotEmpty && _tokenCtrl.text.trim().isNotEmpty;
       }
-      return _nameCtrl.text.trim().isNotEmpty && _phoneCtrl.text.trim().isNotEmpty && _wabaCtrl.text.trim().isNotEmpty && _tokenCtrl.text.trim().isNotEmpty;
+      return _nameCtrl.text.trim().isNotEmpty &&
+          _phoneCtrl.text.trim().isNotEmpty &&
+          _wabaCtrl.text.trim().isNotEmpty &&
+          _tokenCtrl.text.trim().isNotEmpty &&
+          _isPinValid;
     }
     return true;
   }
@@ -638,6 +654,7 @@ class _CreateChannelStepperState extends State<_CreateChannelStepper> {
           phoneNumberId: _phoneCtrl.text.trim(),
           wabaId:        _wabaCtrl.text.trim(),
           accessToken:   _tokenCtrl.text.trim(),
+          pin:           _pinCtrl.text.trim(),
         );
         if (!mounted) return;
         setState(() { _verifying = false; _step++; });
@@ -870,6 +887,43 @@ class _CreateChannelStepperState extends State<_CreateChannelStepper> {
               icon: Icon(_tokenVisible ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 18, color: AppColors.ctText3),
               onPressed: () => setState(() => _tokenVisible = !_tokenVisible),
             ),
+          ),
+        ),
+        const SizedBox(height: 14),
+
+        _label('Crea un PIN de 6 dígitos para este canal *'),
+        TextField(
+          controller: _pinCtrl,
+          obscureText: !_pinVisible,
+          keyboardType: TextInputType.number,
+          maxLength: 6,
+          style: const TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText),
+          decoration: _fieldDec('6 dígitos numéricos').copyWith(
+            counterText: '',
+            suffixIcon: IconButton(
+              icon: Icon(_pinVisible ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 18, color: AppColors.ctText3),
+              onPressed: () => setState(() => _pinVisible = !_pinVisible),
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
+
+        _label('Confirmar PIN *'),
+        TextField(
+          controller: _pinConfirmCtrl,
+          obscureText: !_pinConfirmVisible,
+          keyboardType: TextInputType.number,
+          maxLength: 6,
+          style: const TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText),
+          decoration: _fieldDec('Repite los 6 dígitos').copyWith(
+            counterText: '',
+            suffixIcon: IconButton(
+              icon: Icon(_pinConfirmVisible ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 18, color: AppColors.ctText3),
+              onPressed: () => setState(() => _pinConfirmVisible = !_pinConfirmVisible),
+            ),
+            errorText: _pinConfirmCtrl.text.isNotEmpty && _pinCtrl.text != _pinConfirmCtrl.text
+                ? 'Los PINs no coinciden'
+                : null,
           ),
         ),
         const SizedBox(height: 14),

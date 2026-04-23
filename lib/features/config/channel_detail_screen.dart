@@ -520,10 +520,14 @@ class _CredentialsTabState extends State<_CredentialsTab> {
   late final TextEditingController _phoneCtrl;
   late final TextEditingController _wabaCtrl;
   late final TextEditingController _tokenCtrl;
+  late final TextEditingController _pinCtrl;
+  late final TextEditingController _pinConfirmCtrl;
   bool    _saving             = false;
   bool    _verifying          = false;
   String? _verifyError;
   bool    _showToken          = false;
+  bool    _showPin            = false;
+  bool    _showPinConfirm     = false;
   bool    _credentialsLocked  = false;
 
   Map<String, dynamic> get _credentials {
@@ -548,6 +552,8 @@ class _CredentialsTabState extends State<_CredentialsTab> {
     _tokenCtrl = TextEditingController(
         text: widget.channel['wa_token'] as String?
             ?? creds['access_token'] as String? ?? '');
+    _pinCtrl        = TextEditingController();
+    _pinConfirmCtrl = TextEditingController();
   }
 
   @override
@@ -555,7 +561,14 @@ class _CredentialsTabState extends State<_CredentialsTab> {
     _phoneCtrl.dispose();
     _wabaCtrl.dispose();
     _tokenCtrl.dispose();
+    _pinCtrl.dispose();
+    _pinConfirmCtrl.dispose();
     super.dispose();
+  }
+
+  bool get _isPinValid {
+    final pin = _pinCtrl.text.trim();
+    return pin.length == 6 && RegExp(r'^\d{6}$').hasMatch(pin) && pin == _pinConfirmCtrl.text.trim();
   }
 
   Future<void> _saveCredentials() async {
@@ -564,6 +577,10 @@ class _CredentialsTabState extends State<_CredentialsTab> {
     final token = _tokenCtrl.text.trim();
     if (phone.isEmpty || waba.isEmpty || token.isEmpty) {
       widget.onError('Completa todos los campos de credenciales');
+      return;
+    }
+    if (!_isPinValid) {
+      widget.onError('El PIN debe tener exactamente 6 dígitos numéricos y coincidir en ambos campos');
       return;
     }
     // Step 1: verify credentials against Meta
@@ -581,6 +598,7 @@ class _CredentialsTabState extends State<_CredentialsTab> {
         phoneNumberId: phone,
         wabaId:        waba,
         accessToken:   token,
+        pin:           _pinCtrl.text.trim(),
       );
     } catch (e) {
       if (mounted) setState(() { _verifying = false; _verifyError = _dioError(e); });
@@ -774,6 +792,32 @@ class _CredentialsTabState extends State<_CredentialsTab> {
                         setState(() => _showToken = !_showToken),
                   ),
                 ),
+                if (!_credentialsLocked) ...[
+                  const SizedBox(height: 16),
+                  _FieldLabel('PIN de verificación (6 dígitos)'),
+                  const SizedBox(height: 6),
+                  _StyledTextField(
+                    controller: _pinCtrl,
+                    hint: '6 dígitos numéricos',
+                    obscure: !_showPin,
+                    suffix: IconButton(
+                      icon: Icon(_showPin ? Icons.visibility_off : Icons.visibility, size: 18, color: AppColors.ctText2),
+                      onPressed: () => setState(() => _showPin = !_showPin),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  _FieldLabel('Confirmar PIN'),
+                  const SizedBox(height: 6),
+                  _StyledTextField(
+                    controller: _pinConfirmCtrl,
+                    hint: 'Repite los 6 dígitos',
+                    obscure: !_showPinConfirm,
+                    suffix: IconButton(
+                      icon: Icon(_showPinConfirm ? Icons.visibility_off : Icons.visibility, size: 18, color: AppColors.ctText2),
+                      onPressed: () => setState(() => _showPinConfirm = !_showPinConfirm),
+                    ),
+                  ),
+                ],
                 if (!_credentialsLocked) ...[
                   const SizedBox(height: 20),
                   Align(
