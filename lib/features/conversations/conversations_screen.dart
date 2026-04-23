@@ -21,6 +21,7 @@ import '../../core/api/channels_api.dart';
 import '../../core/api/conversations_api.dart';
 import '../../core/api/messages_api.dart';
 import '../../core/api/operators_api.dart';
+import '../../core/utils/phone_normalizer.dart';
 import '../../core/api/sessions_api.dart';
 import '../../core/api/supabase_messages.dart';
 import '../../core/api/supabase_read_receipts.dart';
@@ -680,6 +681,9 @@ class _ConvoListState extends ConsumerState<_ConvoList> {
   List<Map<String, dynamic>> _conversations = [];
   final Map<String, int> _unreadOverride = {};
   bool _loading = false;
+  // TODO: consolidar streams — ConvoList y ChatPanel suscriben por separado
+  StreamSubscription<List<Map<String, dynamic>>>? _feedSub;
+  DateTime? _feedHighWater;
 
   static DateTime? getLastReadSync(String chatId) => _lastReadAtCache[chatId];
 
@@ -710,10 +714,11 @@ class _ConvoListState extends ConsumerState<_ConvoList> {
 
   @override
   void dispose() {
+    _feedSub?.cancel();
     super.dispose();
   }
 
-  Future<void> _fetchConversations() async {
+  Future<void> _fetchConversations({bool resubscribe = true}) async {
     final channelId = ref.read(selectedChannelIdProvider);
     if (channelId == null) return;
     setState(() => _loading = true);
@@ -723,10 +728,36 @@ class _ConvoListState extends ConsumerState<_ConvoList> {
         tenantId: tenantId.isNotEmpty ? tenantId : 'default',
         channelId: channelId,
       );
-      if (mounted) setState(() { _conversations = convs; _loading = false; });
+      if (mounted) {
+        setState(() { _conversations = convs; _loading = false; });
+        if (resubscribe) _subscribeToFeed(channelId, tenantId);
+      }
     } catch (_) {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  void _subscribeToFeed(String channelId, String tenantId) {
+    _feedSub?.cancel();
+    _feedHighWater = null;
+    _feedSub = SupabaseMessages.streamFeed(tenantId: tenantId).listen((msgs) {
+      if (!mounted) return;
+      DateTime? newest;
+      for (final m in msgs) {
+        if ((m['channel_id'] as String?) != channelId) continue;
+        final t = DateTime.tryParse(m['received_at'] as String? ?? '');
+        if (t != null && (newest == null || t.isAfter(newest))) newest = t;
+      }
+      if (newest == null) return;
+      if (_feedHighWater == null) {
+        _feedHighWater = newest; // baseline — no re-fetch on first emit
+        return;
+      }
+      if (newest.isAfter(_feedHighWater!)) {
+        _feedHighWater = newest;
+        _fetchConversations(resubscribe: false);
+      }
+    });
   }
 
   Widget _searchBar() {
@@ -5281,12 +5312,13 @@ class _NewMessageDialogState extends ConsumerState<_NewMessageDialog> {
     setState(() { _selected = recipient; _checkingWindow = true; _step = 1; });
     try {
       final phone = recipient['phone'] as String? ?? '';
+      final chatId = PhoneNormalizer.toChatId(phone);
       final db = Supabase.instance.client;
       final cutoff = DateTime.now().toUtc().subtract(const Duration(hours: 24)).toIso8601String();
       final rows = await db
           .from('wa_messages')
           .select('received_at')
-          .eq('chat_id', phone)
+          .eq('chat_id', chatId)
           .neq('direction', 'outbound')
           .gte('received_at', cutoff)
           .limit(1);

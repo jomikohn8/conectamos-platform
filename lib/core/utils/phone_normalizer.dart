@@ -57,6 +57,13 @@ abstract class PhoneNormalizer {
     return e164Phone;
   }
 
+  /// Converts an E.164 operator phone to WhatsApp chat_id format (no '+').
+  /// E.g. "+52XXXXXXXXXX" → "521XXXXXXXXXX".
+  static String toChatId(String e164Phone) {
+    final withWa = toWhatsappFormat(e164Phone);
+    return withWa.startsWith('+') ? withWa.substring(1) : withWa;
+  }
+
   /// Returns null if [phone] is valid for [countryCode], or an error message.
   static String? validatePhone(String phone, String countryCode) {
     final digits = phone.replaceAll(RegExp(r'\D'), '');
