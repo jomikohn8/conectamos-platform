@@ -682,7 +682,7 @@ class _ConvoListState extends ConsumerState<_ConvoList> {
   final Map<String, int> _unreadOverride = {};
   bool _loading = false;
   // TODO: consolidar streams — ConvoList y ChatPanel suscriben por separado
-  StreamSubscription<List<Map<String, dynamic>>>? _feedSub;
+  StreamSubscription<Map<String, dynamic>>? _feedSub;
   DateTime? _feedHighWater;
 
   static DateTime? getLastReadSync(String chatId) => _lastReadAtCache[chatId];
@@ -740,23 +740,52 @@ class _ConvoListState extends ConsumerState<_ConvoList> {
   void _subscribeToFeed(String channelId, String tenantId) {
     _feedSub?.cancel();
     _feedHighWater = null;
-    _feedSub = SupabaseMessages.streamFeed(tenantId: tenantId).listen((msgs) {
-      if (!mounted) return;
-      DateTime? newest;
-      for (final m in msgs) {
-        if ((m['channel_id'] as String?) != channelId) continue;
-        final t = DateTime.tryParse(m['received_at'] as String? ?? '');
-        if (t != null && (newest == null || t.isAfter(newest))) newest = t;
+    _feedSub = SupabaseMessages.streamIncomingMessages(
+      channelId: channelId,
+      tenantId: tenantId,
+    ).listen(_onNewMessage);
+  }
+
+  void _onNewMessage(Map<String, dynamic> msg) {
+    if (!mounted) return;
+
+    final chatId = msg['chat_id'] as String?;
+    if (chatId == null) return;
+
+    // Guard against re-emitted old messages on WebSocket reconnect
+    final receivedAt = DateTime.tryParse(msg['received_at'] as String? ?? '');
+    if (receivedAt != null) {
+      if (_feedHighWater != null && !receivedAt.isAfter(_feedHighWater!)) return;
+      _feedHighWater = receivedAt;
+    }
+
+    final idx = _conversations.indexWhere((c) => c['chat_id'] == chatId);
+    if (idx == -1) {
+      // Conversation not yet in list — only case where refetch is allowed
+      _fetchConversations(resubscribe: false);
+      return;
+    }
+
+    final updated = Map<String, dynamic>.from(_conversations[idx]);
+
+    // Build last_message in the shape _ApiConvoItem expects
+    final msgType = msg['message_type'] as String? ?? 'text';
+    final isMedia = msgType != 'text' && msgType.isNotEmpty;
+    updated['last_message'] = {
+      'body': isMedia ? null : (msg['raw_body'] as String? ?? ''),
+      'media_type': isMedia ? msgType : null,
+      'created_at': msg['received_at'],
+    };
+
+    final selectedChatId = ref.read(selectedChatIdProvider);
+    setState(() {
+      if (selectedChatId != chatId) {
+        final current = _unreadOverride[chatId]
+            ?? (updated['unread_count'] as int? ?? 0);
+        _unreadOverride[chatId] = current + 1;
       }
-      if (newest == null) return;
-      if (_feedHighWater == null) {
-        _feedHighWater = newest; // baseline — no re-fetch on first emit
-        return;
-      }
-      if (newest.isAfter(_feedHighWater!)) {
-        _feedHighWater = newest;
-        _fetchConversations(resubscribe: false);
-      }
+      _conversations.removeAt(idx);
+      _conversations.insert(0, updated);
     });
   }
 

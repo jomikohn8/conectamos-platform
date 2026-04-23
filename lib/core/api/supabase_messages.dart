@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class SupabaseMessages {
@@ -96,6 +98,39 @@ class SupabaseMessages {
           }
           return list;
         });
+  }
+
+  /// Streams individual INSERT events on wa_messages for the given channel+tenant.
+  /// Emits one Map per new row — no full-list re-emit.
+  /// Fields: all wa_messages columns in the Realtime payload.
+  static Stream<Map<String, dynamic>> streamIncomingMessages({
+    required String channelId,
+    required String tenantId,
+  }) {
+    final controller = StreamController<Map<String, dynamic>>();
+    RealtimeChannel? rtChannel;
+
+    rtChannel = _client
+        .channel('convo_feed_$channelId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'wa_messages',
+          callback: (payload) {
+            final row = Map<String, dynamic>.from(payload.newRecord);
+            // Client-side filter: ensure this row belongs to the active channel+tenant
+            if (row['channel_id'] == channelId && row['tenant_id'] == tenantId) {
+              if (!controller.isClosed) controller.add(row);
+            }
+          },
+        )
+        .subscribe();
+
+    controller.onCancel = () {
+      if (rtChannel != null) _client.removeChannel(rtChannel);
+    };
+
+    return controller.stream;
   }
 
   static Stream<List<Map<String, dynamic>>> streamFeed({
