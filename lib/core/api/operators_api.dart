@@ -50,8 +50,7 @@ class OperatorsApi {
         'display_name': displayName,
         'phone': phone,
         'flows': flows,
-        if (telegramChatId != null)
-          'metadata': {'telegram_chat_id': telegramChatId},
+        'telegram_chat_id': telegramChatId ?? '',
       },
     );
     return Map<String, dynamic>.from(response.data);

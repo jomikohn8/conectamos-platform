@@ -903,9 +903,7 @@ class _OperatorFormDialogState extends ConsumerState<_OperatorFormDialog> {
 
     try {
       final flows = _selectedFlowIds.toList();
-      final tgId = _telegramCtrl.text.trim().isEmpty
-          ? null
-          : _telegramCtrl.text.trim();
+      final tgId = _telegramCtrl.text.trim();
       if (widget.isEdit) {
         await OperatorsApi.updateOperator(
           id: widget.operatorId!,
