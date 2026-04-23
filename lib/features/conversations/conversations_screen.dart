@@ -1146,6 +1146,7 @@ class _ApiConvoItemState extends State<_ApiConvoItem> {
         onTap: widget.onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 100),
+          height: 64,
           margin: const EdgeInsets.only(bottom: 2),
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
           decoration: BoxDecoration(
@@ -1228,6 +1229,7 @@ class _ApiConvoItemState extends State<_ApiConvoItem> {
                                     fontSize: 11,
                                     color: AppColors.ctText2,
                                   ),
+                                  maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
                         ),
