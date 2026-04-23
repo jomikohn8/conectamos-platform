@@ -1076,6 +1076,15 @@ class _ConvoListState extends ConsumerState<_ConvoList> {
                           ref.read(activeTenantIdProvider));
                       setState(() { _unreadOverride[chatId] = 0; });
                       _updateChannelUnread();
+                      // Mark all inbound messages as panel-read on the server
+                      final channelId = ref.read(selectedChannelIdProvider) ?? '';
+                      if (channelId.isNotEmpty) {
+                        ConversationsApi.markChatRead(
+                          chatId: chatId,
+                          channelId: channelId,
+                          tenantId: ref.read(activeTenantIdProvider),
+                        );
+                      }
                       // read-receipts dispatched in _ChatPanelState._sendReadReceipts
                       ref.read(selectedChatIdProvider.notifier).state = chatId;
                       ref.read(selectedChatNameProvider.notifier).state = name;
