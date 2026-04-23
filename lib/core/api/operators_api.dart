@@ -22,7 +22,20 @@ class OperatorsApi {
     required List<String> flows,
     String tenantId = 'default',
     String? telegramChatId,
+    String? email,
+    String? nationality,
+    String? identityNumber,
+    String? profilePictureUrl,
+    List<Map<String, dynamic>>? phoneSecondary,
   }) async {
+    final metadata = <String, dynamic>{};
+    if (telegramChatId != null && telegramChatId.isNotEmpty) {
+      metadata['telegram_chat_id'] = telegramChatId;
+    }
+    if (phoneSecondary != null && phoneSecondary.isNotEmpty) {
+      metadata['phone_secondary'] = phoneSecondary;
+    }
+
     final response = await ApiClient.instance.post(
       '/operators',
       data: {
@@ -30,8 +43,14 @@ class OperatorsApi {
         'phone': phone,
         'flows': flows,
         'tenant_id': tenantId,
-        if (telegramChatId != null)
-          'metadata': {'telegram_chat_id': telegramChatId},
+        if (email != null && email.isNotEmpty) 'email': email,
+        if (nationality != null && nationality.isNotEmpty)
+          'nationality': nationality,
+        if (identityNumber != null && identityNumber.isNotEmpty)
+          'identity_number': identityNumber,
+        if (profilePictureUrl != null && profilePictureUrl.isNotEmpty)
+          'profile_picture_url': profilePictureUrl,
+        if (metadata.isNotEmpty) 'metadata': metadata,
       },
     );
     return Map<String, dynamic>.from(response.data);
@@ -43,7 +62,17 @@ class OperatorsApi {
     required String phone,
     required List<String> flows,
     String? telegramChatId,
+    String? email,
+    String? nationality,
+    String? identityNumber,
+    String? profilePictureUrl,
+    List<Map<String, dynamic>>? phoneSecondary,
   }) async {
+    final extraMeta = <String, dynamic>{};
+    if (phoneSecondary != null) {
+      extraMeta['phone_secondary'] = phoneSecondary;
+    }
+
     final response = await ApiClient.instance.put(
       '/operators/$id',
       data: {
@@ -51,6 +80,11 @@ class OperatorsApi {
         'phone': phone,
         'flows': flows,
         'telegram_chat_id': telegramChatId ?? '',
+        'email':                ?email,
+        'nationality':          ?nationality,
+        'identity_number':      ?identityNumber,
+        'profile_picture_url':  ?profilePictureUrl,
+        if (extraMeta.isNotEmpty) 'extra_metadata': extraMeta,
       },
     );
     return Map<String, dynamic>.from(response.data);
