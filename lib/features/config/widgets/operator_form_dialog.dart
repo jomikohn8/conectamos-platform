@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:dio/dio.dart';
 import 'package:file_picker/file_picker.dart';
@@ -112,6 +113,8 @@ class _OperatorFormDialogState extends ConsumerState<OperatorFormDialog> {
 
   // Profile photo
   Uint8List? _profileBytes;
+  String? _profilePictureUrl;
+  bool _uploadingPhoto = false;
 
   // ── UI state ──────────────────────────────────────────────────────────────
   bool _saving = false;
@@ -276,15 +279,91 @@ class _OperatorFormDialogState extends ConsumerState<OperatorFormDialog> {
 
   // ── Profile photo ─────────────────────────────────────────────────────────
 
+  static String _generateUuid() {
+    final rng = Random.secure();
+    final b = List.generate(16, (_) => rng.nextInt(256));
+    b[6] = (b[6] & 0x0f) | 0x40;
+    b[8] = (b[8] & 0x3f) | 0x80;
+    final h = b.map((x) => x.toRadixString(16).padLeft(2, '0')).join();
+    return '${h.substring(0, 8)}-${h.substring(8, 12)}-'
+        '${h.substring(12, 16)}-${h.substring(16, 20)}-${h.substring(20)}';
+  }
+
   Future<void> _pickProfilePhoto() async {
+    if (_uploadingPhoto) return;
     final result = await FilePicker.platform.pickFiles(
-      type: FileType.image,
+      type: FileType.custom,
+      allowedExtensions: ['jpg', 'jpeg', 'png'],
       withData: true,
     );
-    if (result != null && result.files.isNotEmpty) {
-      final bytes = result.files.first.bytes;
-      if (bytes != null && mounted) {
-        setState(() => _profileBytes = bytes);
+    if (result == null || result.files.isEmpty) return;
+    final file = result.files.first;
+    final bytes = file.bytes;
+    if (bytes == null) return;
+
+    // OP_E008: size > 2 MB
+    if (bytes.lengthInBytes > 2 * 1024 * 1024) {
+      if (mounted) {
+        setState(() => _fieldErrors['profile_picture'] =
+            'OP_E008: La imagen excede 2MB');
+      }
+      return;
+    }
+
+    // OP_E009: format check
+    final ext = (file.extension ?? '').toLowerCase();
+    if (ext != 'jpg' && ext != 'jpeg' && ext != 'png') {
+      if (mounted) {
+        setState(() => _fieldErrors['profile_picture'] =
+            'OP_E009: Solo se aceptan JPG y PNG');
+      }
+      return;
+    }
+
+    // Show preview + start upload
+    if (mounted) {
+      setState(() {
+        _profileBytes = bytes;
+        _profilePictureUrl = null;
+        _uploadingPhoto = true;
+        _fieldErrors.remove('profile_picture');
+      });
+    }
+
+    try {
+      final folder =
+          widget.operatorId ?? _generateUuid();
+      final ts = DateTime.now().millisecondsSinceEpoch;
+      final path = 'operators/$folder/$ts.$ext';
+      final contentType = ext == 'png' ? 'image/png' : 'image/jpeg';
+
+      await Supabase.instance.client.storage
+          .from('wa-media')
+          .uploadBinary(
+            path,
+            bytes,
+            fileOptions: FileOptions(contentType: contentType),
+          );
+
+      final url = Supabase.instance.client.storage
+          .from('wa-media')
+          .getPublicUrl(path);
+
+      if (mounted) {
+        setState(() {
+          _profilePictureUrl = url;
+          _uploadingPhoto = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _profileBytes = null;
+          _profilePictureUrl = null;
+          _uploadingPhoto = false;
+          _fieldErrors['profile_picture'] =
+              'OP_E015: No se pudo subir la imagen. Intenta de nuevo.';
+        });
       }
     }
   }
@@ -356,6 +435,7 @@ class _OperatorFormDialogState extends ConsumerState<OperatorFormDialog> {
               _identityNumber.isNotEmpty ? _identityNumber : null,
           phoneSecondary:
               _phoneSecondary.isNotEmpty ? _phoneSecondary : null,
+          profilePictureUrl: _profilePictureUrl,
         );
       } else {
         final tenantId = ref.read(activeTenantIdProvider);
@@ -372,6 +452,7 @@ class _OperatorFormDialogState extends ConsumerState<OperatorFormDialog> {
               _identityNumber.isNotEmpty ? _identityNumber : null,
           phoneSecondary:
               _phoneSecondary.isNotEmpty ? _phoneSecondary : null,
+          profilePictureUrl: _profilePictureUrl,
         );
       }
       if (mounted) {
@@ -595,10 +676,14 @@ class _OperatorFormDialogState extends ConsumerState<OperatorFormDialog> {
 
                     // Profile photo
                     Center(
-                      child: GestureDetector(
-                        onTap: _pickProfilePhoto,
+                      child: Column(
+                        children: [
+                          GestureDetector(
+                        onTap: _uploadingPhoto ? null : _pickProfilePhoto,
                         child: MouseRegion(
-                          cursor: SystemMouseCursors.click,
+                          cursor: _uploadingPhoto
+                              ? MouseCursor.defer
+                              : SystemMouseCursors.click,
                           child: Stack(
                             alignment: Alignment.bottomRight,
                             children: [
@@ -611,23 +696,32 @@ class _OperatorFormDialogState extends ConsumerState<OperatorFormDialog> {
                                 backgroundImage: _profileBytes != null
                                     ? MemoryImage(_profileBytes!)
                                     : null,
-                                child: _profileBytes == null
-                                    ? ListenableBuilder(
-                                        listenable: _nameCtrl,
-                                        builder: (context, child) => Text(
-                                          _initials(
-                                              _nameCtrl.text),
-                                          style: const TextStyle(
-                                            fontFamily: 'Onest',
-                                            fontSize: 18,
-                                            fontWeight:
-                                                FontWeight.w700,
-                                            color: Colors.white,
-                                          ),
+                                child: _uploadingPhoto
+                                    ? const SizedBox(
+                                        width: 24,
+                                        height: 24,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2.5,
+                                          color: Colors.white,
                                         ),
                                       )
-                                    : null,
+                                    : _profileBytes == null
+                                        ? ListenableBuilder(
+                                            listenable: _nameCtrl,
+                                            builder: (context, child) =>
+                                                Text(
+                                              _initials(_nameCtrl.text),
+                                              style: const TextStyle(
+                                                fontFamily: 'Onest',
+                                                fontSize: 18,
+                                                fontWeight: FontWeight.w700,
+                                                color: Colors.white,
+                                              ),
+                                            ),
+                                          )
+                                        : null,
                               ),
+                              if (!_uploadingPhoto)
                               Container(
                                 width: 22,
                                 height: 22,
@@ -643,6 +737,19 @@ class _OperatorFormDialogState extends ConsumerState<OperatorFormDialog> {
                             ],
                           ),
                         ),
+                      ),
+                      if (_fieldErrors.containsKey('profile_picture')) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          _fieldErrors['profile_picture']!,
+                          style: const TextStyle(
+                            fontFamily: 'Geist',
+                            fontSize: 11,
+                            color: AppColors.ctDanger,
+                          ),
+                        ),
+                      ],
+                        ],
                       ),
                     ),
                     const SizedBox(height: 16),
