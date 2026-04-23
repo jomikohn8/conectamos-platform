@@ -28,6 +28,7 @@ class OperatorsApi {
     String? identityNumber,
     String? profilePictureUrl,
     List<Map<String, dynamic>>? phoneSecondary,
+    Map<String, dynamic>? customFieldValues,
   }) async {
     final metadata = <String, dynamic>{};
     if (telegramChatId != null && telegramChatId.isNotEmpty) {
@@ -53,6 +54,8 @@ class OperatorsApi {
         if (profilePictureUrl != null && profilePictureUrl.isNotEmpty)
           'profile_picture_url': profilePictureUrl,
         if (metadata.isNotEmpty) 'metadata': metadata,
+        if (customFieldValues != null && customFieldValues.isNotEmpty)
+          'custom_field_values': customFieldValues,
       },
     );
     return Map<String, dynamic>.from(response.data);
@@ -70,6 +73,7 @@ class OperatorsApi {
     String? identityNumber,
     String? profilePictureUrl,
     List<Map<String, dynamic>>? phoneSecondary,
+    Map<String, dynamic>? customFieldValues,
   }) async {
     final extraMeta = <String, dynamic>{};
     if (phoneSecondary != null) {
@@ -89,6 +93,8 @@ class OperatorsApi {
         'identity_number':      ?identityNumber,
         'profile_picture_url':  ?profilePictureUrl,
         if (extraMeta.isNotEmpty) 'extra_metadata': extraMeta,
+        if (customFieldValues != null && customFieldValues.isNotEmpty)
+          'custom_field_values': customFieldValues,
       },
     );
     return Map<String, dynamic>.from(response.data);

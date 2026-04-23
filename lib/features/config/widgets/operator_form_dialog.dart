@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/api/flows_api.dart';
+import '../../../core/api/operator_fields_api.dart';
 import '../../../core/api/operators_api.dart';
 import '../../../core/providers/tenant_provider.dart';
 import '../../../core/theme/colors.dart';
@@ -77,6 +78,7 @@ class OperatorFormDialog extends ConsumerStatefulWidget {
     this.initialNationality,
     this.initialIdentityNumber,
     this.initialProfilePictureUrl,
+    this.initialCustomFields,
     required this.onSaved,
     this.onOperatorMetadataUpdated,
   });
@@ -91,6 +93,7 @@ class OperatorFormDialog extends ConsumerStatefulWidget {
   final String? initialNationality;
   final String? initialIdentityNumber;
   final String? initialProfilePictureUrl;
+  final List<Map<String, dynamic>>? initialCustomFields;
   final VoidCallback onSaved;
   final void Function(String id, Map<String, dynamic> metadata)?
       onOperatorMetadataUpdated;
@@ -148,6 +151,13 @@ class _OperatorFormDialogState extends ConsumerState<OperatorFormDialog> {
   bool _flowsLoading = true;
   Set<String> _selectedFlowIds = {};
 
+  // Custom fields
+  List<Map<String, dynamic>> _customFieldDefs = [];
+  Map<String, dynamic> _customFieldValues = {};
+  Map<String, TextEditingController> _customFieldControllers = {};
+  final Map<String, bool> _customFieldUploading = {};
+  bool _customFieldsLoading = false;
+
   // ── Lifecycle ─────────────────────────────────────────────────────────────
 
   @override
@@ -190,8 +200,10 @@ class _OperatorFormDialogState extends ConsumerState<OperatorFormDialog> {
         .map((e) => Map<String, dynamic>.from(e as Map))
         .toList();
 
-    WidgetsBinding.instance
-        .addPostFrameCallback((_) => _loadFlows());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadFlows();
+      _loadCustomFields();
+    });
 
     // Realtime subscription — DO NOT MODIFY THIS BLOCK
     if (widget.isEdit && widget.operatorId != null) {
@@ -292,6 +304,454 @@ class _OperatorFormDialogState extends ConsumerState<OperatorFormDialog> {
     } catch (_) {
       if (mounted) setState(() => _telegramChannelId = null);
     }
+  }
+
+  // ── Custom fields ─────────────────────────────────────────────────────────
+
+  Future<void> _loadCustomFields() async {
+    if (!mounted) return;
+    setState(() => _customFieldsLoading = true);
+    try {
+      final tenantId = ref.read(activeTenantIdProvider);
+      final defs = await OperatorFieldsApi.getOperatorFields(
+        tenantId: tenantId.isNotEmpty ? tenantId : 'default',
+      );
+      if (!mounted) return;
+
+      // Build initial values from initialCustomFields list
+      final initMap = <String, dynamic>{};
+      if (widget.initialCustomFields != null) {
+        for (final cf in widget.initialCustomFields!) {
+          final key = cf['field_key'] as String? ?? '';
+          if (key.isNotEmpty) initMap[key] = cf['value'];
+        }
+      }
+
+      // Create controllers for text / number / date fields
+      final controllers = <String, TextEditingController>{};
+      for (final def in defs) {
+        final key = def['field_key'] as String? ?? '';
+        final type = def['field_type'] as String? ?? 'text';
+        if (['text', 'number', 'date'].contains(type)) {
+          String displayVal = '';
+          final initVal = initMap[key];
+          if (initVal != null) {
+            if (type == 'date') {
+              try {
+                final parts = initVal.toString().split('-');
+                if (parts.length == 3) {
+                  displayVal =
+                      '${parts[2].padLeft(2, '0')}/${parts[1].padLeft(2, '0')}/${parts[0]}';
+                }
+              } catch (_) {
+                displayVal = initVal.toString();
+              }
+            } else {
+              displayVal = initVal.toString();
+            }
+          }
+          controllers[key] = TextEditingController(text: displayVal);
+        }
+      }
+
+      setState(() {
+        _customFieldDefs = defs;
+        _customFieldValues = Map<String, dynamic>.from(initMap);
+        _customFieldControllers = controllers;
+        _customFieldsLoading = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _customFieldsLoading = false);
+    }
+  }
+
+  List<String> _getFieldChoices(Map<String, dynamic> def) {
+    final raw = def['options'];
+    if (raw is List) return raw.map((e) => e.toString()).toList();
+    if (raw is Map) {
+      final choices = raw['choices'];
+      if (choices is List) return choices.map((e) => e.toString()).toList();
+    }
+    return [];
+  }
+
+  Future<void> _pickCustomFile(String fieldKey,
+      {required bool isPhoto}) async {
+    if (_customFieldUploading[fieldKey] == true) return;
+    FilePickerResult? result;
+    if (isPhoto) {
+      result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['jpg', 'jpeg', 'png'],
+        withData: true,
+      );
+    } else {
+      result = await FilePicker.platform.pickFiles(
+        type: FileType.any,
+        withData: true,
+      );
+    }
+    if (result == null || result.files.isEmpty) return;
+    final file = result.files.first;
+    final bytes = file.bytes;
+    if (bytes == null) return;
+
+    if (bytes.lengthInBytes > 10 * 1024 * 1024) {
+      if (mounted) {
+        setState(() =>
+            _fieldErrors['cf_$fieldKey'] = 'El archivo excede 10MB');
+      }
+      return;
+    }
+
+    setState(() {
+      _customFieldUploading[fieldKey] = true;
+      _fieldErrors.remove('cf_$fieldKey');
+    });
+
+    try {
+      final folder = widget.operatorId ?? _generateUuid();
+      final ts = DateTime.now().millisecondsSinceEpoch;
+      final ext = file.extension ?? 'bin';
+      final path = 'operators/$folder/fields/$fieldKey/$ts.$ext';
+      final contentType = isPhoto
+          ? (ext == 'png' ? 'image/png' : 'image/jpeg')
+          : 'application/octet-stream';
+
+      await Supabase.instance.client.storage
+          .from('wa-media')
+          .uploadBinary(path, bytes,
+              fileOptions: FileOptions(contentType: contentType));
+
+      final url = Supabase.instance.client.storage
+          .from('wa-media')
+          .getPublicUrl(path);
+
+      if (mounted) {
+        setState(() {
+          _customFieldValues[fieldKey] = url;
+          _customFieldUploading[fieldKey] = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _customFieldUploading[fieldKey] = false;
+          _fieldErrors['cf_$fieldKey'] =
+              'No se pudo subir el archivo. Intenta de nuevo.';
+        });
+      }
+    }
+  }
+
+  Widget _buildCustomField(Map<String, dynamic> def) {
+    final key = def['field_key'] as String? ?? '';
+    final label = def['label'] as String? ?? key;
+    final type = def['field_type'] as String? ?? 'text';
+    final isRequired = def['required'] as bool? ?? false;
+    final displayLabel = '$label${isRequired ? ' *' : ''}';
+    final errorKey = 'cf_$key';
+
+    Widget input;
+    switch (type) {
+      case 'boolean':
+        final boolVal =
+            _customFieldValues[key] == true ||
+            _customFieldValues[key].toString() == 'true';
+        input = Switch(
+          value: boolVal,
+          activeTrackColor: AppColors.ctTeal,
+          activeThumbColor: AppColors.ctNavy,
+          onChanged: (v) => setState(() => _customFieldValues[key] = v),
+        );
+      case 'select':
+        final choices = _getFieldChoices(def);
+        final current = _customFieldValues[key] as String?;
+        input = DropdownButtonFormField<String>(
+          initialValue: choices.contains(current) ? current : null,
+          hint: const Text('Seleccionar',
+              style: TextStyle(
+                  fontFamily: 'Geist',
+                  fontSize: 13,
+                  color: AppColors.ctText3)),
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: AppColors.ctSurface2,
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(
+                color: _fieldErrors.containsKey(errorKey)
+                    ? AppColors.ctDanger
+                    : AppColors.ctBorder2,
+              ),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(
+                color: _fieldErrors.containsKey(errorKey)
+                    ? AppColors.ctDanger
+                    : AppColors.ctBorder2,
+              ),
+            ),
+            errorText: _fieldErrors[errorKey],
+            errorStyle:
+                const TextStyle(fontFamily: 'Geist', fontSize: 11),
+          ),
+          items: choices
+              .map((c) => DropdownMenuItem(
+                    value: c,
+                    child: Text(c,
+                        style: const TextStyle(
+                            fontFamily: 'Geist',
+                            fontSize: 13,
+                            color: AppColors.ctText)),
+                  ))
+              .toList(),
+          onChanged: (v) => setState(() => _customFieldValues[key] = v),
+          style: const TextStyle(
+              fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText),
+          dropdownColor: AppColors.ctSurface,
+        );
+      case 'date':
+        final ctrl = _customFieldControllers[key]!;
+        input = Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            GestureDetector(
+              onTap: () async {
+                DateTime? initial;
+                try {
+                  final parts = ctrl.text.split('/');
+                  if (parts.length == 3) {
+                    initial = DateTime(int.parse(parts[2]),
+                        int.parse(parts[1]), int.parse(parts[0]));
+                  }
+                } catch (_) {}
+                final picked = await showDatePicker(
+                  context: context,
+                  initialDate: initial ?? DateTime.now(),
+                  firstDate: DateTime(1900),
+                  lastDate: DateTime(2100),
+                );
+                if (picked != null && mounted) {
+                  setState(() {
+                    ctrl.text =
+                        '${picked.day.toString().padLeft(2, '0')}/'
+                        '${picked.month.toString().padLeft(2, '0')}/'
+                        '${picked.year}';
+                  });
+                }
+              },
+              child: AbsorbPointer(
+                child: TextField(
+                  controller: ctrl,
+                  readOnly: true,
+                  style: const TextStyle(
+                      fontFamily: 'Geist',
+                      fontSize: 13,
+                      color: AppColors.ctText),
+                  decoration: InputDecoration(
+                    hintText: 'dd/mm/aaaa',
+                    hintStyle: const TextStyle(
+                        fontFamily: 'Geist',
+                        fontSize: 13,
+                        color: AppColors.ctText3),
+                    filled: true,
+                    fillColor: AppColors.ctSurface2,
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(
+                          color: _fieldErrors.containsKey(errorKey)
+                              ? AppColors.ctDanger
+                              : AppColors.ctBorder2),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(
+                          color: _fieldErrors.containsKey(errorKey)
+                              ? AppColors.ctDanger
+                              : AppColors.ctBorder2),
+                    ),
+                    suffixIcon: const Icon(
+                        Icons.calendar_today_outlined,
+                        size: 16,
+                        color: AppColors.ctText2),
+                  ),
+                ),
+              ),
+            ),
+            if (_fieldErrors.containsKey(errorKey)) ...[
+              const SizedBox(height: 3),
+              Text(_fieldErrors[errorKey]!,
+                  style: const TextStyle(
+                      fontFamily: 'Geist',
+                      fontSize: 11,
+                      color: AppColors.ctDanger)),
+            ],
+          ],
+        );
+      case 'photo':
+        final url = _customFieldValues[key] as String?;
+        final uploading = _customFieldUploading[key] ?? false;
+        input = Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            GestureDetector(
+              onTap: uploading
+                  ? null
+                  : () => _pickCustomFile(key, isPhoto: true),
+              child: MouseRegion(
+                cursor: uploading
+                    ? MouseCursor.defer
+                    : SystemMouseCursors.click,
+                child: Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    color: AppColors.ctSurface2,
+                    borderRadius: BorderRadius.circular(8),
+                    border:
+                        Border.all(color: AppColors.ctBorder2),
+                  ),
+                  child: uploading
+                      ? const Center(
+                          child: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2),
+                          ),
+                        )
+                      : (url != null && url.isNotEmpty)
+                          ? ClipRRect(
+                              borderRadius:
+                                  BorderRadius.circular(7),
+                              child: Image.network(url,
+                                  fit: BoxFit.cover),
+                            )
+                          : const Icon(
+                              Icons.add_photo_alternate_outlined,
+                              size: 28,
+                              color: AppColors.ctText3),
+                ),
+              ),
+            ),
+            if (_fieldErrors.containsKey(errorKey)) ...[
+              const SizedBox(height: 4),
+              Text(_fieldErrors[errorKey]!,
+                  style: const TextStyle(
+                      fontFamily: 'Geist',
+                      fontSize: 11,
+                      color: AppColors.ctDanger)),
+            ],
+          ],
+        );
+      case 'document':
+        final docUrl = _customFieldValues[key] as String?;
+        final uploading = _customFieldUploading[key] ?? false;
+        final hasDoc = docUrl != null && docUrl.isNotEmpty;
+        input = Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (hasDoc) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppColors.ctSurface2,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppColors.ctBorder2),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.insert_drive_file_outlined,
+                        size: 14, color: AppColors.ctTeal),
+                    const SizedBox(width: 6),
+                    const Expanded(
+                      child: Text('Documento subido',
+                          style: TextStyle(
+                              fontFamily: 'Geist',
+                              fontSize: 12,
+                              color: AppColors.ctText2)),
+                    ),
+                    GestureDetector(
+                      onTap: () => setState(
+                          () => _customFieldValues[key] = null),
+                      child: const Icon(Icons.close,
+                          size: 14, color: AppColors.ctText3),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
+            SizedBox(
+              height: 36,
+              child: uploading
+                  ? const Center(
+                      child: SizedBox(
+                        width: 18,
+                        height: 18,
+                        child:
+                            CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    )
+                  : OutlinedButton.icon(
+                      onPressed: () =>
+                          _pickCustomFile(key, isPhoto: false),
+                      icon: const Icon(Icons.upload_file_outlined,
+                          size: 16),
+                      label: Text(
+                          hasDoc
+                              ? 'Cambiar documento'
+                              : 'Subir documento',
+                          style: const TextStyle(
+                              fontFamily: 'Geist', fontSize: 12)),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.ctText2,
+                        side: const BorderSide(
+                            color: AppColors.ctBorder2),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+            ),
+            if (_fieldErrors.containsKey(errorKey)) ...[
+              const SizedBox(height: 4),
+              Text(_fieldErrors[errorKey]!,
+                  style: const TextStyle(
+                      fontFamily: 'Geist',
+                      fontSize: 11,
+                      color: AppColors.ctDanger)),
+            ],
+          ],
+        );
+      default:
+        // 'text' and 'number'
+        input = _FormField(
+          controller: _customFieldControllers[key]!,
+          placeholder: label,
+          keyboardType:
+              type == 'number' ? TextInputType.number : null,
+          errorText: _fieldErrors[errorKey],
+        );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _FieldLabel(displayLabel),
+          const SizedBox(height: 6),
+          input,
+        ],
+      ),
+    );
   }
 
   // ── Profile photo ─────────────────────────────────────────────────────────
@@ -407,6 +867,23 @@ class _OperatorFormDialogState extends ConsumerState<OperatorFormDialog> {
       _fieldErrors['phone'] = 'Teléfono obligatorio';
       hasErrors = true;
     }
+    for (final def in _customFieldDefs) {
+      final key = def['field_key'] as String? ?? '';
+      final label = def['label'] as String? ?? key;
+      final isRequired = def['required'] as bool? ?? false;
+      final type = def['field_type'] as String? ?? 'text';
+      if (!isRequired || type == 'boolean') continue;
+      final dynamic val;
+      if (['text', 'number', 'date'].contains(type)) {
+        val = _customFieldControllers[key]?.text.trim();
+      } else {
+        val = _customFieldValues[key];
+      }
+      if (val == null || val.toString().isEmpty) {
+        _fieldErrors['cf_$key'] = '$label es requerido';
+        hasErrors = true;
+      }
+    }
     if (hasErrors) {
       setState(() {});
       return;
@@ -445,6 +922,35 @@ class _OperatorFormDialogState extends ConsumerState<OperatorFormDialog> {
           : null;
       final identityNumber = bothPresent ? _identityNumber : null;
 
+      // Collect custom field values
+      final customFieldValues = <String, dynamic>{};
+      for (final def in _customFieldDefs) {
+        final key = def['field_key'] as String? ?? '';
+        final type = def['field_type'] as String? ?? 'text';
+        dynamic val;
+        if (type == 'date') {
+          final text =
+              _customFieldControllers[key]?.text.trim() ?? '';
+          if (text.isNotEmpty) {
+            try {
+              final parts = text.split('/');
+              if (parts.length == 3) {
+                val = '${parts[2]}-'
+                    '${parts[1].padLeft(2, '0')}-'
+                    '${parts[0].padLeft(2, '0')}';
+              }
+            } catch (_) {}
+          }
+        } else if (type == 'text' || type == 'number') {
+          final text =
+              _customFieldControllers[key]?.text.trim() ?? '';
+          if (text.isNotEmpty) val = text;
+        } else {
+          val = _customFieldValues[key];
+        }
+        if (val != null) customFieldValues[key] = val;
+      }
+
       if (widget.isEdit) {
         await OperatorsApi.updateOperator(
           id: widget.operatorId!,
@@ -460,6 +966,8 @@ class _OperatorFormDialogState extends ConsumerState<OperatorFormDialog> {
           phoneSecondary:
               _phoneSecondary.isNotEmpty ? _phoneSecondary : null,
           profilePictureUrl: _profilePictureUrl,
+          customFieldValues:
+              customFieldValues.isNotEmpty ? customFieldValues : null,
         );
       } else {
         final tenantId = ref.read(activeTenantIdProvider);
@@ -477,6 +985,8 @@ class _OperatorFormDialogState extends ConsumerState<OperatorFormDialog> {
           phoneSecondary:
               _phoneSecondary.isNotEmpty ? _phoneSecondary : null,
           profilePictureUrl: _profilePictureUrl,
+          customFieldValues:
+              customFieldValues.isNotEmpty ? customFieldValues : null,
         );
       }
       if (mounted) {
@@ -595,6 +1105,9 @@ class _OperatorFormDialogState extends ConsumerState<OperatorFormDialog> {
     _nameCtrl.dispose();
     _emailCtrl.dispose();
     _telegramCtrl.dispose();
+    for (final ctrl in _customFieldControllers.values) {
+      ctrl.dispose();
+    }
     if (_realtimeChannel != null) {
       Supabase.instance.client
           .removeChannel(_realtimeChannel!)
@@ -1209,6 +1722,27 @@ class _OperatorFormDialogState extends ConsumerState<OperatorFormDialog> {
                           ),
                         ),
                       ],
+                    ],
+
+                    // ── SECCIÓN 6: Campos personalizados ─────────────────
+                    if (_customFieldsLoading)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 16),
+                        child: Center(
+                          child: SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: AppColors.ctTeal),
+                          ),
+                        ),
+                      )
+                    else if (_customFieldDefs.isNotEmpty) ...[
+                      const SizedBox(height: 20),
+                      _SectionHeader(label: 'Campos personalizados'),
+                      const SizedBox(height: 14),
+                      ..._customFieldDefs.map(_buildCustomField),
                     ],
 
                     const SizedBox(height: 24),

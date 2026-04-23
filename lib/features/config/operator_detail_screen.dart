@@ -1,3 +1,6 @@
+// ignore: avoid_web_libraries_in_flutter, deprecated_member_use
+import 'dart:html' as html;
+
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -230,6 +233,9 @@ class _OperatorDetailScreenState extends ConsumerState<OperatorDetailScreen>
         initialNationality: op['nationality'] as String?,
         initialIdentityNumber: op['identity_number'] as String?,
         initialProfilePictureUrl: op['profile_picture_url'] as String?,
+        initialCustomFields: (op['custom_fields'] as List?)
+            ?.map((e) => Map<String, dynamic>.from(e as Map))
+            .toList(),
         onSaved: _load,
       ),
     );
@@ -606,6 +612,26 @@ class _DatosTab extends StatelessWidget {
           _FieldRow(
               label: 'Última modificación', value: _fmtDate(updatedAt)),
           _FieldRow(label: 'Modificado por', value: updatedBy),
+
+          // ── Campos personalizados ───────────────────────────────────────
+          Builder(builder: (context) {
+            final rawCf = op['custom_fields'];
+            final customFields = rawCf is List
+                ? rawCf
+                    .map((e) => Map<String, dynamic>.from(e as Map))
+                    .toList()
+                : <Map<String, dynamic>>[];
+            if (customFields.isEmpty) return const SizedBox.shrink();
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 16),
+                const _SectionTitle('Campos personalizados'),
+                const SizedBox(height: 12),
+                ...customFields.map((cf) => _CustomFieldReadRow(field: cf)),
+              ],
+            );
+          }),
         ],
       ),
     );
@@ -1045,6 +1071,99 @@ class _SessionFields extends StatelessWidget {
                   ),
                 ))
             .toList(),
+      ),
+    );
+  }
+}
+
+// ── Custom field read-only row ─────────────────────────────────────────────────
+
+class _CustomFieldReadRow extends StatelessWidget {
+  const _CustomFieldReadRow({required this.field});
+  final Map<String, dynamic> field;
+
+  @override
+  Widget build(BuildContext context) {
+    final label =
+        field['label'] as String? ?? field['field_key'] as String? ?? '—';
+    final type = field['field_type'] as String? ?? 'text';
+    final value = field['value'];
+
+    final Widget valueWidget;
+    if (value == null) {
+      valueWidget = const Text('—',
+          style: TextStyle(
+              fontFamily: 'Geist', fontSize: 14, color: AppColors.ctText));
+    } else if (type == 'boolean') {
+      final boolVal =
+          value == true || value == 'true' || value == 1;
+      valueWidget = Text(boolVal ? 'Sí' : 'No',
+          style: const TextStyle(
+              fontFamily: 'Geist', fontSize: 14, color: AppColors.ctText));
+    } else if (type == 'photo') {
+      final url = value.toString();
+      valueWidget = ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: Image.network(
+          url,
+          width: 80,
+          height: 80,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) => const SizedBox(
+            width: 80,
+            height: 80,
+            child: Icon(Icons.broken_image_outlined,
+                color: AppColors.ctText3, size: 32),
+          ),
+        ),
+      );
+    } else if (type == 'document') {
+      final url = value.toString();
+      valueWidget = GestureDetector(
+        onTap: () => html.window.open(url, '_blank'),
+        child: MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: Container(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: AppColors.ctSurface2,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: AppColors.ctBorder2),
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.insert_drive_file_outlined,
+                    size: 14, color: AppColors.ctTeal),
+                SizedBox(width: 6),
+                Text('Ver documento',
+                    style: TextStyle(
+                      fontFamily: 'Geist',
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.ctTeal,
+                    )),
+              ],
+            ),
+          ),
+        ),
+      );
+    } else {
+      valueWidget = Text(value.toString(),
+          style: const TextStyle(
+              fontFamily: 'Geist', fontSize: 14, color: AppColors.ctText));
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _FieldLabel(label),
+          const SizedBox(height: 4),
+          valueWidget,
+        ],
       ),
     );
   }
