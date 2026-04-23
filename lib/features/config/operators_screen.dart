@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../core/api/operators_api.dart';
 import '../../core/providers/permissions_provider.dart';
 import '../../core/providers/tenant_provider.dart';
@@ -504,10 +505,12 @@ class _OperatorRowState extends State<_OperatorRow> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // Operador: avatar + nombre + verificación
+            // Operador: avatar + nombre + verificación (clic → ficha)
             Expanded(
               flex: 3,
-              child: Row(
+              child: GestureDetector(
+                onTap: id.isNotEmpty ? () => context.go('/operators/$id') : null,
+                child: Row(
                 children: [
                   (profilePictureUrl != null && profilePictureUrl.isNotEmpty)
                       ? CircleAvatar(
@@ -596,6 +599,7 @@ class _OperatorRowState extends State<_OperatorRow> {
                     ),
                   ),
                 ],
+              ),
               ),
             ),
 

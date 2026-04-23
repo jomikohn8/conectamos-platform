@@ -13,6 +13,7 @@ import '../../features/broadcasts/broadcast_screen.dart';
 import '../../features/config/channel_detail_screen.dart';
 import '../../features/config/channels_screen.dart';
 import '../../features/config/connections_screen.dart';
+import '../../features/config/operator_detail_screen.dart';
 import '../../features/config/operators_screen.dart';
 import '../../features/config/settings_screen.dart';
 import '../../features/config/ai_workers_screen.dart';
@@ -20,7 +21,6 @@ import '../../features/config/workflows_screen.dart';
 import '../../features/conversations/conversations_screen.dart';
 import '../../features/dashboard/dashboard_screen.dart';
 import '../../features/overview/overview_screen.dart';
-import '../../features/sessions/sessions_screen.dart';
 import '../../shared/widgets/app_shell.dart';
 
 // Mapa de ruta → permiso requerido
@@ -178,12 +178,11 @@ final routerProvider = Provider<GoRouter>((ref) {
             ),
           ),
           GoRoute(
-            path: '/sessions/:operatorName',
+            path: '/operators/:id',
             pageBuilder: (context, state) {
-              final name = Uri.decodeComponent(
-                state.pathParameters['operatorName'] ?? '',
-              );
-              return NoTransitionPage(child: SessionsScreen(operatorName: name));
+              final id = state.pathParameters['id'] ?? '';
+              return NoTransitionPage(
+                  child: OperatorDetailScreen(operatorId: id));
             },
           ),
         ],
