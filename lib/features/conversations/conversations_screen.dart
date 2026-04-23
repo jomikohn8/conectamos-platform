@@ -1232,13 +1232,15 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
     if (!_scrollCtrl.hasClients) return;
 
     if (_firstUnreadMessageId == null) {
-      // Un único jump diferido 50ms permite que ListView termine de medir
-      // todos sus ítems antes de saltar, evitando el rebote visible del doble-jump.
+      // Dos jumpTo en frames consecutivos: el primero alcanza el fondo estimado,
+      // el segundo corrige si ListView subestimó maxScrollExtent en el primer frame.
+      // jumpTo es instantáneo — el usuario no percibe el doble salto.
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        Future.delayed(const Duration(milliseconds: 50), () {
-          if (mounted && _scrollCtrl.hasClients) {
-            _scrollCtrl.jumpTo(_scrollCtrl.position.maxScrollExtent);
-          }
+        if (!mounted || !_scrollCtrl.hasClients) return;
+        _scrollCtrl.jumpTo(_scrollCtrl.position.maxScrollExtent);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted || !_scrollCtrl.hasClients) return;
+          _scrollCtrl.jumpTo(_scrollCtrl.position.maxScrollExtent);
         });
       });
       return;
@@ -1865,6 +1867,10 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
           if (!mounted || !_scrollCtrl.hasClients) return;
           if (_atBottom) {
             _scrollCtrl.jumpTo(_scrollCtrl.position.maxScrollExtent);
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!mounted || !_scrollCtrl.hasClients) return;
+              _scrollCtrl.jumpTo(_scrollCtrl.position.maxScrollExtent);
+            });
           } else {
             setState(() => _hasNewMessage = true);
           }
@@ -1950,9 +1956,12 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
         if (mounted) {
           setState(() => _sending = false);
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted && _scrollCtrl.hasClients) {
+            if (!mounted || !_scrollCtrl.hasClients) return;
+            _scrollCtrl.jumpTo(_scrollCtrl.position.maxScrollExtent);
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!mounted || !_scrollCtrl.hasClients) return;
               _scrollCtrl.jumpTo(_scrollCtrl.position.maxScrollExtent);
-            }
+            });
           });
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
             content: Text('✅ Ubicación enviada'),
@@ -2004,9 +2013,12 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
       if (mounted) {
         setState(() => _sending = false);
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted && _scrollCtrl.hasClients) {
+          if (!mounted || !_scrollCtrl.hasClients) return;
+          _scrollCtrl.jumpTo(_scrollCtrl.position.maxScrollExtent);
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted || !_scrollCtrl.hasClients) return;
             _scrollCtrl.jumpTo(_scrollCtrl.position.maxScrollExtent);
-          }
+          });
         });
       }
     } on DioException catch (e) {
@@ -3477,7 +3489,9 @@ class _ChatInputState extends State<_ChatInput>
             widget.onSend != null && !widget.sending && widget.enabled;
         if (canSend) {
           widget.onSend!().then((_) {
-            if (mounted) _focusNode.requestFocus();
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) _focusNode.requestFocus();
+            });
           });
         }
         return KeyEventResult.handled; // previene inserción de newline
@@ -3745,7 +3759,9 @@ class _ChatInputState extends State<_ChatInput>
                     onTap: canSend
                         ? () {
                             widget.onSend!().then((_) {
-                              if (mounted) _focusNode.requestFocus();
+                              WidgetsBinding.instance.addPostFrameCallback((_) {
+                                if (mounted) _focusNode.requestFocus();
+                              });
                             });
                           }
                         : null,
