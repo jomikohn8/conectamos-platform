@@ -42,6 +42,8 @@ final replyingToProvider =
     StateProvider<Map<String, dynamic>?>((ref) => null);
 final selectedConvOperatorIdProvider = StateProvider<String?>((ref) => null);
 final selectedChannelTypeProvider    = StateProvider<String?>((ref) => null);
+final selectedConvPhotoUrlProvider   = StateProvider<String?>((ref) => null);
+final channelUnreadProvider = StateProvider<Map<String, int>>((ref) => const {});
 
 // ── Pantalla ──────────────────────────────────────────────────────────────────
 
@@ -278,6 +280,7 @@ class _ConversationsBodyState extends ConsumerState<_ConversationsBody> {
 
     final tab = ref.watch(selectedChannelTabProvider);
     final selectedChannelId = ref.watch(selectedChannelIdProvider);
+    final channelUnread = ref.watch(channelUnreadProvider);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -287,6 +290,7 @@ class _ConversationsBodyState extends ConsumerState<_ConversationsBody> {
           _ChannelSelectorBar(
             channels: _channels,
             selectedChannelId: selectedChannelId,
+            channelUnread: channelUnread,
             onChannelSelected: (id) {
               final ch = _channels.firstWhere(
                 (c) => (c['id'] as String?) == id,
@@ -419,10 +423,12 @@ class _ChannelSelectorBar extends StatelessWidget {
     required this.channels,
     required this.selectedChannelId,
     required this.onChannelSelected,
+    this.channelUnread = const {},
   });
   final List<Map<String, dynamic>> channels;
   final String? selectedChannelId;
   final ValueChanged<String> onChannelSelected;
+  final Map<String, int> channelUnread;
 
   @override
   Widget build(BuildContext context) {
@@ -480,6 +486,28 @@ class _ChannelSelectorBar extends StatelessWidget {
                             : AppColors.ctText2,
                       ),
                     ),
+                    if (chId != null && (channelUnread[chId] ?? 0) > 0) ...[
+                      const SizedBox(width: 5),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 5, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: AppColors.ctTeal,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          (channelUnread[chId]! > 99)
+                              ? '99+'
+                              : '${channelUnread[chId]}',
+                          style: const TextStyle(
+                            fontFamily: 'Geist',
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.ctNavy,
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -664,6 +692,63 @@ String _mediaLabel(String mediaType) {
   }
 }
 
+// ── Avatar de operador con fallback a iniciales ───────────────────────────────
+
+class _OperatorAvatar extends StatelessWidget {
+  const _OperatorAvatar({
+    required this.name,
+    this.photoUrl,
+    this.size = 40,
+    this.bgColor = const Color(0xFFCCFBF1),
+  });
+  final String name;
+  final String? photoUrl;
+  final double size;
+  final Color bgColor;
+
+  @override
+  Widget build(BuildContext context) {
+    if (photoUrl != null && photoUrl!.isNotEmpty) {
+      return ClipOval(
+        child: Image.network(
+          photoUrl!,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) => _buildFallback(),
+          loadingBuilder: (context, child, progress) =>
+              progress == null ? child : _buildFallback(),
+        ),
+      );
+    }
+    return _buildFallback();
+  }
+
+  Widget _buildFallback() {
+    final parts = name.trim().split(' ').where((p) => p.isNotEmpty).toList();
+    final initials = parts.length >= 2
+        ? '${parts[0][0]}${parts[1][0]}'.toUpperCase()
+        : parts.isNotEmpty
+            ? parts[0][0].toUpperCase()
+            : '?';
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(color: bgColor, shape: BoxShape.circle),
+      alignment: Alignment.center,
+      child: Text(
+        initials,
+        style: TextStyle(
+          fontFamily: 'Geist',
+          fontSize: size * 0.35,
+          fontWeight: FontWeight.w600,
+          color: const Color(0xFF0F766E),
+        ),
+      ),
+    );
+  }
+}
+
 // ── Lista de conversaciones (240px) ───────────────────────────────────────────
 
 class _ConvoList extends ConsumerStatefulWidget {
@@ -730,6 +815,7 @@ class _ConvoListState extends ConsumerState<_ConvoList> {
       );
       if (mounted) {
         setState(() { _conversations = convs; _loading = false; });
+        _updateChannelUnread();
         if (resubscribe) _subscribeToFeed(channelId, tenantId);
       }
     } catch (_) {
@@ -787,6 +873,24 @@ class _ConvoListState extends ConsumerState<_ConvoList> {
       _conversations.removeAt(idx);
       _conversations.insert(0, updated);
     });
+    _updateChannelUnread();
+  }
+
+  void _updateChannelUnread() {
+    final channelId = ref.read(selectedChannelIdProvider);
+    if (channelId == null) return;
+    int total = 0;
+    for (final conv in _conversations) {
+      final chatId = conv['chat_id'] as String? ?? '';
+      total += _unreadOverride[chatId] ?? (conv['unread_count'] as int? ?? 0);
+    }
+    final current = ref.read(channelUnreadProvider);
+    if (current[channelId] != total) {
+      ref.read(channelUnreadProvider.notifier).state = {
+        ...current,
+        channelId: total,
+      };
+    }
   }
 
   Widget _searchBar() {
@@ -842,6 +946,8 @@ class _ConvoListState extends ConsumerState<_ConvoList> {
         _fetchConversations();
         ref.read(selectedChatIdProvider.notifier).state = null;
         ref.read(selectedChatNameProvider.notifier).state = null;
+        ref.read(selectedConvPhotoUrlProvider.notifier).state = null;
+        ref.read(channelUnreadProvider.notifier).state = const {};
         ref.read(selectedOperatorChannelsProvider.notifier).state = [];
         ref.read(selectedConvOperatorIdProvider.notifier).state = null;
         ref.read(selectedChannelIndexProvider.notifier).state = 0;
@@ -893,10 +999,11 @@ class _ConvoListState extends ConsumerState<_ConvoList> {
                 padding: const EdgeInsets.symmetric(horizontal: 6),
                 itemCount: filtered.length,
                 itemBuilder: (context, i) {
-                  final conv    = filtered[i];
-                  final chatId  = conv['chat_id'] as String? ?? '';
-                  final name    = conv['display_name'] as String? ?? chatId;
-                  final lastMsg = conv['last_message'] as Map<String, dynamic>?;
+                  final conv      = filtered[i];
+                  final chatId    = conv['chat_id'] as String? ?? '';
+                  final name      = conv['display_name'] as String? ?? chatId;
+                  final photoUrl  = conv['profile_picture_url'] as String?;
+                  final lastMsg   = conv['last_message'] as Map<String, dynamic>?;
                   final body      = lastMsg?['body'] as String?;
                   final mediaType = lastMsg?['media_type'] as String?;
                   final createdAt = lastMsg?['created_at'] as String?;
@@ -904,6 +1011,7 @@ class _ConvoListState extends ConsumerState<_ConvoList> {
                       ?? (conv['unread_count'] as int? ?? 0);
                   return _ApiConvoItem(
                     name: name,
+                    photoUrl: photoUrl,
                     preview: mediaType != null
                         ? null
                         : (body?.isNotEmpty == true ? body! : 'Sin mensajes'),
@@ -922,9 +1030,11 @@ class _ConvoListState extends ConsumerState<_ConvoList> {
                       setLastRead(chatId, DateTime.now().toUtc(),
                           ref.read(activeTenantIdProvider));
                       setState(() { _unreadOverride[chatId] = 0; });
+                      _updateChannelUnread();
                       // read-receipts dispatched in _ChatPanelState._sendReadReceipts
                       ref.read(selectedChatIdProvider.notifier).state = chatId;
                       ref.read(selectedChatNameProvider.notifier).state = name;
+                      ref.read(selectedConvPhotoUrlProvider.notifier).state = photoUrl;
                       ref.read(selectedOperatorChannelsProvider.notifier).state = [];
                       ref.read(selectedConvOperatorIdProvider.notifier).state =
                           conv['operator_id'] as String?;
@@ -950,11 +1060,13 @@ class _ApiConvoItem extends StatefulWidget {
     required this.isToday,
     required this.isSelected,
     required this.onTap,
+    this.photoUrl,
     this.preview,
     this.mediaType,
     this.unreadCount = 0,
   });
   final String name;
+  final String? photoUrl;
   final String? preview;
   final String? mediaType;
   final String time;
@@ -998,24 +1110,7 @@ class _ApiConvoItemState extends State<_ApiConvoItem> {
           child: Row(
             children: [
               // Avatar
-              Container(
-                width: 32,
-                height: 32,
-                decoration: const BoxDecoration(
-                  color: AppColors.ctTealLight,
-                  shape: BoxShape.circle,
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  _initials(widget.name),
-                  style: const TextStyle(
-                    fontFamily: 'Geist',
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.ctTealDark,
-                  ),
-                ),
-              ),
+              _OperatorAvatar(name: widget.name, photoUrl: widget.photoUrl, size: 32),
               const SizedBox(width: 9),
               // Nombre + preview
               Expanded(
@@ -2247,6 +2342,7 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
         _ApiChatHeader(
           name: chatName ?? chatId,
           windowOpen: _windowOpen,
+          photoUrl: ref.watch(selectedConvPhotoUrlProvider),
           channelType: channelType,
           channelName: activeChannel?['name'] as String?,
           workerName: activeChannel?['worker_name'] as String?,
@@ -2535,6 +2631,7 @@ class _ApiChatHeader extends StatelessWidget {
   const _ApiChatHeader({
     required this.name,
     required this.windowOpen,
+    this.photoUrl,
     this.channelType,
     this.channelName,
     this.workerName,
@@ -2544,6 +2641,7 @@ class _ApiChatHeader extends StatelessWidget {
   });
   final String name;
   final bool? windowOpen;
+  final String? photoUrl;
   final String? channelType;
   final String? channelName;
   final String? workerName;
@@ -2562,24 +2660,7 @@ class _ApiChatHeader extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Container(
-            width: 30,
-            height: 30,
-            decoration: const BoxDecoration(
-              color: AppColors.ctTealLight,
-              shape: BoxShape.circle,
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              _initials(name),
-              style: const TextStyle(
-                fontFamily: 'Geist',
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                color: AppColors.ctTealDark,
-              ),
-            ),
-          ),
+          _OperatorAvatar(name: name, photoUrl: photoUrl, size: 30),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
