@@ -262,25 +262,32 @@ class _ConversationsBodyState extends ConsumerState<_ConversationsBody> {
 
   Future<void> _loadAllChannelUnreads(
       List<Map<String, dynamic>> channels, String tenantId) async {
-    if (channels.isEmpty) return;
+    final activeChannelId = ref.read(selectedChannelIdProvider);
+    final otherChannels = channels
+        .where((ch) => ch['id'] != activeChannelId)
+        .toList();
+    if (otherChannels.isEmpty) return;
+    debugPrint('[_loadAllChannelUnreads] loading ${otherChannels.length} other channels');
     try {
       final results = await Future.wait(
-        channels.map((ch) => ConversationsApi.listConversations(
+        otherChannels.map((ch) => ConversationsApi.listConversations(
           channelId: ch['id'] as String,
           tenantId: tenantId.isNotEmpty ? tenantId : 'default',
         )),
       );
       if (!mounted) return;
-      final Map<String, int> totals = {};
-      for (int i = 0; i < channels.length; i++) {
-        final channelId = channels[i]['id'] as String;
+      final current = ref.read(channelUnreadProvider);
+      final Map<String, int> updated = Map.from(current);
+      for (int i = 0; i < otherChannels.length; i++) {
+        final channelId = otherChannels[i]['id'] as String;
         final convs = results[i];
-        totals[channelId] = convs.fold<int>(
+        updated[channelId] = convs.fold<int>(
             0, (sum, c) => sum + ((c['unread_count'] as int?) ?? 0));
       }
-      ref.read(channelUnreadProvider.notifier).state = totals;
-    } catch (_) {
-      // Non-critical — badges just won't show for other channels
+      debugPrint('[_loadAllChannelUnreads] done — totals: $updated');
+      ref.read(channelUnreadProvider.notifier).state = updated;
+    } catch (e) {
+      debugPrint('[_loadAllChannelUnreads] error: $e');
     }
   }
 
