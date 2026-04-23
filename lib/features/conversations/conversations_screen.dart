@@ -1404,6 +1404,13 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
     }
     final userId = Supabase.instance.client.auth.currentUser?.id;
 
+    final replyTo = ref.read(replyingToProvider);
+    ref.read(replyingToProvider.notifier).state = null;
+    final isTelegram = ref.read(selectedChannelTypeProvider) == 'telegram';
+    final replyId = (replyTo != null && isTelegram)
+        ? replyTo['id'] as String?
+        : null;
+
     if (mounted) setState(() { _sending = true; _isDragOver = false; });
     try {
       await MessagesApi.sendMedia(
@@ -1414,6 +1421,7 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
         channelId: channelId,
         caption: caption,
         sentByUserId: userId,
+        replyToMessageId: replyId,
       );
       if (mounted) setState(() { _sending = false; _isDragOver = false; });
     } on DioException catch (e) {
@@ -1873,6 +1881,13 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
     _msgCtrl.clear();
     setState(() => _sending = true);
 
+    final isTelegram = ref.read(selectedChannelTypeProvider) == 'telegram';
+    final replyId = replyTo == null
+        ? null
+        : isTelegram
+            ? replyTo['id'] as String?
+            : replyTo['wa_message_id'] as String?;
+
     try {
       await MessagesApi.sendWhatsAppMessage(
           to: chatId,
@@ -1880,7 +1895,7 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
           tenantId: tenantId,
           channelId: channelId,
           sentByUserId: Supabase.instance.client.auth.currentUser?.id,
-          replyToMessageId: replyTo?['wa_message_id'] as String?);
+          replyToMessageId: replyId);
       if (mounted) {
         setState(() => _sending = false);
         WidgetsBinding.instance.addPostFrameCallback((_) {

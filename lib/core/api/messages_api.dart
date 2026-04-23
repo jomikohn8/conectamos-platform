@@ -144,6 +144,7 @@ class MessagesApi {
     required String channelId,
     String? caption,
     String? sentByUserId,
+    String? replyToMessageId,
   }) async {
     final formData = FormData.fromMap({
       'to': to,
@@ -156,6 +157,7 @@ class MessagesApi {
       ),
       if (caption != null && caption.isNotEmpty) 'caption': caption,
       'sent_by_user_id': ?sentByUserId,
+      'reply_to_message_id': ?replyToMessageId,
     });
     await ApiClient.instance.post('/messages/send/media', data: formData);
   }
