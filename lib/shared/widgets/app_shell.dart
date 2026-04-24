@@ -552,9 +552,11 @@ class _Sidebar extends ConsumerWidget {
       duration: const Duration(milliseconds: 200),
       curve: Curves.easeInOut,
       width: collapsed ? 56 : 220,
-      decoration: const BoxDecoration(
-        color: AppColors.ctSurface,
-        border: Border(right: BorderSide(color: AppColors.ctBorder)),
+      decoration: BoxDecoration(
+        color: AppColors.ctNavy,
+        border: Border(
+          right: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+        ),
       ),
       // ClipRect evita que el contenido se desborde durante la animación
       child: ClipRect(
@@ -575,11 +577,11 @@ class _Sidebar extends ConsumerWidget {
                     padding: const EdgeInsets.fromLTRB(14, 0, 14, 6),
                     child: Text(
                       tenantName,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontFamily: 'Geist',
                         fontSize: 10,
                         fontWeight: FontWeight.w500,
-                        color: AppColors.ctText3,
+                        color: Colors.white.withValues(alpha: 0.5),
                       ),
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -708,18 +710,18 @@ class _NavSection extends StatelessWidget {
     if (collapsed) {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        child: Container(height: 1, color: AppColors.ctBorder),
+        child: Container(height: 1, color: Colors.white.withValues(alpha: 0.1)),
       );
     }
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 3),
       child: Text(
         label.toUpperCase(),
-        style: const TextStyle(
+        style: TextStyle(
           fontFamily: 'Geist',
           fontSize: 10,
           fontWeight: FontWeight.w600,
-          color: AppColors.ctText3,
+          color: Colors.white.withValues(alpha: 0.35),
           letterSpacing: 0.8,
         ),
       ),
@@ -797,9 +799,9 @@ class _NavItemState extends State<_NavItem> {
       height: 36,
       decoration: BoxDecoration(
         color: _isActive
-            ? AppColors.ctTealLight
+            ? Colors.white.withValues(alpha: 0.12)
             : _hovered
-                ? AppColors.ctSurface2
+                ? Colors.white.withValues(alpha: 0.07)
                 : Colors.transparent,
         borderRadius: BorderRadius.circular(8),
       ),
@@ -808,10 +810,10 @@ class _NavItemState extends State<_NavItem> {
         widget.icon,
         size: 18,
         color: _isActive
-            ? AppColors.ctTealDark
+            ? AppColors.ctTeal
             : _hovered
-                ? AppColors.ctText2
-                : AppColors.ctText3,
+                ? Colors.white
+                : Colors.white.withValues(alpha: 0.5),
       ),
     );
   }
@@ -823,9 +825,9 @@ class _NavItemState extends State<_NavItem> {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
         color: _isActive
-            ? AppColors.ctTealLight
+            ? Colors.white.withValues(alpha: 0.12)
             : _hovered
-                ? AppColors.ctSurface2
+                ? Colors.white.withValues(alpha: 0.07)
                 : Colors.transparent,
         borderRadius: BorderRadius.circular(8),
         border: _isActive
@@ -840,10 +842,10 @@ class _NavItemState extends State<_NavItem> {
             widget.icon,
             size: 16,
             color: _isActive
-                ? AppColors.ctTealDark
+                ? AppColors.ctTeal
                 : _hovered
-                    ? AppColors.ctText2
-                    : AppColors.ctText3,
+                    ? Colors.white
+                    : Colors.white.withValues(alpha: 0.5),
           ),
           const SizedBox(width: 8),
           Expanded(
@@ -855,10 +857,10 @@ class _NavItemState extends State<_NavItem> {
                 fontWeight:
                     _isActive ? FontWeight.w600 : FontWeight.w500,
                 color: _isActive
-                    ? AppColors.ctTealDark
+                    ? AppColors.ctTeal
                     : _hovered
-                        ? AppColors.ctText
-                        : AppColors.ctText2,
+                        ? Colors.white
+                        : Colors.white.withValues(alpha: 0.7),
               ),
               overflow: TextOverflow.ellipsis,
             ),
@@ -894,13 +896,13 @@ class _DisabledNavItemState extends State<_DisabledNavItem> {
       width: 44,
       height: 36,
       decoration: BoxDecoration(
-        color: _hovered ? AppColors.ctSurface2 : Colors.transparent,
+        color: _hovered ? Colors.white.withValues(alpha: 0.07) : Colors.transparent,
         borderRadius: BorderRadius.circular(8),
       ),
       alignment: Alignment.center,
       child: Opacity(
-        opacity: 0.4,
-        child: Icon(widget.icon, size: 18, color: AppColors.ctText3),
+        opacity: 0.3,
+        child: Icon(widget.icon, size: 18, color: Colors.white),
       ),
     );
   }
@@ -910,14 +912,14 @@ class _DisabledNavItemState extends State<_DisabledNavItem> {
       margin: const EdgeInsets.symmetric(vertical: 1, horizontal: 6),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: _hovered ? AppColors.ctSurface2 : Colors.transparent,
+        color: _hovered ? Colors.white.withValues(alpha: 0.07) : Colors.transparent,
         borderRadius: BorderRadius.circular(8),
       ),
       child: Opacity(
-        opacity: 0.4,
+        opacity: 0.3,
         child: Row(
           children: [
-            Icon(widget.icon, size: 16, color: AppColors.ctText3),
+            Icon(widget.icon, size: 16, color: Colors.white),
             const SizedBox(width: 8),
             Expanded(
               child: Text(
@@ -926,7 +928,7 @@ class _DisabledNavItemState extends State<_DisabledNavItem> {
                   fontFamily: 'Geist',
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
-                  color: AppColors.ctText2,
+                  color: Colors.white,
                 ),
                 overflow: TextOverflow.ellipsis,
               ),
@@ -944,7 +946,7 @@ class _DisabledNavItemState extends State<_DisabledNavItem> {
       preferBelow: false,
       waitDuration: Duration.zero,
       decoration: BoxDecoration(
-        color: AppColors.ctNavy,
+        color: Colors.white.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(6),
       ),
       textStyle: const TextStyle(
