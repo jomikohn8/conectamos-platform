@@ -512,7 +512,11 @@ class _BroadcastScreenState extends ConsumerState<BroadcastScreen> {
     final firstSelectedOp =
         selectedOperators.isNotEmpty ? selectedOperators.first : null;
 
-    return Column(
+    return Material(
+      color: Colors.white,
+      borderRadius: isModal ? BorderRadius.circular(16) : BorderRadius.zero,
+      clipBehavior: Clip.antiAlias,
+      child: Column(
       children: [
         _BroadcastHeader(
           onClose: isModal
@@ -685,6 +689,7 @@ class _BroadcastScreenState extends ConsumerState<BroadcastScreen> {
           ),
         ),
       ],
+      ),
     );
   }
 }
