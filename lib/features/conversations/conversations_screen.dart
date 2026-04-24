@@ -2730,35 +2730,51 @@ class _InterveneButtonState extends State<_InterveneButton> {
     final label = isActive ? 'Dejar de intervenir' : 'Intervenir';
     final icon = isActive ? Icons.stop_circle_outlined : Icons.pan_tool_outlined;
 
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          decoration: BoxDecoration(
-            color: _hovered ? hoverBg : normalBg,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: borderColor),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 14, color: iconColor),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: TextStyle(
-                  fontFamily: 'Geist',
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: iconColor,
+    return Tooltip(
+      message: isActive
+          ? 'Devolver el control al AI Worker'
+          : 'Tomar control de la conversación para responder manualmente',
+      preferBelow: false,
+      waitDuration: const Duration(milliseconds: 600),
+      decoration: BoxDecoration(
+        color: AppColors.ctNavy,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      textStyle: const TextStyle(
+        color: Colors.white,
+        fontSize: 11,
+        fontFamily: 'Geist',
+      ),
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          onTap: widget.onTap,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 120),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: _hovered ? hoverBg : normalBg,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: borderColor),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 14, color: iconColor),
+                const SizedBox(width: 6),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontFamily: 'Geist',
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: iconColor,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -3068,32 +3084,90 @@ class _ApiMessageBubbleState extends State<_ApiMessageBubble> {
     if (mUrl == null) return _fallback('[Imagen]');
     final caption =
         (widget.body.isNotEmpty && !widget.body.startsWith('[')) ? widget.body : null;
+
+    final thumbnail = GestureDetector(
+      onTap: () => showDialog(
+        context: context,
+        builder: (_) => Dialog(
+          backgroundColor: Colors.transparent,
+          child: GestureDetector(
+            onTap: () => Navigator.of(context).pop(),
+            child: Image.network(mUrl,
+                errorBuilder: (ctx, e, s) => _fallback('[Imagen]')),
+          ),
+        ),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: Stack(
+          children: [
+            Image.network(
+              mUrl,
+              width: 240,
+              height: 180,
+              fit: BoxFit.cover,
+              loadingBuilder: (ctx, child, progress) {
+                if (progress == null) return child;
+                return Container(
+                  width: 240,
+                  height: 180,
+                  color: AppColors.ctSurface2,
+                );
+              },
+              errorBuilder: (ctx, e, s) => Container(
+                width: 240,
+                height: 180,
+                color: AppColors.ctSurface2,
+                child: const Center(
+                  child: Icon(
+                    Icons.broken_image_outlined,
+                    size: 32,
+                    color: AppColors.ctText3,
+                  ),
+                ),
+              ),
+            ),
+            // Timestamp overlay — bottom-right corner
+            Positioned(
+              bottom: 0,
+              right: 0,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.35),
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(6),
+                  ),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      widget.time,
+                      style: const TextStyle(
+                        fontFamily: 'Geist',
+                        color: Colors.white,
+                        fontSize: 10,
+                      ),
+                    ),
+                    if (widget.isOutbound) ...[
+                      const SizedBox(width: 3),
+                      _statusIcon(),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        GestureDetector(
-          onTap: () => showDialog(
-            context: context,
-            builder: (_) => Dialog(
-              backgroundColor: Colors.transparent,
-              child: GestureDetector(
-                onTap: () => Navigator.of(context).pop(),
-                child: Image.network(mUrl,
-                    errorBuilder: (ctx, e, s) => _fallback('[Imagen]')),
-              ),
-            ),
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: Image.network(
-              mUrl,
-              width: 240,
-              fit: BoxFit.cover,
-              errorBuilder: (ctx, e, s) => _fallback('[Imagen]'),
-            ),
-          ),
-        ),
+        thumbnail,
         if (caption != null)
           Padding(
             padding: const EdgeInsets.only(top: 4),
@@ -3428,32 +3502,36 @@ class _ApiMessageBubbleState extends State<_ApiMessageBubble> {
           if (!const ['image', 'video', 'audio', 'document', 'sticker', 'location']
               .contains(widget.messageType))
             _buildTextContent(textColor: bubbleTextColor),
-          const SizedBox(height: 3),
-          if (isOutbound)
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  widget.time,
-                  style: TextStyle(
-                    fontFamily: 'Geist',
-                    fontSize: 10,
-                    color: timeColor,
+          // Timestamp is rendered inside the image overlay for image messages
+          // with a valid media_url; skip the bottom row in that case.
+          if (!(widget.messageType == 'image' && widget.mediaUrl?.isNotEmpty == true)) ...[
+            const SizedBox(height: 3),
+            if (isOutbound)
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    widget.time,
+                    style: TextStyle(
+                      fontFamily: 'Geist',
+                      fontSize: 10,
+                      color: timeColor,
+                    ),
                   ),
+                  const SizedBox(width: 4),
+                  _statusIcon(),
+                ],
+              )
+            else
+              Text(
+                widget.time,
+                style: TextStyle(
+                  fontFamily: 'Geist',
+                  fontSize: 10,
+                  color: timeColor,
                 ),
-                const SizedBox(width: 4),
-                _statusIcon(),
-              ],
-            )
-          else
-            Text(
-              widget.time,
-              style: TextStyle(
-                fontFamily: 'Geist',
-                fontSize: 10,
-                color: timeColor,
               ),
-            ),
+          ],
         ],
       ),
     );
