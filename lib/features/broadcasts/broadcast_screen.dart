@@ -253,13 +253,12 @@ class _BroadcastScreenState extends ConsumerState<BroadcastScreen> {
     }).toList();
   }
 
-  // FIX 6: ventana cerrada solo si last_inbound_at es válido y >= 24h
-  static bool? _windowOpen(Map<String, dynamic> op) {
-    final last = op['last_inbound_at'] as String?;
-    if (last == null) return null; // indeterminado — operador nuevo
-    final dt = DateTime.tryParse(last);
-    if (dt == null) return null;
-    return DateTime.now().toUtc().difference(dt.toUtc()).inHours < 24;
+  static bool _windowOpen(Map<String, dynamic> op) {
+    final raw = op['last_inbound_at'] as String?;
+    if (raw == null) return false;
+    final dt = DateTime.tryParse(raw);
+    if (dt == null) return false;
+    return DateTime.now().difference(dt).inHours < 24;
   }
 
   Future<void> _sendBroadcast(
@@ -470,14 +469,11 @@ class _BroadcastScreenState extends ConsumerState<BroadcastScreen> {
             effectiveSelectedIds.contains(op['id']?.toString() ?? ''))
         .toList();
 
-    // FIX 6: null last_inbound_at = indeterminado (no cuenta como cerrada)
-    // FIX 4: closedWindowCount solo sobre los seleccionados
+    // closedWindowCount: operadores seleccionados con ventana cerrada (WA only)
+    // null last_inbound_at → _windowOpen retorna false (ventana cerrada)
     final closedWindowCount = isTelegram
         ? 0
-        : selectedOperators.where((op) {
-            final open = _windowOpen(op);
-            return open == false; // solo cerradas conocidas
-          }).length;
+        : selectedOperators.where((op) => !_windowOpen(op)).length;
 
     // Flujos únicos en todos los operadores
     final allFlows   = <String>{};
@@ -500,13 +496,11 @@ class _BroadcastScreenState extends ConsumerState<BroadcastScreen> {
       }
     }
 
-    // FIX 4: bloquear envío si hay cerradas en texto libre + WA
-    final closedWindowBlock =
-        !_useTemplate && !isTelegram && closedWindowCount > 0;
-
+    // Advertencia no bloqueante: solo texto libre + WA con ventanas cerradas
+    final closedWindowBlock = false; // no bloquea — solo informativo
     final canSend = _useTemplate
         ? _selectedTemplateId != null
-        : !closedWindowBlock && _msgCtrl.text.trim().isNotEmpty;
+        : _msgCtrl.text.trim().isNotEmpty;
 
     // FIX 3: primer operador seleccionado para preview de variables
     final firstSelectedOp =
@@ -957,19 +951,13 @@ class _FormColumn extends StatelessWidget {
                   ),
               ],
 
-              // FIX 4: banner ventana cerrada (ambos modos)
-              if (closedWindowCount > 0 && !isTelegram) ...[
+              // Banner advertencia no bloqueante: solo texto libre + WA
+              if (!useTemplate && closedWindowCount > 0 && !isTelegram) ...[
                 const SizedBox(height: 10),
                 _WarningBanner(
-                  message: useTemplate
-                      ? '$closedWindowCount operador'
-                          '${closedWindowCount > 1 ? 'es tienen' : ' tiene'}'
-                          ' la ventana de 24h cerrada. El mensaje se enviará'
-                          ' como plantilla aprobada.'
-                      : '$closedWindowCount operador'
-                          '${closedWindowCount > 1 ? 'es tienen' : ' tiene'}'
-                          ' ventana cerrada. Deselecciónalos o cambia a'
-                          ' Plantilla para poder enviar.',
+                  message: '$closedWindowCount operador'
+                      '${closedWindowCount > 1 ? 'es tienen' : ' tiene'}'
+                      ' la ventana cerrada y no recibirán este mensaje.',
                 ),
               ],
             ],
@@ -1241,11 +1229,10 @@ class _PreviewColumn extends StatelessWidget {
                   final name    = op['display_name']?.toString() ??
                       op['name']?.toString() ?? '—';
                   final phone   = op['phone']?.toString() ?? '';
-                  final photoUrl = op['photo_url']?.toString() ??
-                      op['avatar_url']?.toString();
+                  final photoUrl = op['profile_picture_url']?.toString();
                   final selected = effectiveSelectedIds.contains(opId);
 
-                  // FIX 6: window null = no chip; FIX 5: photo_url/avatar_url
+                  // windowOpen: bool (false = cerrada), solo chip en WA
                   final bool? windowOpen = isWa
                       ? _BroadcastScreenState._windowOpen(op)
                       : null;
