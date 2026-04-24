@@ -346,11 +346,22 @@ class _BroadcastScreenState extends ConsumerState<BroadcastScreen> {
 
     // Unique flows across all operators
     final allFlows = <String>{};
+    final flowLabels = <String, String>{};
     for (final op in operators) {
       final f = op['flows'];
       if (f is List) {
         for (final fl in f) {
-          allFlows.add(fl.toString());
+          final key = fl.toString();
+          allFlows.add(key);
+          if (fl is Map) {
+            final workerName = fl['worker_name'] as String?;
+            final name = fl['name'] as String?;
+            if (name != null) {
+              flowLabels[key] = workerName != null
+                  ? '$workerName · $name'
+                  : name;
+            }
+          }
         }
       }
     }
@@ -386,6 +397,7 @@ class _BroadcastScreenState extends ConsumerState<BroadcastScreen> {
                 selectedStatuses: _selectedStatuses,
                 selectedFlows: _selectedFlows,
                 allFlows: allFlows,
+                flowLabels: flowLabels,
                 canSend: _canSend,
                 sending: _sending,
                 confirming: _confirming,
@@ -593,6 +605,7 @@ class _FormColumn extends StatelessWidget {
     required this.selectedStatuses,
     required this.selectedFlows,
     required this.allFlows,
+    required this.flowLabels,
     required this.canSend,
     required this.sending,
     required this.confirming,
@@ -620,6 +633,7 @@ class _FormColumn extends StatelessWidget {
   final Set<String> selectedStatuses;
   final Set<String> selectedFlows;
   final Set<String> allFlows;
+  final Map<String, String> flowLabels;
   final bool canSend;
   final bool sending;
   final bool confirming;
@@ -801,7 +815,7 @@ class _FormColumn extends StatelessWidget {
                   spacing: 8,
                   runSpacing: 8,
                   children: allFlows.map((f) => _FilterChip(
-                    label: f,
+                    label: flowLabels[f] ?? f,
                     value: f,
                     selected: selectedFlows.contains(f),
                     onTap: onToggleFlow,
