@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/config.dart';
 import 'auth_shared.dart';
@@ -294,10 +295,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     decoration: TextDecoration.underline,
                   ),
                   recognizer: TapGestureRecognizer()
-                    ..onTap = () {
-                      // TODO: reemplazar con URL real cuando esté disponible
-                      // launchUrl(Uri.parse('https://conectamos.ai/terminos'));
-                    },
+                    ..onTap = () => launchUrl(
+                          Uri.parse('https://conectamos.ai/terminos-y-condiciones'),
+                          mode: LaunchMode.externalApplication,
+                        ),
                 ),
                 const TextSpan(text: ' y '),
                 TextSpan(
@@ -308,10 +309,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     decoration: TextDecoration.underline,
                   ),
                   recognizer: TapGestureRecognizer()
-                    ..onTap = () {
-                      // TODO: reemplazar con URL real cuando esté disponible
-                      // launchUrl(Uri.parse('https://conectamos.ai/privacidad'));
-                    },
+                    ..onTap = () => launchUrl(
+                          Uri.parse('https://conectamos.ai/aviso-de-privacidad'),
+                          mode: LaunchMode.externalApplication,
+                        ),
                 ),
                 const TextSpan(text: '.'),
               ],
