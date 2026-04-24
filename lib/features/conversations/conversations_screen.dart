@@ -4185,6 +4185,19 @@ class _TabFeedState extends ConsumerState<_TabFeed> {
     super.dispose();
   }
 
+  void _clearFilters() {
+    _keywordDebounce?.cancel();
+    setState(() {
+      _filterDirection = '';
+      _filterContact = '';
+      _filterContactPhone = '';
+      _dateRange = null;
+      _fromTime = null;
+      _toTime = null;
+      _keyword = '';
+    });
+  }
+
   void _resubscribe() {
     _feedSub?.cancel();
     setState(() => _loading = true);
@@ -4295,7 +4308,10 @@ class _TabFeedState extends ConsumerState<_TabFeed> {
       if (prev != null && prev != next) _resubscribe();
     });
     ref.listen<String?>(selectedChannelIdProvider, (prev, next) {
-      if (prev != next) _resubscribe();
+      if (prev != next) {
+        _clearFilters();
+        _resubscribe();
+      }
     });
 
     return Column(
@@ -4355,6 +4371,17 @@ class _TabFeedState extends ConsumerState<_TabFeed> {
                   messages: _feedMessages,
                   channelType:
                       ref.watch(selectedChannelTypeProvider) ?? 'whatsapp',
+                  hasActiveFilters: _filterDirection.isNotEmpty ||
+                      _filterContact.isNotEmpty ||
+                      _dateRange != null ||
+                      _fromTime != null ||
+                      _toTime != null ||
+                      _keyword.isNotEmpty,
+                  messageCount: _feedMessages.length,
+                  onClearFilters: () {
+                    _clearFilters();
+                    _resubscribe();
+                  },
                 ),
         ),
       ],
@@ -4406,6 +4433,15 @@ class _FeedFiltersState extends State<_FeedFilters> {
   void initState() {
     super.initState();
     _keywordCtrl = TextEditingController(text: widget.keyword);
+  }
+
+  @override
+  void didUpdateWidget(_FeedFilters old) {
+    super.didUpdateWidget(old);
+    if (widget.keyword != old.keyword &&
+        _keywordCtrl.text != widget.keyword) {
+      _keywordCtrl.text = widget.keyword;
+    }
   }
 
   @override
@@ -4593,10 +4629,16 @@ class _FeedMessages extends StatelessWidget {
   const _FeedMessages({
     required this.messages,
     required this.channelType,
+    required this.hasActiveFilters,
+    required this.messageCount,
+    this.onClearFilters,
   });
 
   final List<Map<String, dynamic>> messages;
   final String channelType;
+  final bool hasActiveFilters;
+  final int messageCount;
+  final VoidCallback? onClearFilters;
 
   static const _avatarColors = [
     Color(0xFFDCFCE7),
@@ -4651,13 +4693,61 @@ class _FeedMessages extends StatelessWidget {
       return Container(
         color: const Color(0xFFF0F2F5),
         alignment: Alignment.center,
-        child: const Text(
-          'Sin mensajes',
-          style: TextStyle(
-            fontFamily: 'Geist',
-            fontSize: 13,
-            color: Color(0xFF9CA3AF),
-          ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              hasActiveFilters
+                  ? Icons.filter_list
+                  : Icons.chat_bubble_outline,
+              size: 32,
+              color: AppColors.ctText3,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              hasActiveFilters ? 'Sin resultados' : 'Sin mensajes',
+              style: const TextStyle(
+                fontFamily: 'Geist',
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: AppColors.ctNavy,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              hasActiveFilters
+                  ? 'Ningún mensaje coincide con los filtros activos.'
+                  : 'Aún no hay mensajes en este canal.',
+              style: const TextStyle(
+                fontFamily: 'Geist',
+                fontSize: 13,
+                color: AppColors.ctText2,
+              ),
+            ),
+            if (hasActiveFilters && onClearFilters != null) ...[
+              const SizedBox(height: 16),
+              GestureDetector(
+                onTap: onClearFilters,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 7),
+                  decoration: BoxDecoration(
+                    border:
+                        Border.all(color: AppColors.ctBorder),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Text(
+                    'Limpiar filtros',
+                    style: TextStyle(
+                      fontFamily: 'Geist',
+                      fontSize: 13,
+                      color: AppColors.ctText2,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ],
         ),
       );
     }
@@ -4680,12 +4770,35 @@ class _FeedMessages extends StatelessWidget {
       items.add((isSep: false, label: null, msg: msg));
     }
 
+    final showTruncatedBanner = messageCount >= 200;
+
     return Container(
       color: const Color(0xFFF0F2F5),
       child: ListView.builder(
         padding: const EdgeInsets.symmetric(vertical: 8),
-        itemCount: items.length,
+        itemCount: items.length + (showTruncatedBanner ? 1 : 0),
         itemBuilder: (context, i) {
+          if (showTruncatedBanner && i == items.length) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: const [
+                  Icon(Icons.history,
+                      size: 14, color: AppColors.ctText3),
+                  SizedBox(width: 6),
+                  Text(
+                    'Mostrando los últimos 200 mensajes',
+                    style: TextStyle(
+                      fontFamily: 'Geist',
+                      fontSize: 12,
+                      color: AppColors.ctText3,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
           final item = items[i];
           if (item.isSep) {
             return Center(
