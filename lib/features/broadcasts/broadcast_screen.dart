@@ -26,7 +26,7 @@ const _kFreeVars = [
 ];
 
 String _resolveFreeText(
-    String text, Map<String, dynamic>? op, String tenantId) {
+    String text, Map<String, dynamic>? op, String tenantName) {
   if (text.isEmpty) return text;
   final now = DateTime.now();
   const days = [
@@ -60,7 +60,7 @@ String _resolveFreeText(
           '${now.day.toString().padLeft(2, '0')}/'
           '${now.month.toString().padLeft(2, '0')}/'
           '${now.year}')
-      .replaceAll('{tenant}', tenantId);
+      .replaceAll('{tenant}', tenantName);
 }
 
 // ── Providers ─────────────────────────────────────────────────────────────────
@@ -184,7 +184,11 @@ List<String> _resolveTemplateVariables(Map<String, dynamic> template) {
 // ── Pantalla ──────────────────────────────────────────────────────────────────
 
 class BroadcastScreen extends ConsumerStatefulWidget {
-  const BroadcastScreen({super.key});
+  const BroadcastScreen({super.key, this.channelId, this.channelType});
+
+  /// Cuando se abre como modal, estos parámetros reemplazan los query params.
+  final String? channelId;
+  final String? channelType;
 
   @override
   ConsumerState<BroadcastScreen> createState() => _BroadcastScreenState();
@@ -290,11 +294,31 @@ class _BroadcastScreenState extends ConsumerState<BroadcastScreen> {
       final isPartialSelection =
           effectiveSelectedIds.length < allFilteredIds.length;
 
+      // BUG-B01: resolver variables antes de enviar.
+      // TODO(backend): idealmente el backend resuelve {nombre}/{flujo}/etc.
+      // por destinatario. Mientras tanto, se usan los datos del primer operador
+      // seleccionado como aproximación para todas las variables personales.
+      String resolvedText = _msgCtrl.text.trim();
+      if (!_useTemplate && resolvedText.isNotEmpty) {
+        final firstOp = effectiveSelectedIds.isNotEmpty
+            ? filteredOps.firstWhere(
+                (op) => effectiveSelectedIds.contains(op['id']?.toString()),
+                orElse: () => filteredOps.isNotEmpty ? filteredOps.first : {},
+              )
+            : filteredOps.isNotEmpty
+                ? filteredOps.first
+                : null;
+        if (firstOp != null && firstOp.isNotEmpty) {
+          final tenantDisplayName = ref.read(activeTenantDisplayProvider);
+          resolvedText = _resolveFreeText(resolvedText, firstOp, tenantDisplayName);
+        }
+      }
+
       final body = <String, dynamic>{
         'tenant_id':          tenantId,
         'sent_by_user_id':    userId,
         'channel_id':         _channelId,
-        'message_text':       _useTemplate ? null : _msgCtrl.text.trim(),
+        'message_text':       _useTemplate ? null : resolvedText,
         'template_id':        _useTemplate ? _selectedTemplateId : null,
         'template_variables': _useTemplate && selectedTemplate != null
             ? _resolveTemplateVariables(selectedTemplate)
@@ -395,14 +419,21 @@ class _BroadcastScreenState extends ConsumerState<BroadcastScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final params    = GoRouterState.of(context).uri.queryParameters;
-    _channelId      = params['channel_id']   ?? '';
-    _channelType    = params['channel_type'] ?? 'whatsapp';
+    final isModal = widget.channelId != null;
+    if (isModal) {
+      _channelId   = widget.channelId!;
+      _channelType = widget.channelType ?? 'whatsapp';
+    } else {
+      final params = GoRouterState.of(context).uri.queryParameters;
+      _channelId   = params['channel_id']   ?? '';
+      _channelType = params['channel_type'] ?? 'whatsapp';
+    }
 
     final isTelegram = _channelType == 'telegram';
     if (isTelegram && _useTemplate) _useTemplate = false;
 
     final tenantId       = ref.watch(activeTenantIdProvider);
+    final tenantName     = ref.watch(activeTenantDisplayProvider);
     final operatorsAsync = ref.watch(_bcastOperatorsProvider(tenantId));
     final templatesAsync = ref.watch(_bcastTemplatesProvider(tenantId));
     final credsAsync     = ref.watch(_bcastTenantCredsProvider(tenantId));
@@ -483,7 +514,11 @@ class _BroadcastScreenState extends ConsumerState<BroadcastScreen> {
 
     return Column(
       children: [
-        _BroadcastHeader(onClose: () => context.go('/conversations')),
+        _BroadcastHeader(
+          onClose: isModal
+              ? () => Navigator.of(context).pop()
+              : () => context.go('/conversations'),
+        ),
         Expanded(
           child: LayoutBuilder(
             builder: (context, constraints) {
@@ -575,7 +610,7 @@ class _BroadcastScreenState extends ConsumerState<BroadcastScreen> {
                 effectiveSelectedIds: effectiveSelectedIds,
                 channelType:          _channelType,
                 firstSelectedOp:      firstSelectedOp,
-                tenantId:             tenantId,
+                tenantName:           tenantName,
                 onToggleOperator: (id) => setState(() {
                   if (_selectedOperatorIds.isEmpty) {
                     // Todos estaban seleccionados — deseleccionar este
@@ -1078,7 +1113,7 @@ class _PreviewColumn extends StatelessWidget {
     required this.effectiveSelectedIds,
     required this.channelType,
     required this.firstSelectedOp,
-    required this.tenantId,
+    required this.tenantName,
     required this.onToggleOperator,
   });
 
@@ -1089,7 +1124,7 @@ class _PreviewColumn extends StatelessWidget {
   final Set<String> effectiveSelectedIds;
   final String channelType;
   final Map<String, dynamic>? firstSelectedOp;
-  final String tenantId;
+  final String tenantName;
   final ValueChanged<String> onToggleOperator;
 
   @override
@@ -1100,7 +1135,7 @@ class _PreviewColumn extends StatelessWidget {
       previewText = _resolvePreview(selectedTemplate!);
     } else if (!useTemplate) {
       // FIX 3: resolver variables estándar
-      previewText = _resolveFreeText(msgCtrl.text, firstSelectedOp, tenantId);
+      previewText = _resolveFreeText(msgCtrl.text, firstSelectedOp, tenantName);
     }
 
     // FIX 1: título dinámico

@@ -12,11 +12,11 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/api/api_client.dart';
+import '../broadcasts/broadcast_screen.dart';
 import '../../core/api/channels_api.dart';
 import '../../core/api/conversations_api.dart';
 import '../../core/api/messages_api.dart';
@@ -59,6 +59,38 @@ class ConversationsScreen extends ConsumerWidget {
       ],
     );
   }
+}
+
+// ── Broadcast modal ───────────────────────────────────────────────────────────
+
+void _showBroadcastModal(
+    BuildContext context, String channelId, String channelType) {
+  showDialog<void>(
+    context: context,
+    barrierDismissible: true,
+    barrierColor: Colors.black.withValues(alpha: 0.5),
+    builder: (ctx) {
+      final sw = MediaQuery.of(ctx).size.width;
+      final sh = MediaQuery.of(ctx).size.height;
+      final w  = sw * 0.9 < 900 ? sw * 0.9 : 900.0;
+      final h  = sh * 0.85 < 700 ? sh * 0.85 : 700.0;
+      return Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: EdgeInsets.zero,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: SizedBox(
+            width: w,
+            height: h,
+            child: BroadcastScreen(
+              channelId:   channelId,
+              channelType: channelType,
+            ),
+          ),
+        ),
+      );
+    },
+  );
 }
 
 // ── Action bar ────────────────────────────────────────────────────────────────
@@ -313,7 +345,7 @@ class _ConversationsBodyState extends ConsumerState<_ConversationsBody> {
                 onTap: () {
                   final channelId   = ref.read(selectedChannelIdProvider)   ?? '';
                   final channelType = ref.read(selectedChannelTypeProvider) ?? 'whatsapp';
-                  context.go('/broadcast?channel_id=$channelId&channel_type=$channelType');
+                  _showBroadcastModal(context, channelId, channelType);
                 },
               ),
               const SizedBox(width: 8),
@@ -2576,7 +2608,7 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
                   onTap: () {
                     final chId  = ref.read(selectedChannelIdProvider)   ?? '';
                     final chTyp = ref.read(selectedChannelTypeProvider) ?? 'whatsapp';
-                    context.go('/broadcast?channel_id=$chId&channel_type=$chTyp');
+                    _showBroadcastModal(context, chId, chTyp);
                   },
                   child: Container(
                     padding: const EdgeInsets.symmetric(
