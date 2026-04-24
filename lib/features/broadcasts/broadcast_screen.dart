@@ -13,6 +13,56 @@ import '../../core/theme/app_theme.dart';
 
 enum _BroadcastResultType { success, warning, error }
 
+// ── Variables estándar de texto libre ─────────────────────────────────────────
+
+const _kFreeVars = [
+  (key: '{nombre}',   label: 'nombre'),
+  (key: '{telefono}', label: 'teléfono'),
+  (key: '{flujo}',    label: 'flujo'),
+  (key: '{hora}',     label: 'hora'),
+  (key: '{dia}',      label: 'día'),
+  (key: '{fecha}',    label: 'fecha'),
+  (key: '{tenant}',   label: 'tenant'),
+];
+
+String _resolveFreeText(
+    String text, Map<String, dynamic>? op, String tenantId) {
+  if (text.isEmpty) return text;
+  final now = DateTime.now();
+  const days = [
+    'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'
+  ];
+  String flowName = 'Sin flujo';
+  if (op != null) {
+    final flows = op['flows'];
+    if (flows is List && flows.isNotEmpty) {
+      final first = flows.first;
+      flowName = first is Map
+          ? (first['name']?.toString() ?? 'Sin flujo')
+          : first.toString();
+    }
+  }
+  return text
+      .replaceAll(
+          '{nombre}',
+          op?['display_name']?.toString() ??
+              op?['name']?.toString() ??
+              'Operador')
+      .replaceAll('{telefono}', op?['phone']?.toString() ?? '')
+      .replaceAll('{flujo}', flowName)
+      .replaceAll(
+          '{hora}',
+          '${now.hour.toString().padLeft(2, '0')}:'
+          '${now.minute.toString().padLeft(2, '0')}')
+      .replaceAll('{dia}', days[now.weekday - 1])
+      .replaceAll(
+          '{fecha}',
+          '${now.day.toString().padLeft(2, '0')}/'
+          '${now.month.toString().padLeft(2, '0')}/'
+          '${now.year}')
+      .replaceAll('{tenant}', tenantId);
+}
+
 // ── Providers ─────────────────────────────────────────────────────────────────
 
 final _bcastOperatorsProvider =
@@ -38,7 +88,8 @@ final _bcastTemplatesProvider =
       queryParameters: {'tenant_id': tenantId, 'status': 'APPROVED'},
     );
     final data = res.data;
-    final List raw = data is List ? data : (data['items'] ?? data['templates'] ?? []) as List;
+    final List raw =
+        data is List ? data : (data['items'] ?? data['templates'] ?? []) as List;
     return raw
         .map((e) => Map<String, dynamic>.from(e as Map))
         .where((t) =>
@@ -149,9 +200,12 @@ class _BroadcastScreenState extends ConsumerState<BroadcastScreen> {
   final _msgCtrl = TextEditingController();
   String? _selectedTemplateId;
 
-  // Filtros destinatarios
+  // Filtros de segmento
   final _selectedStatuses = <String>{'active'};
   final _selectedFlows = <String>{};
+
+  // Selección explícita de operadores. {} = todos los filtrados seleccionados.
+  Set<String> _selectedOperatorIds = {};
 
   // Estado envío
   bool _sending = false;
@@ -164,6 +218,13 @@ class _BroadcastScreenState extends ConsumerState<BroadcastScreen> {
   bool _showHistory = false;
 
   @override
+  void initState() {
+    super.initState();
+    // FIX 1: listener para actualizar la vista previa en tiempo real
+    _msgCtrl.addListener(() => setState(() {}));
+  }
+
+  @override
   void dispose() {
     _msgCtrl.dispose();
     super.dispose();
@@ -173,7 +234,8 @@ class _BroadcastScreenState extends ConsumerState<BroadcastScreen> {
       List<Map<String, dynamic>> operators) {
     return operators.where((op) {
       final status = op['status']?.toString() ?? 'active';
-      if (_selectedStatuses.isNotEmpty && !_selectedStatuses.contains(status)) {
+      if (_selectedStatuses.isNotEmpty &&
+          !_selectedStatuses.contains(status)) {
         return false;
       }
       if (_selectedFlows.isNotEmpty) {
@@ -187,14 +249,21 @@ class _BroadcastScreenState extends ConsumerState<BroadcastScreen> {
     }).toList();
   }
 
-  bool get _canSend {
-    if (_useTemplate) return _selectedTemplateId != null;
-    return _msgCtrl.text.trim().isNotEmpty;
+  // FIX 6: ventana cerrada solo si last_inbound_at es válido y >= 24h
+  static bool? _windowOpen(Map<String, dynamic> op) {
+    final last = op['last_inbound_at'] as String?;
+    if (last == null) return null; // indeterminado — operador nuevo
+    final dt = DateTime.tryParse(last);
+    if (dt == null) return null;
+    return DateTime.now().toUtc().difference(dt.toUtc()).inHours < 24;
   }
 
   Future<void> _sendBroadcast(
-      List<Map<String, dynamic>> filtered,
-      List<Map<String, dynamic>> templates) async {
+    List<Map<String, dynamic>> filteredOps,
+    Set<String> effectiveSelectedIds,
+    Set<String> allFilteredIds,
+    List<Map<String, dynamic>> templates,
+  ) async {
     if (_channelId.isEmpty) {
       setState(() {
         _result     = 'No hay canal activo. Regresa y selecciona un canal.';
@@ -217,6 +286,10 @@ class _BroadcastScreenState extends ConsumerState<BroadcastScreen> {
         );
       }
 
+      // FIX 2: usar operator_ids cuando la selección es parcial
+      final isPartialSelection =
+          effectiveSelectedIds.length < allFilteredIds.length;
+
       final body = <String, dynamic>{
         'tenant_id':          tenantId,
         'sent_by_user_id':    userId,
@@ -226,11 +299,16 @@ class _BroadcastScreenState extends ConsumerState<BroadcastScreen> {
         'template_variables': _useTemplate && selectedTemplate != null
             ? _resolveTemplateVariables(selectedTemplate)
             : <String>[],
-        'segment_filters': {
+      };
+
+      if (isPartialSelection) {
+        body['operator_ids'] = effectiveSelectedIds.toList();
+      } else {
+        body['segment_filters'] = {
           'status': _selectedStatuses.toList(),
           'flows':  _selectedFlows.toList(),
-        },
-      };
+        };
+      }
 
       final res = await ApiClient.instance.post(
         '/broadcasts',
@@ -242,9 +320,9 @@ class _BroadcastScreenState extends ConsumerState<BroadcastScreen> {
       final d           = res.data is Map ? res.data as Map : {};
       final sentCount   = (d['sent_count']      ?? d['sent']   ?? 0) as num;
       final failedCount = (d['failed_count']    ?? d['failed'] ?? 0) as num;
-      final total       = (d['recipient_count'] ?? d['total']  ?? filtered.length) as num;
+      final total       = (d['recipient_count'] ?? d['total']  ??
+          effectiveSelectedIds.length) as num;
 
-      // Bug 3: extract per-recipient errors if present
       final errorsRaw = d['errors'];
       final errors = errorsRaw is List
           ? errorsRaw
@@ -253,17 +331,16 @@ class _BroadcastScreenState extends ConsumerState<BroadcastScreen> {
               .toList()
           : <Map<String, dynamic>>[];
 
-      // Bug 1: determine result type and message
       final _BroadcastResultType type;
       final String resultMsg;
       if (sentCount == 0 && failedCount > 0) {
-        type = _BroadcastResultType.error;
+        type      = _BroadcastResultType.error;
         resultMsg = '❌ Envío fallido: $failedCount de $total destinatarios fallaron.';
       } else if (sentCount > 0 && failedCount > 0) {
-        type = _BroadcastResultType.warning;
+        type      = _BroadcastResultType.warning;
         resultMsg = '⚠️ Enviado parcialmente: $sentCount enviados, $failedCount fallaron.';
       } else {
-        type = _BroadcastResultType.success;
+        type      = _BroadcastResultType.success;
         resultMsg = '✅ Enviado a $sentCount operadores.';
       }
 
@@ -304,7 +381,8 @@ class _BroadcastScreenState extends ConsumerState<BroadcastScreen> {
     try {
       final detail = error.toString();
       if (detail.contains('131037') || detail.contains('display name')) {
-        return 'El número aún no tiene el nombre de perfil aprobado por Meta. Por favor espera la aprobación antes de iniciar nuevas conversaciones.';
+        return 'El número aún no tiene el nombre de perfil aprobado por Meta. '
+            'Por favor espera la aprobación antes de iniciar nuevas conversaciones.';
       }
       if (detail.contains('131026') || detail.contains('not in whitelist')) {
         return 'Este número no está registrado como destinatario de prueba.';
@@ -317,12 +395,10 @@ class _BroadcastScreenState extends ConsumerState<BroadcastScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Leer canal activo desde query params (go_router los expone automáticamente)
-    final params = GoRouterState.of(context).uri.queryParameters;
-    _channelId   = params['channel_id']   ?? '';
-    _channelType = params['channel_type'] ?? 'whatsapp';
+    final params    = GoRouterState.of(context).uri.queryParameters;
+    _channelId      = params['channel_id']   ?? '';
+    _channelType    = params['channel_type'] ?? 'whatsapp';
 
-    // Telegram no usa templates
     final isTelegram = _channelType == 'telegram';
     if (isTelegram && _useTemplate) _useTemplate = false;
 
@@ -331,21 +407,49 @@ class _BroadcastScreenState extends ConsumerState<BroadcastScreen> {
     final templatesAsync = ref.watch(_bcastTemplatesProvider(tenantId));
     final credsAsync     = ref.watch(_bcastTenantCredsProvider(tenantId));
 
-    final operators   = operatorsAsync.valueOrNull ?? [];
+    final operators    = operatorsAsync.valueOrNull ?? [];
     final templatesRaw = templatesAsync.valueOrNull ?? [];
-    final activeWabaId = credsAsync.valueOrNull; // null = still loading
+    final activeWabaId = credsAsync.valueOrNull;
 
-    // Bug 2: filter templates by waba_id if templates carry that field
-    final templatesHaveWabaId = templatesRaw.any((t) => t.containsKey('waba_id'));
-    final templates = (templatesHaveWabaId && activeWabaId != null && activeWabaId.isNotEmpty)
-        ? templatesRaw.where((t) => t['waba_id']?.toString() == activeWabaId).toList()
-        : templatesRaw;
+    final templatesHaveWabaId =
+        templatesRaw.any((t) => t.containsKey('waba_id'));
+    final templates =
+        (templatesHaveWabaId && activeWabaId != null && activeWabaId.isNotEmpty)
+            ? templatesRaw
+                .where((t) => t['waba_id']?.toString() == activeWabaId)
+                .toList()
+            : templatesRaw;
     final showWabaWarning = templatesRaw.isNotEmpty && !templatesHaveWabaId;
 
-    final filtered  = _filterOperators(operators);
+    final filtered = _filterOperators(operators);
 
-    // Unique flows across all operators
-    final allFlows = <String>{};
+    // FIX 2: IDs de los filtrados + selección efectiva
+    final filteredIds = filtered
+        .map((op) => op['id']?.toString() ?? '')
+        .where((id) => id.isNotEmpty)
+        .toSet();
+
+    // {} significa "todos seleccionados"; de lo contrario intersección.
+    final effectiveSelectedIds = _selectedOperatorIds.isEmpty
+        ? filteredIds
+        : _selectedOperatorIds.intersection(filteredIds);
+
+    final selectedOperators = filtered
+        .where((op) =>
+            effectiveSelectedIds.contains(op['id']?.toString() ?? ''))
+        .toList();
+
+    // FIX 6: null last_inbound_at = indeterminado (no cuenta como cerrada)
+    // FIX 4: closedWindowCount solo sobre los seleccionados
+    final closedWindowCount = isTelegram
+        ? 0
+        : selectedOperators.where((op) {
+            final open = _windowOpen(op);
+            return open == false; // solo cerradas conocidas
+          }).length;
+
+    // Flujos únicos en todos los operadores
+    final allFlows   = <String>{};
     final flowLabels = <String, String>{};
     for (final op in operators) {
       final f = op['flows'];
@@ -357,60 +461,59 @@ class _BroadcastScreenState extends ConsumerState<BroadcastScreen> {
             final workerName = fl['worker_name'] as String?;
             final name = fl['name'] as String?;
             if (name != null) {
-              flowLabels[key] = workerName != null
-                  ? '$workerName · $name'
-                  : name;
+              flowLabels[key] =
+                  workerName != null ? '$workerName · $name' : name;
             }
           }
         }
       }
     }
 
-    // Operators with closed window (no inbound in 24h) — best effort from data
-    final closedWindowCount = isTelegram
-        ? 0
-        : filtered.where((op) {
-            final last = op['last_inbound_at'] as String?;
-            if (last == null) return true;
-            final dt = DateTime.tryParse(last);
-            if (dt == null) return true;
-            return DateTime.now().toUtc().difference(dt.toUtc()).inHours >= 24;
-          }).length;
+    // FIX 4: bloquear envío si hay cerradas en texto libre + WA
+    final closedWindowBlock =
+        !_useTemplate && !isTelegram && closedWindowCount > 0;
+
+    final canSend = _useTemplate
+        ? _selectedTemplateId != null
+        : !closedWindowBlock && _msgCtrl.text.trim().isNotEmpty;
+
+    // FIX 3: primer operador seleccionado para preview de variables
+    final firstSelectedOp =
+        selectedOperators.isNotEmpty ? selectedOperators.first : null;
 
     return Column(
       children: [
-        // ── Header ──────────────────────────────────────────────────────────
         _BroadcastHeader(onClose: () => context.go('/conversations')),
-
-        // ── Body ────────────────────────────────────────────────────────────
         Expanded(
           child: LayoutBuilder(
             builder: (context, constraints) {
               final wide = constraints.maxWidth > 760;
+
               final formWidget = _FormColumn(
-                useTemplate: _useTemplate,
-                msgCtrl: _msgCtrl,
-                templates: templates,
+                useTemplate:       _useTemplate,
+                msgCtrl:           _msgCtrl,
+                templates:         templates,
                 selectedTemplateId: _selectedTemplateId,
                 closedWindowCount: closedWindowCount,
-                filteredCount: filtered.length,
-                selectedStatuses: _selectedStatuses,
-                selectedFlows: _selectedFlows,
-                allFlows: allFlows,
-                flowLabels: flowLabels,
-                canSend: _canSend,
-                sending: _sending,
-                confirming: _confirming,
-                result: _result,
-                resultType: _resultType,
-                resultErrors: _resultErrors,
-                showWabaWarning: showWabaWarning,
-                channelId: _channelId,
-                channelType: _channelType,
+                closedWindowBlock: closedWindowBlock,
+                selectedCount:     effectiveSelectedIds.length,
+                selectedStatuses:  _selectedStatuses,
+                selectedFlows:     _selectedFlows,
+                allFlows:          allFlows,
+                flowLabels:        flowLabels,
+                canSend:           canSend,
+                sending:           _sending,
+                confirming:        _confirming,
+                result:            _result,
+                resultType:        _resultType,
+                resultErrors:      _resultErrors,
+                showWabaWarning:   showWabaWarning,
+                channelId:         _channelId,
+                channelType:       _channelType,
                 onToggleMode: (v) => setState(() {
-                  _useTemplate = v;
+                  _useTemplate        = v;
                   _selectedTemplateId = null;
-                  _result = null;
+                  _result             = null;
                 }),
                 onSelectTemplate: (id) =>
                     setState(() { _selectedTemplateId = id; _result = null; }),
@@ -430,25 +533,71 @@ class _BroadcastScreenState extends ConsumerState<BroadcastScreen> {
                   }
                   _result = null;
                 }),
-                onSend: (!_canSend || filtered.isEmpty || _sending || !hasPermission(ref, 'broadcasts', 'send'))
+                onInsertVariable: (variable) {
+                  final text   = _msgCtrl.text;
+                  final sel    = _msgCtrl.selection;
+                  final offset = sel.isValid ? sel.baseOffset : text.length;
+                  final newText =
+                      text.substring(0, offset) + variable + text.substring(offset);
+                  _msgCtrl.value = TextEditingValue(
+                    text:      newText,
+                    selection: TextSelection.collapsed(
+                        offset: offset + variable.length),
+                  );
+                },
+                onSend: (!canSend ||
+                        effectiveSelectedIds.isEmpty ||
+                        _sending ||
+                        !hasPermission(ref, 'broadcasts', 'send'))
                     ? null
                     : () => setState(() { _confirming = true; }),
-                onConfirm: () => _sendBroadcast(filtered, templates),
-                onCancelConfirm: () => setState(() => _confirming = false),
+                onConfirm: () => _sendBroadcast(
+                    filtered, effectiveSelectedIds, filteredIds, templates),
+                onCancelConfirm: () =>
+                    setState(() => _confirming = false),
               );
 
-              final selectedTemplate = _useTemplate && _selectedTemplateId != null
-                  ? templates.cast<Map<String, dynamic>?>().firstWhere(
-                      (t) => t!['id']?.toString() == _selectedTemplateId,
-                      orElse: () => null)
-                  : null;
+              final selectedTemplate =
+                  _useTemplate && _selectedTemplateId != null
+                      ? templates
+                          .cast<Map<String, dynamic>?>()
+                          .firstWhere(
+                            (t) =>
+                                t!['id']?.toString() == _selectedTemplateId,
+                            orElse: () => null)
+                      : null;
 
               final previewWidget = _PreviewColumn(
-                useTemplate: _useTemplate,
-                msgCtrl: _msgCtrl,
-                selectedTemplate: selectedTemplate,
-                filtered: filtered,
-                channelType: _channelType,
+                useTemplate:          _useTemplate,
+                msgCtrl:              _msgCtrl,
+                selectedTemplate:     selectedTemplate,
+                filtered:             filtered,
+                effectiveSelectedIds: effectiveSelectedIds,
+                channelType:          _channelType,
+                firstSelectedOp:      firstSelectedOp,
+                tenantId:             tenantId,
+                onToggleOperator: (id) => setState(() {
+                  if (_selectedOperatorIds.isEmpty) {
+                    // Todos estaban seleccionados — deseleccionar este
+                    _selectedOperatorIds = Set.from(filteredIds)..remove(id);
+                  } else if (_selectedOperatorIds.contains(id)) {
+                    _selectedOperatorIds =
+                        Set.from(_selectedOperatorIds)..remove(id);
+                    // Si quedó igual a todos los filtrados, resetear a vacío
+                    if (_selectedOperatorIds.containsAll(filteredIds) &&
+                        filteredIds.containsAll(_selectedOperatorIds)) {
+                      _selectedOperatorIds = {};
+                    }
+                  } else {
+                    _selectedOperatorIds =
+                        Set.from(_selectedOperatorIds)..add(id);
+                    if (_selectedOperatorIds.containsAll(filteredIds) &&
+                        filteredIds.containsAll(_selectedOperatorIds)) {
+                      _selectedOperatorIds = {};
+                    }
+                  }
+                  _result = null;
+                }),
               );
 
               if (wide) {
@@ -470,7 +619,7 @@ class _BroadcastScreenState extends ConsumerState<BroadcastScreen> {
                       const SizedBox(height: 24),
                       _HistorySection(
                         tenantId: tenantId,
-                        show: _showHistory,
+                        show:     _showHistory,
                         onToggle: () =>
                             setState(() => _showHistory = !_showHistory),
                       ),
@@ -489,7 +638,7 @@ class _BroadcastScreenState extends ConsumerState<BroadcastScreen> {
                       const SizedBox(height: 24),
                       _HistorySection(
                         tenantId: tenantId,
-                        show: _showHistory,
+                        show:     _showHistory,
                         onToggle: () =>
                             setState(() => _showHistory = !_showHistory),
                       ),
@@ -602,7 +751,8 @@ class _FormColumn extends StatelessWidget {
     required this.templates,
     required this.selectedTemplateId,
     required this.closedWindowCount,
-    required this.filteredCount,
+    required this.closedWindowBlock,
+    required this.selectedCount,
     required this.selectedStatuses,
     required this.selectedFlows,
     required this.allFlows,
@@ -620,6 +770,7 @@ class _FormColumn extends StatelessWidget {
     required this.onSelectTemplate,
     required this.onToggleStatus,
     required this.onToggleFlow,
+    required this.onInsertVariable,
     required this.onSend,
     required this.onConfirm,
     required this.onCancelConfirm,
@@ -630,7 +781,8 @@ class _FormColumn extends StatelessWidget {
   final List<Map<String, dynamic>> templates;
   final String? selectedTemplateId;
   final int closedWindowCount;
-  final int filteredCount;
+  final bool closedWindowBlock;
+  final int selectedCount;
   final Set<String> selectedStatuses;
   final Set<String> selectedFlows;
   final Set<String> allFlows;
@@ -648,6 +800,7 @@ class _FormColumn extends StatelessWidget {
   final ValueChanged<String?> onSelectTemplate;
   final ValueChanged<String> onToggleStatus;
   final ValueChanged<String> onToggleFlow;
+  final ValueChanged<String> onInsertVariable;
   final VoidCallback? onSend;
   final VoidCallback onConfirm;
   final VoidCallback onCancelConfirm;
@@ -723,26 +876,30 @@ class _FormColumn extends StatelessWidget {
               const SizedBox(height: 14),
 
               if (!isTelegram) ...[
-                // Toggle segmentado (solo WhatsApp)
-                _ModeToggle(
-                  useTemplate: useTemplate,
-                  onChanged: onToggleMode,
-                ),
+                _ModeToggle(useTemplate: useTemplate, onChanged: onToggleMode),
                 const SizedBox(height: 16),
               ],
 
               if (!useTemplate || isTelegram) ...[
-                // Texto libre
                 _BuildTextField(ctrl: msgCtrl),
+                // FIX 3: chips de variables estándar
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: _kFreeVars.map((v) => _VarChip(
+                    label: v.label,
+                    onTap: () => onInsertVariable(v.key),
+                  )).toList(),
+                ),
               ] else ...[
-                // Bug 2: advertencia si las plantillas no tienen waba_id aún
                 if (showWabaWarning) ...[
                   _WarningBanner(
-                    message: '⚠️ Verifica que tus credenciales de Meta estén actualizadas antes de enviar.',
+                    message: '⚠️ Verifica que tus credenciales de Meta '
+                        'estén actualizadas antes de enviar.',
                   ),
                   const SizedBox(height: 10),
                 ],
-                // Selector de plantilla (solo WhatsApp)
                 if (templates.isEmpty)
                   const Text(
                     'No hay plantillas APPROVED disponibles.',
@@ -754,17 +911,25 @@ class _FormColumn extends StatelessWidget {
                   )
                 else
                   _TemplateDropdown(
-                    templates: templates,
+                    templates:  templates,
                     selectedId: selectedTemplateId,
-                    onChanged: onSelectTemplate,
+                    onChanged:  onSelectTemplate,
                   ),
               ],
+
+              // FIX 4: banner ventana cerrada (ambos modos)
               if (closedWindowCount > 0 && !isTelegram) ...[
                 const SizedBox(height: 10),
                 _WarningBanner(
                   message: useTemplate
-                      ? '$closedWindowCount operador${closedWindowCount > 1 ? 'es tienen' : ' tiene'} la ventana de 24h cerrada. El mensaje se enviará como plantilla aprobada.'
-                      : '$closedWindowCount operador${closedWindowCount > 1 ? 'es tienen' : ' tiene'} ventana de 24hrs cerrada y no recibirán este mensaje.',
+                      ? '$closedWindowCount operador'
+                          '${closedWindowCount > 1 ? 'es tienen' : ' tiene'}'
+                          ' la ventana de 24h cerrada. El mensaje se enviará'
+                          ' como plantilla aprobada.'
+                      : '$closedWindowCount operador'
+                          '${closedWindowCount > 1 ? 'es tienen' : ' tiene'}'
+                          ' ventana cerrada. Deselecciónalos o cambia a'
+                          ' Plantilla para poder enviar.',
                 ),
               ],
             ],
@@ -781,7 +946,6 @@ class _FormColumn extends StatelessWidget {
               const _SectionTitle(label: '¿A quién enviar?'),
               const SizedBox(height: 14),
 
-              // Status chips
               const _Label(text: 'Estado del operador'),
               const SizedBox(height: 8),
               Wrap(
@@ -789,22 +953,22 @@ class _FormColumn extends StatelessWidget {
                 runSpacing: 8,
                 children: [
                   _FilterChip(
-                    label: 'Activos',
-                    value: 'active',
+                    label:    'Activos',
+                    value:    'active',
                     selected: selectedStatuses.contains('active'),
-                    onTap: onToggleStatus,
+                    onTap:    onToggleStatus,
                   ),
                   _FilterChip(
-                    label: 'En incidencia',
-                    value: 'incident',
+                    label:    'En incidencia',
+                    value:    'incident',
                     selected: selectedStatuses.contains('incident'),
-                    onTap: onToggleStatus,
+                    onTap:    onToggleStatus,
                   ),
                   _FilterChip(
-                    label: 'Inactivos',
-                    value: 'inactive',
+                    label:    'Inactivos',
+                    value:    'inactive',
                     selected: selectedStatuses.contains('inactive'),
-                    onTap: onToggleStatus,
+                    onTap:    onToggleStatus,
                   ),
                 ],
               ),
@@ -820,19 +984,22 @@ class _FormColumn extends StatelessWidget {
                     final lbl = flowLabels[f] ?? f;
                     final sel = selectedFlows.contains(f);
                     return sel
-                        ? _FlowCard(label: lbl, value: f, onRemove: onToggleFlow)
-                        : _AddFlowChip(label: lbl, value: f, onTap: onToggleFlow);
+                        ? _FlowCard(
+                            label: lbl, value: f, onRemove: onToggleFlow)
+                        : _AddFlowChip(
+                            label: lbl, value: f, onTap: onToggleFlow);
                   }).toList(),
                 ),
               ],
 
               const SizedBox(height: 16),
 
-              // Contador
+              // Contador — muestra seleccionados, no filtrados totales
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
-                  color: filteredCount > 0
+                  color: selectedCount > 0
                       ? const Color(0xFFCCFBF1)
                       : AppColors.ctSurface2,
                   borderRadius: BorderRadius.circular(8),
@@ -843,18 +1010,20 @@ class _FormColumn extends StatelessWidget {
                     Icon(
                       Icons.group_rounded,
                       size: 14,
-                      color: filteredCount > 0
+                      color: selectedCount > 0
                           ? AppColors.ctTeal
                           : AppColors.ctText3,
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      '$filteredCount operador${filteredCount != 1 ? 'es' : ''} seleccionado${filteredCount != 1 ? 's' : ''}',
+                      '$selectedCount operador'
+                      '${selectedCount != 1 ? 'es' : ''} seleccionado'
+                      '${selectedCount != 1 ? 's' : ''}',
                       style: TextStyle(
                         fontFamily: 'Geist',
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: filteredCount > 0
+                        color: selectedCount > 0
                             ? AppColors.ctTeal
                             : AppColors.ctText3,
                       ),
@@ -871,18 +1040,18 @@ class _FormColumn extends StatelessWidget {
         // ── Confirmar / Enviar ─────────────────────────────────────────────
         if (confirming) ...[
           _ConfirmBox(
-            count: filteredCount,
+            count:     selectedCount,
             onConfirm: onConfirm,
-            onCancel: onCancelConfirm,
-            sending: sending,
+            onCancel:  onCancelConfirm,
+            sending:   sending,
           ),
           const SizedBox(height: 12),
         ] else ...[
           _SendButton(
-            enabled: canSend && filteredCount > 0 && !sending,
+            enabled: canSend && selectedCount > 0 && !sending,
             loading: sending,
-            count: filteredCount,
-            onTap: onSend,
+            count:   selectedCount,
+            onTap:   onSend,
           ),
           const SizedBox(height: 12),
         ],
@@ -890,15 +1059,15 @@ class _FormColumn extends StatelessWidget {
         if (result != null)
           _ResultBanner(
             message: result!,
-            type: resultType,
-            errors: resultErrors,
+            type:    resultType,
+            errors:  resultErrors,
           ),
       ],
     );
   }
 }
 
-// ── Columna derecha: preview ──────────────────────────────────────────────────
+// ── Columna derecha: preview + lista destinatarios ────────────────────────────
 
 class _PreviewColumn extends StatelessWidget {
   const _PreviewColumn({
@@ -906,26 +1075,42 @@ class _PreviewColumn extends StatelessWidget {
     required this.msgCtrl,
     required this.selectedTemplate,
     required this.filtered,
+    required this.effectiveSelectedIds,
     required this.channelType,
+    required this.firstSelectedOp,
+    required this.tenantId,
+    required this.onToggleOperator,
   });
 
   final bool useTemplate;
   final TextEditingController msgCtrl;
   final Map<String, dynamic>? selectedTemplate;
   final List<Map<String, dynamic>> filtered;
+  final Set<String> effectiveSelectedIds;
   final String channelType;
+  final Map<String, dynamic>? firstSelectedOp;
+  final String tenantId;
+  final ValueChanged<String> onToggleOperator;
 
   @override
   Widget build(BuildContext context) {
+    // FIX 1: previewText se resuelve con variables del primer destinatario
     String previewText = '';
     if (useTemplate && selectedTemplate != null) {
       previewText = _resolvePreview(selectedTemplate!);
     } else if (!useTemplate) {
-      previewText = msgCtrl.text;
+      // FIX 3: resolver variables estándar
+      previewText = _resolveFreeText(msgCtrl.text, firstSelectedOp, tenantId);
     }
 
-    final visibleOps = filtered.take(5).toList();
-    final remaining  = filtered.length - visibleOps.length;
+    // FIX 1: título dinámico
+    final firstName = firstSelectedOp?['display_name']?.toString() ??
+        firstSelectedOp?['name']?.toString();
+    final previewTitle = firstName != null
+        ? 'Vista previa · $firstName'
+        : 'Vista previa del mensaje';
+
+    final isWa = channelType == 'whatsapp';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -935,7 +1120,7 @@ class _PreviewColumn extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const _SectionTitle(label: 'Vista previa del mensaje'),
+              _SectionTitle(label: previewTitle),
               const SizedBox(height: 12),
               if (previewText.isEmpty)
                 const Text(
@@ -957,9 +1142,9 @@ class _PreviewColumn extends StatelessWidget {
                     decoration: const BoxDecoration(
                       color: Color(0xFFD9FDD3),
                       borderRadius: BorderRadius.only(
-                        topLeft: Radius.circular(12),
-                        topRight: Radius.circular(2),
-                        bottomLeft: Radius.circular(12),
+                        topLeft:     Radius.circular(12),
+                        topRight:    Radius.circular(2),
+                        bottomLeft:  Radius.circular(12),
                         bottomRight: Radius.circular(12),
                       ),
                     ),
@@ -979,7 +1164,7 @@ class _PreviewColumn extends StatelessWidget {
 
         const SizedBox(height: 16),
 
-        // Lista de destinatarios
+        // Lista de destinatarios — TODOS, con checkbox
         _Card(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -990,7 +1175,7 @@ class _PreviewColumn extends StatelessWidget {
                     child: _SectionTitle(label: 'Destinatarios'),
                   ),
                   Text(
-                    '${filtered.length}',
+                    '${effectiveSelectedIds.length}/${filtered.length}',
                     style: const TextStyle(
                       fontFamily: 'Geist',
                       fontSize: 13,
@@ -1010,27 +1195,23 @@ class _PreviewColumn extends StatelessWidget {
                     color: AppColors.ctText2,
                   ),
                 )
-              else ...[
-                ...visibleOps.map((op) {
-                  final name = op['display_name']?.toString() ??
+              else
+                ...filtered.map((op) {
+                  final opId    = op['id']?.toString() ?? '';
+                  final name    = op['display_name']?.toString() ??
                       op['name']?.toString() ?? '—';
-                  final phone = op['phone']?.toString() ?? '';
+                  final phone   = op['phone']?.toString() ?? '';
                   final photoUrl = op['photo_url']?.toString() ??
                       op['avatar_url']?.toString();
-                  // Window chip — WhatsApp only
-                  final isWa = channelType == 'whatsapp';
-                  bool? windowOpen;
-                  if (isWa) {
-                    final last = op['last_inbound_at'] as String?;
-                    if (last == null) {
-                      windowOpen = false;
-                    } else {
-                      final dt = DateTime.tryParse(last);
-                      windowOpen = dt != null &&
-                          DateTime.now().toUtc().difference(dt.toUtc()).inHours < 24;
-                    }
-                  }
-                  return Padding(
+                  final selected = effectiveSelectedIds.contains(opId);
+
+                  // FIX 6: window null = no chip; FIX 5: photo_url/avatar_url
+                  final bool? windowOpen = isWa
+                      ? _BroadcastScreenState._windowOpen(op)
+                      : null;
+                  final isClosed = windowOpen == false;
+
+                  Widget row = Padding(
                     padding: const EdgeInsets.only(bottom: 8),
                     child: Row(
                       children: [
@@ -1061,6 +1242,7 @@ class _PreviewColumn extends StatelessWidget {
                             ],
                           ),
                         ),
+                        // Window chip
                         if (windowOpen != null) ...[
                           const SizedBox(width: 6),
                           Container(
@@ -1085,21 +1267,57 @@ class _PreviewColumn extends StatelessWidget {
                             ),
                           ),
                         ],
+                        const SizedBox(width: 8),
+                        // Checkbox
+                        if (opId.isNotEmpty)
+                          GestureDetector(
+                            onTap: () => onToggleOperator(opId),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 100),
+                              width: 18,
+                              height: 18,
+                              decoration: BoxDecoration(
+                                color: selected
+                                    ? AppColors.ctTeal
+                                    : Colors.transparent,
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(
+                                  color: selected
+                                      ? AppColors.ctTeal
+                                      : AppColors.ctBorder,
+                                  width: 1.5,
+                                ),
+                              ),
+                              child: selected
+                                  ? const Icon(Icons.check_rounded,
+                                      size: 13, color: AppColors.ctNavy)
+                                  : null,
+                            ),
+                          ),
                       ],
                     ),
                   );
+
+                  // FIX 2: opacidad reducida + tooltip para ventana cerrada seleccionada
+                  if (isClosed && selected) {
+                    row = Tooltip(
+                      message: 'Sin ventana de 24h — usa plantilla o deselecciona',
+                      preferBelow: false,
+                      waitDuration: const Duration(milliseconds: 400),
+                      decoration: BoxDecoration(
+                        color: AppColors.ctNavy,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      textStyle: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontFamily: 'Geist'),
+                      child: Opacity(opacity: 0.5, child: row),
+                    );
+                  }
+
+                  return row;
                 }),
-                if (remaining > 0)
-                  Text(
-                    'y $remaining más...',
-                    style: const TextStyle(
-                      fontFamily: 'Geist',
-                      fontSize: 12,
-                      color: AppColors.ctText2,
-                      fontStyle: FontStyle.italic,
-                    ),
-                  ),
-              ],
             ],
           ),
         ),
@@ -1133,7 +1351,6 @@ class _HistorySection extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header colapsable
           InkWell(
             onTap: onToggle,
             borderRadius: BorderRadius.circular(10),
@@ -1164,7 +1381,6 @@ class _HistorySection extends ConsumerWidget {
               ),
             ),
           ),
-
           if (show) ...[
             const Divider(height: 1, color: AppColors.ctBorder),
             Padding(
@@ -1173,7 +1389,8 @@ class _HistorySection extends ConsumerWidget {
                 loading: () => const Center(
                   child: Padding(
                     padding: EdgeInsets.all(16),
-                    child: CircularProgressIndicator(color: AppColors.ctTeal),
+                    child:
+                        CircularProgressIndicator(color: AppColors.ctTeal),
                   ),
                 ),
                 error: (e, _) => Text(
@@ -1219,13 +1436,16 @@ class _HistoryItem extends StatelessWidget {
       dt = DateTime.parse(createdAt).toLocal();
     } catch (_) {}
     final dateStr = dt != null
-        ? '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}'
+        ? '${dt.day.toString().padLeft(2, '0')}/'
+            '${dt.month.toString().padLeft(2, '0')}/'
+            '${dt.year} '
+            '${dt.hour.toString().padLeft(2, '0')}:'
+            '${dt.minute.toString().padLeft(2, '0')}'
         : createdAt;
 
-    final sent   = broadcast['sent']   ?? broadcast['total_sent']   ?? '—';
-    final failed = broadcast['failed'] ?? broadcast['total_failed'] ?? 0;
-    final status = broadcast['status']?.toString() ?? 'sent';
-
+    final sent    = broadcast['sent']   ?? broadcast['total_sent']   ?? '—';
+    final failed  = broadcast['failed'] ?? broadcast['total_failed'] ?? 0;
+    final status  = broadcast['status']?.toString() ?? 'sent';
     final msgText = broadcast['message_text']?.toString() ??
         broadcast['template_id']?.toString() ?? '';
     final preview = msgText.length > 60
@@ -1240,8 +1460,8 @@ class _HistoryItem extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 10),
         decoration: const BoxDecoration(
-          border: Border(
-              bottom: BorderSide(color: AppColors.ctBorder)),
+          border:
+              Border(bottom: BorderSide(color: AppColors.ctBorder)),
         ),
         child: Row(
           children: [
@@ -1300,13 +1520,11 @@ class _BroadcastDetailDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final recipients = broadcast['recipients'];
-    final List<Map<String, dynamic>> recipientList =
-        recipients is List
-            ? recipients
-                .map((e) => Map<String, dynamic>.from(e as Map))
-                .toList()
-            : [];
-
+    final List<Map<String, dynamic>> recipientList = recipients is List
+        ? recipients
+            .map((e) => Map<String, dynamic>.from(e as Map))
+            .toList()
+        : [];
     final msgText = broadcast['message_text']?.toString() ?? '';
 
     return Dialog(
@@ -1321,12 +1539,10 @@ class _BroadcastDetailDialog extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header
             Container(
               padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
               decoration: const BoxDecoration(
-                border: Border(
-                    bottom: BorderSide(color: AppColors.ctBorder)),
+                border: Border(bottom: BorderSide(color: AppColors.ctBorder)),
               ),
               child: Row(
                 children: [
@@ -1351,7 +1567,6 @@ class _BroadcastDetailDialog extends StatelessWidget {
                 ],
               ),
             ),
-            // Content
             Flexible(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(24),
@@ -1399,8 +1614,8 @@ class _BroadcastDetailDialog extends StatelessWidget {
                       ),
                       const SizedBox(height: 8),
                       ...recipientList.map((r) {
-                        final name =
-                            r['name']?.toString() ?? r['phone']?.toString() ?? '—';
+                        final name = r['name']?.toString() ??
+                            r['phone']?.toString() ?? '—';
                         final rStatus = r['status']?.toString() ?? 'sent';
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 8),
@@ -1508,14 +1723,14 @@ class _ModeToggle extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           _ToggleItem(
-            label: 'Texto libre',
+            label:  'Texto libre',
             active: !useTemplate,
-            onTap: () => onChanged(false),
+            onTap:  () => onChanged(false),
           ),
           _ToggleItem(
-            label: 'Plantilla',
+            label:  'Plantilla',
             active: useTemplate,
-            onTap: () => onChanged(true),
+            onTap:  () => onChanged(true),
           ),
         ],
       ),
@@ -1539,7 +1754,8 @@ class _ToggleItem extends StatelessWidget {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 100),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+        padding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
         decoration: BoxDecoration(
           color: active ? AppColors.ctTeal : Colors.transparent,
           borderRadius: BorderRadius.circular(7),
@@ -1571,9 +1787,12 @@ class _BuildTextField extends StatelessWidget {
       style: const TextStyle(
           fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText),
       decoration: InputDecoration(
-        hintText: 'Escribe el mensaje que recibirán todos los operadores...',
+        hintText:
+            'Escribe el mensaje que recibirán todos los operadores...',
         hintStyle: const TextStyle(
-            fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText3),
+            fontFamily: 'Geist',
+            fontSize: 13,
+            color: AppColors.ctText3),
         filled: true,
         fillColor: AppColors.ctSurface2,
         contentPadding:
@@ -1608,10 +1827,9 @@ class _TemplateDropdown extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final validId =
-        templates.any((t) => t['id']?.toString() == selectedId)
-            ? selectedId
-            : null;
+    final validId = templates.any((t) => t['id']?.toString() == selectedId)
+        ? selectedId
+        : null;
     return Container(
       height: 40,
       padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -1628,7 +1846,9 @@ class _TemplateDropdown extends StatelessWidget {
           hint: const Text(
             'Selecciona una plantilla',
             style: TextStyle(
-                fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText3),
+                fontFamily: 'Geist',
+                fontSize: 13,
+                color: AppColors.ctText3),
           ),
           style: const TextStyle(
               fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText),
@@ -1649,7 +1869,8 @@ class _TemplateDropdown extends StatelessWidget {
   }
 }
 
-class _FilterChip extends StatelessWidget {
+// FIX 8: chips de estado con fondo navy cuando seleccionados
+class _FilterChip extends StatefulWidget {
   const _FilterChip({
     required this.label,
     required this.value,
@@ -1662,27 +1883,41 @@ class _FilterChip extends StatelessWidget {
   final ValueChanged<String> onTap;
 
   @override
+  State<_FilterChip> createState() => _FilterChipState();
+}
+
+class _FilterChipState extends State<_FilterChip> {
+  bool _hovered = false;
+
+  @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => onTap(value),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 100),
-        padding:
-            const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: selected ? const Color(0xFFCCFBF1) : AppColors.ctSurface2,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: selected ? AppColors.ctTeal : AppColors.ctBorder,
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit:  (_) => setState(() => _hovered = false),
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: () => widget.onTap(widget.value),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 100),
+          padding:
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: widget.selected
+                ? AppColors.ctNavy
+                : (_hovered ? AppColors.ctSurface2 : Colors.transparent),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: widget.selected ? AppColors.ctNavy : AppColors.ctBorder,
+            ),
           ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontFamily: 'Geist',
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: selected ? AppColors.ctTeal : AppColors.ctText2,
+          child: Text(
+            widget.label,
+            style: TextStyle(
+              fontFamily: 'Geist',
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: widget.selected ? Colors.white : AppColors.ctText2,
+            ),
           ),
         ),
       ),
@@ -1690,6 +1925,7 @@ class _FilterChip extends StatelessWidget {
   }
 }
 
+// FIX 7: botón de envío con altura 52, radius 10, ícono, colores correctos
 class _SendButton extends StatefulWidget {
   const _SendButton({
     required this.enabled,
@@ -1722,33 +1958,48 @@ class _SendButtonState extends State<_SendButton> {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 120),
           width: double.infinity,
-          padding: const EdgeInsets.symmetric(vertical: 12),
+          height: 52,
           decoration: BoxDecoration(
             color: widget.enabled
                 ? (_hovered ? AppColors.ctTealDark : AppColors.ctTeal)
-                : AppColors.ctTeal.withValues(alpha: 0.4),
-            borderRadius: BorderRadius.circular(8),
+                : AppColors.ctSurface2,
+            borderRadius: BorderRadius.circular(10),
           ),
           alignment: Alignment.center,
           child: widget.loading
               ? const SizedBox(
-                  width: 18,
-                  height: 18,
+                  width: 20,
+                  height: 20,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
                     color: AppColors.ctNavy,
                   ),
                 )
-              : Text(
-                  widget.count > 0
-                      ? 'Enviar broadcast a ${widget.count} operadores'
-                      : 'Enviar broadcast',
-                  style: const TextStyle(
-                    fontFamily: 'Geist',
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.ctNavy,
-                  ),
+              : Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.send_rounded,
+                      size: 16,
+                      color: widget.enabled
+                          ? AppColors.ctNavy
+                          : AppColors.ctText3,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      widget.count > 0
+                          ? 'Enviar broadcast a ${widget.count} operadores'
+                          : 'Enviar broadcast',
+                      style: TextStyle(
+                        fontFamily: 'Geist',
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: widget.enabled
+                            ? AppColors.ctNavy
+                            : AppColors.ctText3,
+                      ),
+                    ),
+                  ],
                 ),
         ),
       ),
@@ -1805,8 +2056,8 @@ class _ConfirmBox extends StatelessWidget {
               _OutlineButton(label: 'Cancelar', onTap: onCancel),
               const SizedBox(width: 10),
               _PrimaryButton(
-                label: 'Confirmar envío',
-                onTap: sending ? null : onConfirm,
+                label:   'Confirmar envío',
+                onTap:   sending ? null : onConfirm,
                 loading: sending,
               ),
             ],
@@ -1893,7 +2144,8 @@ class _ResultBanner extends StatelessWidget {
         Expanded(
           child: Text(
             message,
-            style: TextStyle(fontFamily: 'Geist', fontSize: 13, color: textColor),
+            style: TextStyle(
+                fontFamily: 'Geist', fontSize: 13, color: textColor),
           ),
         ),
       ],
@@ -1902,7 +2154,8 @@ class _ResultBanner extends StatelessWidget {
     if (errors.isEmpty) {
       return Container(
         width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        padding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
           color: bgColor,
           borderRadius: BorderRadius.circular(8),
@@ -1912,7 +2165,6 @@ class _ResultBanner extends StatelessWidget {
       );
     }
 
-    // Bug 3: show expandable error list
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
@@ -1923,30 +2175,44 @@ class _ResultBanner extends StatelessWidget {
       child: Theme(
         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
-          tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
-          childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+          tilePadding:
+              const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
+          childrenPadding:
+              const EdgeInsets.fromLTRB(14, 0, 14, 10),
           title: bannerRow,
           iconColor: textColor,
           collapsedIconColor: textColor,
           initiallyExpanded: false,
           subtitle: Text(
             'Ver detalle de errores (${errors.length})',
-            style: TextStyle(fontFamily: 'Geist', fontSize: 11, color: textColor.withValues(alpha: 0.8)),
+            style: TextStyle(
+                fontFamily: 'Geist',
+                fontSize: 11,
+                color: textColor.withValues(alpha: 0.8)),
           ),
           children: errors.map((e) {
-            final phone   = e['phone']?.toString() ?? e['to']?.toString() ?? '—';
-            final errMsg  = e['error']?.toString() ?? e['message']?.toString() ?? e['detail']?.toString() ?? 'Error desconocido';
+            final phone  = e['phone']?.toString() ??
+                e['to']?.toString() ?? '—';
+            final errMsg = e['error']?.toString() ??
+                e['message']?.toString() ??
+                e['detail']?.toString() ??
+                'Error desconocido';
             return Padding(
               padding: const EdgeInsets.only(bottom: 4),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.circle, size: 5, color: textColor.withValues(alpha: 0.6)),
+                  Icon(Icons.circle,
+                      size: 5,
+                      color: textColor.withValues(alpha: 0.6)),
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
                       '$phone — $errMsg',
-                      style: TextStyle(fontFamily: 'Geist', fontSize: 11, color: textColor),
+                      style: TextStyle(
+                          fontFamily: 'Geist',
+                          fontSize: 11,
+                          color: textColor),
                     ),
                   ),
                 ],
@@ -2112,6 +2378,54 @@ class _OutlineButtonState extends State<_OutlineButton> {
   }
 }
 
+// ── Chip de variable (FIX 3) ──────────────────────────────────────────────────
+
+class _VarChip extends StatefulWidget {
+  const _VarChip({required this.label, required this.onTap});
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  State<_VarChip> createState() => _VarChipState();
+}
+
+class _VarChipState extends State<_VarChip> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit:  (_) => setState(() => _hovered = false),
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 100),
+          padding:
+              const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: _hovered
+                ? AppColors.ctTeal.withValues(alpha: 0.15)
+                : AppColors.ctTealLight,
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: AppColors.ctTeal),
+          ),
+          child: Text(
+            '+ {${widget.label}}',
+            style: const TextStyle(
+              fontFamily: 'Geist',
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: AppColors.ctTealDark,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 // ── Avatar circular con foto o inicial ────────────────────────────────────────
 
 class _BcastAvatar extends StatelessWidget {
@@ -2219,7 +2533,7 @@ class _FlowCard extends StatelessWidget {
   }
 }
 
-// ── Chip de flujo no seleccionado (teal dashed add) ──────────────────────────
+// ── Chip de flujo no seleccionado (teal add) ──────────────────────────────────
 
 class _AddFlowChip extends StatefulWidget {
   const _AddFlowChip({
@@ -2248,7 +2562,8 @@ class _AddFlowChipState extends State<_AddFlowChip> {
         onTap: () => widget.onTap(widget.value),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 100),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          padding:
+              const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
             color: _hovered ? const Color(0xFFCCFBF1) : Colors.transparent,
             borderRadius: BorderRadius.circular(8),
