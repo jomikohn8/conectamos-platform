@@ -496,11 +496,12 @@ class _BroadcastScreenState extends ConsumerState<BroadcastScreen> {
       }
     }
 
-    // Advertencia no bloqueante: solo texto libre + WA con ventanas cerradas
-    final closedWindowBlock = false; // no bloquea — solo informativo
+    // Bloqueo: texto libre + WA + al menos un seleccionado con ventana cerrada
+    final closedWindowBlock =
+        !_useTemplate && !isTelegram && closedWindowCount > 0;
     final canSend = _useTemplate
         ? _selectedTemplateId != null
-        : _msgCtrl.text.trim().isNotEmpty;
+        : !closedWindowBlock && _msgCtrl.text.trim().isNotEmpty;
 
     // FIX 3: primer operador seleccionado para preview de variables
     final firstSelectedOp =
@@ -957,7 +958,8 @@ class _FormColumn extends StatelessWidget {
                 _WarningBanner(
                   message: '$closedWindowCount operador'
                       '${closedWindowCount > 1 ? 'es tienen' : ' tiene'}'
-                      ' la ventana cerrada y no recibirán este mensaje.',
+                      ' la ventana cerrada. Deselecciónalos o cambia a'
+                      ' Plantilla para continuar.',
                 ),
               ],
             ],
