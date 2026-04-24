@@ -448,6 +448,32 @@ class _TabPill extends StatelessWidget {
   }
 }
 
+// ── Platform icon helper ───────────────────────────────────────────────────────
+
+Widget _platformIcon(String? channelType) {
+  final color = channelType == 'whatsapp'
+      ? const Color(0xFF25D366)
+      : channelType == 'telegram'
+          ? const Color(0xFF229ED9)
+          : Colors.grey;
+  final label = channelType == 'whatsapp'
+      ? 'W'
+      : channelType == 'telegram'
+          ? 'T'
+          : '?';
+  return Container(
+    width: 16,
+    height: 16,
+    decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+    alignment: Alignment.center,
+    child: Text(
+      label,
+      style: const TextStyle(
+          color: Colors.white, fontSize: 9, fontWeight: FontWeight.w700),
+    ),
+  );
+}
+
 // ── Channel selector bar (Nivel 1) ────────────────────────────────────────────
 
 class _ChannelSelectorBar extends StatelessWidget {
@@ -497,14 +523,7 @@ class _ChannelSelectorBar extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        color: color,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
+                    _platformIcon(ch['channel_type'] as String?),
                     const SizedBox(width: 6),
                     Text(
                       label,
@@ -1044,16 +1063,23 @@ class _ConvoListState extends ConsumerState<_ConvoList> {
                 padding: const EdgeInsets.symmetric(horizontal: 6),
                 itemCount: filtered.length,
                 itemBuilder: (context, i) {
-                  final conv      = filtered[i];
-                  final chatId    = conv['chat_id'] as String? ?? '';
-                  final name      = conv['display_name'] as String? ?? chatId;
-                  final photoUrl  = conv['profile_picture_url'] as String?;
-                  final lastMsg   = conv['last_message'] as Map<String, dynamic>?;
-                  final body      = lastMsg?['body'] as String?;
-                  final mediaType = lastMsg?['media_type'] as String?;
-                  final createdAt = lastMsg?['created_at'] as String?;
-                  final unread = _unreadOverride[chatId]
+                  final conv       = filtered[i];
+                  final chatId     = conv['chat_id'] as String? ?? '';
+                  final name       = conv['display_name'] as String? ?? chatId;
+                  final photoUrl   = conv['profile_picture_url'] as String?;
+                  final lastMsg    = conv['last_message'] as Map<String, dynamic>?;
+                  final body       = lastMsg?['body'] as String?;
+                  final mediaType  = lastMsg?['media_type'] as String?;
+                  final createdAt  = lastMsg?['created_at'] as String?;
+                  final unread     = _unreadOverride[chatId]
                       ?? (conv['unread_count'] as int? ?? 0);
+                  final chType     = ref.read(selectedChannelTypeProvider);
+                  final isWa       = (chType ?? 'whatsapp') == 'whatsapp';
+                  final lastTime   = DateTime.tryParse(createdAt ?? '');
+                  final windowOpen = !isWa ||
+                      (lastTime != null &&
+                          DateTime.now().toUtc().difference(lastTime) <
+                              const Duration(hours: 24));
                   return _ApiConvoItem(
                     name: name,
                     photoUrl: photoUrl,
@@ -1065,6 +1091,7 @@ class _ConvoListState extends ConsumerState<_ConvoList> {
                     isToday: _isToday(createdAt),
                     isSelected: chatId == selectedChatId,
                     unreadCount: unread,
+                    isWindowOpen: windowOpen,
                     onTap: () {
                       final prev = getLastReadSync(chatId);
                       if (prev != null) {
@@ -1118,6 +1145,7 @@ class _ApiConvoItem extends StatefulWidget {
     this.preview,
     this.mediaType,
     this.unreadCount = 0,
+    this.isWindowOpen = true,
   });
   final String name;
   final String? photoUrl;
@@ -1128,6 +1156,7 @@ class _ApiConvoItem extends StatefulWidget {
   final bool isSelected;
   final VoidCallback onTap;
   final int unreadCount;
+  final bool isWindowOpen;
 
   @override
   State<_ApiConvoItem> createState() => _ApiConvoItemState();
@@ -1164,8 +1193,27 @@ class _ApiConvoItemState extends State<_ApiConvoItem> {
           ),
           child: Row(
             children: [
-              // Avatar
-              _OperatorAvatar(name: widget.name, photoUrl: widget.photoUrl, size: 32),
+              // Avatar + status dot
+              Stack(
+                children: [
+                  _OperatorAvatar(name: widget.name, photoUrl: widget.photoUrl, size: 32),
+                  Positioned(
+                    bottom: 0,
+                    right: 0,
+                    child: Container(
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        color: widget.isWindowOpen
+                            ? const Color(0xFF10B981)
+                            : const Color(0xFF9CA3AF),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 1.5),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
               const SizedBox(width: 9),
               // Nombre + preview
               Expanded(
@@ -2040,6 +2088,12 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
         lower.contains('maps.app.goo.gl');
   }
 
+  Color _channelSendColor(String? channelType) {
+    if (channelType == 'whatsapp') return const Color(0xFF25D366);
+    if (channelType == 'telegram') return const Color(0xFF229ED9);
+    return AppColors.ctTeal;
+  }
+
   Future<void> _intervene() async {
     final chatId = ref.read(selectedChatIdProvider);
     if (chatId == null) return;
@@ -2278,6 +2332,8 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
           : (msg['from_name'] as String? ??
               msg['from_phone'] as String? ?? ''),
       isOutbound: isOutbound,
+      origin: msg['origin'] as String?,
+      channelType: ref.read(selectedChannelTypeProvider),
       waStatus: msg['wa_status'] as String?,
       messageType: msg['message_type'] as String?,
       mediaUrl: msg['media_url'] as String?,
@@ -2516,21 +2572,45 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
         // Banner ventana cerrada (solo WhatsApp, supervisor mode activo)
         if (_isSupervisorMode && isWhatsapp && _windowOpen == false)
           Container(
-            padding: const EdgeInsets.symmetric(
-                horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             color: const Color(0xFFFEF3C7),
-            child: const Row(
+            child: Row(
               children: [
-                Icon(Icons.warning_amber_rounded,
-                    size: 16, color: Color(0xFF92400E)),
-                SizedBox(width: 8),
-                Expanded(
+                const Icon(Icons.timer_outlined,
+                    size: 18, color: Color(0xFF92400E)),
+                const SizedBox(width: 10),
+                const Expanded(
                   child: Text(
-                    'Ventana de 24h cerrada. Solo puedes enviar plantillas aprobadas.',
+                    'Ventana de 24h cerrada. Solo puedes enviar mensajes con plantilla aprobada.',
                     style: TextStyle(
                       fontFamily: 'Geist',
-                      fontSize: 11,
+                      fontSize: 12,
                       color: Color(0xFF92400E),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                GestureDetector(
+                  onTap: () {
+                    final chId  = ref.read(selectedChannelIdProvider)   ?? '';
+                    final chTyp = ref.read(selectedChannelTypeProvider) ?? 'whatsapp';
+                    context.go('/broadcast?channel_id=$chId&channel_type=$chTyp');
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF92400E),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Text(
+                      'Usar plantilla →',
+                      style: TextStyle(
+                        fontFamily: 'Geist',
+                        fontSize: 11,
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ),
@@ -2583,21 +2663,23 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
             ),
           ),
 
-        // Input
-        _ChatInput(
-          controller: _msgCtrl,
-          onSend: (_windowOpen == true && _isSupervisorMode) ? _sendMessage : null,
-          onTyping: (_windowOpen == true && _isSupervisorMode) ? _handleTyping : null,
-          sending: _sending,
-          enabled: _windowOpen == true && _isSupervisorMode,
-          hintText: inputHint,
-          onAttach: _handleAttach,
-          onMic: (_windowOpen == true && _isSupervisorMode) ? _startVoiceRecording : null,
-          isRecording: _isRecording,
-          recordingSeconds: _recordingSeconds,
-          onStop: _stopVoiceRecording,
-          onCancel: _cancelVoiceRecording,
-        ),
+        // Input (hidden when WA window is closed and supervisor is active — banner shown instead)
+        if (!(_isSupervisorMode && isWhatsapp && _windowOpen == false))
+          _ChatInput(
+            controller: _msgCtrl,
+            onSend: (_windowOpen == true && _isSupervisorMode) ? _sendMessage : null,
+            onTyping: (_windowOpen == true && _isSupervisorMode) ? _handleTyping : null,
+            sending: _sending,
+            enabled: _windowOpen == true && _isSupervisorMode,
+            hintText: inputHint,
+            onAttach: _handleAttach,
+            onMic: (_windowOpen == true && _isSupervisorMode) ? _startVoiceRecording : null,
+            isRecording: _isRecording,
+            recordingSeconds: _recordingSeconds,
+            onStop: _stopVoiceRecording,
+            onCancel: _cancelVoiceRecording,
+            sendColor: _channelSendColor(channelType),
+          ),
       ],
     );
 
@@ -2795,6 +2877,8 @@ class _ApiMessageBubble extends StatefulWidget {
     required this.time,
     required this.senderName,
     required this.isOutbound,
+    this.origin,
+    this.channelType,
     this.waStatus,
     this.messageType,
     this.mediaUrl,
@@ -2811,6 +2895,8 @@ class _ApiMessageBubble extends StatefulWidget {
   final String time;
   final String senderName;
   final bool isOutbound;
+  final String? origin;
+  final String? channelType;
   final Color? senderNameColor;
   final Widget? senderBadge;
   final String? waStatus;
@@ -3224,13 +3310,13 @@ class _ApiMessageBubbleState extends State<_ApiMessageBubble> {
     );
   }
 
-  Widget _buildTextContent() {
+  Widget _buildTextContent({Color textColor = const Color(0xFF111B21)}) {
     return Text(
       widget.body,
-      style: const TextStyle(
+      style: TextStyle(
           fontFamily: 'Geist',
           fontSize: 13,
-          color: Color(0xFF111B21),
+          color: textColor,
           height: 1.4),
     );
   }
@@ -3260,11 +3346,24 @@ class _ApiMessageBubbleState extends State<_ApiMessageBubble> {
     const timeColor = Color(0xFF667781);
     final isSticker = widget.messageType == 'sticker';
     final isOutbound = widget.isOutbound;
-    final bubbleBg = isSticker
-        ? Colors.transparent
-        : isOutbound
-            ? const Color(0xFFD9FDD3)
-            : Colors.white;
+    final origin = widget.origin;
+    final channelType = widget.channelType ?? 'whatsapp';
+    final isHuman = origin == 'human';
+    final Color bubbleBg;
+    if (isSticker) {
+      bubbleBg = Colors.transparent;
+    } else if (!isOutbound) {
+      bubbleBg = Colors.white;
+    } else if (isHuman) {
+      bubbleBg = AppColors.ctNavy;
+    } else if (channelType == 'telegram') {
+      bubbleBg = const Color(0xFFDBEAFE);
+    } else {
+      bubbleBg = const Color(0xFFDCF8C6);
+    }
+    final Color bubbleTextColor = (isOutbound && isHuman)
+        ? Colors.white
+        : const Color(0xFF111B21);
 
     final bubble = Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -3320,7 +3419,7 @@ class _ApiMessageBubbleState extends State<_ApiMessageBubble> {
           if (widget.messageType == 'location') _buildLocationContent(),
           if (!const ['image', 'video', 'audio', 'document', 'sticker', 'location']
               .contains(widget.messageType))
-            _buildTextContent(),
+            _buildTextContent(textColor: bubbleTextColor),
           const SizedBox(height: 3),
           if (isOutbound)
             Row(
@@ -3584,6 +3683,7 @@ class _ChatInput extends StatefulWidget {
     this.recordingSeconds = 0,
     this.onStop,
     this.onCancel,
+    this.sendColor,
   });
   final TextEditingController controller;
   final Future<void> Function()? onSend;
@@ -3597,6 +3697,7 @@ class _ChatInput extends StatefulWidget {
   final int recordingSeconds;
   final Future<void> Function()? onStop;
   final VoidCallback? onCancel;
+  final Color? sendColor;
 
   @override
   State<_ChatInput> createState() => _ChatInputState();
@@ -3913,8 +4014,8 @@ class _ChatInputState extends State<_ChatInput>
                           decoration: BoxDecoration(
                             color: canSend
                                 ? (_hoverSend
-                                    ? AppColors.ctTealDark
-                                    : AppColors.ctTeal)
+                                    ? (widget.sendColor ?? AppColors.ctTeal).withValues(alpha: 0.8)
+                                    : (widget.sendColor ?? AppColors.ctTeal))
                                 : AppColors.ctSurface2,
                             borderRadius: BorderRadius.circular(8),
                           ),
