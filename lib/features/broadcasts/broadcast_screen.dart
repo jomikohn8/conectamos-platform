@@ -367,7 +367,7 @@ class _BroadcastScreenState extends ConsumerState<BroadcastScreen> {
     }
 
     // Operators with closed window (no inbound in 24h) — best effort from data
-    final closedWindowCount = _useTemplate
+    final closedWindowCount = isTelegram
         ? 0
         : filtered.where((op) {
             final last = op['last_inbound_at'] as String?;
@@ -448,6 +448,7 @@ class _BroadcastScreenState extends ConsumerState<BroadcastScreen> {
                 msgCtrl: _msgCtrl,
                 selectedTemplate: selectedTemplate,
                 filtered: filtered,
+                channelType: _channelType,
               );
 
               if (wide) {
@@ -733,13 +734,6 @@ class _FormColumn extends StatelessWidget {
               if (!useTemplate || isTelegram) ...[
                 // Texto libre
                 _BuildTextField(ctrl: msgCtrl),
-                if (closedWindowCount > 0 && !isTelegram) ...[
-                  const SizedBox(height: 10),
-                  _WarningBanner(
-                    message:
-                        '$closedWindowCount operador${closedWindowCount > 1 ? 'es tienen' : ' tiene'} ventana de 24hrs cerrada y no recibirán este mensaje.',
-                  ),
-                ],
               ] else ...[
                 // Bug 2: advertencia si las plantillas no tienen waba_id aún
                 if (showWabaWarning) ...[
@@ -764,6 +758,14 @@ class _FormColumn extends StatelessWidget {
                     selectedId: selectedTemplateId,
                     onChanged: onSelectTemplate,
                   ),
+              ],
+              if (closedWindowCount > 0 && !isTelegram) ...[
+                const SizedBox(height: 10),
+                _WarningBanner(
+                  message: useTemplate
+                      ? '$closedWindowCount operador${closedWindowCount > 1 ? 'es tienen' : ' tiene'} la ventana de 24h cerrada. El mensaje se enviará como plantilla aprobada.'
+                      : '$closedWindowCount operador${closedWindowCount > 1 ? 'es tienen' : ' tiene'} ventana de 24hrs cerrada y no recibirán este mensaje.',
+                ),
               ],
             ],
           ),
@@ -814,12 +816,13 @@ class _FormColumn extends StatelessWidget {
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
-                  children: allFlows.map((f) => _FilterChip(
-                    label: flowLabels[f] ?? f,
-                    value: f,
-                    selected: selectedFlows.contains(f),
-                    onTap: onToggleFlow,
-                  )).toList(),
+                  children: allFlows.map((f) {
+                    final lbl = flowLabels[f] ?? f;
+                    final sel = selectedFlows.contains(f);
+                    return sel
+                        ? _FlowCard(label: lbl, value: f, onRemove: onToggleFlow)
+                        : _AddFlowChip(label: lbl, value: f, onTap: onToggleFlow);
+                  }).toList(),
                 ),
               ],
 
@@ -903,12 +906,14 @@ class _PreviewColumn extends StatelessWidget {
     required this.msgCtrl,
     required this.selectedTemplate,
     required this.filtered,
+    required this.channelType,
   });
 
   final bool useTemplate;
   final TextEditingController msgCtrl;
   final Map<String, dynamic>? selectedTemplate;
   final List<Map<String, dynamic>> filtered;
+  final String channelType;
 
   @override
   Widget build(BuildContext context) {
@@ -1010,30 +1015,26 @@ class _PreviewColumn extends StatelessWidget {
                   final name = op['display_name']?.toString() ??
                       op['name']?.toString() ?? '—';
                   final phone = op['phone']?.toString() ?? '';
+                  final photoUrl = op['photo_url']?.toString() ??
+                      op['avatar_url']?.toString();
+                  // Window chip — WhatsApp only
+                  final isWa = channelType == 'whatsapp';
+                  bool? windowOpen;
+                  if (isWa) {
+                    final last = op['last_inbound_at'] as String?;
+                    if (last == null) {
+                      windowOpen = false;
+                    } else {
+                      final dt = DateTime.tryParse(last);
+                      windowOpen = dt != null &&
+                          DateTime.now().toUtc().difference(dt.toUtc()).inHours < 24;
+                    }
+                  }
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 8),
                     child: Row(
                       children: [
-                        Container(
-                          width: 32,
-                          height: 32,
-                          decoration: BoxDecoration(
-                            color: AppColors.ctSurface2,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          alignment: Alignment.center,
-                          child: Text(
-                            name.isNotEmpty
-                                ? name[0].toUpperCase()
-                                : '?',
-                            style: const TextStyle(
-                              fontFamily: 'Geist',
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.ctText2,
-                            ),
-                          ),
-                        ),
+                        _BcastAvatar(name: name, photoUrl: photoUrl),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Column(
@@ -1060,6 +1061,30 @@ class _PreviewColumn extends StatelessWidget {
                             ],
                           ),
                         ),
+                        if (windowOpen != null) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: windowOpen
+                                  ? const Color(0xFFD1FAE5)
+                                  : const Color(0xFFFEE2E2),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              windowOpen ? 'Abierta' : 'Cerrada',
+                              style: TextStyle(
+                                fontFamily: 'Geist',
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                color: windowOpen
+                                    ? const Color(0xFF065F46)
+                                    : const Color(0xFF991B1B),
+                              ),
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   );
@@ -2080,6 +2105,171 @@ class _OutlineButtonState extends State<_OutlineButton> {
               fontWeight: FontWeight.w500,
               color: AppColors.ctText2,
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Avatar circular con foto o inicial ────────────────────────────────────────
+
+class _BcastAvatar extends StatelessWidget {
+  const _BcastAvatar({required this.name, this.photoUrl});
+  final String name;
+  final String? photoUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    if (photoUrl != null && photoUrl!.isNotEmpty) {
+      return ClipOval(
+        child: Image.network(
+          photoUrl!,
+          width: 32,
+          height: 32,
+          fit: BoxFit.cover,
+          errorBuilder: (_, e, s) => _initials(),
+        ),
+      );
+    }
+    return _initials();
+  }
+
+  Widget _initials() {
+    return Container(
+      width: 32,
+      height: 32,
+      decoration: BoxDecoration(
+        color: AppColors.ctSurface2,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        name.isNotEmpty ? name[0].toUpperCase() : '?',
+        style: const TextStyle(
+          fontFamily: 'Geist',
+          fontSize: 13,
+          fontWeight: FontWeight.w700,
+          color: AppColors.ctText2,
+        ),
+      ),
+    );
+  }
+}
+
+// ── Chip de flujo seleccionado (card con ×) ───────────────────────────────────
+
+class _FlowCard extends StatelessWidget {
+  const _FlowCard({
+    required this.label,
+    required this.value,
+    required this.onRemove,
+  });
+  final String label;
+  final String value;
+  final ValueChanged<String> onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFFCCFBF1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.ctTeal),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.smart_toy_outlined,
+              size: 13, color: AppColors.ctTealDark),
+          const SizedBox(width: 6),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(
+                  fontFamily: 'Geist',
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.ctTealDark,
+                ),
+              ),
+              const Text(
+                'Worker activo',
+                style: TextStyle(
+                  fontFamily: 'Geist',
+                  fontSize: 10,
+                  color: AppColors.ctTeal,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(width: 6),
+          GestureDetector(
+            onTap: () => onRemove(value),
+            child: const Icon(Icons.close_rounded,
+                size: 14, color: AppColors.ctTealDark),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Chip de flujo no seleccionado (teal dashed add) ──────────────────────────
+
+class _AddFlowChip extends StatefulWidget {
+  const _AddFlowChip({
+    required this.label,
+    required this.value,
+    required this.onTap,
+  });
+  final String label;
+  final String value;
+  final ValueChanged<String> onTap;
+
+  @override
+  State<_AddFlowChip> createState() => _AddFlowChipState();
+}
+
+class _AddFlowChipState extends State<_AddFlowChip> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit:  (_) => setState(() => _hovered = false),
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: () => widget.onTap(widget.value),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 100),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: _hovered ? const Color(0xFFCCFBF1) : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: AppColors.ctTeal, width: 1.5),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.add_rounded,
+                  size: 13, color: AppColors.ctTeal),
+              const SizedBox(width: 4),
+              Text(
+                widget.label,
+                style: const TextStyle(
+                  fontFamily: 'Geist',
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.ctTeal,
+                ),
+              ),
+            ],
           ),
         ),
       ),
