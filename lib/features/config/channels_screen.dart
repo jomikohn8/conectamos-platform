@@ -20,10 +20,6 @@ external void _fbLaunchSignup(JSFunction onCode, JSFunction onCancel);
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const _kColorPalette = [
-  '#2DD4BF', '#818CF8', '#FB923C', '#F472B6', '#34D399', '#60A5FA',
-];
-
 const _kChannelTypeConfig = {
   'whatsapp': (label: 'WhatsApp', bg: Color(0xFFDBEAFE), fg: Color(0xFF1E40AF)),
   'telegram': (label: 'Telegram', bg: Color(0xFFEDE9FE), fg: Color(0xFF6D28D9)),
@@ -474,7 +470,7 @@ class _CreateChannelStepperState extends State<_CreateChannelStepper> {
   late final TextEditingController _tokenCtrl;
   late final TextEditingController _pinCtrl;
   late final TextEditingController _pinConfirmCtrl;
-  String _color             = _kColorPalette.first;
+  String _color             = '#2DD4BF';
   bool   _tokenVisible      = false;
   bool   _pinVisible        = false;
   bool   _pinConfirmVisible = false;
@@ -748,9 +744,9 @@ class _CreateChannelStepperState extends State<_CreateChannelStepper> {
         const SizedBox(height: 24),
         Row(
           children: [
-            Expanded(child: _TypeCard(type: 'whatsapp', selected: _channelType == 'whatsapp', onTap: () => setState(() => _channelType = 'whatsapp'))),
+            Expanded(child: _TypeCard(type: 'whatsapp', selected: _channelType == 'whatsapp', onTap: () => setState(() { _channelType = 'whatsapp'; _color = '#25D366'; }))),
             const SizedBox(width: 12),
-            Expanded(child: _TypeCard(type: 'telegram', selected: _channelType == 'telegram', onTap: () => setState(() => _channelType = 'telegram'))),
+            Expanded(child: _TypeCard(type: 'telegram', selected: _channelType == 'telegram', onTap: () => setState(() { _channelType = 'telegram'; _color = '#229ED9'; }))),
           ],
         ),
         const SizedBox(height: 12),
@@ -928,28 +924,6 @@ class _CreateChannelStepperState extends State<_CreateChannelStepper> {
         ),
         const SizedBox(height: 14),
 
-        _label('Color del canal'),
-        Row(
-          children: _kColorPalette.map((hex) {
-            final selected = _color == hex;
-            final c = _hexColor(hex);
-            return GestureDetector(
-              onTap: () => setState(() => _color = hex),
-              child: MouseRegion(
-                cursor: SystemMouseCursors.click,
-                child: Container(
-                  width: 28, height: 28,
-                  margin: const EdgeInsets.only(right: 10),
-                  decoration: BoxDecoration(
-                    color: c, shape: BoxShape.circle,
-                    border: selected ? Border.all(color: AppColors.ctNavy, width: 2) : null,
-                    boxShadow: selected ? [BoxShadow(color: c.withValues(alpha: 0.4), blurRadius: 6, spreadRadius: 1)] : null,
-                  ),
-                ),
-              ),
-            );
-          }).toList(),
-        ),
       ],
     );
   }
@@ -1012,28 +986,6 @@ class _CreateChannelStepperState extends State<_CreateChannelStepper> {
         ),
         const SizedBox(height: 14),
 
-        _label('Color del canal'),
-        Row(
-          children: _kColorPalette.map((hex) {
-            final selected = _color == hex;
-            final c = _hexColor(hex);
-            return GestureDetector(
-              onTap: () => setState(() => _color = hex),
-              child: MouseRegion(
-                cursor: SystemMouseCursors.click,
-                child: Container(
-                  width: 28, height: 28,
-                  margin: const EdgeInsets.only(right: 10),
-                  decoration: BoxDecoration(
-                    color: c, shape: BoxShape.circle,
-                    border: selected ? Border.all(color: AppColors.ctNavy, width: 2) : null,
-                    boxShadow: selected ? [BoxShadow(color: c.withValues(alpha: 0.4), blurRadius: 6, spreadRadius: 1)] : null,
-                  ),
-                ),
-              ),
-            );
-          }).toList(),
-        ),
       ],
     );
   }
