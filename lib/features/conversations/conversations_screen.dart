@@ -4169,6 +4169,7 @@ class _TabFeedState extends ConsumerState<_TabFeed> {
   String _keyword = '';
   List<Map<String, dynamic>> _feedMessages = [];
   StreamSubscription<List<Map<String, dynamic>>>? _feedSub;
+  Timer? _keywordDebounce;
   bool _loading = true;
 
   @override
@@ -4180,6 +4181,7 @@ class _TabFeedState extends ConsumerState<_TabFeed> {
   @override
   void dispose() {
     _feedSub?.cancel();
+    _keywordDebounce?.cancel();
     super.dispose();
   }
 
@@ -4198,6 +4200,12 @@ class _TabFeedState extends ConsumerState<_TabFeed> {
       setState(() {
         _feedMessages = filtered;
         _loading = false;
+        // BUG 2: limpiar contacto seleccionado si ya no está en el nuevo batch
+        if (_filterContact.isNotEmpty &&
+            !_contactPhoneMap.containsKey(_filterContact)) {
+          _filterContact = '';
+          _filterContactPhone = '';
+        }
       });
     }, onError: (_) {
       if (mounted) setState(() => _loading = false);
@@ -4241,6 +4249,14 @@ class _TabFeedState extends ConsumerState<_TabFeed> {
       if (local.isBefore(_dateRange!.start)) { return false; }
       if (local.isAfter(
           _dateRange!.end.add(const Duration(days: 1)))) { return false; }
+    } else if (_fromTime != null || _toTime != null) {
+      // Sin rango de fecha explícito la UI muestra "Hoy HH:MM–HH:MM":
+      // restringir al día actual antes de evaluar la hora.
+      final now = DateTime.now();
+      final isToday = local.year == now.year &&
+          local.month == now.month &&
+          local.day == now.day;
+      if (!isToday) return false;
     }
     if (_fromTime != null) {
       final fromMinutes = _fromTime!.hour * 60 + _fromTime!.minute;
@@ -4325,8 +4341,11 @@ class _TabFeedState extends ConsumerState<_TabFeed> {
             _resubscribe();
           },
           onKeyword: (v) {
-            setState(() => _keyword = v);
-            _resubscribe();
+            _keywordDebounce?.cancel();
+            _keywordDebounce = Timer(const Duration(milliseconds: 400), () {
+              setState(() => _keyword = v);
+              _resubscribe();
+            });
           },
         ),
         Expanded(
