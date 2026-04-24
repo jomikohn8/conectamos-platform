@@ -657,7 +657,7 @@ String _outboundSenderName(Map<String, dynamic> msg) {
         ),
       );
     case 'human':
-      return (nameColor: const Color(0xFF065F46), badge: null);
+      return (nameColor: const Color(0xFF66E2D0), badge: null);
     case 'external':
       return (
         nameColor: const Color(0xFF6B7280),
@@ -2722,8 +2722,11 @@ class _InterveneButtonState extends State<_InterveneButton> {
   Widget build(BuildContext context) {
     final isActive = widget.isSupervisorMode;
     final borderColor = isActive ? AppColors.ctTeal : const Color(0xFFFB923C);
-    final hoverBg = isActive ? AppColors.ctTealLight : const Color(0xFFFFF7ED);
-    final iconColor = isActive ? AppColors.ctTeal : const Color(0xFFFB923C);
+    final normalBg  = isActive ? AppColors.ctTealLight : const Color(0xFFFFF7ED);
+    final hoverBg   = isActive
+        ? AppColors.ctTeal.withValues(alpha: 0.2)
+        : const Color(0xFFFED7AA);
+    final iconColor = isActive ? AppColors.ctTealDark : const Color(0xFFEA580C);
     final label = isActive ? 'Dejar de intervenir' : 'Intervenir';
     final icon = isActive ? Icons.stop_circle_outlined : Icons.pan_tool_outlined;
 
@@ -2735,23 +2738,23 @@ class _InterveneButtonState extends State<_InterveneButton> {
         onTap: widget.onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 120),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
-            color: _hovered ? hoverBg : (isActive ? AppColors.ctTealLight.withValues(alpha: 0.5) : Colors.transparent),
-            borderRadius: BorderRadius.circular(7),
+            color: _hovered ? hoverBg : normalBg,
+            borderRadius: BorderRadius.circular(8),
             border: Border.all(color: borderColor),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(icon, size: 14, color: iconColor),
-              const SizedBox(width: 5),
+              const SizedBox(width: 6),
               Text(
                 label,
                 style: TextStyle(
                   fontFamily: 'Geist',
                   fontSize: 12,
-                  fontWeight: FontWeight.w500,
+                  fontWeight: FontWeight.w600,
                   color: iconColor,
                 ),
               ),
@@ -2848,7 +2851,10 @@ class _ApiChatHeader extends StatelessWidget {
                 Text(
                   channelName != null
                       ? '$channelName${workerName != null ? ' · $workerName' : ''}'
-                      : 'Sin canal asignado',
+                      // TODO: show operator flow chips here when flows are
+                      // available in the conversation object (currently not
+                      // returned by /conversations — would require extra request).
+                      : 'Sin flujos asignados',
                   style: const TextStyle(
                     fontFamily: 'Geist',
                     fontSize: 11,
@@ -3343,7 +3349,6 @@ class _ApiMessageBubbleState extends State<_ApiMessageBubble> {
 
   @override
   Widget build(BuildContext context) {
-    const timeColor = Color(0xFF667781);
     final isSticker = widget.messageType == 'sticker';
     final isOutbound = widget.isOutbound;
     final origin = widget.origin;
@@ -3364,6 +3369,9 @@ class _ApiMessageBubbleState extends State<_ApiMessageBubble> {
     final Color bubbleTextColor = (isOutbound && isHuman)
         ? Colors.white
         : const Color(0xFF111B21);
+    final Color timeColor = (isOutbound && isHuman)
+        ? Colors.white.withValues(alpha: 0.5)
+        : const Color(0xFF667781);
 
     final bubble = Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -3427,7 +3435,7 @@ class _ApiMessageBubbleState extends State<_ApiMessageBubble> {
               children: [
                 Text(
                   widget.time,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontFamily: 'Geist',
                     fontSize: 10,
                     color: timeColor,
@@ -3440,7 +3448,7 @@ class _ApiMessageBubbleState extends State<_ApiMessageBubble> {
           else
             Text(
               widget.time,
-              style: const TextStyle(
+              style: TextStyle(
                 fontFamily: 'Geist',
                 fontSize: 10,
                 color: timeColor,
