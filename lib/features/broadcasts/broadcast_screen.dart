@@ -1792,8 +1792,11 @@ class _ToggleItem extends StatelessWidget {
         padding:
             const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
         decoration: BoxDecoration(
-          color: active ? AppColors.ctTeal : Colors.transparent,
+          color: active ? AppColors.ctNavy : Colors.transparent,
           borderRadius: BorderRadius.circular(7),
+          border: Border.all(
+            color: active ? AppColors.ctNavy : AppColors.ctBorder,
+          ),
         ),
         child: Text(
           label,
@@ -1801,7 +1804,7 @@ class _ToggleItem extends StatelessWidget {
             fontFamily: 'Geist',
             fontSize: 12,
             fontWeight: FontWeight.w600,
-            color: active ? AppColors.ctNavy : AppColors.ctText2,
+            color: active ? AppColors.ctTeal : AppColors.ctText2,
           ),
         ),
       ),
@@ -1978,13 +1981,9 @@ class _SendButton extends StatefulWidget {
 }
 
 class _SendButtonState extends State<_SendButton> {
-  bool _hovered = false;
-
   @override
   Widget build(BuildContext context) {
     return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit:  (_) => setState(() => _hovered = false),
       cursor: widget.enabled
           ? SystemMouseCursors.click
           : SystemMouseCursors.basic,
@@ -1996,7 +1995,7 @@ class _SendButtonState extends State<_SendButton> {
           height: 52,
           decoration: BoxDecoration(
             color: widget.enabled
-                ? (_hovered ? AppColors.ctTealDark : AppColors.ctTeal)
+                ? AppColors.ctNavy
                 : AppColors.ctSurface2,
             borderRadius: BorderRadius.circular(10),
           ),
@@ -2017,7 +2016,7 @@ class _SendButtonState extends State<_SendButton> {
                       Icons.send_rounded,
                       size: 16,
                       color: widget.enabled
-                          ? AppColors.ctNavy
+                          ? AppColors.ctTeal
                           : AppColors.ctText3,
                     ),
                     const SizedBox(width: 8),
@@ -2030,7 +2029,7 @@ class _SendButtonState extends State<_SendButton> {
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
                         color: widget.enabled
-                            ? AppColors.ctNavy
+                            ? AppColors.ctTeal
                             : AppColors.ctText3,
                       ),
                     ),
