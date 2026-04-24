@@ -63,11 +63,11 @@ class ConversationsScreen extends ConsumerWidget {
 
 // ── Action bar ────────────────────────────────────────────────────────────────
 
-class _ActionBar extends ConsumerWidget {
+class _ActionBar extends StatelessWidget {
   const _ActionBar();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     return Container(
       height: 48,
       width: double.infinity,
@@ -76,56 +76,17 @@ class _ActionBar extends ConsumerWidget {
         border: Border(bottom: BorderSide(color: AppColors.ctBorder)),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 22),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Text(
-                  'Conversaciones',
-                  style: TextStyle(
-                    fontFamily: 'Geist',
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.ctText,
-                  ),
-                ),
-                const SizedBox(height: 1),
-                Text(
-                  () {
-                    final ct = ref.watch(selectedChannelTypeProvider);
-                    if (ct == 'telegram') return 'Canal Telegram · Mensajes en tiempo real';
-                    if (ct == 'whatsapp') return 'Canal WhatsApp · Mensajes en tiempo real';
-                    return 'Mensajes en tiempo real';
-                  }(),
-                  style: const TextStyle(
-                    fontFamily: 'Geist',
-                    fontSize: 11,
-                    color: AppColors.ctText2,
-                  ),
-                ),
-              ],
-            ),
+      child: const Align(
+        alignment: Alignment.centerLeft,
+        child: Text(
+          'Conversaciones',
+          style: TextStyle(
+            fontFamily: 'Geist',
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+            color: AppColors.ctText,
           ),
-          _ActionBarGhostButton(
-            label: '📢  Broadcast a todos',
-            onTap: () {
-              final channelId   = ref.read(selectedChannelIdProvider)   ?? '';
-              final channelType = ref.read(selectedChannelTypeProvider) ?? 'whatsapp';
-              context.go('/broadcast?channel_id=$channelId&channel_type=$channelType');
-            },
-          ),
-          const SizedBox(width: 8),
-          _PrimaryButton(
-            label: '+ Nuevo mensaje',
-            onTap: () => showDialog(
-              context: context,
-              builder: (_) => const _NewMessageDialog(),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -340,10 +301,31 @@ class _ConversationsBodyState extends ConsumerState<_ConversationsBody> {
             },
           ),
 
-        // Nivel 2 — Pill tab bar (Conversaciones / Feed global)
+        // Nivel 2 — Pill tab bar (Conversaciones / Feed global) + action buttons
         Padding(
           padding: const EdgeInsets.fromLTRB(22, 14, 22, 0),
-          child: _TabBar(selectedIndex: tab),
+          child: Row(
+            children: [
+              _TabBar(selectedIndex: tab),
+              const Spacer(),
+              _ActionBarGhostButton(
+                label: '📢  Broadcast a todos',
+                onTap: () {
+                  final channelId   = ref.read(selectedChannelIdProvider)   ?? '';
+                  final channelType = ref.read(selectedChannelTypeProvider) ?? 'whatsapp';
+                  context.go('/broadcast?channel_id=$channelId&channel_type=$channelType');
+                },
+              ),
+              const SizedBox(width: 8),
+              _PrimaryButton(
+                label: '+ Nuevo mensaje',
+                onTap: () => showDialog(
+                  context: context,
+                  builder: (_) => const _NewMessageDialog(),
+                ),
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: 14),
 
