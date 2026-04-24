@@ -137,22 +137,21 @@ class SupabaseMessages {
     String? chatId,
     String? direction,
     String? keyword,
-    String? tenantId,
+    required String tenantId,
     int limit = 200,
   }) {
+    assert(tenantId.isNotEmpty, 'streamFeed: tenantId must not be empty');
+
     final query = Supabase.instance.client
         .from('wa_messages')
         .stream(primaryKey: ['id'])
+        .eq('tenant_id', tenantId)
         .order('received_at', ascending: false)
         .limit(limit);
 
     return query.map((data) {
       var messages = List<Map<String, dynamic>>.from(data);
 
-      if (tenantId != null && tenantId.isNotEmpty) {
-        messages =
-            messages.where((m) => m['tenant_id'] == tenantId).toList();
-      }
       if (chatId != null && chatId.isNotEmpty) {
         messages = messages.where((m) => m['chat_id'] == chatId).toList();
       }

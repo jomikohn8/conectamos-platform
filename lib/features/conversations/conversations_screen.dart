@@ -663,11 +663,11 @@ String _outboundSenderName(Map<String, dynamic> msg) {
   switch (origin) {
     case 'ai_worker':
       return (
-        nameColor: const Color(0xFF1e40af),
+        nameColor: AppColors.ctInfoText,
         badge: _OriginBadge(
           label: 'IA',
-          bg: const Color(0xFFDBEAFE),
-          fg: const Color(0xFF1e40af),
+          bg: AppColors.ctInfoBg,
+          fg: AppColors.ctInfoText,
         ),
       );
     case 'human':
@@ -3450,9 +3450,9 @@ class _ApiMessageBubbleState extends State<_ApiMessageBubble> {
     } else if (isHuman) {
       bubbleBg = AppColors.ctNavy;
     } else if (channelType == 'telegram') {
-      bubbleBg = const Color(0xFFDBEAFE);
+      bubbleBg = AppColors.ctInfoBg;
     } else {
-      bubbleBg = const Color(0xFFDCF8C6);
+      bubbleBg = AppColors.waBubbleAi;
     }
     final Color bubbleTextColor = (isOutbound && isHuman)
         ? Colors.white
@@ -4167,8 +4167,6 @@ class _TabFeedState extends ConsumerState<_TabFeed> {
   String _filterDirection = '';
   String _filterFlow = '';
   String _keyword = '';
-  final Set<String> _selectedIds = {};
-  bool _selectionMode = false;
   List<Map<String, dynamic>> _feedMessages = [];
   StreamSubscription<List<Map<String, dynamic>>>? _feedSub;
   bool _loading = true;
@@ -4192,7 +4190,7 @@ class _TabFeedState extends ConsumerState<_TabFeed> {
     _feedSub = SupabaseMessages.streamFeed(
       direction: _filterDirection.isEmpty ? null : _filterDirection,
       keyword: _keyword.isEmpty ? null : _keyword,
-      tenantId: tenantId.isNotEmpty ? tenantId : null,
+      tenantId: tenantId,
     ).listen((messages) {
       if (!mounted) return;
       // messages arrive descending; filter then reverse to ascending for display
@@ -4295,7 +4293,6 @@ class _TabFeedState extends ConsumerState<_TabFeed> {
           filterFlow: _filterFlow,
           keyword: _keyword,
           contacts: _uniqueContacts,
-          selectedCount: _selectedIds.length,
           onDateRange: (range, from, to) {
             setState(() {
               _dateRange = range;
@@ -4331,51 +4328,14 @@ class _TabFeedState extends ConsumerState<_TabFeed> {
             setState(() => _keyword = v);
             _resubscribe();
           },
-          onReprocesar: _selectedIds.isEmpty
-              ? null
-              : () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        '${_selectedIds.length} mensajes seleccionados para reprocesar',
-                        style: const TextStyle(
-                            fontFamily: 'Geist', fontSize: 13),
-                      ),
-                      duration: const Duration(seconds: 2),
-                      backgroundColor: AppColors.ctNavy,
-                    ),
-                  );
-                },
         ),
         Expanded(
           child: _loading
               ? const Center(child: CircularProgressIndicator())
               : _FeedMessages(
                   messages: _feedMessages,
-                  selectedIds: _selectedIds,
-                  selectionMode: _selectionMode,
-                  onToggleSelect: (id) {
-                    setState(() {
-                      if (_selectedIds.contains(id)) {
-                        _selectedIds.remove(id);
-                        if (_selectedIds.isEmpty) _selectionMode = false;
-                      } else {
-                        _selectedIds.add(id);
-                      }
-                    });
-                  },
-                  onLongPress: (id) {
-                    setState(() {
-                      _selectionMode = true;
-                      _selectedIds.add(id);
-                    });
-                  },
-                  onTapOutside: () {
-                    setState(() {
-                      _selectionMode = false;
-                      _selectedIds.clear();
-                    });
-                  },
+                  channelType:
+                      ref.watch(selectedChannelTypeProvider) ?? 'whatsapp',
                 ),
         ),
       ],
@@ -4395,13 +4355,11 @@ class _FeedFilters extends StatefulWidget {
     required this.filterFlow,
     required this.keyword,
     required this.contacts,
-    required this.selectedCount,
     required this.onDateRange,
     required this.onContact,
     required this.onDirection,
     required this.onFlow,
     required this.onKeyword,
-    required this.onReprocesar,
   });
 
   final DateTimeRange? dateRange;
@@ -4412,13 +4370,11 @@ class _FeedFilters extends StatefulWidget {
   final String filterFlow;
   final String keyword;
   final List<String> contacts;
-  final int selectedCount;
   final void Function(DateTimeRange?, TimeOfDay?, TimeOfDay?) onDateRange;
   final ValueChanged<String> onContact;
   final ValueChanged<String> onDirection;
   final ValueChanged<String> onFlow;
   final ValueChanged<String> onKeyword;
-  final VoidCallback? onReprocesar;
 
   @override
   State<_FeedFilters> createState() => _FeedFiltersState();
@@ -4606,16 +4562,6 @@ class _FeedFiltersState extends State<_FeedFilters> {
               ),
             ),
           ),
-          if (widget.selectedCount > 0) ...[
-            const SizedBox(width: 8),
-            _GhostButton(
-              label:
-                  '${widget.selectedCount} seleccionados · Reprocesar',
-              icon: Icons.refresh_rounded,
-              active: true,
-              onTap: widget.onReprocesar,
-            ),
-          ],
         ],
       ),
     );
@@ -4627,19 +4573,11 @@ class _FeedFiltersState extends State<_FeedFilters> {
 class _FeedMessages extends StatelessWidget {
   const _FeedMessages({
     required this.messages,
-    required this.selectedIds,
-    required this.selectionMode,
-    required this.onToggleSelect,
-    required this.onLongPress,
-    required this.onTapOutside,
+    required this.channelType,
   });
 
   final List<Map<String, dynamic>> messages;
-  final Set<String> selectedIds;
-  final bool selectionMode;
-  final void Function(String id) onToggleSelect;
-  final void Function(String id) onLongPress;
-  final VoidCallback onTapOutside;
+  final String channelType;
 
   static const _avatarColors = [
     Color(0xFFDCFCE7),
@@ -4691,18 +4629,15 @@ class _FeedMessages extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (messages.isEmpty) {
-      return GestureDetector(
-        onTap: onTapOutside,
-        child: Container(
-          color: const Color(0xFFF0F2F5),
-          alignment: Alignment.center,
-          child: const Text(
-            'Sin mensajes',
-            style: TextStyle(
-              fontFamily: 'Geist',
-              fontSize: 13,
-              color: Color(0xFF9CA3AF),
-            ),
+      return Container(
+        color: const Color(0xFFF0F2F5),
+        alignment: Alignment.center,
+        child: const Text(
+          'Sin mensajes',
+          style: TextStyle(
+            fontFamily: 'Geist',
+            fontSize: 13,
+            color: Color(0xFF9CA3AF),
           ),
         ),
       );
@@ -4726,87 +4661,80 @@ class _FeedMessages extends StatelessWidget {
       items.add((isSep: false, label: null, msg: msg));
     }
 
-    return GestureDetector(
-      onTap: onTapOutside,
-      child: Container(
-        color: const Color(0xFFF0F2F5),
-        child: ListView.builder(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          itemCount: items.length,
-          itemBuilder: (context, i) {
-            final item = items[i];
-            if (item.isSep) {
-              return Center(
-                child: Container(
-                  margin:
-                      const EdgeInsets.symmetric(vertical: 8),
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF3F4F6),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    item.label!,
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: Color(0xFF6B7280),
-                      fontFamily: 'Geist',
-                    ),
+    return Container(
+      color: const Color(0xFFF0F2F5),
+      child: ListView.builder(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        itemCount: items.length,
+        itemBuilder: (context, i) {
+          final item = items[i];
+          if (item.isSep) {
+            return Center(
+              child: Container(
+                margin:
+                    const EdgeInsets.symmetric(vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF3F4F6),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  item.label!,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFF6B7280),
+                    fontFamily: 'Geist',
                   ),
                 ),
-              );
-            }
+              ),
+            );
+          }
 
-            final msg = item.msg!;
-            final msgId = msg['id'] as String? ?? '';
-            final isSelected = selectedIds.contains(msgId);
-            final direction = msg['direction'] as String?;
-            final isOutbound = direction == 'outbound';
-            final phone = msg['from_phone'] as String? ??
-                msg['chat_id'] as String? ?? '';
-            final name =
-                msg['from_name'] as String? ?? phone;
-            final chatId = msg['chat_id'] as String? ?? '';
-            final time =
-                _timeLabel(msg['received_at'] as String?);
-            final waStatus = msg['wa_status'] as String?;
-            final body = _msgBody(msg);
-            final messageType =
-                msg['message_type'] as String?;
+          final msg = item.msg!;
+          final msgId = msg['id'] as String? ?? '';
+          final direction = msg['direction'] as String?;
+          final isOutbound = direction == 'outbound';
+          final phone = msg['from_phone'] as String? ??
+              msg['chat_id'] as String? ?? '';
+          final name =
+              msg['from_name'] as String? ?? phone;
+          final chatId = msg['chat_id'] as String? ?? '';
+          final time =
+              _timeLabel(msg['received_at'] as String?);
+          final waStatus = msg['wa_status'] as String?;
+          final body = _msgBody(msg);
+          final messageType = msg['message_type'] as String?;
+          final mediaUrl = msg['media_url'] as String?;
+          final origin = msg['origin'] as String? ?? 'ai_worker';
 
-            if (isOutbound) {
-              return _FeedOutboundBubble(
-                key: ValueKey(msgId),
-                body: body,
-                time: time,
-                toPhone: chatId,
-                senderName: _outboundSenderName(msg),
-                waStatus: waStatus,
-                isSelected: isSelected,
-                selectionMode: selectionMode,
-                onToggleSelect: () => onToggleSelect(msgId),
-                onLongPress: () => onLongPress(msgId),
-                messageType: messageType,
-              );
-            }
-            return _FeedInboundBubble(
+          if (isOutbound) {
+            return _FeedOutboundBubble(
               key: ValueKey(msgId),
               body: body,
               time: time,
-              name: name,
-              phone: phone,
-              chatId: chatId,
-              avatarBg: _avatarBg(phone),
-              avatarTextColor: _avatarFg(phone),
-              isSelected: isSelected,
-              selectionMode: selectionMode,
-              onToggleSelect: () => onToggleSelect(msgId),
-              onLongPress: () => onLongPress(msgId),
+              toPhone: chatId,
+              senderName: _outboundSenderName(msg),
+              waStatus: waStatus,
+              origin: origin,
+              channelType: channelType,
               messageType: messageType,
+              mediaUrl: mediaUrl,
             );
-          },
-        ),
+          }
+          return _FeedInboundBubble(
+            key: ValueKey(msgId),
+            body: body,
+            time: time,
+            name: name,
+            phone: phone,
+            chatId: chatId,
+            avatarBg: _avatarBg(phone),
+            avatarTextColor: _avatarFg(phone),
+            messageType: messageType,
+            mediaUrl: mediaUrl,
+          );
+        },
       ),
     );
   }
@@ -4814,12 +4742,161 @@ class _FeedMessages extends StatelessWidget {
 
 // ── Feed: helper de contenido ────────────────────────────────────────────────
 
-Widget _buildFeedBody(String body, String? messageType, String direction) {
-  final isOutbound = direction == 'outbound';
-  final textColor = isOutbound
-      ? const Color(0xFF0F2937)
-      : const Color(0xFF111827);
+/// Guard para HtmlElementView en el feed — prefijo 'feed-' evita colisiones con chat.
+final Set<String> _feedRegisteredMediaViews = {};
 
+Widget _buildFeedBody(
+  String body,
+  String? messageType,
+  String direction, {
+  String? mediaUrl,
+  Color? textColor,
+}) {
+  final isOutbound = direction == 'outbound';
+  final Color effectiveTextColor =
+      textColor ?? (isOutbound ? AppColors.ctText : AppColors.ctText);
+
+  // ── imagen ──────────────────────────────────────────────────────────────────
+  if (messageType == 'image' || messageType == 'sticker') {
+    final mUrl = mediaUrl?.isNotEmpty == true ? mediaUrl! : null;
+    if (mUrl == null) {
+      return Text('[${messageType == 'sticker' ? 'Sticker' : 'Imagen'}]',
+          style: TextStyle(
+              fontFamily: 'Geist', fontSize: 13, color: effectiveTextColor));
+    }
+    final maxW = messageType == 'sticker' ? 120.0 : 220.0;
+    final maxH = messageType == 'sticker' ? 120.0 : 220.0;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: Image.network(
+        mUrl,
+        width: maxW,
+        height: maxH,
+        fit: BoxFit.cover,
+        errorBuilder: (context, e, s) => Text('[Imagen no disponible]',
+            style: TextStyle(
+                fontFamily: 'Geist',
+                fontSize: 13,
+                color: effectiveTextColor.withValues(alpha: 0.6))),
+      ),
+    );
+  }
+
+  // ── audio ───────────────────────────────────────────────────────────────────
+  if (messageType == 'audio' || messageType == 'voice') {
+    final mUrl = mediaUrl?.isNotEmpty == true ? mediaUrl! : null;
+    if (mUrl == null) {
+      return Text('[Audio]',
+          style: TextStyle(
+              fontFamily: 'Geist', fontSize: 13, color: effectiveTextColor));
+    }
+    final audioViewId = 'feed-audio-${mUrl.hashCode}';
+    if (!_feedRegisteredMediaViews.contains(audioViewId)) {
+      _feedRegisteredMediaViews.add(audioViewId);
+      ui_web.platformViewRegistry.registerViewFactory(audioViewId, (int id) {
+        final audio = html.AudioElement()
+          ..controls = true
+          ..style.width = '220px'
+          ..style.outline = 'none'
+          ..style.display = 'block';
+        audio.append(html.SourceElement()
+          ..src = mUrl
+          ..type = 'audio/ogg');
+        audio.append(html.SourceElement()
+          ..src = mUrl
+          ..type = 'audio/mpeg');
+        return audio;
+      });
+    }
+    return SizedBox(
+      width: 220,
+      height: 54,
+      child: HtmlElementView(viewType: audioViewId),
+    );
+  }
+
+  // ── video ───────────────────────────────────────────────────────────────────
+  if (messageType == 'video') {
+    final mUrl = mediaUrl?.isNotEmpty == true ? mediaUrl! : null;
+    if (mUrl == null) {
+      return Text('[Video]',
+          style: TextStyle(
+              fontFamily: 'Geist', fontSize: 13, color: effectiveTextColor));
+    }
+    final videoViewId = 'feed-video-${mUrl.hashCode}';
+    if (!_feedRegisteredMediaViews.contains(videoViewId)) {
+      _feedRegisteredMediaViews.add(videoViewId);
+      ui_web.platformViewRegistry.registerViewFactory(videoViewId, (int id) {
+        final video = html.VideoElement()
+          ..controls = true
+          ..style.width = '240px'
+          ..style.height = '135px'
+          ..style.borderRadius = '8px'
+          ..style.background = '#000'
+          ..style.outline = 'none'
+          ..style.display = 'block';
+        video.append(html.SourceElement()
+          ..src = mUrl
+          ..type = 'video/mp4');
+        return video;
+      });
+    }
+    final caption =
+        (body.isNotEmpty && !body.startsWith('[')) ? body : null;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          width: 240,
+          height: 135,
+          child: HtmlElementView(viewType: videoViewId),
+        ),
+        if (caption != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(caption,
+                style: TextStyle(
+                    fontFamily: 'Geist',
+                    fontSize: 13,
+                    color: effectiveTextColor,
+                    height: 1.4)),
+          ),
+      ],
+    );
+  }
+
+  // ── document ────────────────────────────────────────────────────────────────
+  if (messageType == 'document') {
+    final mUrl = mediaUrl?.isNotEmpty == true ? mediaUrl! : null;
+    final fileName = body.isNotEmpty && !body.startsWith('[') ? body : 'Documento';
+    return GestureDetector(
+      onTap: mUrl != null ? () => launchUrl(Uri.parse(mUrl)) : null,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.insert_drive_file_rounded,
+              size: 20, color: effectiveTextColor.withValues(alpha: 0.7)),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              fileName,
+              style: TextStyle(
+                  fontFamily: 'Geist',
+                  fontSize: 13,
+                  color: mUrl != null
+                      ? AppColors.ctInfo
+                      : effectiveTextColor,
+                  decoration:
+                      mUrl != null ? TextDecoration.underline : null),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── location ────────────────────────────────────────────────────────────────
   if (messageType == 'location') {
     Map<String, dynamic>? locData;
     try {
@@ -4835,16 +4912,14 @@ Widget _buildFeedBody(String body, String? messageType, String direction) {
         : 'https://maps.google.com/';
 
     return Column(
-      crossAxisAlignment: isOutbound
-          ? CrossAxisAlignment.end
-          : CrossAxisAlignment.start,
+      crossAxisAlignment:
+          isOutbound ? CrossAxisAlignment.end : CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.location_on,
-                color: Colors.red, size: 18),
+            const Icon(Icons.location_on, color: Colors.red, size: 18),
             const SizedBox(width: 6),
             Flexible(
               child: Text(
@@ -4853,7 +4928,7 @@ Widget _buildFeedBody(String body, String? messageType, String direction) {
                     fontFamily: 'Geist',
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: textColor),
+                    color: effectiveTextColor),
               ),
             ),
           ],
@@ -4866,15 +4941,15 @@ Widget _buildFeedBody(String body, String? messageType, String direction) {
               style: TextStyle(
                   fontFamily: 'Geist',
                   fontSize: 11,
-                  color: textColor.withValues(alpha: 0.6)),
+                  color: effectiveTextColor.withValues(alpha: 0.6)),
             ),
           ),
         const SizedBox(height: 6),
         GestureDetector(
           onTap: () => launchUrl(Uri.parse(mapsUrl)),
           child: Container(
-            padding: const EdgeInsets.symmetric(
-                horizontal: 10, vertical: 4),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
               color: const Color(0xFF53BDEB).withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(6),
@@ -4893,11 +4968,12 @@ Widget _buildFeedBody(String body, String? messageType, String direction) {
     );
   }
 
+  // ── texto (fallback) ─────────────────────────────────────────────────────────
   return Text(
     body,
     style: TextStyle(
       fontSize: 13,
-      color: textColor,
+      color: effectiveTextColor,
       fontFamily: 'Geist',
       height: 1.4,
     ),
@@ -4916,11 +4992,8 @@ class _FeedInboundBubble extends StatelessWidget {
     required this.chatId,
     required this.avatarBg,
     required this.avatarTextColor,
-    required this.isSelected,
-    required this.selectionMode,
-    required this.onToggleSelect,
-    required this.onLongPress,
     this.messageType,
+    this.mediaUrl,
   });
 
   final String body;
@@ -4930,117 +5003,88 @@ class _FeedInboundBubble extends StatelessWidget {
   final String chatId;
   final Color avatarBg;
   final Color avatarTextColor;
-  final bool isSelected;
-  final bool selectionMode;
-  final VoidCallback onToggleSelect;
-  final VoidCallback onLongPress;
   final String? messageType;
+  final String? mediaUrl;
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: selectionMode ? onToggleSelect : null,
-      onLongPress: onLongPress,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-            horizontal: 12, vertical: 2),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (selectionMode)
-              Padding(
-                padding:
-                    const EdgeInsets.only(right: 4, top: 4),
-                child: Checkbox(
-                  value: isSelected,
-                  onChanged: (_) => onToggleSelect(),
-                  materialTapTargetSize:
-                      MaterialTapTargetSize.shrinkWrap,
-                  activeColor: AppColors.ctTeal,
-                  checkColor: AppColors.ctNavy,
-                ),
-              ),
-            // Avatar
-            Container(
-              width: 28,
-              height: 28,
-              margin:
-                  const EdgeInsets.only(top: 4, right: 6),
-              decoration: BoxDecoration(
-                color: avatarBg,
-                shape: BoxShape.circle,
-              ),
-              alignment: Alignment.center,
-              child: Text(
-                _initials(name),
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                  color: avatarTextColor,
-                  fontFamily: 'Geist',
-                ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Avatar
+          Container(
+            width: 28,
+            height: 28,
+            margin: const EdgeInsets.only(top: 4, right: 6),
+            decoration: BoxDecoration(
+              color: avatarBg,
+              shape: BoxShape.circle,
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              _initials(name),
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                color: avatarTextColor,
+                fontFamily: 'Geist',
               ),
             ),
-            // Bubble
-            Flexible(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '$name · $chatId',
-                    style: const TextStyle(
-                      fontSize: 10,
-                      color: Color(0xFF9CA3AF),
-                      fontFamily: 'Geist',
-                    ),
+          ),
+          // Bubble
+          Flexible(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '$name · $chatId',
+                  style: const TextStyle(
+                    fontSize: 10,
+                    color: Color(0xFF9CA3AF),
+                    fontFamily: 'Geist',
                   ),
-                  const SizedBox(height: 2),
-                  Container(
-                    constraints:
-                        const BoxConstraints(maxWidth: 440),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 7),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(2),
-                        topRight: Radius.circular(10),
-                        bottomLeft: Radius.circular(10),
-                        bottomRight: Radius.circular(10),
-                      ),
-                      border: Border.all(
-                        color: isSelected
-                            ? AppColors.ctTeal
-                            : const Color(0xFFE5E7EB),
-                        width: isSelected ? 2 : 1,
-                      ),
+                ),
+                const SizedBox(height: 2),
+                Container(
+                  constraints: const BoxConstraints(maxWidth: 440),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 7),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(2),
+                      topRight: Radius.circular(10),
+                      bottomLeft: Radius.circular(10),
+                      bottomRight: Radius.circular(10),
                     ),
-                    child: Column(
-                      crossAxisAlignment:
-                          CrossAxisAlignment.start,
-                      children: [
-                        _buildFeedBody(
-                            body, messageType, 'inbound'),
-                        const SizedBox(height: 2),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: Text(
-                            time,
-                            style: const TextStyle(
-                              fontSize: 10,
-                              color: Color(0xFF9CA3AF),
-                              fontFamily: 'Geist',
-                            ),
+                    border: Border.all(color: const Color(0xFFE5E7EB)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildFeedBody(body, messageType, 'inbound',
+                          mediaUrl: mediaUrl),
+                      const SizedBox(height: 2),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: Text(
+                          time,
+                          style: const TextStyle(
+                            fontSize: 10,
+                            color: Color(0xFF9CA3AF),
+                            fontFamily: 'Geist',
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -5056,11 +5100,10 @@ class _FeedOutboundBubble extends StatelessWidget {
     required this.toPhone,
     required this.senderName,
     required this.waStatus,
-    required this.isSelected,
-    required this.selectionMode,
-    required this.onToggleSelect,
-    required this.onLongPress,
+    required this.origin,
+    required this.channelType,
     this.messageType,
+    this.mediaUrl,
   });
 
   final String body;
@@ -5068,123 +5111,115 @@ class _FeedOutboundBubble extends StatelessWidget {
   final String toPhone;
   final String senderName;
   final String? waStatus;
-  final bool isSelected;
-  final bool selectionMode;
-  final VoidCallback onToggleSelect;
-  final VoidCallback onLongPress;
+  final String origin;
+  final String channelType;
   final String? messageType;
+  final String? mediaUrl;
 
-  Widget _statusIcon() {
+  Widget _statusIcon(Color baseColor) {
     switch (waStatus) {
       case 'read':
-        return const Icon(Icons.done_all,
-            size: 12, color: Color(0xFF0F2937));
+        return Icon(Icons.done_all, size: 12, color: baseColor);
       case 'delivered':
         return Icon(Icons.done_all,
-            size: 12,
-            color: const Color(0xFF0F2937).withValues(alpha: 0.5));
+            size: 12, color: baseColor.withValues(alpha: 0.5));
       case 'sent':
         return Icon(Icons.check,
-            size: 12,
-            color: const Color(0xFF0F2937).withValues(alpha: 0.5));
+            size: 12, color: baseColor.withValues(alpha: 0.5));
       case 'failed':
         return const Icon(Icons.error_outline,
             size: 12, color: Color(0xFF991B1B));
       default:
         return Icon(Icons.check,
-            size: 12,
-            color: const Color(0xFF0F2937).withValues(alpha: 0.5));
+            size: 12, color: baseColor.withValues(alpha: 0.5));
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: selectionMode ? onToggleSelect : null,
-      onLongPress: onLongPress,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-            horizontal: 12, vertical: 2),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.end,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Flexible(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    '$senderName → $toPhone',
-                    style: const TextStyle(
-                      fontSize: 10,
-                      color: Color(0xFF9CA3AF),
-                      fontFamily: 'Geist',
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Container(
-                    constraints:
-                        const BoxConstraints(maxWidth: 440),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 7),
-                    decoration: BoxDecoration(
-                      color: AppColors.ctTeal,
-                      borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(10),
-                        topRight: Radius.circular(2),
-                        bottomLeft: Radius.circular(10),
-                        bottomRight: Radius.circular(10),
+    final Color bubbleBg;
+    final Color bubbleTextColor;
+    if (origin == 'human') {
+      bubbleBg = AppColors.ctNavy;
+      bubbleTextColor = AppColors.ctTeal;
+    } else if (channelType == 'telegram') {
+      bubbleBg = AppColors.ctInfoBg;
+      bubbleTextColor = AppColors.ctText;
+    } else {
+      bubbleBg = AppColors.waBubbleAi;
+      bubbleTextColor = AppColors.ctText;
+    }
+    final originStyle = _outboundOriginStyle({'origin': origin});
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Flexible(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    if (originStyle.badge != null) ...[
+                      originStyle.badge!,
+                      const SizedBox(width: 4),
+                    ],
+                    Text(
+                      '$senderName → $toPhone',
+                      style: const TextStyle(
+                        fontSize: 10,
+                        color: Color(0xFF9CA3AF),
+                        fontFamily: 'Geist',
                       ),
-                      border: isSelected
-                          ? Border.all(
-                              color: AppColors.ctNavy,
-                              width: 2)
-                          : null,
                     ),
-                    child: Column(
-                      crossAxisAlignment:
-                          CrossAxisAlignment.end,
-                      children: [
-                        _buildFeedBody(
-                            body, messageType, 'outbound'),
-                        const SizedBox(height: 2),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              time,
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: const Color(0xFF0F2937)
-                                    .withValues(alpha: 0.7),
-                                fontFamily: 'Geist',
-                              ),
-                            ),
-                            const SizedBox(width: 3),
-                            _statusIcon(),
-                          ],
-                        ),
-                      ],
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Container(
+                  constraints: const BoxConstraints(maxWidth: 440),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 7),
+                  decoration: BoxDecoration(
+                    color: bubbleBg,
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(10),
+                      topRight: Radius.circular(2),
+                      bottomLeft: Radius.circular(10),
+                      bottomRight: Radius.circular(10),
                     ),
                   ),
-                ],
-              ),
-            ),
-            if (selectionMode)
-              Padding(
-                padding:
-                    const EdgeInsets.only(left: 4, top: 4),
-                child: Checkbox(
-                  value: isSelected,
-                  onChanged: (_) => onToggleSelect(),
-                  materialTapTargetSize:
-                      MaterialTapTargetSize.shrinkWrap,
-                  activeColor: AppColors.ctTeal,
-                  checkColor: AppColors.ctNavy,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      _buildFeedBody(body, messageType, 'outbound',
+                          mediaUrl: mediaUrl, textColor: bubbleTextColor),
+                      const SizedBox(height: 2),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            time,
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: bubbleTextColor.withValues(alpha: 0.7),
+                              fontFamily: 'Geist',
+                            ),
+                          ),
+                          const SizedBox(width: 3),
+                          _statusIcon(bubbleTextColor),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-          ],
-        ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -5258,71 +5293,6 @@ class _GhostButtonState extends State<_GhostButton> {
                 ),
               ),
             ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ── Botón Reprocesar (aparece al hover) ───────────────────────────────────────
-
-class _ReprocesarBtn extends StatefulWidget {
-  const _ReprocesarBtn({required this.onTap});
-  final VoidCallback onTap;
-
-  @override
-  State<_ReprocesarBtn> createState() => _ReprocesarBtnState();
-}
-
-class _ReprocesarBtnState extends State<_ReprocesarBtn> {
-  bool _hovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          padding:
-              const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(
-            color: _hovered
-                ? AppColors.ctSurface2
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(
-              color:
-                  _hovered ? AppColors.ctBorder2 : Colors.transparent,
-            ),
-          ),
-          child: AnimatedOpacity(
-            duration: const Duration(milliseconds: 120),
-            opacity: _hovered ? 1.0 : 0.0,
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.refresh_rounded,
-                  size: 12,
-                  color: AppColors.ctText2,
-                ),
-                SizedBox(width: 4),
-                Text(
-                  'Reprocesar',
-                  style: TextStyle(
-                    fontFamily: 'Geist',
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.ctText2,
-                  ),
-                ),
-              ],
-            ),
           ),
         ),
       ),

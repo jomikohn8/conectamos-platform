@@ -39,4 +39,7 @@ abstract final class AppColors {
   static const ctInfo = Color(0xFF3B82F6);
   static const ctInfoBg = Color(0xFFDBEAFE);
   static const ctInfoText = Color(0xFF1E40AF);
+
+  // Mensajería — burbujas
+  static const waBubbleAi = Color(0xFFDCF8C6); // outbound IA WhatsApp
 }
