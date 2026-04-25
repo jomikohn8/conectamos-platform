@@ -9,6 +9,7 @@ import '../../core/api/operators_api.dart';
 import '../../core/api/templates_api.dart';
 import '../../core/providers/tenant_provider.dart';
 import '../../core/theme/colors.dart';
+import 'template_create_dialog.dart';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -943,6 +944,21 @@ class _TemplatesTabState extends State<_TemplatesTab> {
           ),
           child: Row(
             children: [
+              _TealButton(
+                label: '+ Nueva plantilla',
+                onTap: () async {
+                  final created = await showDialog<bool>(
+                    context: context,
+                    barrierDismissible: true,
+                    builder: (_) => TemplateCreateDialog(
+                      channelId: widget.channelId,
+                      tenantId: widget.tenantId,
+                    ),
+                  );
+                  if (created == true) _fetchTemplates();
+                },
+              ),
+              const SizedBox(width: 12),
               Text(
                 '${_templates.length} plantillas',
                 style: const TextStyle(
@@ -1683,6 +1699,50 @@ class _OutlineButtonState extends State<_OutlineButton> {
               fontSize: 13,
               fontWeight: FontWeight.w600,
               color: textColor,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Botón primario teal ────────────────────────────────────────────────────────
+
+class _TealButton extends StatefulWidget {
+  const _TealButton({required this.label, required this.onTap});
+  final String label;
+  final VoidCallback? onTap;
+
+  @override
+  State<_TealButton> createState() => _TealButtonState();
+}
+
+class _TealButtonState extends State<_TealButton> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit:  (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 120),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+          decoration: BoxDecoration(
+            color: _hovered ? AppColors.ctTealDark : AppColors.ctTeal,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            widget.label,
+            style: const TextStyle(
+              fontFamily: 'Geist',
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
             ),
           ),
         ),
