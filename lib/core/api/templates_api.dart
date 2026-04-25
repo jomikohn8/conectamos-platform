@@ -55,6 +55,12 @@ class TemplatesApi {
     required List<Map<String, dynamic>> variables,
     bool isWelcome = false,
     String? channelId,
+    // Optional template components
+    String? headerType,        // 'TEXT' | 'IMAGE' | 'VIDEO' | 'DOCUMENT'
+    String? headerText,        // only when headerType == 'TEXT'
+    String? headerExampleUrl,  // only when headerType is media
+    String? footerText,
+    List<Map<String, dynamic>>? buttons,
   }) async {
     await ApiClient.instance.post(
       '/templates',
@@ -67,6 +73,16 @@ class TemplatesApi {
         'variables':  variables,
         'is_welcome': isWelcome,
         'channel_id': ?channelId,
+        'header_type': ?headerType,
+        if (headerType == 'TEXT' && (headerText?.isNotEmpty ?? false))
+          'header_text': headerText,
+        if (headerType != null && headerType != 'TEXT' &&
+            (headerExampleUrl?.isNotEmpty ?? false))
+          'header_example_url': headerExampleUrl,
+        if (footerText != null && footerText.isNotEmpty)
+          'footer_text': footerText,
+        if (buttons != null && buttons.isNotEmpty)
+          'buttons': buttons,
       },
       options: Options(
         validateStatus: (s) => s != null && s >= 200 && s < 300,

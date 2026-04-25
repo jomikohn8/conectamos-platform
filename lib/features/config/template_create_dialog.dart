@@ -112,14 +112,34 @@ class _TemplateCreateDialogState extends State<TemplateCreateDialog> {
 
     setState(() { _submitting = true; _nameError = null; });
     try {
+      final headerTypeStr = switch (_headerType) {
+        _HeaderType.none  => null,
+        _HeaderType.text  => 'TEXT',
+        _HeaderType.image => 'IMAGE',
+        _HeaderType.video => 'VIDEO',
+        _HeaderType.file  => 'DOCUMENT',
+      };
+      final headerText = _headerType == _HeaderType.text
+          ? _headerTextCtrl.text.trim()
+          : null;
+      final headerUrl = (_headerType != _HeaderType.none &&
+              _headerType != _HeaderType.text)
+          ? _headerUrlCtrl.text.trim()
+          : null;
+      final footerText = _footerCtrl.text.trim();
+
       await TemplatesApi.createTemplate(
-        tenantId:  widget.tenantId,
-        name:      name,
-        category:  _category,
-        language:  _language,
-        bodyText:  _bodyCtrl.text.trim(),
-        variables: _buildVariables(),
-        channelId: widget.channelId,
+        tenantId:         widget.tenantId,
+        name:             name,
+        category:         _category,
+        language:         _language,
+        bodyText:         _bodyCtrl.text.trim(),
+        variables:        _buildVariables(),
+        channelId:        widget.channelId,
+        headerType:       headerTypeStr,
+        headerText:       headerText,
+        headerExampleUrl: headerUrl,
+        footerText:       footerText.isEmpty ? null : footerText,
       );
       if (mounted) Navigator.of(context).pop(true);
     } catch (e) {
