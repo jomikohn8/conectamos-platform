@@ -1527,6 +1527,17 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
       debugPrint('[markRead] SKIP — tenantId empty');
       return;
     }
+    // Early return: si no hay inbounds con wamid no procesados, nada que hacer.
+    // Evita iterar la lista completa en emits causados por UPDATEs de wa_status.
+    final pendingIds = messages
+        .where((m) =>
+            (m['direction'] as String?) == 'inbound' &&
+            (m['wa_message_id'] as String?)?.startsWith('wamid.') == true &&
+            !_processedReadIds.contains(m['wa_message_id'] as String))
+        .map((m) => m['wa_message_id'] as String)
+        .toSet();
+    if (pendingIds.isEmpty) return;
+
     // Fase 1: recolectar IDs pendientes (dedup + validación),
     // añadiendo a _processedReadIds antes del async para evitar
     // que un segundo emit encole los mismos IDs mientras este procesa.
@@ -4289,15 +4300,6 @@ class _TabFeedState extends ConsumerState<_TabFeed> {
       toDate = DateTime(now.year, now.month, now.day,
           _toTime?.hour ?? 23, _toTime?.minute ?? 59, 59);
     }
-
-    debugPrint('[FEED DATE FILTER] '
-      'dateRange: $_dateRange, '
-      'fromTime: $_fromTime, '
-      'toTime: $_toTime, '
-      'fromDate: $fromDate, '
-      'toDate: $toDate, '
-      'fromDateUtc: ${fromDate?.toUtc()}, '
-      'toDateUtc: ${toDate?.toUtc()}');
 
     _feedSub = SupabaseMessages.streamFeed(
       direction: _filterDirection.isEmpty ? null : _filterDirection,

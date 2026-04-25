@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class SupabaseMessages {
@@ -217,13 +216,6 @@ class SupabaseMessages {
     if (toDate != null) {
       query = query.lte('received_at', toDate.toUtc().toIso8601String());
     }
-
-    debugPrint('[FEED STATIC QUERY] '
-      'fromDate: $fromDate, '
-      'toDate: $toDate, '
-      'fromDateUtc: ${fromDate?.toUtc().toIso8601String()}, '
-      'toDateUtc: ${toDate?.toUtc().toIso8601String()}, '
-      'tenantId: $tenantId');
 
     var messages = List<Map<String, dynamic>>.from(
       await query.order('received_at', ascending: false).limit(limit),
