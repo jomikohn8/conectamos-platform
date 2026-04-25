@@ -4290,6 +4290,15 @@ class _TabFeedState extends ConsumerState<_TabFeed> {
           _toTime?.hour ?? 23, _toTime?.minute ?? 59, 59);
     }
 
+    debugPrint('[FEED DATE FILTER] '
+      'dateRange: $_dateRange, '
+      'fromTime: $_fromTime, '
+      'toTime: $_toTime, '
+      'fromDate: $fromDate, '
+      'toDate: $toDate, '
+      'fromDateUtc: ${fromDate?.toUtc()}, '
+      'toDateUtc: ${toDate?.toUtc()}');
+
     _feedSub = SupabaseMessages.streamFeed(
       direction: _filterDirection.isEmpty ? null : _filterDirection,
       keyword: _keyword.isEmpty ? null : _keyword,
