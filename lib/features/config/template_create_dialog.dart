@@ -31,11 +31,14 @@ class _TemplateCreateDialogState extends State<TemplateCreateDialog> {
   final _footerCtrl      = TextEditingController();
   final _bodyFocus       = FocusNode();
 
+  final Map<int, TextEditingController> _varExampleCtrls = {};
+
   String      _category   = 'MARKETING';
   String      _language   = 'es';
   _HeaderType _headerType = _HeaderType.none;
   bool        _submitting = false;
   String?     _nameError;
+  String?     _varError;
   int         _varCount   = 0;
 
   static const _categories = [
@@ -62,7 +65,30 @@ class _TemplateCreateDialogState extends State<TemplateCreateDialog> {
     _footerCtrl.addListener(_refresh);
   }
 
-  void _refresh() => setState(() {});
+  void _refresh() {
+    _syncVarControllers();
+    setState(() {});
+  }
+
+  void _syncVarControllers() {
+    final re = RegExp(r'\{\{(\d+)\}\}');
+    final detected = re
+        .allMatches(_bodyCtrl.text)
+        .map((m) => int.parse(m.group(1)!))
+        .toSet();
+
+    // Add controllers for newly detected variables
+    for (final n in detected) {
+      _varExampleCtrls.putIfAbsent(n, () => TextEditingController());
+    }
+
+    // Dispose and remove controllers for variables no longer in body
+    final toRemove =
+        _varExampleCtrls.keys.where((k) => !detected.contains(k)).toList();
+    for (final k in toRemove) {
+      _varExampleCtrls.remove(k)!.dispose();
+    }
+  }
 
   @override
   void dispose() {
@@ -72,6 +98,9 @@ class _TemplateCreateDialogState extends State<TemplateCreateDialog> {
     _bodyCtrl.dispose();
     _footerCtrl.dispose();
     _bodyFocus.dispose();
+    for (final c in _varExampleCtrls.values) {
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -93,13 +122,85 @@ class _TemplateCreateDialogState extends State<TemplateCreateDialog> {
 
   List<Map<String, dynamic>> _buildVariables() {
     final re = RegExp(r'\{\{(\d+)\}\}');
-    return re
-        .allMatches(_bodyCtrl.text)
-        .map((m) => {'index': int.parse(m.group(1)!), 'example': ''})
-        .toList();
+    final seen = <int>{};
+    final result = <Map<String, dynamic>>[];
+    for (final m in re.allMatches(_bodyCtrl.text)) {
+      final n = int.parse(m.group(1)!);
+      if (seen.add(n)) {
+        result.add({
+          'index': n,
+          'example': _varExampleCtrls[n]?.text.trim().isNotEmpty == true
+              ? _varExampleCtrls[n]!.text.trim()
+              : 'Ejemplo $n',
+        });
+      }
+    }
+    return result;
   }
 
   bool _nameValid(String v) => _nameRe.hasMatch(v);
+
+  static const _varHints = {
+    1: 'Ej: Juan García',
+    2: 'Ej: TMR-Prixz',
+  };
+
+  Widget _buildVarExamples() {
+    if (_varExampleCtrls.isEmpty) return const SizedBox.shrink();
+
+    final indices = _varExampleCtrls.keys.toList()..sort();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 16),
+        _sectionLabel('Ejemplos de variables *'),
+        if (_varError != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            _varError!,
+            style: const TextStyle(
+              fontFamily: 'Geist',
+              fontSize: 11,
+              color: AppColors.ctDanger,
+            ),
+          ),
+        ],
+        const SizedBox(height: 8),
+        for (final n in indices) ...[
+          Text(
+            'Ejemplo para {{$n}}',
+            style: const TextStyle(
+              fontFamily: 'Geist',
+              fontSize: 12,
+              color: AppColors.ctText2,
+            ),
+          ),
+          const SizedBox(height: 4),
+          TextField(
+            controller: _varExampleCtrls[n],
+            decoration: InputDecoration(
+              hintText: _varHints[n] ?? 'Ej: Valor $n',
+              hintStyle: const TextStyle(
+                  fontFamily: 'Geist',
+                  fontSize: 13,
+                  color: AppColors.ctText3),
+              border:
+                  OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              isDense: true,
+            ),
+            style: const TextStyle(fontFamily: 'Geist', fontSize: 13),
+            onChanged: (_) {
+              if (_varError != null) setState(() => _varError = null);
+            },
+          ),
+          const SizedBox(height: 10),
+        ],
+      ],
+    );
+  }
 
   Future<void> _submit() async {
     final name = _nameCtrl.text.trim();
@@ -110,7 +211,20 @@ class _TemplateCreateDialogState extends State<TemplateCreateDialog> {
     }
     if (_bodyCtrl.text.trim().isEmpty) return;
 
-    setState(() { _submitting = true; _nameError = null; });
+    // Validate var examples before submitting
+    if (_varExampleCtrls.isNotEmpty) {
+      final missing = _varExampleCtrls.entries
+          .where((e) => e.value.text.trim().isEmpty)
+          .map((e) => '{{${e.key}}}')
+          .toList();
+      if (missing.isNotEmpty) {
+        setState(() =>
+            _varError = 'Completa los ejemplos de todas las variables.');
+        return;
+      }
+    }
+
+    setState(() { _submitting = true; _nameError = null; _varError = null; });
     try {
       final headerTypeStr = switch (_headerType) {
         _HeaderType.none  => null,
@@ -128,16 +242,6 @@ class _TemplateCreateDialogState extends State<TemplateCreateDialog> {
           : null;
       final footerText = _footerCtrl.text.trim();
 
-      debugPrint('=== TEMPLATE PAYLOAD ===');
-      debugPrint('name: $name');
-      debugPrint('category: $_category');
-      debugPrint('language: $_language');
-      debugPrint('headerType: $headerTypeStr');
-      debugPrint('headerText: $headerText');
-      debugPrint('headerUrl: $headerUrl');
-      debugPrint('bodyText: ${_bodyCtrl.text.trim()}');
-      debugPrint('footer: ${_footerCtrl.text.trim()}');
-      debugPrint('buttons: null');
       await TemplatesApi.createTemplate(
         tenantId:         widget.tenantId,
         name:             name,
@@ -429,6 +533,8 @@ class _TemplateCreateDialogState extends State<TemplateCreateDialog> {
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
           ),
+          // 4b ── Ejemplos de variables (condicional)
+          _buildVarExamples(),
           const SizedBox(height: 16),
 
           // 5 ── Pie de página (opcional)
