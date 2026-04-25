@@ -2450,8 +2450,7 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
         final cid = ref.read(selectedChatIdProvider);
         // Re-subscribe only if we have no active subscription yet (or the
         // existing one was created without tenant filtering).
-        if (cid != null && (cid != _subscribedChatId || _apiMessages.isEmpty)) {
-          debugPrint('[ChatPanel] tenant loaded ($next), re-subscribing for chat $cid');
+        if (cid != null && cid != _subscribedChatId) {
           _subscribeToMessages(cid);
         }
       }
