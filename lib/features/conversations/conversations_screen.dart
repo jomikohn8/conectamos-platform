@@ -1527,60 +1527,35 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
       debugPrint('[markRead] SKIP — tenantId empty');
       return;
     }
-    // Early return: si no hay inbounds con wamid no procesados, nada que hacer.
-    // Evita iterar la lista completa en emits causados por UPDATEs de wa_status.
-    final pendingIds = messages
-        .where((m) =>
-            (m['direction'] as String?) == 'inbound' &&
-            (m['wa_message_id'] as String?)?.startsWith('wamid.') == true &&
-            !_processedReadIds.contains(m['wa_message_id'] as String))
-        .map((m) => m['wa_message_id'] as String)
-        .toSet();
-    if (pendingIds.isEmpty) return;
-
-    // Fase 1: recolectar IDs pendientes (dedup + validación),
-    // añadiendo a _processedReadIds antes del async para evitar
-    // que un segundo emit encole los mismos IDs mientras este procesa.
-    final pending = <({String waId, String channelId})>[];
+    // Find the last inbound message that is valid and not yet processed.
+    // WhatsApp marks all prior messages as read when the latest one is marked.
+    // messages is ordered ascending by received_at from the stream.
+    ({String waId, String channelId})? last;
     for (final msg in messages) {
       if ((msg['direction'] as String?) == 'outbound') continue;
 
       // Only process messages that belong to the active tenant.
-      // The stream subscription may lack a tenant filter if tenantId was
-      // empty at subscription time, so messages from other tenants can
-      // arrive here — calling markRead for them causes 400s from Meta.
       final msgTenantId = msg['tenant_id'] as String?;
-      if (msgTenantId != tenantId) {
-        debugPrint('[markRead] SKIP tenant mismatch — msgTenant=$msgTenantId activeTenant=$tenantId');
-        continue;
-      }
+      if (msgTenantId != tenantId) continue;
 
       final waId = msg['wa_message_id'] as String?;
       if (waId == null || waId.isEmpty || waId == 'null') continue;
-      // Validate it is a real Meta wamid (format: wamid.XXXXX)
-      if (!waId.startsWith('wamid.')) {
-        debugPrint('[markRead] SKIP invalid waId format: "$waId"');
-        continue;
-      }
+      if (!waId.startsWith('wamid.')) continue;
       if (_processedReadIds.contains(waId)) continue;
 
       final channelId = msg['channel_id'] as String? ?? '';
-      if (channelId.isEmpty) {
-        debugPrint('[markRead] SKIP — no channel_id for $waId');
-        continue;
-      }
+      if (channelId.isEmpty) continue;
 
-      _processedReadIds.add(waId);
-      pending.add((waId: waId, channelId: channelId));
+      last = (waId: waId, channelId: channelId);
     }
-    // Fase 2: procesar en serie con 50ms entre requests para
-    // evitar la ráfaga de N POSTs simultáneos en el primer emit.
-    for (final item in pending) {
-      if (!mounted) return;
-      debugPrint('[markRead] CALLING — tenantId=$tenantId waId=${item.waId} channelId=${item.channelId}');
-      await MessagesApi.markRead(item.waId, tenantId: tenantId, channelId: item.channelId);
-      if (item.waId != pending.last.waId) await Future.delayed(const Duration(milliseconds: 50));
-    }
+
+    if (last == null) return;
+
+    // Mark the single most-recent unread inbound; add before the await to
+    // block any concurrent emit from enqueuing the same wamid.
+    _processedReadIds.add(last.waId);
+    if (!mounted) return;
+    await MessagesApi.markRead(last.waId, tenantId: tenantId, channelId: last.channelId);
   }
 
   void _handleTyping() {
