@@ -4281,6 +4281,7 @@ class _TabFeedState extends ConsumerState<_TabFeed> {
     _feedSub?.cancel();
     setState(() => _loading = true);
     final tenantId = ref.read(activeTenantIdProvider);
+    if (tenantId.isEmpty) return;
 
     DateTime? fromDate;
     DateTime? toDate;
