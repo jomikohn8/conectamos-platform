@@ -128,6 +128,16 @@ class _TemplateCreateDialogState extends State<TemplateCreateDialog> {
           : null;
       final footerText = _footerCtrl.text.trim();
 
+      debugPrint('=== TEMPLATE PAYLOAD ===');
+      debugPrint('name: $name');
+      debugPrint('category: $_category');
+      debugPrint('language: $_language');
+      debugPrint('headerType: $headerTypeStr');
+      debugPrint('headerText: $headerText');
+      debugPrint('headerUrl: $headerUrl');
+      debugPrint('bodyText: ${_bodyCtrl.text.trim()}');
+      debugPrint('footer: ${_footerCtrl.text.trim()}');
+      debugPrint('buttons: null');
       await TemplatesApi.createTemplate(
         tenantId:         widget.tenantId,
         name:             name,
