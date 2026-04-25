@@ -12,6 +12,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:sticky_headers/sticky_headers.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -1391,10 +1392,6 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
   bool _atBottom = true;       // true mientras el usuario esté cerca del fondo
   bool _hasNewMessage = false; // badge "↓ Nuevo mensaje" visible
 
-  // Sticky date header for the chat
-  String? _chatStickyLabel;
-  List<({bool isSep, String? label, Map<String, dynamic>? msg})> _chatItems = [];
-  Map<int, GlobalKey> _chatSepKeys = {};
 
   @override
   void initState() {
@@ -1410,26 +1407,6 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
     final nearBottom = pos.maxScrollExtent - pos.pixels <= 100;
     if (nearBottom != _atBottom) setState(() => _atBottom = nearBottom);
     if (nearBottom && _hasNewMessage) setState(() => _hasNewMessage = false);
-    _updateChatStickyLabel();
-  }
-
-  void _updateChatStickyLabel() {
-    if (!_scrollCtrl.hasClients || _chatItems.isEmpty) return;
-    final sorted = _chatSepKeys.entries.toList()
-      ..sort((a, b) => b.key.compareTo(a.key));
-    String? label;
-    for (final entry in sorted) {
-      final ctx = entry.value.currentContext;
-      if (ctx == null) continue;
-      final box = ctx.findRenderObject() as RenderBox?;
-      if (box == null || !box.hasSize) continue;
-      final dy = box.localToGlobal(Offset.zero).dy;
-      if (dy <= 120) {
-        label = _chatItems[entry.key].label;
-        break;
-      }
-    }
-    if (label != _chatStickyLabel) setState(() => _chatStickyLabel = label);
   }
 
   String _chatFormatDate(DateTime dt) {
@@ -2585,115 +2562,90 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
             child: ColoredBox(
               color: const Color(0xFFEBEBE9),
               child: Builder(builder: (context) {
-                // Build chat items with date separators.
-                // Store in _chatItems/_chatSepKeys so _updateChatStickyLabel can access them.
-                final newItems =
-                    <({bool isSep, String? label, Map<String, dynamic>? msg})>[];
-                final newSepKeys = <int, GlobalKey>{};
-                DateTime? lastDate;
+                // Group messages by day for StickyHeader.
+                final groups =
+                    <({String label, List<Map<String, dynamic>> msgs})>[];
+                DateTime? lastDay;
                 for (final msg in visibleMessages) {
                   final iso = msg['received_at'] as String?;
-                  if (iso != null) {
-                    final dt = DateTime.tryParse(iso)?.toLocal();
-                    if (dt != null) {
-                      final day = DateTime(dt.year, dt.month, dt.day);
-                      if (lastDate == null || day != lastDate) {
-                        newSepKeys[newItems.length] = GlobalKey();
-                        newItems.add(
-                            (isSep: true,
-                             label: _chatFormatDate(dt),
-                             msg: null));
-                        lastDate = day;
-                      }
+                  DateTime? dt;
+                  if (iso != null) dt = DateTime.tryParse(iso)?.toLocal();
+                  if (dt != null) {
+                    final day = DateTime(dt.year, dt.month, dt.day);
+                    if (lastDay == null || day != lastDay) {
+                      groups.add((label: _chatFormatDate(dt), msgs: []));
+                      lastDay = day;
                     }
+                  } else if (groups.isEmpty) {
+                    groups.add((label: '', msgs: []));
                   }
-                  newItems.add((isSep: false, label: null, msg: msg));
-                }
-                // Update without setState — read in scroll listener after next build.
-                _chatItems = newItems;
-                _chatSepKeys = newSepKeys;
-                if (_chatStickyLabel == null && newItems.isNotEmpty) {
-                  final first = newItems.firstWhere(
-                    (it) => it.isSep,
-                    orElse: () => newItems.first,
-                  );
-                  if (first.isSep) _chatStickyLabel = first.label;
+                  if (groups.isNotEmpty) groups.last.msgs.add(msg);
                 }
 
-                return Stack(
-                  children: [
-                    ListView.builder(
-                      controller: _scrollCtrl,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 20, vertical: 16),
-                      itemCount: newItems.length,
-                      itemBuilder: (context, i) {
-                        final item = newItems[i];
-                        if (item.isSep) {
-                          return KeyedSubtree(
-                            key: newSepKeys[i],
-                            child: _chatDateSepChip(item.label!),
-                          );
-                        }
-                        final msg = item.msg!;
-                        final msgId = msg['id'] as String?;
-                        final isFirstUnread = msgId != null &&
-                            msgId == _firstUnreadMessageId;
+                return ListView.builder(
+                  controller: _scrollCtrl,
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 20, vertical: 16),
+                  itemCount: groups.length,
+                  itemBuilder: (context, i) {
+                    final group = groups[i];
+                    return StickyHeader(
+                      header: _chatDateSepChip(group.label),
+                      content: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: group.msgs.map((msg) {
+                          final msgId = msg['id'] as String?;
+                          final isFirstUnread = msgId != null &&
+                              msgId == _firstUnreadMessageId;
 
-                        if (isFirstUnread) {
-                          return Column(
-                            key: _firstUnreadKey,
-                            children: [
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                    vertical: 12),
-                                child: Row(
-                                  children: [
-                                    const Expanded(
-                                      child: Divider(
-                                        color: Color(0xFF2DD4BF),
-                                        thickness: 0.5,
-                                      ),
-                                    ),
-                                    const Padding(
-                                      padding: EdgeInsets.symmetric(
-                                          horizontal: 10),
-                                      child: Text(
-                                        'Mensajes nuevos',
-                                        style: TextStyle(
-                                          fontFamily: 'Geist',
-                                          fontSize: 11,
+                          if (isFirstUnread) {
+                            return Column(
+                              key: _firstUnreadKey,
+                              children: [
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      vertical: 12),
+                                  child: Row(
+                                    children: [
+                                      const Expanded(
+                                        child: Divider(
                                           color: Color(0xFF2DD4BF),
-                                          fontWeight: FontWeight.w600,
+                                          thickness: 0.5,
                                         ),
                                       ),
-                                    ),
-                                    const Expanded(
-                                      child: Divider(
-                                        color: Color(0xFF2DD4BF),
-                                        thickness: 0.5,
+                                      const Padding(
+                                        padding: EdgeInsets.symmetric(
+                                            horizontal: 10),
+                                        child: Text(
+                                          'Mensajes nuevos',
+                                          style: TextStyle(
+                                            fontFamily: 'Geist',
+                                            fontSize: 11,
+                                            color: Color(0xFF2DD4BF),
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
                                       ),
-                                    ),
-                                  ],
+                                      const Expanded(
+                                        child: Divider(
+                                          color: Color(0xFF2DD4BF),
+                                          thickness: 0.5,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                              _buildMessageBubble(msg,
-                                  reactionsMap: reactionsMap),
-                            ],
-                          );
-                        }
-                        return _buildMessageBubble(msg,
-                            reactionsMap: reactionsMap);
-                      },
-                    ),
-                    if (_chatStickyLabel != null)
-                      Positioned(
-                        top: 8,
-                        left: 0,
-                        right: 0,
-                        child: _chatDateSepChip(_chatStickyLabel!),
+                                _buildMessageBubble(msg,
+                                    reactionsMap: reactionsMap),
+                              ],
+                            );
+                          }
+                          return _buildMessageBubble(msg,
+                              reactionsMap: reactionsMap);
+                        }).toList(),
                       ),
-                  ],
+                    );
+                  },
                 );
               }),
             ),
@@ -4806,83 +4758,25 @@ class _FeedMessages extends StatefulWidget {
 }
 
 class _FeedMessagesState extends State<_FeedMessages> {
-  final ScrollController _scrollController = ScrollController();
-  String? _stickyLabel;
-  List<({bool isSep, String? label, Map<String, dynamic>? msg})> _items = [];
-  Map<int, GlobalKey> _sepKeys = {};
-
-  @override
-  void initState() {
-    super.initState();
-    _buildItems();
-    _scrollController.addListener(_updateStickyLabel);
-  }
-
-  @override
-  void didUpdateWidget(_FeedMessages old) {
-    super.didUpdateWidget(old);
-    if (old.messages != widget.messages) {
-      _buildItems();
-      _updateStickyLabel();
-    }
-  }
-
-  @override
-  void dispose() {
-    _scrollController.dispose();
-    super.dispose();
-  }
-
-  void _buildItems() {
-    final items = <({bool isSep, String? label, Map<String, dynamic>? msg})>[];
-    final sepKeys = <int, GlobalKey>{};
-    DateTime? lastDate;
+  List<({String label, List<Map<String, dynamic>> msgs})> _buildGroups() {
+    final groups = <({String label, List<Map<String, dynamic>> msgs})>[];
+    DateTime? lastDay;
     for (final msg in widget.messages) {
       final iso = msg['received_at'] as String?;
-      if (iso != null) {
-        final dt = DateTime.tryParse(iso)?.toLocal();
-        if (dt != null) {
-          final day = DateTime(dt.year, dt.month, dt.day);
-          if (lastDate == null || day != lastDate) {
-            sepKeys[items.length] = GlobalKey();
-            items.add((isSep: true, label: _formatDate(dt), msg: null));
-            lastDate = day;
-          }
+      DateTime? dt;
+      if (iso != null) dt = DateTime.tryParse(iso)?.toLocal();
+      if (dt != null) {
+        final day = DateTime(dt.year, dt.month, dt.day);
+        if (lastDay == null || day != lastDay) {
+          groups.add((label: _formatDate(dt), msgs: []));
+          lastDay = day;
         }
+      } else if (groups.isEmpty) {
+        groups.add((label: '', msgs: []));
       }
-      items.add((isSep: false, label: null, msg: msg));
+      if (groups.isNotEmpty) groups.last.msgs.add(msg);
     }
-    _items = items;
-    _sepKeys = sepKeys;
-    // Initialise sticky label to first separator when first loaded
-    if (_stickyLabel == null && _items.isNotEmpty) {
-      final first = _items.firstWhere(
-        (it) => it.isSep,
-        orElse: () => _items.first,
-      );
-      if (first.isSep) _stickyLabel = first.label;
-    }
-  }
-
-  void _updateStickyLabel() {
-    if (!_scrollController.hasClients || _items.isEmpty) return;
-    // Walk separators from highest index down; pick the last one whose top
-    // edge is at or above the viewport top (approximated as dy <= 120).
-    final sorted = _sepKeys.entries.toList()
-      ..sort((a, b) => b.key.compareTo(a.key));
-    String? label;
-    for (final entry in sorted) {
-      final ctx = entry.value.currentContext;
-      if (ctx == null) continue;
-      final box = ctx.findRenderObject() as RenderBox?;
-      if (box == null || !box.hasSize) continue;
-      final dy = box.localToGlobal(Offset.zero).dy;
-      if (dy <= 120) {
-        label = _items[entry.key].label;
-        break;
-      }
-    }
-    if (label != _stickyLabel) setState(() => _stickyLabel = label);
+    return groups;
   }
 
   String _formatDate(DateTime dt) {
@@ -4993,97 +4887,85 @@ class _FeedMessagesState extends State<_FeedMessages> {
       );
     }
 
+    final groups = _buildGroups();
     final showTruncatedBanner = widget.messageCount >= 200;
 
     return Container(
       color: const Color(0xFFF0F2F5),
-      child: Stack(
-        children: [
-          ListView.builder(
-            controller: _scrollController,
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            itemCount: _items.length + (showTruncatedBanner ? 1 : 0),
-            itemBuilder: (context, i) {
-              if (showTruncatedBanner && i == _items.length) {
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: const [
-                      Icon(Icons.history,
-                          size: 14, color: AppColors.ctText3),
-                      SizedBox(width: 6),
-                      Text(
-                        'Mostrando los últimos 200 mensajes',
-                        style: TextStyle(
-                          fontFamily: 'Geist',
-                          fontSize: 12,
-                          color: AppColors.ctText3,
-                        ),
-                      ),
-                    ],
+      child: ListView.builder(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        itemCount: groups.length + (showTruncatedBanner ? 1 : 0),
+        itemBuilder: (context, i) {
+          if (showTruncatedBanner && i == groups.length) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: const [
+                  Icon(Icons.history, size: 14, color: AppColors.ctText3),
+                  SizedBox(width: 6),
+                  Text(
+                    'Mostrando los últimos 200 mensajes',
+                    style: TextStyle(
+                      fontFamily: 'Geist',
+                      fontSize: 12,
+                      color: AppColors.ctText3,
+                    ),
                   ),
-                );
-              }
-              final item = _items[i];
-              if (item.isSep) {
-                return KeyedSubtree(
-                  key: _sepKeys[i],
-                  child: _dateSepChip(item.label!),
-                );
-              }
+                ],
+              ),
+            );
+          }
+          final group = groups[i];
+          return StickyHeader(
+            header: _dateSepChip(group.label),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: group.msgs.map((msg) {
+                final msgId = msg['id'] as String? ?? '';
+                final direction = msg['direction'] as String?;
+                final isOutbound = direction == 'outbound';
+                final phone = msg['from_phone'] as String? ??
+                    msg['chat_id'] as String? ?? '';
+                final name = msg['from_name'] as String? ?? phone;
+                final chatId = msg['chat_id'] as String? ?? '';
+                final time = _timeLabel(msg['received_at'] as String?);
+                final waStatus = msg['wa_status'] as String?;
+                final body = _msgBody(msg);
+                final messageType = msg['message_type'] as String?;
+                final mediaUrl = msg['media_url'] as String?;
+                final origin = msg['origin'] as String? ?? 'ai_worker';
 
-              final msg = item.msg!;
-              final msgId = msg['id'] as String? ?? '';
-              final direction = msg['direction'] as String?;
-              final isOutbound = direction == 'outbound';
-              final phone = msg['from_phone'] as String? ??
-                  msg['chat_id'] as String? ?? '';
-              final name = msg['from_name'] as String? ?? phone;
-              final chatId = msg['chat_id'] as String? ?? '';
-              final time = _timeLabel(msg['received_at'] as String?);
-              final waStatus = msg['wa_status'] as String?;
-              final body = _msgBody(msg);
-              final messageType = msg['message_type'] as String?;
-              final mediaUrl = msg['media_url'] as String?;
-              final origin = msg['origin'] as String? ?? 'ai_worker';
-
-              if (isOutbound) {
-                return _FeedOutboundBubble(
+                if (isOutbound) {
+                  return _FeedOutboundBubble(
+                    key: ValueKey(msgId),
+                    body: body,
+                    time: time,
+                    toPhone: chatId,
+                    senderName: _outboundSenderName(msg),
+                    waStatus: waStatus,
+                    origin: origin,
+                    channelType: widget.channelType,
+                    messageType: messageType,
+                    mediaUrl: mediaUrl,
+                  );
+                }
+                return _FeedInboundBubble(
                   key: ValueKey(msgId),
                   body: body,
                   time: time,
-                  toPhone: chatId,
-                  senderName: _outboundSenderName(msg),
-                  waStatus: waStatus,
-                  origin: origin,
-                  channelType: widget.channelType,
+                  name: name,
+                  phone: phone,
+                  chatId: chatId,
+                  avatarBg: _FeedMessages._avatarBg(phone),
+                  avatarTextColor: _FeedMessages._avatarFg(phone),
                   messageType: messageType,
                   mediaUrl: mediaUrl,
                 );
-              }
-              return _FeedInboundBubble(
-                key: ValueKey(msgId),
-                body: body,
-                time: time,
-                name: name,
-                phone: phone,
-                chatId: chatId,
-                avatarBg: _FeedMessages._avatarBg(phone),
-                avatarTextColor: _FeedMessages._avatarFg(phone),
-                messageType: messageType,
-                mediaUrl: mediaUrl,
-              );
-            },
-          ),
-          if (_stickyLabel != null)
-            Positioned(
-              top: 8,
-              left: 0,
-              right: 0,
-              child: _dateSepChip(_stickyLabel!),
+              }).toList(),
             ),
-        ],
+          );
+        },
       ),
     );
   }
