@@ -138,6 +138,8 @@ class SupabaseMessages {
     String? direction,
     String? keyword,
     required String tenantId,
+    DateTime? fromDate,
+    DateTime? toDate,
     int limit = 200,
   }) {
     assert(tenantId.isNotEmpty, 'streamFeed: tenantId must not be empty');
@@ -165,6 +167,20 @@ class SupabaseMessages {
           final body = (m['raw_body'] as String? ?? '').toLowerCase();
           final name = (m['from_name'] as String? ?? '').toLowerCase();
           return body.contains(kw) || name.contains(kw);
+        }).toList();
+      }
+      if (fromDate != null) {
+        final fromUtc = fromDate.toUtc();
+        messages = messages.where((m) {
+          final t = DateTime.tryParse(m['received_at'] as String? ?? '');
+          return t != null && !t.toUtc().isBefore(fromUtc);
+        }).toList();
+      }
+      if (toDate != null) {
+        final toUtc = toDate.toUtc();
+        messages = messages.where((m) {
+          final t = DateTime.tryParse(m['received_at'] as String? ?? '');
+          return t != null && !t.toUtc().isAfter(toUtc);
         }).toList();
       }
       return messages;
