@@ -144,6 +144,23 @@ class SupabaseMessages {
   }) {
     assert(tenantId.isNotEmpty, 'streamFeed: tenantId must not be empty');
 
+    // When a date range is active, use a static SELECT query so we can apply
+    // DB-level gte/lte filters. The .stream() builder only supports .eq(), so
+    // date filtering client-side over a 200-row window would miss messages.
+    if (fromDate != null || toDate != null) {
+      return Stream.fromFuture(
+        _fetchFeedStatic(
+          chatId: chatId,
+          direction: direction,
+          keyword: keyword,
+          tenantId: tenantId,
+          fromDate: fromDate,
+          toDate: toDate,
+          limit: 500,
+        ),
+      );
+    }
+
     final query = Supabase.instance.client
         .from('wa_messages')
         .stream(primaryKey: ['id'])
@@ -169,21 +186,50 @@ class SupabaseMessages {
           return body.contains(kw) || name.contains(kw);
         }).toList();
       }
-      if (fromDate != null) {
-        final fromUtc = fromDate.toUtc();
-        messages = messages.where((m) {
-          final t = DateTime.tryParse(m['received_at'] as String? ?? '');
-          return t != null && !t.toUtc().isBefore(fromUtc);
-        }).toList();
-      }
-      if (toDate != null) {
-        final toUtc = toDate.toUtc();
-        messages = messages.where((m) {
-          final t = DateTime.tryParse(m['received_at'] as String? ?? '');
-          return t != null && !t.toUtc().isAfter(toUtc);
-        }).toList();
-      }
       return messages;
     });
+  }
+
+  static Future<List<Map<String, dynamic>>> _fetchFeedStatic({
+    String? chatId,
+    String? direction,
+    String? keyword,
+    required String tenantId,
+    DateTime? fromDate,
+    DateTime? toDate,
+    int limit = 500,
+  }) async {
+    var query = _client
+        .from('wa_messages')
+        .select('*')
+        .eq('tenant_id', tenantId);
+
+    if (chatId != null && chatId.isNotEmpty) {
+      query = query.eq('chat_id', chatId);
+    }
+    if (direction != null && direction.isNotEmpty) {
+      query = query.eq('direction', direction);
+    }
+    if (fromDate != null) {
+      query = query.gte('received_at', fromDate.toUtc().toIso8601String());
+    }
+    if (toDate != null) {
+      query = query.lte('received_at', toDate.toUtc().toIso8601String());
+    }
+
+    var messages = List<Map<String, dynamic>>.from(
+      await query.order('received_at', ascending: false).limit(limit),
+    );
+
+    if (keyword != null && keyword.isNotEmpty) {
+      final kw = keyword.toLowerCase();
+      messages = messages.where((m) {
+        final body = (m['raw_body'] as String? ?? '').toLowerCase();
+        final name = (m['from_name'] as String? ?? '').toLowerCase();
+        return body.contains(kw) || name.contains(kw);
+      }).toList();
+    }
+
+    return messages;
   }
 }

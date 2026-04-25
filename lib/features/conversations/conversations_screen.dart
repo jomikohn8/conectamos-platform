@@ -1394,6 +1394,7 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
   // Sticky date header for the chat
   String? _chatStickyLabel;
   List<({bool isSep, String? label, Map<String, dynamic>? msg})> _chatItems = [];
+  Map<int, GlobalKey> _chatSepKeys = {};
 
   @override
   void initState() {
@@ -1414,14 +1415,17 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
 
   void _updateChatStickyLabel() {
     if (!_scrollCtrl.hasClients || _chatItems.isEmpty) return;
-    final offset = _scrollCtrl.offset;
-    const estHeight = 80.0;
-    final topIdx =
-        (offset / estHeight).floor().clamp(0, _chatItems.length - 1);
+    final sorted = _chatSepKeys.entries.toList()
+      ..sort((a, b) => b.key.compareTo(a.key));
     String? label;
-    for (int i = topIdx; i >= 0; i--) {
-      if (_chatItems[i].isSep) {
-        label = _chatItems[i].label;
+    for (final entry in sorted) {
+      final ctx = entry.value.currentContext;
+      if (ctx == null) continue;
+      final box = ctx.findRenderObject() as RenderBox?;
+      if (box == null || !box.hasSize) continue;
+      final dy = box.localToGlobal(Offset.zero).dy;
+      if (dy <= 120) {
+        label = _chatItems[entry.key].label;
         break;
       }
     }
@@ -2582,9 +2586,10 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
               color: const Color(0xFFEBEBE9),
               child: Builder(builder: (context) {
                 // Build chat items with date separators.
-                // Store in _chatItems so _updateChatStickyLabel can access them.
+                // Store in _chatItems/_chatSepKeys so _updateChatStickyLabel can access them.
                 final newItems =
                     <({bool isSep, String? label, Map<String, dynamic>? msg})>[];
+                final newSepKeys = <int, GlobalKey>{};
                 DateTime? lastDate;
                 for (final msg in visibleMessages) {
                   final iso = msg['received_at'] as String?;
@@ -2593,6 +2598,7 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
                     if (dt != null) {
                       final day = DateTime(dt.year, dt.month, dt.day);
                       if (lastDate == null || day != lastDate) {
+                        newSepKeys[newItems.length] = GlobalKey();
                         newItems.add(
                             (isSep: true,
                              label: _chatFormatDate(dt),
@@ -2605,6 +2611,7 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
                 }
                 // Update without setState — read in scroll listener after next build.
                 _chatItems = newItems;
+                _chatSepKeys = newSepKeys;
                 if (_chatStickyLabel == null && newItems.isNotEmpty) {
                   final first = newItems.firstWhere(
                     (it) => it.isSep,
@@ -2623,7 +2630,10 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
                       itemBuilder: (context, i) {
                         final item = newItems[i];
                         if (item.isSep) {
-                          return _chatDateSepChip(item.label!);
+                          return KeyedSubtree(
+                            key: newSepKeys[i],
+                            child: _chatDateSepChip(item.label!),
+                          );
                         }
                         final msg = item.msg!;
                         final msgId = msg['id'] as String?;
@@ -4799,6 +4809,7 @@ class _FeedMessagesState extends State<_FeedMessages> {
   final ScrollController _scrollController = ScrollController();
   String? _stickyLabel;
   List<({bool isSep, String? label, Map<String, dynamic>? msg})> _items = [];
+  Map<int, GlobalKey> _sepKeys = {};
 
   @override
   void initState() {
@@ -4824,6 +4835,7 @@ class _FeedMessagesState extends State<_FeedMessages> {
 
   void _buildItems() {
     final items = <({bool isSep, String? label, Map<String, dynamic>? msg})>[];
+    final sepKeys = <int, GlobalKey>{};
     DateTime? lastDate;
     for (final msg in widget.messages) {
       final iso = msg['received_at'] as String?;
@@ -4832,6 +4844,7 @@ class _FeedMessagesState extends State<_FeedMessages> {
         if (dt != null) {
           final day = DateTime(dt.year, dt.month, dt.day);
           if (lastDate == null || day != lastDate) {
+            sepKeys[items.length] = GlobalKey();
             items.add((isSep: true, label: _formatDate(dt), msg: null));
             lastDate = day;
           }
@@ -4840,6 +4853,7 @@ class _FeedMessagesState extends State<_FeedMessages> {
       items.add((isSep: false, label: null, msg: msg));
     }
     _items = items;
+    _sepKeys = sepKeys;
     // Initialise sticky label to first separator when first loaded
     if (_stickyLabel == null && _items.isNotEmpty) {
       final first = _items.firstWhere(
@@ -4852,14 +4866,19 @@ class _FeedMessagesState extends State<_FeedMessages> {
 
   void _updateStickyLabel() {
     if (!_scrollController.hasClients || _items.isEmpty) return;
-    final offset = _scrollController.offset;
-    const estHeight = 80.0;
-    final topIdx =
-        (offset / estHeight).floor().clamp(0, _items.length - 1);
+    // Walk separators from highest index down; pick the last one whose top
+    // edge is at or above the viewport top (approximated as dy <= 120).
+    final sorted = _sepKeys.entries.toList()
+      ..sort((a, b) => b.key.compareTo(a.key));
     String? label;
-    for (int i = topIdx; i >= 0; i--) {
-      if (_items[i].isSep) {
-        label = _items[i].label;
+    for (final entry in sorted) {
+      final ctx = entry.value.currentContext;
+      if (ctx == null) continue;
+      final box = ctx.findRenderObject() as RenderBox?;
+      if (box == null || !box.hasSize) continue;
+      final dy = box.localToGlobal(Offset.zero).dy;
+      if (dy <= 120) {
+        label = _items[entry.key].label;
         break;
       }
     }
@@ -5007,7 +5026,12 @@ class _FeedMessagesState extends State<_FeedMessages> {
                 );
               }
               final item = _items[i];
-              if (item.isSep) return _dateSepChip(item.label!);
+              if (item.isSep) {
+                return KeyedSubtree(
+                  key: _sepKeys[i],
+                  child: _dateSepChip(item.label!),
+                );
+              }
 
               final msg = item.msg!;
               final msgId = msg['id'] as String? ?? '';
