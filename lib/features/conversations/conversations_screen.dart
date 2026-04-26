@@ -1045,6 +1045,8 @@ class _ConvoListState extends ConsumerState<_ConvoList> {
 
     final selectedChatId = ref.watch(selectedChatIdProvider);
     final filtered = _conversations.where((conv) {
+      final chatIdVal = conv['chat_id'] as String?;
+      if (chatIdVal == null || chatIdVal.isEmpty) return false;
       final name = conv['display_name'] as String? ?? '';
       return name.toLowerCase().contains(_search.toLowerCase());
     }).toList();
