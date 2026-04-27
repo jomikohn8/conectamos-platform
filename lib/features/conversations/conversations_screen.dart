@@ -1406,7 +1406,8 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
   void _onScroll() {
     if (!_scrollCtrl.hasClients) return;
     final pos = _scrollCtrl.position;
-    final nearBottom = pos.maxScrollExtent - pos.pixels <= 100;
+    // reverse: true → pixels == 0 is the visual bottom (most recent messages).
+    final nearBottom = pos.pixels <= 100;
     if (nearBottom != _atBottom) setState(() => _atBottom = nearBottom);
     if (nearBottom && _hasNewMessage) setState(() => _hasNewMessage = false);
   }
@@ -1480,42 +1481,22 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
   }
 
   void _scrollToFirstUnread() {
+    // With reverse: true, position 0 == visual bottom (most recent).
+    // No unread → the list already opens at position 0 (bottom), nothing to do.
+    if (_firstUnreadMessageId == null) return;
+
     if (!_scrollCtrl.hasClients) return;
 
-    if (_firstUnreadMessageId == null) {
-      // Dos jumpTo en frames consecutivos: el primero alcanza el fondo estimado,
-      // el segundo corrige si ListView subestimó maxScrollExtent en el primer frame.
-      // jumpTo es instantáneo — el usuario no percibe el doble salto.
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted || !_scrollCtrl.hasClients) return;
-        _scrollCtrl.jumpTo(_scrollCtrl.position.maxScrollExtent);
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted || !_scrollCtrl.hasClients) return;
-          _scrollCtrl.jumpTo(_scrollCtrl.position.maxScrollExtent);
-        });
-      });
-      return;
-    }
-
-    // Try to scroll to the separator via GlobalKey
+    // Try to scroll to the separator via GlobalKey.
+    // Called from inside a postFrameCallback, so the widget should already be
+    // in the tree — ensureVisible is instantaneous (Duration.zero).
     final ctx = _firstUnreadKey.currentContext;
     if (ctx != null) {
       Scrollable.ensureVisible(
         ctx,
         alignment: 0.0,
-        duration: const Duration(milliseconds: 300),
+        duration: Duration.zero,
       );
-    } else {
-      // Fallback: estimate by index
-      final idx = _apiMessages
-          .indexWhere((m) => (m['id'] as String?) == _firstUnreadMessageId);
-      if (idx >= 0) {
-        final offset = (idx * 80.0)
-            .clamp(0.0, _scrollCtrl.position.maxScrollExtent);
-        _scrollCtrl.jumpTo(offset);
-      } else {
-        _scrollCtrl.jumpTo(_scrollCtrl.position.maxScrollExtent);
-      }
     }
   }
 
@@ -2099,15 +2080,12 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
         WidgetsBinding.instance.addPostFrameCallback(
             (_) => _scrollToFirstUnread());
       } else {
-        // Emit posterior: mensaje nuevo en tiempo real
+        // Emit posterior: mensaje nuevo en tiempo real.
+        // reverse: true → position 0 == visual bottom.
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted || !_scrollCtrl.hasClients) return;
           if (_atBottom) {
-            _scrollCtrl.jumpTo(_scrollCtrl.position.maxScrollExtent);
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (!mounted || !_scrollCtrl.hasClients) return;
-              _scrollCtrl.jumpTo(_scrollCtrl.position.maxScrollExtent);
-            });
+            _scrollCtrl.jumpTo(0);
           } else {
             setState(() => _hasNewMessage = true);
           }
@@ -2200,11 +2178,7 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
           setState(() => _sending = false);
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (!mounted || !_scrollCtrl.hasClients) return;
-            _scrollCtrl.jumpTo(_scrollCtrl.position.maxScrollExtent);
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (!mounted || !_scrollCtrl.hasClients) return;
-              _scrollCtrl.jumpTo(_scrollCtrl.position.maxScrollExtent);
-            });
+            _scrollCtrl.jumpTo(0); // reverse: true → 0 == visual bottom
           });
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
             content: Text('✅ Ubicación enviada'),
@@ -2257,11 +2231,7 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
         setState(() => _sending = false);
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted || !_scrollCtrl.hasClients) return;
-          _scrollCtrl.jumpTo(_scrollCtrl.position.maxScrollExtent);
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (!mounted || !_scrollCtrl.hasClients) return;
-            _scrollCtrl.jumpTo(_scrollCtrl.position.maxScrollExtent);
-          });
+          _scrollCtrl.jumpTo(0); // reverse: true → 0 == visual bottom
         });
       }
     } on DioException catch (e) {
@@ -2549,7 +2519,7 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
             child: ColoredBox(
               color: const Color(0xFFEBEBE9),
               child: Builder(builder: (context) {
-                // Group messages by day for StickyHeader.
+                // Group messages by day for StickyHeader (ascending order).
                 final groups =
                     <({String label, List<Map<String, dynamic>> msgs})>[];
                 DateTime? lastDay;
@@ -2568,14 +2538,18 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
                   }
                   if (groups.isNotEmpty) groups.last.msgs.add(msg);
                 }
+                // With reverse: true, index 0 == visual bottom. Reverse the
+                // groups so the most-recent day group is at index 0 (bottom).
+                final displayGroups = groups.reversed.toList();
 
                 return ListView.builder(
                   controller: _scrollCtrl,
+                  reverse: true,
                   padding: const EdgeInsets.symmetric(
                       horizontal: 20, vertical: 16),
-                  itemCount: groups.length,
+                  itemCount: displayGroups.length,
                   itemBuilder: (context, i) {
-                    final group = groups[i];
+                    final group = displayGroups[i];
                     return StickyHeader(
                       header: _chatDateSepChip(group.label),
                       content: Column(
@@ -2700,8 +2674,9 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
           GestureDetector(
             onTap: () {
               if (_scrollCtrl.hasClients) {
+                // reverse: true → 0 == visual bottom (most recent messages)
                 _scrollCtrl.animateTo(
-                  _scrollCtrl.position.maxScrollExtent,
+                  0,
                   duration: const Duration(milliseconds: 200),
                   curve: Curves.easeOut,
                 );
