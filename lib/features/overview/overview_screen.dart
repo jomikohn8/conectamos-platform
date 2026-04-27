@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -298,6 +301,12 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
   bool _kpisError = false;
   bool _initialized = false;
 
+  List<dynamic> _executions = [];
+  bool _executionsLoading = false;
+  bool _executionsError = false;
+  Timer? _refreshTimer;
+  DateTime? _lastExecutionsFetch;
+
   @override
   void initState() {
     super.initState();
@@ -308,6 +317,23 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
       if (tenantId.isNotEmpty) _fetchKpis(tenantId);
       // If still empty, the ref.listen in build() will trigger the fetch.
     });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final tenantId = ref.read(activeTenantIdProvider);
+      if (tenantId.isNotEmpty) {
+        _fetchExecutions(tenantId);
+        _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+          final tid = ref.read(activeTenantIdProvider);
+          if (tid.isNotEmpty) _fetchExecutions(tid);
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _fetchKpis(String tenantId) async {
@@ -332,6 +358,21 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
     }
   }
 
+  Future<void> _fetchExecutions(String tenantId) async {
+    if (tenantId.isEmpty) return;
+    setState(() { _executionsLoading = true; _executionsError = false; });
+    try {
+      final data = await OverviewApi.getFlowExecutionsDebug(tenantId: tenantId);
+      setState(() {
+        _executions = List<dynamic>.from(data['executions'] ?? []);
+        _executionsLoading = false;
+        _lastExecutionsFetch = DateTime.now();
+      });
+    } catch (_) {
+      setState(() { _executionsLoading = false; _executionsError = true; });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final tenantId = ref.watch(activeTenantIdProvider);
@@ -340,6 +381,14 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
     ref.listen<String>(activeTenantIdProvider, (prev, next) {
       if (next.isNotEmpty && !_initialized && !_kpisLoading) {
         _fetchKpis(next);
+      }
+      if (next.isNotEmpty) {
+        _fetchExecutions(next);
+        _refreshTimer?.cancel();
+        _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+          final tid = ref.read(activeTenantIdProvider);
+          if (tid.isNotEmpty) _fetchExecutions(tid);
+        });
       }
     });
 
@@ -361,6 +410,17 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
                   kpis: _kpis,
                   loading: _kpisLoading,
                   error: _kpisError,
+                ),
+                const SizedBox(height: 18),
+                _ExecutionsSection(
+                  executions: _executions,
+                  loading: _executionsLoading,
+                  error: _executionsError,
+                  onRefresh: () {
+                    final tid = ref.read(activeTenantIdProvider);
+                    if (tid.isNotEmpty) _fetchExecutions(tid);
+                  },
+                  lastFetch: _lastExecutionsFetch,
                 ),
                 const SizedBox(height: 18),
                 const Text(
@@ -1024,6 +1084,434 @@ class FlowBadge extends StatelessWidget {
           fontSize: 10,
           fontWeight: FontWeight.w600,
           color: data.textColor,
+        ),
+      ),
+    );
+  }
+}
+
+// ── Helpers para executions ───────────────────────────────────────────────────
+
+String _formatElapsed(int? seconds) {
+  if (seconds == null) return '—';
+  if (seconds < 60) return '${seconds}s';
+  if (seconds < 3600) return '${seconds ~/ 60}m ${seconds % 60}s';
+  return '${seconds ~/ 3600}h ${(seconds % 3600) ~/ 60}m';
+}
+
+String _elapsedSince(DateTime t) {
+  final diff = DateTime.now().difference(t);
+  if (diff.inSeconds < 60) return 'hace ${diff.inSeconds}s';
+  if (diff.inMinutes < 60) return 'hace ${diff.inMinutes}m';
+  return 'hace ${diff.inHours}h';
+}
+
+// ── _ExecutionsSection ────────────────────────────────────────────────────────
+
+class _ExecutionsSection extends StatelessWidget {
+  const _ExecutionsSection({
+    required this.executions,
+    required this.loading,
+    required this.error,
+    required this.onRefresh,
+    required this.lastFetch,
+  });
+
+  final List<dynamic> executions;
+  final bool loading;
+  final bool error;
+  final VoidCallback onRefresh;
+  final DateTime? lastFetch;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Header
+        Row(
+          children: [
+            const Text(
+              'FLUJOS EN CURSO',
+              style: TextStyle(
+                fontFamily: 'Geist',
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                color: AppColors.ctText3,
+                letterSpacing: 1.2,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: AppColors.ctTealLight,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                '${executions.length}',
+                style: const TextStyle(
+                  fontFamily: 'Geist',
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.ctTealDark,
+                ),
+              ),
+            ),
+            const Spacer(),
+            if (lastFetch != null)
+              Text(
+                'Act. ${_elapsedSince(lastFetch!)}',
+                style: const TextStyle(
+                  fontFamily: 'Geist',
+                  fontSize: 10,
+                  color: AppColors.ctText3,
+                ),
+              ),
+            const SizedBox(width: 4),
+            SizedBox(
+              width: 30,
+              height: 30,
+              child: IconButton(
+                padding: EdgeInsets.zero,
+                icon: const Icon(Icons.refresh,
+                    size: 16, color: AppColors.ctText3),
+                onPressed: onRefresh,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        // Body
+        if (loading && executions.isEmpty)
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.all(24),
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          )
+        else if (error)
+          Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Error al cargar executions',
+                  style: TextStyle(
+                    fontFamily: 'Geist',
+                    fontSize: 13,
+                    color: AppColors.ctText3,
+                  ),
+                ),
+                TextButton(
+                  onPressed: onRefresh,
+                  child: const Text('Reintentar'),
+                ),
+              ],
+            ),
+          )
+        else if (executions.isEmpty)
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.all(24),
+              child: Text(
+                'Sin executions registradas',
+                style: TextStyle(
+                  fontFamily: 'Geist',
+                  fontSize: 13,
+                  color: AppColors.ctText3,
+                ),
+              ),
+            ),
+          )
+        else
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: executions.length,
+            itemBuilder: (context, i) => _ExecutionTile(
+              execution: executions[i] as Map<String, dynamic>,
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+// ── _ExecutionTile ────────────────────────────────────────────────────────────
+
+class _ExecutionTile extends StatelessWidget {
+  const _ExecutionTile({required this.execution});
+
+  final Map<String, dynamic> execution;
+
+  @override
+  Widget build(BuildContext context) {
+    final flowDef = execution['flow_definition'] as Map<String, dynamic>?;
+    final operator_ = execution['operator'] as Map<String, dynamic>?;
+    final status = execution['status'] as String? ?? 'unknown';
+    final elapsedSeconds = execution['elapsed_seconds'] as int?;
+    final fieldsCaptured =
+        (execution['fields_captured'] as Map?)
+            ?.map((k, v) => MapEntry(k.toString(), v)) ??
+        <String, dynamic>{};
+
+    final fieldsExpected = flowDef != null
+        ? List<Map<String, dynamic>>.from(
+            (flowDef['fields_expected'] as List? ?? [])
+                .map((f) => Map<String, dynamic>.from(f as Map)),
+          )
+        : <Map<String, dynamic>>[];
+
+    final captured = fieldsExpected.where((f) {
+      final v = fieldsCaptured[f['key']];
+      return v != null && v.toString().isNotEmpty;
+    }).length;
+
+    final flowName = flowDef?['name'] as String?;
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 4),
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+        side: const BorderSide(color: AppColors.ctBorder),
+      ),
+      child: ExpansionTile(
+        tilePadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        childrenPadding:
+            const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        shape: const RoundedRectangleBorder(),
+        collapsedShape: const RoundedRectangleBorder(),
+        title: Row(
+          children: [
+            Expanded(
+              child: flowDef != null
+                  ? Text(
+                      flowName ?? 'Sin nombre',
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontFamily: 'Geist',
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.ctText,
+                      ),
+                    )
+                  : const Text(
+                      'Flow eliminado',
+                      style: TextStyle(
+                        fontFamily: 'Geist',
+                        fontSize: 13,
+                        fontStyle: FontStyle.italic,
+                        color: AppColors.ctText3,
+                      ),
+                    ),
+            ),
+            const SizedBox(width: 8),
+            _ExecStatusBadge(status: status),
+          ],
+        ),
+        subtitle: Padding(
+          padding: const EdgeInsets.only(top: 4, bottom: 4),
+          child: Row(
+            children: [
+              const Icon(Icons.person_outline,
+                  size: 12, color: AppColors.ctText3),
+              const SizedBox(width: 4),
+              Text(
+                operator_?['name'] as String? ?? 'Sin operador',
+                style: const TextStyle(
+                  fontFamily: 'Geist',
+                  fontSize: 11,
+                  color: AppColors.ctText3,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Icon(Icons.timer_outlined,
+                  size: 12, color: AppColors.ctText3),
+              const SizedBox(width: 4),
+              Text(
+                _formatElapsed(elapsedSeconds),
+                style: const TextStyle(
+                  fontFamily: 'Geist',
+                  fontSize: 11,
+                  color: AppColors.ctText3,
+                ),
+              ),
+              if (flowDef != null) ...[
+                const SizedBox(width: 12),
+                Text(
+                  '$captured/${fieldsExpected.length} campos',
+                  style: const TextStyle(
+                    fontFamily: 'Geist',
+                    fontSize: 11,
+                    color: AppColors.ctTealDark,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        children: [
+          if (flowDef != null && fieldsExpected.isNotEmpty)
+            ...List.generate(fieldsExpected.length, (i) {
+              final field = fieldsExpected[i];
+              final key = field['key'] as String? ?? '';
+              final label = field['label'] as String? ?? key;
+              final isRequired = field['required'] == true;
+              final value = fieldsCaptured[key];
+              final hasValue =
+                  value != null && value.toString().isNotEmpty;
+
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (i > 0) const Divider(height: 1),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    child: Row(
+                      children: [
+                        Icon(
+                          hasValue
+                              ? Icons.check_circle
+                              : Icons.radio_button_unchecked,
+                          size: 14,
+                          color: hasValue
+                              ? AppColors.ctOk
+                              : AppColors.ctText3,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            label,
+                            style: const TextStyle(
+                              fontFamily: 'Geist',
+                              fontSize: 12,
+                              color: AppColors.ctText,
+                            ),
+                          ),
+                        ),
+                        if (isRequired)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 4, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppColors.ctWarnBg,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Text(
+                              'req',
+                              style: TextStyle(
+                                fontFamily: 'Geist',
+                                fontSize: 9,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.ctWarnText,
+                              ),
+                            ),
+                          ),
+                        const SizedBox(width: 8),
+                        Text(
+                          hasValue ? value.toString() : '—',
+                          style: TextStyle(
+                            fontFamily: 'Geist',
+                            fontSize: 12,
+                            color: hasValue
+                                ? AppColors.ctText
+                                : AppColors.ctText3,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              );
+            }),
+          if (flowDef == null)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Definición de flujo no disponible',
+                  style: TextStyle(
+                    fontFamily: 'Geist',
+                    fontSize: 12,
+                    fontStyle: FontStyle.italic,
+                    color: AppColors.ctText3,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  jsonEncode(execution['fields_captured']),
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontFamily: 'monospace',
+                    color: AppColors.ctText2,
+                  ),
+                ),
+              ],
+            ),
+          const SizedBox(height: 8),
+          SelectableText(
+            'ID: ${execution['execution_id']}',
+            style: const TextStyle(
+              fontSize: 10,
+              fontFamily: 'monospace',
+              color: AppColors.ctText3,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── _ExecStatusBadge ──────────────────────────────────────────────────────────
+
+class _ExecStatusBadge extends StatelessWidget {
+  const _ExecStatusBadge({required this.status});
+
+  final String status;
+
+  @override
+  Widget build(BuildContext context) {
+    final Color bg;
+    final Color fg;
+
+    switch (status) {
+      case 'active':
+      case 'in_progress':
+        bg = AppColors.ctTealLight;
+        fg = AppColors.ctTealDark;
+      case 'completed':
+        bg = AppColors.ctOkBg;
+        fg = AppColors.ctOkText;
+      case 'abandoned':
+        bg = AppColors.ctSurface2;
+        fg = AppColors.ctText3;
+      case 'paused':
+        bg = AppColors.ctWarnBg;
+        fg = AppColors.ctWarnText;
+      default:
+        bg = AppColors.ctSurface2;
+        fg = AppColors.ctText2;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Text(
+        status,
+        style: TextStyle(
+          fontFamily: 'Geist',
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+          color: fg,
         ),
       ),
     );
