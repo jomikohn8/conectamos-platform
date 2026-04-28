@@ -24,17 +24,19 @@ import '../../features/flows/flow_detail_screen.dart';
 import '../../features/flows/flow_integrations_screen.dart';
 import '../../features/conversations/conversations_screen.dart';
 import '../../features/dashboard/dashboard_screen.dart';
+import '../../features/escalaciones/escalaciones_screen.dart';
 import '../../features/overview/overview_screen.dart';
 import '../../shared/widgets/app_shell.dart';
 
 // Mapa de ruta → permiso requerido
 const _kRoutePermissions = {
-  '/operators':   'operators.view',
-  '/flows':       'flows.view',
-  '/channels':    'settings.view',
-  '/connections': 'settings.view',
-  '/settings':    'settings.view',
-  '/broadcast':   'broadcasts.send',
+  '/operators':    'operators.view',
+  '/flows':        'flows.view',
+  '/channels':     'settings.view',
+  '/connections':  'settings.view',
+  '/settings':     'settings.view',
+  '/broadcast':    'broadcasts.send',
+  '/escalaciones': 'escalations.view',
 };
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -146,6 +148,12 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: '/tareas',
             pageBuilder: (context, state) => const NoTransitionPage(
               child: ExecutionsScreen(),
+            ),
+          ),
+          GoRoute(
+            path: '/escalaciones',
+            pageBuilder: (context, state) => const NoTransitionPage(
+              child: EscalacionesScreen(),
             ),
           ),
           GoRoute(

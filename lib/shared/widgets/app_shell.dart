@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/config.dart';
 import '../../core/providers/auth_provider.dart';
+import '../../core/providers/escalaciones_provider.dart';
 import '../../core/providers/permissions_provider.dart';
 import '../../core/providers/tenant_provider.dart';
 import '../../core/theme/app_theme.dart';
@@ -614,6 +615,11 @@ class _Sidebar extends ConsumerWidget {
                           currentRoute: currentRoute,
                           collapsed: collapsed,
                         ),
+                        if (hasPermission(ref, 'escalations', 'view'))
+                          _EscalacionesNavItem(
+                            currentRoute: currentRoute,
+                            collapsed:    collapsed,
+                          ),
                         const SizedBox(height: 4),
                         _NavSection(
                           label: 'Workers',
@@ -749,12 +755,14 @@ class _NavItem extends StatefulWidget {
     required this.route,
     required this.currentRoute,
     required this.collapsed,
+    this.badgeCount,
   });
   final IconData icon;
   final String label;
   final String route;
   final String currentRoute;
   final bool collapsed;
+  final int? badgeCount;
 
   @override
   State<_NavItem> createState() => _NavItemState();
@@ -802,8 +810,9 @@ class _NavItemState extends State<_NavItem> {
     return content;
   }
 
-  // Ítem colapsado: solo ícono centrado
+  // Ítem colapsado: solo ícono centrado (con dot badge opcional)
   Widget _buildCollapsed() {
+    final hasBadge = (widget.badgeCount ?? 0) > 0;
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 1, horizontal: 6),
       width: 44,
@@ -817,20 +826,39 @@ class _NavItemState extends State<_NavItem> {
         borderRadius: BorderRadius.circular(8),
       ),
       alignment: Alignment.center,
-      child: Icon(
-        widget.icon,
-        size: 18,
-        color: _isActive
-            ? AppColors.ctTealDark
-            : _hovered
-                ? AppColors.ctText2
-                : AppColors.ctText3,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Icon(
+            widget.icon,
+            size: 18,
+            color: _isActive
+                ? AppColors.ctTealDark
+                : _hovered
+                    ? AppColors.ctText2
+                    : AppColors.ctText3,
+          ),
+          if (hasBadge)
+            Positioned(
+              right: -5,
+              top: -5,
+              child: Container(
+                width: 8,
+                height: 8,
+                decoration: const BoxDecoration(
+                  color: AppColors.ctDanger,
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
 
-  // Ítem expandido: ícono + texto, borde izquierdo si activo
+  // Ítem expandido: ícono + texto + badge opcional, borde izquierdo si activo
   Widget _buildExpanded() {
+    final badgeCount = widget.badgeCount ?? 0;
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 1, horizontal: 6),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -876,8 +904,51 @@ class _NavItemState extends State<_NavItem> {
               overflow: TextOverflow.ellipsis,
             ),
           ),
+          if (badgeCount > 0) ...[
+            const SizedBox(width: 4),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+              decoration: BoxDecoration(
+                color: AppColors.ctDanger,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                badgeCount > 99 ? '99+' : '$badgeCount',
+                style: const TextStyle(
+                  fontFamily: 'Geist',
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ],
         ],
       ),
+    );
+  }
+}
+
+// ── Escalaciones nav item (with Realtime badge) ───────────────────────────────
+
+class _EscalacionesNavItem extends ConsumerWidget {
+  const _EscalacionesNavItem({
+    required this.currentRoute,
+    required this.collapsed,
+  });
+  final String currentRoute;
+  final bool   collapsed;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final count = ref.watch(openEscalationsCountProvider).valueOrNull ?? 0;
+    return _NavItem(
+      icon:         Icons.warning_amber_rounded,
+      label:        'Escalaciones',
+      route:        '/escalaciones',
+      currentRoute: currentRoute,
+      collapsed:    collapsed,
+      badgeCount:   count > 0 ? count : null,
     );
   }
 }

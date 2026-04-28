@@ -40,6 +40,10 @@ abstract final class AppColors {
   static const ctInfoBg = Color(0xFFDBEAFE);
   static const ctInfoText = Color(0xFF1E40AF);
 
+  // Naranja — escalaciones reabiertas
+  static const ctOrangeBg   = Color(0xFFFFEDD5);
+  static const ctOrangeText = Color(0xFF9A3412);
+
   // Mensajería — burbujas
   static const waBubbleAi = Color(0xFFDCF8C6); // outbound IA WhatsApp
 }
