@@ -98,6 +98,7 @@ class _FlowDetailScreenState extends ConsumerState<FlowDetailScreen>
 
   // Comportamiento tab state
   List<Map<String, dynamic>> _conditions = [];
+  bool _sendProactive = true;
 
   // Al cerrar tab state
   List<Map<String, dynamic>> _actions = [];
@@ -160,6 +161,7 @@ class _FlowDetailScreenState extends ConsumerState<FlowDetailScreen>
         _triggerSources = sources;
         _conditions = conditions;
         _actions = actions;
+        _sendProactive = (flow['send_proactive'] as bool?) ?? true;
         _nameCtrl.text = flow['name'] as String? ?? '';
         _slugCtrl.text = flow['slug'] as String? ?? '';
         _descCtrl.text = flow['description'] as String? ?? '';
@@ -328,6 +330,10 @@ class _FlowDetailScreenState extends ConsumerState<FlowDetailScreen>
             conditions: _conditions,
             flowFields: _fields,
             canManage: canManage,
+            triggerSources: _triggerSources,
+            flowId: widget.flowId,
+            tenantId: ref.read(activeTenantIdProvider),
+            sendProactive: _sendProactive,
             onChanged: (updated) => setState(() => _conditions = updated),
           ),
           _AlCerrarTab(
@@ -1016,12 +1022,20 @@ class _ComportamientoTab extends StatefulWidget {
     required this.conditions,
     required this.flowFields,
     required this.canManage,
+    required this.triggerSources,
+    required this.flowId,
+    required this.tenantId,
+    required this.sendProactive,
     required this.onChanged,
   });
 
   final List<Map<String, dynamic>> conditions;
   final List<Map<String, dynamic>> flowFields;
   final bool canManage;
+  final List<String> triggerSources;
+  final String flowId;
+  final String tenantId;
+  final bool sendProactive;
   final ValueChanged<List<Map<String, dynamic>>> onChanged;
 
   @override
@@ -1030,11 +1044,14 @@ class _ComportamientoTab extends StatefulWidget {
 
 class _ComportamientoTabState extends State<_ComportamientoTab> {
   late List<Map<String, dynamic>> _conditions;
+  late bool _sendProactive;
+  bool _savingProactive = false;
 
   @override
   void initState() {
     super.initState();
     _conditions = List.from(widget.conditions);
+    _sendProactive = widget.sendProactive;
   }
 
   @override
@@ -1042,6 +1059,42 @@ class _ComportamientoTabState extends State<_ComportamientoTab> {
     super.didUpdateWidget(old);
     if (old.conditions != widget.conditions) {
       _conditions = List.from(widget.conditions);
+    }
+    if (old.sendProactive != widget.sendProactive) {
+      _sendProactive = widget.sendProactive;
+    }
+  }
+
+  Future<void> _patchSendProactive(bool value) async {
+    setState(() {
+      _sendProactive = value;
+      _savingProactive = true;
+    });
+    try {
+      await FlowsApi.updateFlow(
+        flowId: widget.flowId,
+        sendProactive: value,
+      );
+      if (!mounted) return;
+      setState(() => _savingProactive = false);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(value
+            ? 'Mensaje proactivo activado'
+            : 'Mensaje proactivo desactivado'),
+        backgroundColor: AppColors.ctOk,
+        duration: const Duration(seconds: 2),
+      ));
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _sendProactive = !value;
+        _savingProactive = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(_dioError(e)),
+        backgroundColor: AppColors.ctDanger,
+        duration: const Duration(seconds: 3),
+      ));
     }
   }
 
@@ -1173,6 +1226,65 @@ class _ComportamientoTabState extends State<_ComportamientoTab> {
               ),
             ),
           const SizedBox(height: 24),
+          if (widget.triggerSources.contains('conversational')) ...[
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.ctSurface,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.ctBorder),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: const [
+                        Text(
+                          'Enviar mensaje proactivo al operador al iniciar este flujo',
+                          style: TextStyle(
+                            fontFamily: 'Geist',
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.ctText,
+                          ),
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          'Si está activado, la plataforma envía un mensaje automático al operador cuando se abre este flujo',
+                          style: TextStyle(
+                            fontFamily: 'Geist',
+                            fontSize: 12,
+                            color: AppColors.ctText2,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  if (_savingProactive)
+                    const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: AppColors.ctTeal,
+                      ),
+                    )
+                  else
+                    Switch(
+                      value: _sendProactive,
+                      activeThumbColor: AppColors.ctTeal,
+                      activeTrackColor: AppColors.ctTeal.withValues(alpha: 0.4),
+                      onChanged: widget.canManage
+                          ? (v) => _patchSendProactive(v)
+                          : null,
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+          ],
         ],
       ),
     );

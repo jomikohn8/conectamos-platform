@@ -51,6 +51,7 @@ class FlowsApi {
     Map<String, dynamic>? behavior,
     Map<String, dynamic>? onComplete,
     List<String>? triggerSources,
+    bool? sendProactive,
   }) async {
     final response = await ApiClient.instance.patch(
       '/flows/$flowId',
@@ -63,6 +64,7 @@ class FlowsApi {
         'behavior':        ?behavior,
         'on_complete':     ?onComplete,
         'trigger_sources': ?triggerSources,
+        'send_proactive':  ?sendProactive,
       },
     );
     return Map<String, dynamic>.from(response.data);
