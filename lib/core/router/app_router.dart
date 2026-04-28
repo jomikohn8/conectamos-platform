@@ -19,6 +19,7 @@ import '../../features/config/settings_screen.dart';
 import '../../features/settings/operator_fields_screen.dart';
 import '../../features/config/ai_workers_screen.dart';
 import '../../features/config/workflows_screen.dart';
+import '../../features/flows/flow_detail_screen.dart';
 import '../../features/conversations/conversations_screen.dart';
 import '../../features/dashboard/dashboard_screen.dart';
 import '../../features/overview/overview_screen.dart';
@@ -144,6 +145,13 @@ final routerProvider = Provider<GoRouter>((ref) {
             pageBuilder: (context, state) => const NoTransitionPage(
               child: WorkflowsScreen(),
             ),
+          ),
+          GoRoute(
+            path: '/flows/:flowId',
+            pageBuilder: (context, state) {
+              final flowId = state.pathParameters['flowId'] ?? '';
+              return NoTransitionPage(child: FlowDetailScreen(flowId: flowId));
+            },
           ),
           GoRoute(
             path: '/workers',

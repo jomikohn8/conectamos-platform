@@ -11,6 +11,17 @@ class FlowsApi {
     return List<Map<String, dynamic>>.from(response.data);
   }
 
+  static Future<Map<String, dynamic>> getFlow({
+    required String tenantId,
+    required String flowId,
+  }) async {
+    final response = await ApiClient.instance.get(
+      '/flows/$flowId',
+      queryParameters: {'tenant_id': tenantId},
+    );
+    return Map<String, dynamic>.from(response.data);
+  }
+
   static Future<Map<String, dynamic>> createFlow({
     required String tenantId,
     required String tenantWorkerId,
@@ -33,19 +44,23 @@ class FlowsApi {
   static Future<Map<String, dynamic>> updateFlow({
     required String flowId,
     String? name,
+    String? slug,
     String? description,
     bool? isActive,
     List<Map<String, dynamic>>? fields,
     Map<String, dynamic>? behavior,
+    List<String>? triggerSources,
   }) async {
     final response = await ApiClient.instance.patch(
       '/flows/$flowId',
       data: {
-        'name':        ?name,
-        'description': ?description,
-        'is_active':   ?isActive,
-        'fields':      ?fields,
-        'behavior':    ?behavior,
+        'name':            ?name,
+        'slug':            ?slug,
+        'description':     ?description,
+        'is_active':       ?isActive,
+        'fields':          ?fields,
+        'behavior':        ?behavior,
+        'trigger_sources': ?triggerSources,
       },
     );
     return Map<String, dynamic>.from(response.data);

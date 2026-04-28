@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/api/ai_workers_api.dart';
 import '../../core/api/flows_api.dart';
@@ -212,7 +213,7 @@ class _WorkflowsScreenState extends ConsumerState<WorkflowsScreen> {
               flow: entry.value,
               index: entry.key,
               onToggle: () => _toggleActive(entry.value),
-              onEdit: () => _openForm(flow: entry.value),
+              onEdit: () => context.go('/flows/${entry.value['id']}'),
               canManage: canManage,
             ),
           );
