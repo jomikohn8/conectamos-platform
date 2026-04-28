@@ -70,9 +70,11 @@ class _FlowIntegrationsScreenState
     if (_deleting) return;
     setState(() => _deleting = true);
     try {
+      final tenantId = ref.read(activeTenantIdProvider);
       await FlowsApi.deleteIntegration(
         flowId: widget.flowId,
         integrationId: integrationId,
+        tenantId: tenantId,
       );
       if (!mounted) return;
       await _load();
@@ -117,10 +119,12 @@ class _FlowIntegrationsScreenState
   }
 
   void _openCreateDialog() {
+    final tenantId = ref.read(activeTenantIdProvider);
     showDialog(
       context: context,
       builder: (_) => _CreateIntegrationDialog(
         flowId: widget.flowId,
+        tenantId: tenantId,
         onCreated: (integration) async {
           await _showSecretDialog(integration);
           await _load();
@@ -454,10 +458,12 @@ class _IntegrationCard extends StatelessWidget {
 class _CreateIntegrationDialog extends StatefulWidget {
   const _CreateIntegrationDialog({
     required this.flowId,
+    required this.tenantId,
     required this.onCreated,
   });
 
   final String flowId;
+  final String tenantId;
   final Future<void> Function(Map<String, dynamic> integration) onCreated;
 
   @override
@@ -496,6 +502,7 @@ class _CreateIntegrationDialogState extends State<_CreateIntegrationDialog> {
     try {
       final integration = await FlowsApi.createIntegration(
         flowId: widget.flowId,
+        tenantId: widget.tenantId,
         integrationType: _type,
         endpointUrl: _urlCtrl.text.trim().isEmpty ? null : _urlCtrl.text.trim(),
         includeAncestors: _includeAncestors,

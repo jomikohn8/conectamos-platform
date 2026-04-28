@@ -94,6 +94,7 @@ class FlowsApi {
 
   static Future<Map<String, dynamic>> createIntegration({
     required String flowId,
+    required String tenantId,
     required String integrationType,
     String? endpointUrl,
     bool includeAncestors = false,
@@ -101,6 +102,7 @@ class FlowsApi {
   }) async {
     final response = await ApiClient.instance.post(
       '/flows/$flowId/integrations',
+      queryParameters: {'tenant_id': tenantId},
       data: {
         'integration_type':    integrationType,
         'endpoint_url':        ?endpointUrl,
@@ -128,8 +130,12 @@ class FlowsApi {
   static Future<void> deleteIntegration({
     required String flowId,
     required String integrationId,
+    required String tenantId,
   }) async {
-    await ApiClient.instance.delete('/flows/$flowId/integrations/$integrationId');
+    await ApiClient.instance.delete(
+      '/flows/$flowId/integrations/$integrationId',
+      queryParameters: {'tenant_id': tenantId},
+    );
   }
 
   // ── Dashboard (executions) ──────────────────────────────────────────────────

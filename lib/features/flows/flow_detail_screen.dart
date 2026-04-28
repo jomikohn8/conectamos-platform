@@ -10,6 +10,32 @@ import '../../core/theme/app_theme.dart';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+const _kFieldAccentMap = {
+  'à': 'a', 'á': 'a', 'â': 'a', 'ã': 'a', 'ä': 'a', 'å': 'a',
+  'æ': 'ae', 'ç': 'c',
+  'è': 'e', 'é': 'e', 'ê': 'e', 'ë': 'e',
+  'ì': 'i', 'í': 'i', 'î': 'i', 'ï': 'i',
+  'ð': 'd', 'ñ': 'n',
+  'ò': 'o', 'ó': 'o', 'ô': 'o', 'õ': 'o', 'ö': 'o', 'ø': 'o',
+  'ù': 'u', 'ú': 'u', 'û': 'u', 'ü': 'u',
+  'ý': 'y', 'ÿ': 'y', 'þ': 'th', 'ß': 'ss',
+};
+
+String _fieldKeyify(String input) {
+  final lower = input.toLowerCase();
+  final buf = StringBuffer();
+  for (final rune in lower.runes) {
+    final ch = String.fromCharCode(rune);
+    buf.write(_kFieldAccentMap[ch] ?? ch);
+  }
+  final key = buf
+      .toString()
+      .replaceAll(RegExp(r'[^a-z0-9]+'), '_')
+      .replaceAll(RegExp(r'_+'), '_')
+      .replaceAll(RegExp(r'^_+|_+$'), '');
+  return key.length > 63 ? key.substring(0, 63) : key;
+}
+
 Color _hexColor(String? hex) {
   try {
     final h = (hex ?? '#9CA3AF').replaceAll('#', '');
@@ -816,6 +842,9 @@ class _FieldDialogState extends State<_FieldDialog> {
 
   bool get _isEdit => widget.field != null;
 
+  String get _fieldKey => _fieldKeyify(_labelCtrl.text.trim());
+  bool get _fieldKeyValid => _fieldKey.length >= 2;
+
   @override
   void initState() {
     super.initState();
@@ -824,20 +853,25 @@ class _FieldDialogState extends State<_FieldDialog> {
       _type = widget.field!['type'] as String? ?? 'text';
       _required = widget.field!['required'] as bool? ?? false;
     }
+    _labelCtrl.addListener(_onLabelChanged);
   }
+
+  void _onLabelChanged() => setState(() {});
 
   @override
   void dispose() {
+    _labelCtrl.removeListener(_onLabelChanged);
     _labelCtrl.dispose();
     super.dispose();
   }
 
   void _submit() {
     final label = _labelCtrl.text.trim();
-    if (label.isEmpty) return;
+    if (label.isEmpty || !_fieldKeyValid) return;
 
     final updated = Map<String, dynamic>.from(widget.field ?? {});
     updated['label'] = label;
+    updated['key'] = _fieldKey;
     updated['type'] = _type;
     updated['required'] = _required;
     if (!_isEdit || updated['id'] == null) {
@@ -882,6 +916,13 @@ class _FieldDialogState extends State<_FieldDialog> {
                 controller: _labelCtrl,
                 placeholder: 'Ej: Número de guía',
               ),
+              if (_labelCtrl.text.trim().isNotEmpty) ...[
+                const SizedBox(height: 6),
+                _FieldKeyPreview(
+                  fieldKey: _fieldKey,
+                  valid: _fieldKeyValid,
+                ),
+              ],
               const SizedBox(height: 14),
 
               // Type
@@ -973,7 +1014,8 @@ class _FieldDialogState extends State<_FieldDialog> {
                   const SizedBox(width: 10),
                   _PrimaryButton(
                     label: 'Guardar',
-                    onTap: _submit,
+                    onTap: _fieldKeyValid ? _submit : () {},
+                    enabled: _fieldKeyValid,
                   ),
                 ],
               ),
@@ -2333,29 +2375,68 @@ class _FormField extends StatelessWidget {
   }
 }
 
+class _FieldKeyPreview extends StatelessWidget {
+  const _FieldKeyPreview({required this.fieldKey, required this.valid});
+  final String fieldKey;
+  final bool valid;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(
+          valid ? Icons.check_circle_outline : Icons.warning_amber_outlined,
+          size: 13,
+          color: valid ? const Color(0xFF107C41) : const Color(0xFFE24C4B),
+        ),
+        const SizedBox(width: 4),
+        Expanded(
+          child: Text(
+            valid ? fieldKey : (fieldKey.isEmpty ? 'Clave inválida' : 'Clave inválida: "$fieldKey"'),
+            style: TextStyle(
+              fontFamily: 'Geist',
+              fontSize: 12,
+              color: valid ? const Color(0xFF107C41) : const Color(0xFFE24C4B),
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _PrimaryButton extends StatelessWidget {
-  const _PrimaryButton({required this.label, required this.onTap});
+  const _PrimaryButton({
+    required this.label,
+    required this.onTap,
+    this.enabled = true,
+  });
   final String label;
   final VoidCallback onTap;
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: AppColors.ctTeal,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Text(
-          label,
-          style: const TextStyle(
-            fontFamily: 'Geist',
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: AppColors.ctNavy,
+      child: Opacity(
+        opacity: enabled ? 1.0 : 0.45,
+        child: Container(
+          padding:
+              const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            color: AppColors.ctTeal,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            label,
+            style: const TextStyle(
+              fontFamily: 'Geist',
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: AppColors.ctNavy,
+            ),
           ),
         ),
       ),
