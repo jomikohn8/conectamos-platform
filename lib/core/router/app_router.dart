@@ -21,6 +21,7 @@ import '../../features/config/ai_workers_screen.dart';
 import '../../features/config/workflows_screen.dart';
 import '../../features/flows/executions_screen.dart';
 import '../../features/flows/flow_detail_screen.dart';
+import '../../features/flows/flow_integrations_screen.dart';
 import '../../features/conversations/conversations_screen.dart';
 import '../../features/dashboard/dashboard_screen.dart';
 import '../../features/overview/overview_screen.dart';
@@ -158,6 +159,16 @@ final routerProvider = Provider<GoRouter>((ref) {
             pageBuilder: (context, state) {
               final flowId = state.pathParameters['flowId'] ?? '';
               return NoTransitionPage(child: FlowDetailScreen(flowId: flowId));
+            },
+          ),
+          GoRoute(
+            path: '/flows/:flowId/integrations',
+            pageBuilder: (context, state) {
+              final flowId = state.pathParameters['flowId'] ?? '';
+              final flowName = state.uri.queryParameters['flowName'] ?? 'Flujo';
+              return NoTransitionPage(
+                child: FlowIntegrationsScreen(flowId: flowId, flowName: flowName),
+              );
             },
           ),
           GoRoute(

@@ -357,6 +357,15 @@ class _FlowDetailScreenState extends ConsumerState<FlowDetailScreen>
         ),
       ),
       actions: [
+        if (_flow != null && hasPermission(ref, 'flow_integrations', 'view'))
+          IconButton(
+            icon: const Icon(Icons.electrical_services_outlined, color: Colors.white70),
+            tooltip: 'Integraciones',
+            onPressed: () {
+              final name = _flow!['name'] as String? ?? 'Flujo';
+              context.go('/flows/${widget.flowId}/integrations?flowName=${Uri.encodeComponent(name)}');
+            },
+          ),
         if (_saving)
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 16),

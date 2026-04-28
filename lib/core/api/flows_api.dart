@@ -72,6 +72,50 @@ class FlowsApi {
     await ApiClient.instance.delete('/flows/$flowId');
   }
 
+  // ── Integrations ────────────────────────────────────────────────────────────
+
+  static Future<List<Map<String, dynamic>>> listIntegrations({
+    required String tenantId,
+    required String flowId,
+  }) async {
+    final response = await ApiClient.instance.get(
+      '/flows/$flowId/integrations',
+      queryParameters: {'tenant_id': tenantId},
+    );
+    final raw = response.data;
+    final list = raw is List
+        ? raw
+        : (raw is Map ? (raw['integrations'] ?? raw['items'] ?? raw['data'] ?? []) : []);
+    return List<Map<String, dynamic>>.from(
+        (list as List).whereType<Map>().map((e) => Map<String, dynamic>.from(e)));
+  }
+
+  static Future<Map<String, dynamic>> createIntegration({
+    required String flowId,
+    required String integrationType,
+    String? endpointUrl,
+    bool includeAncestors = false,
+    int rateLimitPerMinute = 60,
+  }) async {
+    final response = await ApiClient.instance.post(
+      '/flows/$flowId/integrations',
+      data: {
+        'integration_type':    integrationType,
+        'endpoint_url':        ?endpointUrl,
+        'include_ancestors':   includeAncestors,
+        'rate_limit_per_minute': rateLimitPerMinute,
+      },
+    );
+    return Map<String, dynamic>.from(response.data);
+  }
+
+  static Future<void> deleteIntegration({
+    required String flowId,
+    required String integrationId,
+  }) async {
+    await ApiClient.instance.delete('/flows/$flowId/integrations/$integrationId');
+  }
+
   // ── Dashboard (executions) ──────────────────────────────────────────────────
 
   static Future<List<Map<String, dynamic>>> listPendingExecutions({

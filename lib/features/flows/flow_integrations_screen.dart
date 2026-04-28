@@ -1,0 +1,842 @@
+import 'package:dio/dio.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../core/api/flows_api.dart';
+import '../../core/providers/permissions_provider.dart';
+import '../../core/providers/tenant_provider.dart';
+import '../../core/theme/app_theme.dart';
+
+// ── Screen ────────────────────────────────────────────────────────────────────
+
+class FlowIntegrationsScreen extends ConsumerStatefulWidget {
+  const FlowIntegrationsScreen({
+    super.key,
+    required this.flowId,
+    required this.flowName,
+  });
+
+  final String flowId;
+  final String flowName;
+
+  @override
+  ConsumerState<FlowIntegrationsScreen> createState() =>
+      _FlowIntegrationsScreenState();
+}
+
+class _FlowIntegrationsScreenState
+    extends ConsumerState<FlowIntegrationsScreen> {
+  List<Map<String, dynamic>> _integrations = [];
+  bool _loading = true;
+  String? _error;
+  bool _deleting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+  }
+
+  Future<void> _load() async {
+    if (!mounted) return;
+    final tenantId = ref.read(activeTenantIdProvider);
+    if (tenantId.isEmpty) return;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final list = await FlowsApi.listIntegrations(
+        tenantId: tenantId,
+        flowId: widget.flowId,
+      );
+      if (!mounted) return;
+      setState(() {
+        _integrations = list;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = _dioError(e);
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _delete(String integrationId) async {
+    if (_deleting) return;
+    setState(() => _deleting = true);
+    try {
+      await FlowsApi.deleteIntegration(
+        flowId: widget.flowId,
+        integrationId: integrationId,
+      );
+      if (!mounted) return;
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _deleting = false);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(_dioError(e)),
+        backgroundColor: AppColors.ctDanger,
+        duration: const Duration(seconds: 3),
+      ));
+    }
+  }
+
+  void _openCreateDialog() {
+    showDialog(
+      context: context,
+      builder: (_) => _CreateIntegrationDialog(
+        flowId: widget.flowId,
+        onCreated: (integration) async {
+          await _showSecretDialog(integration);
+          await _load();
+        },
+      ),
+    );
+  }
+
+  Future<void> _showSecretDialog(Map<String, dynamic> integration) async {
+    final secret = integration['secret'] as String? ??
+        integration['api_key'] as String? ??
+        integration['token'] as String?;
+    if (secret == null || !mounted) return;
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text(
+          'Copia tu clave ahora',
+          style: TextStyle(
+            fontFamily: 'Geist',
+            fontWeight: FontWeight.w600,
+            fontSize: 15,
+            color: AppColors.ctText,
+          ),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Esta clave secreta solo se muestra una vez. Guárdala en un lugar seguro.',
+              style: TextStyle(
+                fontFamily: 'Geist',
+                fontSize: 13,
+                color: AppColors.ctText2,
+              ),
+            ),
+            const SizedBox(height: 16),
+            _SecretBox(secret: secret),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => ctx.pop(),
+            child: const Text('Cerrar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    ref.listen<String>(activeTenantIdProvider, (prev, next) {
+      if (next.isNotEmpty) _load();
+    });
+
+    final canManage = hasPermission(ref, 'flow_integrations', 'manage');
+
+    return Scaffold(
+      backgroundColor: AppColors.ctBg,
+      appBar: AppBar(
+        backgroundColor: AppColors.ctNavy,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => context.go('/flows/${widget.flowId}'),
+        ),
+        title: Text(
+          'Integraciones — ${widget.flowName}',
+          style: AppFonts.onest(
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+          ),
+        ),
+        actions: [
+          if (canManage)
+            TextButton.icon(
+              onPressed: _loading ? null : _openCreateDialog,
+              icon: const Icon(Icons.add, color: AppColors.ctTeal, size: 18),
+              label: const Text(
+                'Nueva',
+                style: TextStyle(
+                  fontFamily: 'Geist',
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.ctTeal,
+                ),
+              ),
+            ),
+        ],
+      ),
+      body: _buildBody(canManage),
+    );
+  }
+
+  Widget _buildBody(bool canManage) {
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_error != null) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.error_outline, size: 48, color: AppColors.ctDanger),
+            const SizedBox(height: 12),
+            Text(
+              _error!,
+              style: const TextStyle(
+                fontFamily: 'Geist',
+                color: AppColors.ctText2,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            TextButton(onPressed: _load, child: const Text('Reintentar')),
+          ],
+        ),
+      );
+    }
+    if (_integrations.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.electrical_services_outlined,
+                size: 52, color: AppColors.ctText3),
+            const SizedBox(height: 12),
+            Text(
+              'Sin integraciones',
+              style: AppFonts.onest(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: AppColors.ctText2,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Crea una integración para conectar este flujo con sistemas externos.',
+              style: AppFonts.geist(fontSize: 13, color: AppColors.ctText2),
+              textAlign: TextAlign.center,
+            ),
+            if (canManage) ...[
+              const SizedBox(height: 20),
+              ElevatedButton.icon(
+                onPressed: _openCreateDialog,
+                icon: const Icon(Icons.add, size: 16),
+                label: const Text('Nueva integración'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.ctTeal,
+                  foregroundColor: Colors.white,
+                  textStyle: AppFonts.geist(
+                      fontSize: 13, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ],
+        ),
+      );
+    }
+
+    return ListView.separated(
+      padding: const EdgeInsets.all(24),
+      itemCount: _integrations.length,
+      separatorBuilder: (ctx2, idx2) => const SizedBox(height: 12),
+      itemBuilder: (context, i) => _IntegrationCard(
+        integration: _integrations[i],
+        canManage: canManage,
+        deleting: _deleting,
+        onDelete: () {
+          final id = _integrations[i]['id'] as String? ?? '';
+          if (id.isNotEmpty) _delete(id);
+        },
+      ),
+    );
+  }
+}
+
+// ── Card ──────────────────────────────────────────────────────────────────────
+
+class _IntegrationCard extends StatelessWidget {
+  const _IntegrationCard({
+    required this.integration,
+    required this.canManage,
+    required this.deleting,
+    required this.onDelete,
+  });
+
+  final Map<String, dynamic> integration;
+  final bool canManage;
+  final bool deleting;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final type = integration['integration_type'] as String? ??
+        integration['type'] as String? ??
+        'api';
+    final id = integration['id'] as String? ?? '';
+    final isActive = integration['is_active'] as bool? ?? true;
+    final createdAt = integration['created_at'] as String? ?? '';
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.ctSurface,
+        border: Border.all(color: AppColors.ctBorder),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        children: [
+          _TypeIcon(type: type),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      _typeLabel(type),
+                      style: AppFonts.geist(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.ctText,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    _StatusChip(active: isActive),
+                  ],
+                ),
+                if (id.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    'ID: $id',
+                    style: AppFonts.geist(
+                        fontSize: 11, color: AppColors.ctText3),
+                  ),
+                ],
+                if (createdAt.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    'Creado: ${_formatDate(createdAt)}',
+                    style: AppFonts.geist(
+                        fontSize: 11, color: AppColors.ctText3),
+                  ),
+                ],
+                if (type == 'webhook' || type == 'webhook_out') ...[
+                  const SizedBox(height: 4),
+                  _EndpointRow(integration: integration),
+                ],
+              ],
+            ),
+          ),
+          if (canManage)
+            deleting
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : IconButton(
+                    icon: const Icon(Icons.delete_outline,
+                        color: AppColors.ctText3, size: 18),
+                    tooltip: 'Eliminar',
+                    onPressed: () => _confirmDelete(context),
+                  ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmDelete(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text(
+          'Eliminar integración',
+          style: TextStyle(
+              fontFamily: 'Geist',
+              fontWeight: FontWeight.w600,
+              fontSize: 15,
+              color: AppColors.ctText),
+        ),
+        content: const Text(
+          '¿Estás seguro? Esta acción no se puede deshacer.',
+          style: TextStyle(
+              fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText2),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => ctx.pop(),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () {
+              ctx.pop();
+              onDelete();
+            },
+            child: const Text(
+              'Eliminar',
+              style: TextStyle(color: AppColors.ctDanger),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Create dialog ─────────────────────────────────────────────────────────────
+
+class _CreateIntegrationDialog extends StatefulWidget {
+  const _CreateIntegrationDialog({
+    required this.flowId,
+    required this.onCreated,
+  });
+
+  final String flowId;
+  final Future<void> Function(Map<String, dynamic> integration) onCreated;
+
+  @override
+  State<_CreateIntegrationDialog> createState() =>
+      _CreateIntegrationDialogState();
+}
+
+class _CreateIntegrationDialogState extends State<_CreateIntegrationDialog> {
+  String _type = 'api';
+  final _urlCtrl = TextEditingController();
+  bool _includeAncestors = false;
+  int _rateLimit = 60;
+  bool _saving = false;
+  String? _error;
+
+  static const _kTypes = [
+    ('api', 'API Key'),
+    ('webhook', 'Webhook'),
+    ('zapier', 'Zapier'),
+    ('make', 'Make (Integromat)'),
+    ('n8n', 'n8n'),
+  ];
+
+  @override
+  void dispose() {
+    _urlCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (_saving) return;
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      final integration = await FlowsApi.createIntegration(
+        flowId: widget.flowId,
+        integrationType: _type,
+        endpointUrl: _urlCtrl.text.trim().isEmpty ? null : _urlCtrl.text.trim(),
+        includeAncestors: _includeAncestors,
+        rateLimitPerMinute: _rateLimit,
+      );
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      await widget.onCreated(integration);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _saving = false;
+        _error = _dioError(e);
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final needsUrl = _type == 'webhook' || _type == 'n8n';
+
+    return AlertDialog(
+      title: const Text(
+        'Nueva integración',
+        style: TextStyle(
+          fontFamily: 'Geist',
+          fontWeight: FontWeight.w600,
+          fontSize: 15,
+          color: AppColors.ctText,
+        ),
+      ),
+      content: SizedBox(
+        width: 400,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Tipo',
+              style: TextStyle(
+                  fontFamily: 'Geist',
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.ctText2),
+            ),
+            const SizedBox(height: 6),
+            Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: AppColors.ctBorder),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: DropdownButton<String>(
+                value: _type,
+                isExpanded: true,
+                underline: const SizedBox.shrink(),
+                style: AppFonts.geist(fontSize: 13, color: AppColors.ctText),
+                items: _kTypes
+                    .map((t) => DropdownMenuItem(
+                          value: t.$1,
+                          child: Text(t.$2),
+                        ))
+                    .toList(),
+                onChanged: (v) {
+                  if (v != null) setState(() => _type = v);
+                },
+              ),
+            ),
+            if (needsUrl) ...[
+              const SizedBox(height: 14),
+              const Text(
+                'URL del endpoint',
+                style: TextStyle(
+                    fontFamily: 'Geist',
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.ctText2),
+              ),
+              const SizedBox(height: 6),
+              TextField(
+                controller: _urlCtrl,
+                style: AppFonts.geist(fontSize: 13, color: AppColors.ctText),
+                decoration: InputDecoration(
+                  hintText: 'https://...',
+                  hintStyle:
+                      AppFonts.geist(fontSize: 13, color: AppColors.ctText3),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(6),
+                    borderSide: const BorderSide(color: AppColors.ctBorder),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(6),
+                    borderSide: const BorderSide(color: AppColors.ctBorder),
+                  ),
+                ),
+              ),
+            ],
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Switch(
+                  value: _includeAncestors,
+                  activeThumbColor: Colors.white,
+                  activeTrackColor: AppColors.ctTeal,
+                  onChanged: (v) => setState(() => _includeAncestors = v),
+                ),
+                const SizedBox(width: 8),
+                const Text(
+                  'Incluir flujos anteriores',
+                  style: TextStyle(
+                      fontFamily: 'Geist',
+                      fontSize: 13,
+                      color: AppColors.ctText),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                const Text(
+                  'Límite por minuto:',
+                  style: TextStyle(
+                      fontFamily: 'Geist',
+                      fontSize: 13,
+                      color: AppColors.ctText),
+                ),
+                const SizedBox(width: 12),
+                SizedBox(
+                  width: 72,
+                  child: TextField(
+                    keyboardType: TextInputType.number,
+                    style:
+                        AppFonts.geist(fontSize: 13, color: AppColors.ctText),
+                    decoration: InputDecoration(
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 8),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(6),
+                        borderSide:
+                            const BorderSide(color: AppColors.ctBorder),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(6),
+                        borderSide:
+                            const BorderSide(color: AppColors.ctBorder),
+                      ),
+                    ),
+                    controller:
+                        TextEditingController(text: _rateLimit.toString()),
+                    onChanged: (v) {
+                      final n = int.tryParse(v);
+                      if (n != null && n > 0) _rateLimit = n;
+                    },
+                  ),
+                ),
+              ],
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: 12),
+              Text(
+                _error!,
+                style: const TextStyle(
+                    fontFamily: 'Geist',
+                    fontSize: 12,
+                    color: AppColors.ctDanger),
+              ),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _saving ? null : () => Navigator.of(context).pop(),
+          child: const Text('Cancelar'),
+        ),
+        ElevatedButton(
+          onPressed: _saving ? null : _submit,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.ctTeal,
+            foregroundColor: Colors.white,
+          ),
+          child: _saving
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: Colors.white),
+                )
+              : const Text('Crear',
+                  style: TextStyle(fontFamily: 'Geist', fontSize: 13)),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Secret box ────────────────────────────────────────────────────────────────
+
+class _SecretBox extends StatefulWidget {
+  const _SecretBox({required this.secret});
+  final String secret;
+
+  @override
+  State<_SecretBox> createState() => _SecretBoxState();
+}
+
+class _SecretBoxState extends State<_SecretBox> {
+  bool _copied = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.ctSurface2,
+        border: Border.all(color: AppColors.ctBorder),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      child: Row(
+        children: [
+          Expanded(
+            child: SelectableText(
+              widget.secret,
+              style: const TextStyle(
+                fontFamily: 'Geist',
+                fontSize: 13,
+                color: AppColors.ctText,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          IconButton(
+            icon: Icon(
+              _copied ? Icons.check : Icons.copy_outlined,
+              size: 16,
+              color: _copied ? AppColors.ctOk : AppColors.ctText3,
+            ),
+            tooltip: 'Copiar',
+            onPressed: () {
+              Clipboard.setData(ClipboardData(text: widget.secret));
+              setState(() => _copied = true);
+              Future.delayed(const Duration(seconds: 2),
+                  () {
+                if (mounted) setState(() => _copied = false);
+              });
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Small widgets ─────────────────────────────────────────────────────────────
+
+class _TypeIcon extends StatelessWidget {
+  const _TypeIcon({required this.type});
+  final String type;
+
+  @override
+  Widget build(BuildContext context) {
+    final IconData icon;
+    switch (type) {
+      case 'webhook':
+      case 'webhook_out':
+        icon = Icons.webhook_outlined;
+        break;
+      case 'zapier':
+        icon = Icons.bolt_outlined;
+        break;
+      case 'make':
+      case 'n8n':
+        icon = Icons.device_hub_outlined;
+        break;
+      default:
+        icon = Icons.key_outlined;
+    }
+    return Container(
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(
+        color: AppColors.ctInfoBg,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Icon(icon, size: 20, color: AppColors.ctInfo),
+    );
+  }
+}
+
+class _StatusChip extends StatelessWidget {
+  const _StatusChip({required this.active});
+  final bool active;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: active ? AppColors.ctOkBg : AppColors.ctSurface2,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        active ? 'Activo' : 'Inactivo',
+        style: TextStyle(
+          fontFamily: 'Geist',
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+          color: active ? AppColors.ctOkText : AppColors.ctText3,
+        ),
+      ),
+    );
+  }
+}
+
+class _EndpointRow extends StatelessWidget {
+  const _EndpointRow({required this.integration});
+  final Map<String, dynamic> integration;
+
+  @override
+  Widget build(BuildContext context) {
+    final url = integration['endpoint_url'] as String? ??
+        integration['url'] as String? ??
+        '';
+    if (url.isEmpty) return const SizedBox.shrink();
+    return Row(
+      children: [
+        const Icon(Icons.link, size: 12, color: AppColors.ctText3),
+        const SizedBox(width: 4),
+        Expanded(
+          child: Text(
+            url,
+            style: AppFonts.geist(fontSize: 11, color: AppColors.ctText3),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+String _typeLabel(String type) {
+  switch (type) {
+    case 'api':
+      return 'API Key';
+    case 'webhook':
+    case 'webhook_out':
+      return 'Webhook';
+    case 'zapier':
+      return 'Zapier';
+    case 'make':
+      return 'Make';
+    case 'n8n':
+      return 'n8n';
+    default:
+      return type;
+  }
+}
+
+String _formatDate(String iso) {
+  try {
+    final dt = DateTime.parse(iso).toLocal();
+    final dd = dt.day.toString().padLeft(2, '0');
+    final mm = dt.month.toString().padLeft(2, '0');
+    final yyyy = dt.year.toString();
+    final hh = dt.hour.toString().padLeft(2, '0');
+    final min = dt.minute.toString().padLeft(2, '0');
+    return '$dd/$mm/$yyyy $hh:$min';
+  } catch (_) {
+    return iso;
+  }
+}
+
+String _dioError(Object e) {
+  if (e is DioException) {
+    final data = e.response?.data;
+    if (data is Map) {
+      final d = data['detail'];
+      if (d != null) return 'Error: $d';
+    }
+    final s = e.response?.statusCode;
+    if (s != null) return 'Error $s al procesar la solicitud';
+  }
+  return e.toString();
+}
