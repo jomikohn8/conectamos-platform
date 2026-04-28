@@ -134,7 +134,7 @@ class OperatorsApi {
     required String id,
     required List<String> types,
   }) async {
-    await ApiClient.instance.patch(
+    await ApiClient.instance.put(
       '/operators/$id',
       data: {'preferred_channel_types': types},
     );
