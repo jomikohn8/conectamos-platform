@@ -113,6 +113,7 @@ class _FlowDetailScreenState extends ConsumerState<FlowDetailScreen>
   }
 
   Future<void> _load() async {
+    if (_loading && _flow != null) return;
     if (!mounted) return;
     setState(() {
       _loading = true;
