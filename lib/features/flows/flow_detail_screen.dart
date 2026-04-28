@@ -266,6 +266,50 @@ class _FlowDetailScreenState extends ConsumerState<FlowDetailScreen>
     });
   }
 
+  void _confirmDeleteField(Map<String, dynamic> field, int index) {
+    final label = field['label'] as String? ?? field['key'] as String? ?? 'este campo';
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.ctSurface,
+        title: const Text(
+          'Eliminar campo',
+          style: TextStyle(
+            fontFamily: 'Geist',
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+            color: AppColors.ctText,
+          ),
+        ),
+        content: Text(
+          '¿Eliminar el campo "$label"? Esta acción no se puede deshacer.',
+          style: const TextStyle(
+            fontFamily: 'Geist',
+            fontSize: 13,
+            color: AppColors.ctText2,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              setState(() => _fields.removeAt(index));
+              _save(silent: true);
+            },
+            child: const Text(
+              'Eliminar',
+              style: TextStyle(color: AppColors.ctDanger),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _openFieldDialog({Map<String, dynamic>? field, int? index}) {
     showDialog(
       context: context,
@@ -354,6 +398,8 @@ class _FlowDetailScreenState extends ConsumerState<FlowDetailScreen>
             onReorder: _onReorder,
             onEditField: (field, index) =>
                 _openFieldDialog(field: field, index: index),
+            onDeleteField: (field, index) =>
+                _confirmDeleteField(field, index),
             onAddField: () => _openFieldDialog(),
           ),
           _ComportamientoTab(
@@ -616,6 +662,7 @@ class _CamposTab extends StatelessWidget {
     required this.canManage,
     required this.onReorder,
     required this.onEditField,
+    required this.onDeleteField,
     required this.onAddField,
   });
 
@@ -623,6 +670,7 @@ class _CamposTab extends StatelessWidget {
   final bool canManage;
   final void Function(int oldIndex, int newIndex) onReorder;
   final void Function(Map<String, dynamic> field, int index) onEditField;
+  final void Function(Map<String, dynamic> field, int index) onDeleteField;
   final VoidCallback onAddField;
 
   @override
@@ -698,6 +746,7 @@ class _CamposTab extends StatelessWidget {
                   canManage: canManage,
                   isLast: i == fields.length - 1,
                   onEdit: () => onEditField(field, i),
+                  onDelete: () => onDeleteField(field, i),
                 );
               },
             ),
@@ -719,6 +768,7 @@ class _FieldRow extends StatelessWidget {
     required this.canManage,
     required this.isLast,
     required this.onEdit,
+    required this.onDelete,
   });
 
   final Map<String, dynamic> field;
@@ -726,6 +776,7 @@ class _FieldRow extends StatelessWidget {
   final bool canManage;
   final bool isLast;
   final VoidCallback onEdit;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -814,6 +865,15 @@ class _FieldRow extends StatelessWidget {
                         size: 16, color: AppColors.ctText2),
                     onPressed: onEdit,
                     tooltip: 'Editar campo',
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(
+                        minWidth: 32, minHeight: 32),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline,
+                        size: 16, color: AppColors.ctDanger),
+                    onPressed: onDelete,
+                    tooltip: 'Eliminar campo',
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(
                         minWidth: 32, minHeight: 32),
