@@ -110,6 +110,36 @@ class OperatorsApi {
     );
   }
 
+  /// GET /operators/{id}/available-channel-types?tenant_id=
+  /// Returns the channel types the operator actually has via assigned flows.
+  static Future<List<String>> getAvailableChannelTypes({
+    required String operatorId,
+    required String tenantId,
+  }) async {
+    final response = await ApiClient.instance.get(
+      '/operators/$operatorId/available-channel-types',
+      queryParameters: {'tenant_id': tenantId},
+    );
+    final data = response.data;
+    final List raw = data is Map
+        ? ((data['channel_types'] ?? data['types'] ?? []) as List)
+        : data is List
+            ? data
+            : [];
+    return raw.map((e) => e.toString()).toList();
+  }
+
+  /// PATCH /operators/{id} — persists the ordered list of preferred channel types.
+  static Future<void> patchPreferredChannelTypes({
+    required String id,
+    required List<String> types,
+  }) async {
+    await ApiClient.instance.patch(
+      '/operators/$id',
+      data: {'preferred_channel_types': types},
+    );
+  }
+
   static Future<List<Map<String, dynamic>>> listOperatorFlows({
     required String operatorId,
   }) async {

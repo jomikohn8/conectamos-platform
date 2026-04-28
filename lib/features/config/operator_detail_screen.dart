@@ -10,6 +10,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/api/api_client.dart';
 import '../../core/api/operators_api.dart';
 import '../../core/providers/permissions_provider.dart';
+import '../../core/providers/tenant_provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/identity_config.dart';
 import 'widgets/operator_form_dialog.dart';
@@ -516,20 +517,116 @@ class _OperatorHeader extends StatelessWidget {
 
 // ── Tab DATOS ──────────────────────────────────────────────────────────────────
 
-class _DatosTab extends StatelessWidget {
+class _DatosTab extends ConsumerStatefulWidget {
   const _DatosTab({required this.op});
   final Map<String, dynamic> op;
 
   @override
+  ConsumerState<_DatosTab> createState() => _DatosTabState();
+}
+
+class _DatosTabState extends ConsumerState<_DatosTab> {
+  List<String> _orderedTypes = [];
+  bool _loadingTypes = false;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Seed from persisted preferred_channel_types before API loads
+    final raw = widget.op['preferred_channel_types'];
+    if (raw is List) {
+      _orderedTypes = raw.map((e) => e.toString()).toList();
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadTypes());
+  }
+
+  Future<void> _loadTypes() async {
+    if (!mounted) return;
+    final tenantId  = ref.read(activeTenantIdProvider);
+    final operatorId = widget.op['id'] as String? ?? '';
+    if (tenantId.isEmpty || operatorId.isEmpty) return;
+
+    setState(() => _loadingTypes = true);
+    try {
+      final available = await OperatorsApi.getAvailableChannelTypes(
+        operatorId: operatorId,
+        tenantId:   tenantId,
+      );
+      if (!mounted) return;
+      setState(() {
+        _orderedTypes = _mergeWithPreferred(available, _orderedTypes);
+        _loadingTypes = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loadingTypes = false);
+    }
+  }
+
+  /// Preferred types first (in saved order), then remaining available types.
+  static List<String> _mergeWithPreferred(
+    List<String> available,
+    List<String> preferred,
+  ) {
+    final result = <String>[];
+    for (final t in preferred) {
+      if (available.contains(t)) result.add(t);
+    }
+    for (final t in available) {
+      if (!result.contains(t)) result.add(t);
+    }
+    return result;
+  }
+
+  Future<void> _saveOrder(List<String> newOrder) async {
+    final operatorId = widget.op['id'] as String? ?? '';
+    if (operatorId.isEmpty) return;
+    setState(() {
+      _orderedTypes = newOrder;
+      _saving = true;
+    });
+    try {
+      await OperatorsApi.patchPreferredChannelTypes(
+        id:    operatorId,
+        types: newOrder,
+      );
+      if (!mounted) return;
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content:         Text('Canal preferido actualizado'),
+        backgroundColor: AppColors.ctOk,
+        duration:        Duration(seconds: 2),
+      ));
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      String msg = 'Error al actualizar el canal preferido';
+      if (e is DioException) {
+        final body = e.response?.data;
+        if (body is Map) {
+          final detail = body['detail'] ?? body['message'];
+          if (detail != null) msg = detail.toString();
+        }
+      }
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content:         Text(msg),
+        backgroundColor: AppColors.ctDanger,
+      ));
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final meta = op['metadata'] as Map<String, dynamic>? ?? {};
-    final nationality = op['nationality'] as String? ?? '';
+    final canManage = hasPermission(ref, 'operators', 'manage');
+    final op        = widget.op;
+    final meta      = op['metadata'] as Map<String, dynamic>? ?? {};
+
+    final nationality    = op['nationality']    as String? ?? '';
     final identityNumber = op['identity_number'] as String? ?? '';
-    final identityType = op['identity_type'] as String?;
-    final email = op['email'] as String? ?? '';
-    final phone = op['phone'] as String? ?? '';
-    final name =
-        op['display_name'] as String? ?? op['name'] as String? ?? '—';
+    final identityType   = op['identity_type']   as String?;
+    final email          = op['email']           as String? ?? '';
+    final phone          = op['phone']           as String? ?? '';
+    final name = op['display_name'] as String? ?? op['name'] as String? ?? '—';
     final createdAt = op['created_at'] as String?;
     final updatedAt = op['updated_at'] as String?;
     final createdBy =
@@ -542,9 +639,8 @@ class _DatosTab extends StatelessWidget {
             .map((e) => Map<String, dynamic>.from(e as Map))
             .toList();
 
-    final idConfig =
-        nationality.isNotEmpty ? getIdentityConfig(nationality) : null;
-    final idLabel = idConfig?.label ?? identityType ?? 'Identidad';
+    final idConfig = nationality.isNotEmpty ? getIdentityConfig(nationality) : null;
+    final idLabel  = idConfig?.label ?? identityType ?? 'Identidad';
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
@@ -593,9 +689,9 @@ class _DatosTab extends StatelessWidget {
             const _SectionTitle('Teléfonos secundarios'),
             const SizedBox(height: 12),
             ...phoneSecondary.map((p) {
-              final lbl = p['label'] as String? ?? '—';
-              final ch = p['channel'] as String? ?? '';
-              final pPhone = p['phone'] as String? ?? '—';
+              final lbl    = p['label']   as String? ?? '—';
+              final ch     = p['channel'] as String? ?? '';
+              final pPhone = p['phone']   as String? ?? '—';
               return Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: _FieldRow(
@@ -605,14 +701,59 @@ class _DatosTab extends StatelessWidget {
               );
             }),
           ],
+
+          // ── Canal preferido ─────────────────────────────────────────────
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              const _SectionTitle('Canal preferido'),
+              if (_saving) ...[
+                const SizedBox(width: 10),
+                const SizedBox(
+                  width:  14,
+                  height: 14,
+                  child:  CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: AppColors.ctTeal,
+                  ),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 10),
+          if (_loadingTypes)
+            const SizedBox(
+              height: 36,
+              child: Center(
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: AppColors.ctTeal,
+                ),
+              ),
+            )
+          else if (_orderedTypes.isEmpty)
+            const Text(
+              'Sin canales disponibles. Asigna flows al operador primero.',
+              style: TextStyle(
+                fontFamily: 'Geist',
+                fontSize:   13,
+                color:      AppColors.ctText3,
+              ),
+            )
+          else
+            _ChannelTypeOrderList(
+              types:      _orderedTypes,
+              enabled:    canManage && !_saving,
+              onReorder:  canManage ? _saveOrder : null,
+            ),
+
           const SizedBox(height: 16),
           const _SectionTitle('Auditoría'),
           const SizedBox(height: 12),
-          _FieldRow(label: 'Creado el', value: _fmtDate(createdAt)),
-          _FieldRow(label: 'Creado por', value: createdBy),
-          _FieldRow(
-              label: 'Última modificación', value: _fmtDate(updatedAt)),
-          _FieldRow(label: 'Modificado por', value: updatedBy),
+          _FieldRow(label: 'Creado el',          value: _fmtDate(createdAt)),
+          _FieldRow(label: 'Creado por',          value: createdBy),
+          _FieldRow(label: 'Última modificación', value: _fmtDate(updatedAt)),
+          _FieldRow(label: 'Modificado por',      value: updatedBy),
 
           // ── Campos personalizados ───────────────────────────────────────
           Builder(builder: (context) {
@@ -634,6 +775,155 @@ class _DatosTab extends StatelessWidget {
             );
           }),
         ],
+      ),
+    );
+  }
+}
+
+// ── Channel type order list ───────────────────────────────────────────────────
+
+class _ChannelTypeOrderList extends StatelessWidget {
+  const _ChannelTypeOrderList({
+    required this.types,
+    required this.enabled,
+    required this.onReorder,
+  });
+
+  final List<String>            types;
+  final bool                    enabled;
+  final ValueChanged<List<String>>? onReorder;
+
+  static Color _color(String t) => switch (t) {
+    'whatsapp' => const Color(0xFF25D366),
+    'telegram' => const Color(0xFF229ED9),
+    'sms'      => const Color(0xFF6B7280),
+    _          => AppColors.ctText3,
+  };
+
+  static IconData _icon(String t) => switch (t) {
+    'whatsapp' => Icons.chat_bubble_outline,
+    'telegram' => Icons.telegram,
+    'sms'      => Icons.sms_outlined,
+    _          => Icons.router_rounded,
+  };
+
+  static String _label(String t) => switch (t) {
+    'whatsapp' => 'WhatsApp',
+    'telegram' => 'Telegram',
+    'sms'      => 'SMS',
+    _          => t,
+  };
+
+  void _move(int from, int delta) {
+    final to = from + delta;
+    if (to < 0 || to >= types.length) return;
+    final next = List<String>.from(types);
+    final item = next.removeAt(from);
+    next.insert(to, item);
+    onReorder?.call(next);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: types.asMap().entries.map((entry) {
+        final i    = entry.key;
+        final type = entry.value;
+        final color = _color(type);
+
+        return Container(
+          key:    ValueKey(type),
+          margin: const EdgeInsets.only(bottom: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color:        AppColors.ctSurface,
+            border:       Border.all(color: AppColors.ctBorder),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            children: [
+              // Priority badge
+              Container(
+                width:  22,
+                height: 22,
+                decoration: BoxDecoration(
+                  color:        color.withValues(alpha: 0.12),
+                  shape:        BoxShape.circle,
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  '${i + 1}',
+                  style: TextStyle(
+                    fontFamily:  'Geist',
+                    fontSize:    11,
+                    fontWeight:  FontWeight.w700,
+                    color:       color,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              // Channel icon
+              Icon(_icon(type), size: 16, color: color),
+              const SizedBox(width: 8),
+              // Label
+              Expanded(
+                child: Text(
+                  _label(type),
+                  style: TextStyle(
+                    fontFamily:  'Geist',
+                    fontSize:    13,
+                    fontWeight:  FontWeight.w600,
+                    color:       enabled ? AppColors.ctText : AppColors.ctText3,
+                  ),
+                ),
+              ),
+              // ↑ ↓ arrows
+              if (enabled) ...[
+                _ArrowBtn(
+                  icon:      Icons.keyboard_arrow_up_rounded,
+                  tooltip:   'Mover arriba',
+                  onPressed: i > 0 ? () => _move(i, -1) : null,
+                ),
+                _ArrowBtn(
+                  icon:      Icons.keyboard_arrow_down_rounded,
+                  tooltip:   'Mover abajo',
+                  onPressed: i < types.length - 1 ? () => _move(i, 1) : null,
+                ),
+              ],
+            ],
+          ),
+        );
+      }).toList(),
+    );
+  }
+}
+
+class _ArrowBtn extends StatelessWidget {
+  const _ArrowBtn({
+    required this.icon,
+    required this.tooltip,
+    required this.onPressed,
+  });
+  final IconData     icon;
+  final String       tooltip;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message:      tooltip,
+      waitDuration: const Duration(milliseconds: 400),
+      child: InkWell(
+        onTap:        onPressed,
+        borderRadius: BorderRadius.circular(4),
+        child: Padding(
+          padding: const EdgeInsets.all(2),
+          child: Icon(
+            icon,
+            size:  20,
+            color: onPressed != null ? AppColors.ctText2 : AppColors.ctBorder2,
+          ),
+        ),
       ),
     );
   }
