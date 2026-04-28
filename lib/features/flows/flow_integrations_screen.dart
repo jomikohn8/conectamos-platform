@@ -473,6 +473,7 @@ class _CreateIntegrationDialog extends StatefulWidget {
 
 class _CreateIntegrationDialogState extends State<_CreateIntegrationDialog> {
   String _type = 'api';
+  final _nameCtrl = TextEditingController();
   final _urlCtrl = TextEditingController();
   bool _includeAncestors = false;
   int _rateLimit = 60;
@@ -488,7 +489,14 @@ class _CreateIntegrationDialogState extends State<_CreateIntegrationDialog> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _nameCtrl.addListener(() => setState(() {}));
+  }
+
+  @override
   void dispose() {
+    _nameCtrl.dispose();
     _urlCtrl.dispose();
     super.dispose();
   }
@@ -503,6 +511,7 @@ class _CreateIntegrationDialogState extends State<_CreateIntegrationDialog> {
       final integration = await FlowsApi.createIntegration(
         flowId: widget.flowId,
         tenantId: widget.tenantId,
+        name: _nameCtrl.text.trim(),
         integrationType: _type,
         endpointUrl: _urlCtrl.text.trim().isEmpty ? null : _urlCtrl.text.trim(),
         includeAncestors: _includeAncestors,
@@ -523,6 +532,7 @@ class _CreateIntegrationDialogState extends State<_CreateIntegrationDialog> {
   @override
   Widget build(BuildContext context) {
     final needsUrl = _type == 'webhook' || _type == 'n8n';
+    final nameValid = _nameCtrl.text.trim().isNotEmpty;
 
     return AlertDialog(
       title: const Text(
@@ -540,6 +550,33 @@ class _CreateIntegrationDialogState extends State<_CreateIntegrationDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            const Text(
+              'Nombre',
+              style: TextStyle(
+                  fontFamily: 'Geist',
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.ctText2),
+            ),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _nameCtrl,
+              style: AppFonts.geist(fontSize: 13, color: AppColors.ctText),
+              decoration: InputDecoration(
+                hintText: 'Ej: API Sistema Externo',
+                hintStyle: AppFonts.geist(fontSize: 13, color: AppColors.ctText2),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(6),
+                  borderSide: const BorderSide(color: AppColors.ctBorder),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(6),
+                  borderSide: const BorderSide(color: AppColors.ctBorder),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
             const Text(
               'Tipo',
               style: TextStyle(
@@ -681,7 +718,7 @@ class _CreateIntegrationDialogState extends State<_CreateIntegrationDialog> {
           child: const Text('Cancelar'),
         ),
         ElevatedButton(
-          onPressed: _saving ? null : _submit,
+          onPressed: (_saving || !nameValid) ? null : _submit,
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.ctTeal,
             foregroundColor: Colors.white,

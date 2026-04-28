@@ -95,6 +95,7 @@ class FlowsApi {
   static Future<Map<String, dynamic>> createIntegration({
     required String flowId,
     required String tenantId,
+    required String name,
     required String integrationType,
     String? endpointUrl,
     bool includeAncestors = false,
@@ -104,6 +105,7 @@ class FlowsApi {
       '/flows/$flowId/integrations',
       queryParameters: {'tenant_id': tenantId},
       data: {
+        'name':                name,
         'integration_type':    integrationType,
         'endpoint_url':        ?endpointUrl,
         'include_ancestors':   includeAncestors,
