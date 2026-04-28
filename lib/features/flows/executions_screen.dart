@@ -1,7 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 
 import '../../core/api/flows_api.dart';
 import '../../core/providers/tenant_provider.dart';
@@ -17,7 +16,7 @@ String _formatDate(String? raw) {
     final today = DateTime(now.year, now.month, now.day);
     final yesterday = today.subtract(const Duration(days: 1));
     final day = DateTime(dt.year, dt.month, dt.day);
-    final time = DateFormat('HH:mm').format(dt);
+    final time = '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
     if (day == today) return 'Hoy $time';
     if (day == yesterday) return 'Ayer $time';
     final d = dt.day.toString().padLeft(2, '0');
