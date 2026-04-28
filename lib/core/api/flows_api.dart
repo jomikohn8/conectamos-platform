@@ -71,4 +71,40 @@ class FlowsApi {
   static Future<void> deleteFlow({required String flowId}) async {
     await ApiClient.instance.delete('/flows/$flowId');
   }
+
+  // ── Dashboard (executions) ──────────────────────────────────────────────────
+
+  static Future<List<Map<String, dynamic>>> listPendingExecutions({
+    required String tenantId,
+    String? flowSlug,
+  }) async {
+    final params = <String, dynamic>{'tenant_id': tenantId};
+    if (flowSlug != null) params['flow_slug'] = flowSlug;
+    final response = await ApiClient.instance.get(
+      '/api/v1/dashboard/',
+      queryParameters: params,
+    );
+    return List<Map<String, dynamic>>.from(response.data);
+  }
+
+  static Future<Map<String, dynamic>> getExecution({
+    required String tenantId,
+    required String executionId,
+  }) async {
+    final response = await ApiClient.instance.get(
+      '/api/v1/dashboard/$executionId',
+      queryParameters: {'tenant_id': tenantId},
+    );
+    return Map<String, dynamic>.from(response.data);
+  }
+
+  static Future<void> submitExecution({
+    required String executionId,
+    required List<Map<String, dynamic>> fieldValues,
+  }) async {
+    await ApiClient.instance.post(
+      '/api/v1/dashboard/$executionId/submit',
+      data: {'field_values': fieldValues},
+    );
+  }
 }

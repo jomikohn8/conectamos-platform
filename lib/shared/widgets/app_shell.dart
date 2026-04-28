@@ -626,6 +626,14 @@ class _Sidebar extends ConsumerWidget {
                           currentRoute: currentRoute,
                           collapsed: collapsed,
                         ),
+                        if (hasPermission(ref, 'flow_executions', 'execute_dashboard'))
+                          _NavItem(
+                            icon: Icons.task_alt_outlined,
+                            label: 'Tareas',
+                            route: '/tareas',
+                            currentRoute: currentRoute,
+                            collapsed: collapsed,
+                          ),
                         if (hasPermission(ref, 'flows', 'view'))
                           _NavItem(
                             icon: Icons.account_tree_outlined,

@@ -19,6 +19,7 @@ import '../../features/config/settings_screen.dart';
 import '../../features/settings/operator_fields_screen.dart';
 import '../../features/config/ai_workers_screen.dart';
 import '../../features/config/workflows_screen.dart';
+import '../../features/flows/executions_screen.dart';
 import '../../features/flows/flow_detail_screen.dart';
 import '../../features/conversations/conversations_screen.dart';
 import '../../features/dashboard/dashboard_screen.dart';
@@ -138,6 +139,12 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: '/operators',
             pageBuilder: (context, state) => const NoTransitionPage(
               child: OperatorsScreen(),
+            ),
+          ),
+          GoRoute(
+            path: '/tareas',
+            pageBuilder: (context, state) => const NoTransitionPage(
+              child: ExecutionsScreen(),
             ),
           ),
           GoRoute(
