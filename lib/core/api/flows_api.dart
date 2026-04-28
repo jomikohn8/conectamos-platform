@@ -111,6 +111,20 @@ class FlowsApi {
     return Map<String, dynamic>.from(response.data);
   }
 
+  static Future<Map<String, dynamic>> patchIntegration({
+    required String flowId,
+    required String integrationId,
+    required String tenantId,
+    required String endpointUrl,
+  }) async {
+    final response = await ApiClient.instance.patch(
+      '/flows/$flowId/integrations/$integrationId',
+      queryParameters: {'tenant_id': tenantId},
+      data: {'endpoint_url': endpointUrl},
+    );
+    return Map<String, dynamic>.from(response.data);
+  }
+
   static Future<void> deleteIntegration({
     required String flowId,
     required String integrationId,

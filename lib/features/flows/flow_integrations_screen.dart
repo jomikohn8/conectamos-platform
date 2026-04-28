@@ -87,6 +87,35 @@ class _FlowIntegrationsScreenState
     }
   }
 
+  void _openEditUrlDialog(String integrationId, String currentUrl) {
+    showDialog(
+      context: context,
+      builder: (_) => _EditEndpointDialog(
+        currentUrl: currentUrl,
+        onSave: (newUrl) async {
+          final tenantId = ref.read(activeTenantIdProvider);
+          final updated = await FlowsApi.patchIntegration(
+            flowId: widget.flowId,
+            integrationId: integrationId,
+            tenantId: tenantId,
+            endpointUrl: newUrl,
+          );
+          if (!mounted) return;
+          setState(() {
+            final idx =
+                _integrations.indexWhere((e) => e['id'] == integrationId);
+            if (idx >= 0) _integrations[idx] = updated;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('URL actualizada'),
+            backgroundColor: AppColors.ctOk,
+            duration: Duration(seconds: 2),
+          ));
+        },
+      ),
+    );
+  }
+
   void _openCreateDialog() {
     showDialog(
       context: context,
@@ -260,15 +289,23 @@ class _FlowIntegrationsScreenState
       padding: const EdgeInsets.all(24),
       itemCount: _integrations.length,
       separatorBuilder: (ctx2, idx2) => const SizedBox(height: 12),
-      itemBuilder: (context, i) => _IntegrationCard(
-        integration: _integrations[i],
-        canManage: canManage,
-        deleting: _deleting,
-        onDelete: () {
-          final id = _integrations[i]['id'] as String? ?? '';
-          if (id.isNotEmpty) _delete(id);
-        },
-      ),
+      itemBuilder: (context, i) {
+        final intg = _integrations[i];
+        final id = intg['id'] as String? ?? '';
+        final type = intg['integration_type'] as String? ?? '';
+        final url = intg['endpoint_url'] as String? ?? '';
+        return _IntegrationCard(
+          integration: intg,
+          canManage: canManage,
+          deleting: _deleting,
+          onDelete: () {
+            if (id.isNotEmpty) _delete(id);
+          },
+          onEditEndpointUrl: (canManage && type == 'outbound' && id.isNotEmpty)
+              ? () => _openEditUrlDialog(id, url)
+              : null,
+        );
+      },
     );
   }
 }
@@ -281,12 +318,14 @@ class _IntegrationCard extends StatelessWidget {
     required this.canManage,
     required this.deleting,
     required this.onDelete,
+    this.onEditEndpointUrl,
   });
 
   final Map<String, dynamic> integration;
   final bool canManage;
   final bool deleting;
   final VoidCallback onDelete;
+  final VoidCallback? onEditEndpointUrl;
 
   @override
   Widget build(BuildContext context) {
@@ -342,9 +381,14 @@ class _IntegrationCard extends StatelessWidget {
                         fontSize: 11, color: AppColors.ctText3),
                   ),
                 ],
-                if (type == 'webhook' || type == 'webhook_out') ...[
+                if (type == 'outbound' ||
+                    type == 'webhook' ||
+                    type == 'webhook_out') ...[
                   const SizedBox(height: 4),
-                  _EndpointRow(integration: integration),
+                  _OutboundEndpointRow(
+                    integration: integration,
+                    onEdit: onEditEndpointUrl,
+                  ),
                 ],
               ],
             ),
@@ -768,26 +812,183 @@ class _StatusChip extends StatelessWidget {
   }
 }
 
-class _EndpointRow extends StatelessWidget {
-  const _EndpointRow({required this.integration});
+class _OutboundEndpointRow extends StatelessWidget {
+  const _OutboundEndpointRow({
+    required this.integration,
+    this.onEdit,
+  });
+
   final Map<String, dynamic> integration;
+  final VoidCallback? onEdit;
 
   @override
   Widget build(BuildContext context) {
     final url = integration['endpoint_url'] as String? ??
         integration['url'] as String? ??
         '';
-    if (url.isEmpty) return const SizedBox.shrink();
+    final hasUrl = url.isNotEmpty;
     return Row(
       children: [
-        const Icon(Icons.link, size: 12, color: AppColors.ctText3),
+        Icon(Icons.link, size: 12,
+            color: hasUrl ? AppColors.ctText3 : AppColors.ctText3),
         const SizedBox(width: 4),
         Expanded(
           child: Text(
-            url,
+            hasUrl ? url : 'Sin URL configurada',
             style: AppFonts.geist(fontSize: 11, color: AppColors.ctText3),
             overflow: TextOverflow.ellipsis,
           ),
+        ),
+        if (onEdit != null) ...[
+          const SizedBox(width: 4),
+          InkWell(
+            onTap: onEdit,
+            borderRadius: BorderRadius.circular(4),
+            child: const Padding(
+              padding: EdgeInsets.all(2),
+              child: Icon(Icons.edit_outlined,
+                  size: 13, color: AppColors.ctText3),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+// ── Edit endpoint dialog ───────────────────────────────────────────────────────
+
+class _EditEndpointDialog extends StatefulWidget {
+  const _EditEndpointDialog({
+    required this.currentUrl,
+    required this.onSave,
+  });
+
+  final String currentUrl;
+  final Future<void> Function(String url) onSave;
+
+  @override
+  State<_EditEndpointDialog> createState() => _EditEndpointDialogState();
+}
+
+class _EditEndpointDialogState extends State<_EditEndpointDialog> {
+  late final TextEditingController _urlCtrl;
+  bool _saving = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _urlCtrl = TextEditingController(text: widget.currentUrl);
+  }
+
+  @override
+  void dispose() {
+    _urlCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (_saving) return;
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      await widget.onSave(_urlCtrl.text.trim());
+      if (!mounted) return;
+      Navigator.of(context).pop();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _saving = false;
+        _error = _dioError(e);
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text(
+        'Editar URL del endpoint',
+        style: TextStyle(
+          fontFamily: 'Geist',
+          fontWeight: FontWeight.w600,
+          fontSize: 15,
+          color: AppColors.ctText,
+        ),
+      ),
+      content: SizedBox(
+        width: 400,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'URL del endpoint',
+              style: TextStyle(
+                fontFamily: 'Geist',
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: AppColors.ctText2,
+              ),
+            ),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _urlCtrl,
+              autofocus: true,
+              style: AppFonts.geist(fontSize: 13, color: AppColors.ctText),
+              decoration: InputDecoration(
+                hintText: 'https://...',
+                hintStyle:
+                    AppFonts.geist(fontSize: 13, color: AppColors.ctText3),
+                contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 10),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(6),
+                  borderSide: const BorderSide(color: AppColors.ctBorder),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(6),
+                  borderSide: const BorderSide(color: AppColors.ctBorder),
+                ),
+              ),
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                _error!,
+                style: const TextStyle(
+                  fontFamily: 'Geist',
+                  fontSize: 12,
+                  color: AppColors.ctDanger,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _saving ? null : () => Navigator.of(context).pop(),
+          child: const Text('Cancelar'),
+        ),
+        ElevatedButton(
+          onPressed: _saving ? null : _submit,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.ctTeal,
+            foregroundColor: Colors.white,
+          ),
+          child: _saving
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: Colors.white),
+                )
+              : const Text('Guardar',
+                  style: TextStyle(fontFamily: 'Geist', fontSize: 13)),
         ),
       ],
     );
