@@ -22,7 +22,9 @@ String _formatDate(String? raw) {
     final d = dt.day.toString().padLeft(2, '0');
     final m = dt.month.toString().padLeft(2, '0');
     return '$d/$m · $time';
-  } catch (_) {
+  } catch (e, st) {
+    debugPrint('FORMAT_DATE ERROR: $e | input: $raw');
+    debugPrint('FORMAT_DATE STACK: $st');
     return raw;
   }
 }
@@ -100,6 +102,7 @@ class _ExecutionsScreenState extends ConsumerState<ExecutionsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    debugPrint('EXECUTIONS BUILD: loading=$_loading error=$_error count=${_executions.length}');
     ref.listen<String>(activeTenantIdProvider, (prev, next) {
       if (next.isNotEmpty && next != prev) _load();
     });
