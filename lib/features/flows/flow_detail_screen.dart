@@ -257,6 +257,7 @@ class _FlowDetailScreenState extends ConsumerState<FlowDetailScreen>
 
   @override
   Widget build(BuildContext context) {
+    debugPrint('FLOW_DETAIL BUILD: loading=$_loading error=$_error flow=${_flow?['name']}');
     if (_loading) {
       return Scaffold(
         backgroundColor: AppColors.ctBg,
