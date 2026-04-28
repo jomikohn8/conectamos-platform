@@ -77,12 +77,18 @@ class _ExecutionsScreenState extends ConsumerState<ExecutionsScreen> {
         _executions = data;
         _loading = false;
       });
-    } catch (e) {
+    } catch (e, st) {
+      debugPrint('EXECUTIONS_LOAD ERROR: ${e.runtimeType}');
+      String errorMsg;
+      if (e is DioException) {
+        errorMsg = e.response?.data?['detail']?.toString()
+            ?? 'Error ${e.response?.statusCode ?? 'de red'}';
+      } else {
+        errorMsg = 'Error inesperado';
+      }
       if (!mounted) return;
-      setState(() {
-        _error = _dioError(e);
-        _loading = false;
-      });
+      setState(() { _error = errorMsg; _loading = false; });
+      debugPrint('EXECUTIONS_LOAD STACK: $st');
     }
   }
 
@@ -103,7 +109,6 @@ class _ExecutionsScreenState extends ConsumerState<ExecutionsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    debugPrint('EXECUTIONS BUILD: loading=$_loading error=$_error count=${_executions.length}');
     ref.listen<String>(activeTenantIdProvider, (prev, next) {
       if (next.isNotEmpty && next != prev) _load();
     });
