@@ -17,6 +17,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/api/api_client.dart';
+import '../../core/api/flows_api.dart';
 import '../broadcasts/broadcast_screen.dart';
 import '../../core/api/channels_api.dart';
 import '../../core/api/conversations_api.dart';
@@ -2470,6 +2471,8 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
               ? (!_isSupervisorMode ? _intervene : _stopIntervening)
               : null,
           isSupervisorMode: _isSupervisorMode,
+          operatorId: ref.watch(selectedConvOperatorIdProvider),
+          tenantId: ref.read(activeTenantIdProvider),
         ),
 
         // Mensajes
@@ -2839,6 +2842,8 @@ class _ApiChatHeader extends StatelessWidget {
     this.channelColor,
     this.onIntervene,
     this.isSupervisorMode = false,
+    this.operatorId,
+    this.tenantId,
   });
   final String name;
   final bool? windowOpen;
@@ -2849,6 +2854,8 @@ class _ApiChatHeader extends StatelessWidget {
   final String? channelColor;
   final VoidCallback? onIntervene;
   final bool isSupervisorMode;
+  final String? operatorId;
+  final String? tenantId;
 
   @override
   Widget build(BuildContext context) {
@@ -2924,10 +2931,117 @@ class _ApiChatHeader extends StatelessWidget {
               ],
             ),
           ),
+          if (operatorId != null &&
+              operatorId!.isNotEmpty &&
+              tenantId != null &&
+              tenantId!.isNotEmpty) ...[
+            const SizedBox(width: 8),
+            _ActiveFlowPill(
+              operatorId: operatorId!,
+              tenantId: tenantId!,
+            ),
+          ],
           if (onIntervene != null) ...[
             const SizedBox(width: 12),
             _InterveneButton(onTap: onIntervene!, isSupervisorMode: isSupervisorMode),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+// ── _ActiveFlowPill ───────────────────────────────────────────────────────────
+
+class _ActiveFlowPill extends StatefulWidget {
+  const _ActiveFlowPill({
+    required this.operatorId,
+    required this.tenantId,
+  });
+  final String operatorId;
+  final String tenantId;
+
+  @override
+  State<_ActiveFlowPill> createState() => _ActiveFlowPillState();
+}
+
+class _ActiveFlowPillState extends State<_ActiveFlowPill> {
+  Map<String, dynamic>? _activeFlow;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetch();
+    _timer = Timer.periodic(const Duration(seconds: 30), (_) => _fetch());
+  }
+
+  @override
+  void didUpdateWidget(_ActiveFlowPill old) {
+    super.didUpdateWidget(old);
+    if (old.operatorId != widget.operatorId ||
+        old.tenantId != widget.tenantId) {
+      _fetch();
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _fetch() async {
+    if (!mounted) return;
+    try {
+      final flow = await FlowsApi.getActiveFlow(
+        tenantId: widget.tenantId,
+        operatorId: widget.operatorId,
+      );
+      if (!mounted) return;
+      setState(() => _activeFlow = flow);
+    } catch (_) {
+      // Silently ignore — pill simply stays hidden on error
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final flow = _activeFlow;
+    if (flow == null) return const SizedBox.shrink();
+
+    final flowName = flow['flow_name'] as String? ??
+        flow['flow_slug'] as String? ??
+        'Flow activo';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppColors.ctTealLight,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.ctTeal),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: const BoxDecoration(
+              color: AppColors.ctTeal,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            flowName,
+            style: const TextStyle(
+              fontFamily: 'Geist',
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: AppColors.ctTeal,
+            ),
+          ),
         ],
       ),
     );

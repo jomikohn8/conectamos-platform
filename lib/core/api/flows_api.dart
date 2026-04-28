@@ -90,6 +90,21 @@ class FlowsApi {
         (list as List).whereType<Map>().map((e) => Map<String, dynamic>.from(e)));
   }
 
+  static Future<Map<String, dynamic>?> getActiveFlow({
+    required String tenantId,
+    required String operatorId,
+  }) async {
+    final response = await ApiClient.instance.get(
+      '/flows/active',
+      queryParameters: {
+        'tenant_id': tenantId,
+        'operator_id': operatorId,
+      },
+    );
+    final data = response.data as Map<String, dynamic>?;
+    return data?['execution'] as Map<String, dynamic>?;
+  }
+
   static Future<Map<String, dynamic>> getExecution({
     required String tenantId,
     required String executionId,
