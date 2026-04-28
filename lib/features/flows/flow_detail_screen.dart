@@ -96,6 +96,12 @@ class _FlowDetailScreenState extends ConsumerState<FlowDetailScreen>
   // Campos tab state
   List<Map<String, dynamic>> _fields = [];
 
+  // Comportamiento tab state
+  List<Map<String, dynamic>> _conditions = [];
+
+  // Al cerrar tab state
+  List<Map<String, dynamic>> _actions = [];
+
   @override
   void initState() {
     super.initState();
@@ -136,10 +142,24 @@ class _FlowDetailScreenState extends ConsumerState<FlowDetailScreen>
           ? List<String>.from(rawSources.map((s) => s.toString()))
           : <String>[];
 
+      final rawBehavior = (flow['behavior'] as Map<String, dynamic>?) ?? {};
+      final conditions = List<Map<String, dynamic>>.from(
+          (rawBehavior['conditions'] as List? ?? [])
+              .whereType<Map>()
+              .map((e) => Map<String, dynamic>.from(e)));
+      final rawOnComplete =
+          (flow['on_complete'] as Map<String, dynamic>?) ?? {};
+      final actions = List<Map<String, dynamic>>.from(
+          (rawOnComplete['actions'] as List? ?? [])
+              .whereType<Map>()
+              .map((e) => Map<String, dynamic>.from(e)));
+
       setState(() {
         _flow = flow;
         _fields = fields;
         _triggerSources = sources;
+        _conditions = conditions;
+        _actions = actions;
         _nameCtrl.text = flow['name'] as String? ?? '';
         _slugCtrl.text = flow['slug'] as String? ?? '';
         _descCtrl.text = flow['description'] as String? ?? '';
@@ -164,7 +184,8 @@ class _FlowDetailScreenState extends ConsumerState<FlowDetailScreen>
         slug: _slugCtrl.text.trim(),
         description: _descCtrl.text.trim(),
         fields: _fields,
-        behavior: (_flow?['behavior'] as Map<String, dynamic>?) ?? {},
+        behavior: {'conditions': _conditions},
+        onComplete: {'actions': _actions},
         triggerSources: _triggerSources,
       );
       if (!mounted) return;
@@ -173,9 +194,21 @@ class _FlowDetailScreenState extends ConsumerState<FlowDetailScreen>
           ? List<Map<String, dynamic>>.from(
               rawFields.whereType<Map>().map((e) => Map<String, dynamic>.from(e)))
           : _fields;
+      final rawBeh = (updated['behavior'] as Map<String, dynamic>?) ?? {};
+      final updatedConditions = List<Map<String, dynamic>>.from(
+          (rawBeh['conditions'] as List? ?? [])
+              .whereType<Map>()
+              .map((e) => Map<String, dynamic>.from(e)));
+      final rawOC = (updated['on_complete'] as Map<String, dynamic>?) ?? {};
+      final updatedActions = List<Map<String, dynamic>>.from(
+          (rawOC['actions'] as List? ?? [])
+              .whereType<Map>()
+              .map((e) => Map<String, dynamic>.from(e)));
       setState(() {
         _flow = updated;
         _fields = fields;
+        _conditions = updatedConditions;
+        _actions = updatedActions;
         _saving = false;
       });
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
@@ -290,8 +323,17 @@ class _FlowDetailScreenState extends ConsumerState<FlowDetailScreen>
                 _openFieldDialog(field: field, index: index),
             onAddField: () => _openFieldDialog(),
           ),
-          const _ComingSoonTab(),
-          const _ComingSoonTab(),
+          _ComportamientoTab(
+            conditions: _conditions,
+            flowFields: _fields,
+            canManage: canManage,
+            onChanged: (updated) => setState(() => _conditions = updated),
+          ),
+          _AlCerrarTab(
+            actions: _actions,
+            canManage: canManage,
+            onChanged: (updated) => setState(() => _actions = updated),
+          ),
         ],
       ),
     );
@@ -927,23 +969,1162 @@ class _FieldDialogState extends State<_FieldDialog> {
   }
 }
 
-// ── _ComingSoonTab ────────────────────────────────────────────────────────────
+// ── _EmptyState ───────────────────────────────────────────────────────────────
 
-class _ComingSoonTab extends StatelessWidget {
-  const _ComingSoonTab();
+class _EmptyState extends StatelessWidget {
+  const _EmptyState({required this.icon, required this.message});
+  final IconData icon;
+  final String message;
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
-      child: Text(
-        'Próximamente · Esta sección se habilitará en la siguiente entrega',
-        style: TextStyle(
-          fontFamily: 'Geist',
-          fontSize: 13,
-          color: AppColors.ctText3,
-        ),
-        textAlign: TextAlign.center,
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 48, color: AppColors.ctText3),
+          const SizedBox(height: 12),
+          Text(
+            message,
+            style: const TextStyle(
+              fontFamily: 'Geist',
+              fontSize: 13,
+              color: AppColors.ctText2,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
       ),
+    );
+  }
+}
+
+// ── _ComportamientoTab ────────────────────────────────────────────────────────
+
+class _ComportamientoTab extends StatefulWidget {
+  const _ComportamientoTab({
+    required this.conditions,
+    required this.flowFields,
+    required this.canManage,
+    required this.onChanged,
+  });
+
+  final List<Map<String, dynamic>> conditions;
+  final List<Map<String, dynamic>> flowFields;
+  final bool canManage;
+  final ValueChanged<List<Map<String, dynamic>>> onChanged;
+
+  @override
+  State<_ComportamientoTab> createState() => _ComportamientoTabState();
+}
+
+class _ComportamientoTabState extends State<_ComportamientoTab> {
+  late List<Map<String, dynamic>> _conditions;
+
+  @override
+  void initState() {
+    super.initState();
+    _conditions = List.from(widget.conditions);
+  }
+
+  @override
+  void didUpdateWidget(_ComportamientoTab old) {
+    super.didUpdateWidget(old);
+    if (old.conditions != widget.conditions) {
+      _conditions = List.from(widget.conditions);
+    }
+  }
+
+  void _openConditionDialog(Map<String, dynamic>? condition) {
+    showDialog(
+      context: context,
+      builder: (_) => _ConditionDialog(
+        condition: condition,
+        flowFields: widget.flowFields,
+        onSaved: (updated) {
+          setState(() {
+            if (condition != null) {
+              final idx = _conditions.indexWhere(
+                  (c) => c['id'] == condition['id']);
+              if (idx >= 0) {
+                _conditions[idx] = updated;
+              } else {
+                _conditions.add(updated);
+              }
+            } else {
+              _conditions.add(updated);
+            }
+          });
+          widget.onChanged(List.from(_conditions));
+        },
+      ),
+    );
+  }
+
+  void _deleteCondition(Map<String, dynamic> condition) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.ctSurface,
+        title: const Text(
+          'Eliminar condición',
+          style: TextStyle(
+            fontFamily: 'Geist',
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+            color: AppColors.ctText,
+          ),
+        ),
+        content: const Text(
+          '¿Eliminar esta condición de branching?',
+          style: TextStyle(
+            fontFamily: 'Geist',
+            fontSize: 13,
+            color: AppColors.ctText2,
+          ),
+        ),
+        actions: [
+          _GhostButton(
+            label: 'Cancelar',
+            onTap: () => Navigator.pop(ctx),
+          ),
+          const SizedBox(width: 8),
+          _PrimaryButton(
+            label: 'Eliminar',
+            onTap: () {
+              Navigator.pop(ctx);
+              setState(() {
+                _conditions.removeWhere((c) => c['id'] == condition['id']);
+              });
+              widget.onChanged(List.from(_conditions));
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text(
+                'Condiciones de branching',
+                style: TextStyle(
+                  fontFamily: 'Onest',
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.ctText,
+                ),
+              ),
+              const Spacer(),
+              if (widget.canManage)
+                TextButton(
+                  onPressed: () => _openConditionDialog(null),
+                  style: TextButton.styleFrom(
+                      foregroundColor: AppColors.ctTeal),
+                  child: const Text(
+                    '+ Agregar condición',
+                    style: TextStyle(
+                      fontFamily: 'Geist',
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          if (_conditions.isEmpty)
+            const SizedBox(
+              height: 200,
+              child: _EmptyState(
+                icon: Icons.alt_route_outlined,
+                message:
+                    'Sin condiciones definidas.\nEste flujo avanza linealmente.',
+              ),
+            )
+          else
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _conditions.length,
+              separatorBuilder: (context2, i2) => const SizedBox(height: 8),
+              itemBuilder: (_, i) => _ConditionCard(
+                condition: _conditions[i],
+                canManage: widget.canManage,
+                onEdit: () => _openConditionDialog(_conditions[i]),
+                onDelete: () => _deleteCondition(_conditions[i]),
+              ),
+            ),
+          const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+}
+
+// ── _ConditionCard ────────────────────────────────────────────────────────────
+
+class _ConditionCard extends StatelessWidget {
+  const _ConditionCard({
+    required this.condition,
+    required this.canManage,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  final Map<String, dynamic> condition;
+  final bool canManage;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final field = condition['field'] as String? ?? '';
+    final operator = condition['operator'] as String? ?? '';
+    final value = condition['value']?.toString() ?? '';
+    final label = condition['label'] as String?;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.ctSurface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.ctBorder),
+        // left accent
+      ),
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              width: 3,
+              decoration: const BoxDecoration(
+                color: AppColors.ctTeal,
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(8),
+                  bottomLeft: Radius.circular(8),
+                ),
+              ),
+            ),
+            Expanded(
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.ctTealLight,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            operator,
+                            style: const TextStyle(
+                              fontFamily: 'Geist',
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.ctTealDark,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '$field $operator "$value"',
+                            style: const TextStyle(
+                              fontFamily: 'Geist',
+                              fontSize: 13,
+                              color: AppColors.ctText,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (label != null && label.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        label,
+                        style: const TextStyle(
+                          fontFamily: 'Geist',
+                          fontSize: 11,
+                          color: AppColors.ctText2,
+                        ),
+                      ),
+                    ],
+                    if (canManage) ...[
+                      const SizedBox(height: 6),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.edit_outlined,
+                                size: 16, color: AppColors.ctText2),
+                            onPressed: onEdit,
+                            tooltip: 'Editar',
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(
+                                minWidth: 30, minHeight: 30),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete_outline,
+                                size: 16, color: AppColors.ctDanger),
+                            onPressed: onDelete,
+                            tooltip: 'Eliminar',
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(
+                                minWidth: 30, minHeight: 30),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── _ConditionDialog ──────────────────────────────────────────────────────────
+
+const _kOperators = [
+  ('==', 'igual a'),
+  ('!=', 'distinto de'),
+  ('<', 'menor que'),
+  ('<=', 'menor o igual'),
+  ('>', 'mayor que'),
+  ('>=', 'mayor o igual'),
+  ('in', 'contiene'),
+  ('not in', 'no contiene'),
+];
+
+class _ConditionDialog extends StatefulWidget {
+  const _ConditionDialog({
+    required this.flowFields,
+    required this.onSaved,
+    this.condition,
+  });
+
+  final Map<String, dynamic>? condition;
+  final List<Map<String, dynamic>> flowFields;
+  final void Function(Map<String, dynamic>) onSaved;
+
+  @override
+  State<_ConditionDialog> createState() => _ConditionDialogState();
+}
+
+class _ConditionDialogState extends State<_ConditionDialog> {
+  String? _selectedFieldId; // stored as "fields.{id}"
+  String _operator = '==';
+  final _valueCtrl = TextEditingController();
+  final _labelCtrl = TextEditingController();
+
+  bool get _isEdit => widget.condition != null;
+
+  String? get _selectedFieldType {
+    if (_selectedFieldId == null) return null;
+    final rawId =
+        _selectedFieldId!.startsWith('fields.')
+            ? _selectedFieldId!.substring(7)
+            : _selectedFieldId!;
+    final match = widget.flowFields
+        .where((f) => f['id']?.toString() == rawId)
+        .firstOrNull;
+    return match?['type'] as String?;
+  }
+
+  String get _valueHint {
+    switch (_selectedFieldType) {
+      case 'number':
+        return 'ej. 100';
+      case 'boolean':
+        return 'true o false';
+      case 'date':
+        return 'ej. 2026-01-01';
+      case 'select':
+        return 'ej. opción_a';
+      default:
+        return 'ej. pendiente';
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    final cond = widget.condition;
+    if (cond != null) {
+      _selectedFieldId = cond['field'] as String?;
+      _operator = cond['operator'] as String? ?? '==';
+      _valueCtrl.text = cond['value']?.toString() ?? '';
+      _labelCtrl.text = cond['label'] as String? ?? '';
+    }
+  }
+
+  @override
+  void dispose() {
+    _valueCtrl.dispose();
+    _labelCtrl.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    if (_selectedFieldId == null) return;
+    if (_valueCtrl.text.trim().isEmpty) return;
+
+    final updated = Map<String, dynamic>.from(widget.condition ?? {});
+    updated['field'] = _selectedFieldId;
+    updated['operator'] = _operator;
+    updated['value'] = _valueCtrl.text.trim();
+    final lbl = _labelCtrl.text.trim();
+    if (lbl.isNotEmpty) updated['label'] = lbl;
+    if (!_isEdit || updated['id'] == null) {
+      updated['id'] = DateTime.now().millisecondsSinceEpoch.toString();
+    }
+
+    widget.onSaved(updated);
+    Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: AppColors.ctSurface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: const BorderSide(color: AppColors.ctBorder),
+      ),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 480),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                _isEdit ? 'Condición' : 'Nueva condición',
+                style: const TextStyle(
+                  fontFamily: 'Geist',
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.ctText,
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // Campo
+              const Text(
+                'Campo',
+                style: TextStyle(
+                  fontFamily: 'Geist',
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.ctText,
+                ),
+              ),
+              const SizedBox(height: 6),
+              _DropdownContainer(
+                child: DropdownButton<String>(
+                  value: _selectedFieldId,
+                  isExpanded: true,
+                  underline: const SizedBox.shrink(),
+                  hint: const Text(
+                    'Selecciona un campo',
+                    style: TextStyle(
+                        fontFamily: 'Geist',
+                        fontSize: 13,
+                        color: AppColors.ctText3),
+                  ),
+                  dropdownColor: AppColors.ctSurface,
+                  items: widget.flowFields.map((f) {
+                    final id = f['id']?.toString() ?? '';
+                    final lbl = f['label'] as String? ?? id;
+                    return DropdownMenuItem(
+                      value: 'fields.$id',
+                      child: Text(
+                        lbl,
+                        style: const TextStyle(
+                            fontFamily: 'Geist',
+                            fontSize: 13,
+                            color: AppColors.ctText),
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (v) => setState(() => _selectedFieldId = v),
+                ),
+              ),
+              const SizedBox(height: 14),
+
+              // Operador
+              const Text(
+                'Operador',
+                style: TextStyle(
+                  fontFamily: 'Geist',
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.ctText,
+                ),
+              ),
+              const SizedBox(height: 6),
+              _DropdownContainer(
+                child: DropdownButton<String>(
+                  value: _operator,
+                  isExpanded: true,
+                  underline: const SizedBox.shrink(),
+                  dropdownColor: AppColors.ctSurface,
+                  items: _kOperators.map((entry) {
+                    final (val, lbl) = entry;
+                    return DropdownMenuItem(
+                      value: val,
+                      child: Text(
+                        '$val — $lbl',
+                        style: const TextStyle(
+                            fontFamily: 'Geist',
+                            fontSize: 13,
+                            color: AppColors.ctText),
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (v) {
+                    if (v != null) setState(() => _operator = v);
+                  },
+                ),
+              ),
+              const SizedBox(height: 14),
+
+              // Valor
+              _FormField(
+                label: 'Valor',
+                controller: _valueCtrl,
+                placeholder: _valueHint,
+              ),
+              const SizedBox(height: 14),
+
+              // Etiqueta
+              _FormField(
+                label: 'Etiqueta (opcional)',
+                controller: _labelCtrl,
+                placeholder: 'Descripción legible (opcional)',
+              ),
+
+              // Preview
+              const SizedBox(height: 10),
+              ValueListenableBuilder(
+                valueListenable: _valueCtrl,
+                builder: (context2, value, child) {
+                  if (_selectedFieldId == null || _valueCtrl.text.isEmpty) {
+                    return const SizedBox.shrink();
+                  }
+                  return Text(
+                    'Expresión: $_selectedFieldId $_operator "${_valueCtrl.text}"',
+                    style: const TextStyle(
+                      fontFamily: 'Geist',
+                      fontSize: 11,
+                      color: AppColors.ctText2,
+                    ),
+                  );
+                },
+              ),
+
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  _GhostButton(
+                      label: 'Cancelar',
+                      onTap: () => Navigator.pop(context)),
+                  const SizedBox(width: 10),
+                  _PrimaryButton(label: 'Guardar', onTap: _submit),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── _AlCerrarTab ──────────────────────────────────────────────────────────────
+
+class _AlCerrarTab extends StatefulWidget {
+  const _AlCerrarTab({
+    required this.actions,
+    required this.canManage,
+    required this.onChanged,
+  });
+
+  final List<Map<String, dynamic>> actions;
+  final bool canManage;
+  final ValueChanged<List<Map<String, dynamic>>> onChanged;
+
+  @override
+  State<_AlCerrarTab> createState() => _AlCerrarTabState();
+}
+
+class _AlCerrarTabState extends State<_AlCerrarTab> {
+  late List<Map<String, dynamic>> _actions;
+
+  @override
+  void initState() {
+    super.initState();
+    _actions = List.from(widget.actions);
+  }
+
+  @override
+  void didUpdateWidget(_AlCerrarTab old) {
+    super.didUpdateWidget(old);
+    if (old.actions != widget.actions) {
+      _actions = List.from(widget.actions);
+    }
+  }
+
+  void _openActionDialog(Map<String, dynamic>? action) {
+    showDialog(
+      context: context,
+      builder: (_) => _ActionDialog(
+        action: action,
+        onSaved: (updated) {
+          setState(() {
+            if (action != null) {
+              final idx =
+                  _actions.indexWhere((a) => a['id'] == action['id']);
+              if (idx >= 0) {
+                _actions[idx] = updated;
+              } else {
+                _actions.add(updated);
+              }
+            } else {
+              _actions.add(updated);
+            }
+          });
+          widget.onChanged(List.from(_actions));
+        },
+      ),
+    );
+  }
+
+  void _deleteAction(Map<String, dynamic> action) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.ctSurface,
+        title: const Text(
+          'Eliminar acción',
+          style: TextStyle(
+            fontFamily: 'Geist',
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+            color: AppColors.ctText,
+          ),
+        ),
+        content: const Text(
+          '¿Eliminar esta acción?',
+          style: TextStyle(
+            fontFamily: 'Geist',
+            fontSize: 13,
+            color: AppColors.ctText2,
+          ),
+        ),
+        actions: [
+          _GhostButton(
+              label: 'Cancelar', onTap: () => Navigator.pop(ctx)),
+          const SizedBox(width: 8),
+          _PrimaryButton(
+            label: 'Eliminar',
+            onTap: () {
+              Navigator.pop(ctx);
+              setState(() {
+                _actions.removeWhere((a) => a['id'] == action['id']);
+              });
+              widget.onChanged(List.from(_actions));
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text(
+                'Acciones al completar el flujo',
+                style: TextStyle(
+                  fontFamily: 'Onest',
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.ctText,
+                ),
+              ),
+              const Spacer(),
+              if (widget.canManage)
+                TextButton(
+                  onPressed: () => _openActionDialog(null),
+                  style: TextButton.styleFrom(
+                      foregroundColor: AppColors.ctTeal),
+                  child: const Text(
+                    '+ Agregar acción',
+                    style: TextStyle(
+                      fontFamily: 'Geist',
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Se ejecutan en orden cuando el flujo se marca como completado.',
+            style: TextStyle(
+              fontFamily: 'Geist',
+              fontSize: 12,
+              color: AppColors.ctText2,
+            ),
+          ),
+          const SizedBox(height: 16),
+          if (_actions.isEmpty)
+            const SizedBox(
+              height: 200,
+              child: _EmptyState(
+                icon: Icons.check_circle_outline,
+                message:
+                    'Sin acciones configuradas.\nEl flujo cierra sin efectos secundarios.',
+              ),
+            )
+          else
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _actions.length,
+              separatorBuilder: (context2, i2) => const SizedBox(height: 8),
+              itemBuilder: (_, i) => _ActionCard(
+                action: _actions[i],
+                canManage: widget.canManage,
+                onEdit: () => _openActionDialog(_actions[i]),
+                onDelete: () => _deleteAction(_actions[i]),
+              ),
+            ),
+          const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+}
+
+// ── _ActionCard ───────────────────────────────────────────────────────────────
+
+IconData _actionIcon(String? type) {
+  switch (type) {
+    case 'webhook_out':
+      return Icons.webhook_outlined;
+    case 'emit_event':
+      return Icons.notifications_outlined;
+    default:
+      return Icons.account_tree_outlined;
+  }
+}
+
+String _actionLabel(String? type) {
+  switch (type) {
+    case 'webhook_out':
+      return 'Webhook saliente';
+    case 'emit_event':
+      return 'Emitir evento';
+    default:
+      return 'Abrir flujo';
+  }
+}
+
+String _actionSubtitle(Map<String, dynamic> action) {
+  final type = action['type'] as String?;
+  switch (type) {
+    case 'open_flow':
+      final slug = action['target_flow_slug'] as String? ?? '';
+      return '→ $slug';
+    case 'webhook_out':
+      final id = action['integration_id'] as String? ?? '';
+      final short = id.length > 8 ? id.substring(0, 8) : id;
+      return '↗ $short';
+    case 'emit_event':
+      final name = action['event_name'] as String? ?? '';
+      return '⚡ $name';
+    default:
+      return '';
+  }
+}
+
+class _ActionCard extends StatelessWidget {
+  const _ActionCard({
+    required this.action,
+    required this.canManage,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  final Map<String, dynamic> action;
+  final bool canManage;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final type = action['type'] as String?;
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.ctSurface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.ctBorder),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      child: Row(
+        children: [
+          Icon(_actionIcon(type), size: 20, color: AppColors.ctTeal),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _actionLabel(type),
+                  style: const TextStyle(
+                    fontFamily: 'Geist',
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.ctText,
+                  ),
+                ),
+                Text(
+                  _actionSubtitle(action),
+                  style: const TextStyle(
+                    fontFamily: 'Geist',
+                    fontSize: 12,
+                    color: AppColors.ctText2,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (canManage) ...[
+            IconButton(
+              icon: const Icon(Icons.edit_outlined,
+                  size: 16, color: AppColors.ctText2),
+              onPressed: onEdit,
+              tooltip: 'Editar',
+              padding: EdgeInsets.zero,
+              constraints:
+                  const BoxConstraints(minWidth: 30, minHeight: 30),
+            ),
+            IconButton(
+              icon: const Icon(Icons.delete_outline,
+                  size: 16, color: AppColors.ctDanger),
+              onPressed: onDelete,
+              tooltip: 'Eliminar',
+              padding: EdgeInsets.zero,
+              constraints:
+                  const BoxConstraints(minWidth: 30, minHeight: 30),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// ── _ActionDialog ─────────────────────────────────────────────────────────────
+
+class _ActionDialog extends StatefulWidget {
+  const _ActionDialog({required this.onSaved, this.action});
+
+  final Map<String, dynamic>? action;
+  final void Function(Map<String, dynamic>) onSaved;
+
+  @override
+  State<_ActionDialog> createState() => _ActionDialogState();
+}
+
+class _ActionDialogState extends State<_ActionDialog> {
+  String _type = 'open_flow';
+
+  // open_flow
+  final _slugCtrl = TextEditingController();
+  final _carryCtrl = TextEditingController();
+  bool _carryAncestors = false;
+
+  // webhook_out
+  final _integrationCtrl = TextEditingController();
+  bool _includeAncestors = false;
+
+  // emit_event
+  final _eventNameCtrl = TextEditingController();
+
+  bool get _isEdit => widget.action != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final a = widget.action;
+    if (a != null) {
+      _type = a['type'] as String? ?? 'open_flow';
+      _slugCtrl.text = a['target_flow_slug'] as String? ?? '';
+      final cf = a['carry_fields'];
+      _carryCtrl.text =
+          cf is List ? cf.map((e) => e.toString()).join(', ') : '';
+      _carryAncestors = a['carry_ancestors'] as bool? ?? false;
+      _integrationCtrl.text = a['integration_id'] as String? ?? '';
+      _includeAncestors = a['include_ancestors'] as bool? ?? false;
+      _eventNameCtrl.text = a['event_name'] as String? ?? '';
+    }
+  }
+
+  @override
+  void dispose() {
+    _slugCtrl.dispose();
+    _carryCtrl.dispose();
+    _integrationCtrl.dispose();
+    _eventNameCtrl.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final updated = Map<String, dynamic>.from(widget.action ?? {});
+    updated['type'] = _type;
+    if (!_isEdit || updated['id'] == null) {
+      updated['id'] = DateTime.now().millisecondsSinceEpoch.toString();
+    }
+    switch (_type) {
+      case 'open_flow':
+        if (_slugCtrl.text.trim().isEmpty) return;
+        updated['target_flow_slug'] = _slugCtrl.text.trim();
+        final raw = _carryCtrl.text.trim();
+        if (raw.isNotEmpty) {
+          updated['carry_fields'] =
+              raw.split(',').map((s) => s.trim()).toList();
+        } else {
+          updated.remove('carry_fields');
+        }
+        updated['carry_ancestors'] = _carryAncestors;
+        updated.remove('integration_id');
+        updated.remove('include_ancestors');
+        updated.remove('event_name');
+        updated.remove('event_data');
+        break;
+      case 'webhook_out':
+        if (_integrationCtrl.text.trim().isEmpty) return;
+        updated['integration_id'] = _integrationCtrl.text.trim();
+        updated['include_ancestors'] = _includeAncestors;
+        updated.remove('target_flow_slug');
+        updated.remove('carry_fields');
+        updated.remove('carry_ancestors');
+        updated.remove('event_name');
+        updated.remove('event_data');
+        break;
+      case 'emit_event':
+        if (_eventNameCtrl.text.trim().isEmpty) return;
+        updated['event_name'] = _eventNameCtrl.text.trim();
+        updated.remove('target_flow_slug');
+        updated.remove('carry_fields');
+        updated.remove('carry_ancestors');
+        updated.remove('integration_id');
+        updated.remove('include_ancestors');
+        break;
+    }
+    widget.onSaved(updated);
+    Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: AppColors.ctSurface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: const BorderSide(color: AppColors.ctBorder),
+      ),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 480),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                _isEdit ? 'Acción' : 'Nueva acción',
+                style: const TextStyle(
+                  fontFamily: 'Geist',
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.ctText,
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // Tipo
+              const Text(
+                'Tipo de acción',
+                style: TextStyle(
+                  fontFamily: 'Geist',
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.ctText,
+                ),
+              ),
+              const SizedBox(height: 6),
+              _DropdownContainer(
+                child: DropdownButton<String>(
+                  value: _type,
+                  isExpanded: true,
+                  underline: const SizedBox.shrink(),
+                  dropdownColor: AppColors.ctSurface,
+                  items: const [
+                    DropdownMenuItem(
+                      value: 'open_flow',
+                      child: Text('Abrir flujo',
+                          style: TextStyle(
+                              fontFamily: 'Geist',
+                              fontSize: 13,
+                              color: AppColors.ctText)),
+                    ),
+                    DropdownMenuItem(
+                      value: 'webhook_out',
+                      child: Text('Webhook saliente',
+                          style: TextStyle(
+                              fontFamily: 'Geist',
+                              fontSize: 13,
+                              color: AppColors.ctText)),
+                    ),
+                    DropdownMenuItem(
+                      value: 'emit_event',
+                      child: Text('Emitir evento',
+                          style: TextStyle(
+                              fontFamily: 'Geist',
+                              fontSize: 13,
+                              color: AppColors.ctText)),
+                    ),
+                  ],
+                  onChanged: (v) {
+                    if (v != null) setState(() => _type = v);
+                  },
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Campos condicionales
+              if (_type == 'open_flow') ...[
+                _FormField(
+                  label: 'Slug del flujo destino',
+                  controller: _slugCtrl,
+                  placeholder: 'ej. asignar-operador',
+                ),
+                const SizedBox(height: 14),
+                _FormField(
+                  label: 'Campos a heredar',
+                  controller: _carryCtrl,
+                  placeholder: 'ej. orden_id, cliente — separados por coma',
+                ),
+                const SizedBox(height: 8),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text(
+                    'Heredar todos los ancestros',
+                    style: TextStyle(
+                        fontFamily: 'Geist',
+                        fontSize: 13,
+                        color: AppColors.ctText),
+                  ),
+                  value: _carryAncestors,
+                  onChanged: (v) => setState(() => _carryAncestors = v),
+                  activeThumbColor: AppColors.ctTeal,
+                  activeTrackColor: AppColors.ctTeal.withValues(alpha: 0.4),
+                ),
+              ] else if (_type == 'webhook_out') ...[
+                _FormField(
+                  label: 'ID de integración',
+                  controller: _integrationCtrl,
+                  placeholder: 'UUID de la flow_integration configurada',
+                ),
+                const SizedBox(height: 8),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text(
+                    'Incluir datos de ancestros',
+                    style: TextStyle(
+                        fontFamily: 'Geist',
+                        fontSize: 13,
+                        color: AppColors.ctText),
+                  ),
+                  value: _includeAncestors,
+                  onChanged: (v) => setState(() => _includeAncestors = v),
+                  activeThumbColor: AppColors.ctTeal,
+                  activeTrackColor: AppColors.ctTeal.withValues(alpha: 0.4),
+                ),
+              ] else if (_type == 'emit_event') ...[
+                _FormField(
+                  label: 'Nombre del evento',
+                  controller: _eventNameCtrl,
+                  placeholder: 'ej. flujo_completado',
+                ),
+              ],
+
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  _GhostButton(
+                      label: 'Cancelar',
+                      onTap: () => Navigator.pop(context)),
+                  const SizedBox(width: 10),
+                  _PrimaryButton(label: 'Guardar', onTap: _submit),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── _DropdownContainer ────────────────────────────────────────────────────────
+
+class _DropdownContainer extends StatelessWidget {
+  const _DropdownContainer({required this.child});
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+      decoration: BoxDecoration(
+        color: AppColors.ctSurface2,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.ctBorder2),
+      ),
+      child: child,
     );
   }
 }

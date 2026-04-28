@@ -49,6 +49,7 @@ class FlowsApi {
     bool? isActive,
     List<Map<String, dynamic>>? fields,
     Map<String, dynamic>? behavior,
+    Map<String, dynamic>? onComplete,
     List<String>? triggerSources,
   }) async {
     final response = await ApiClient.instance.patch(
@@ -60,6 +61,7 @@ class FlowsApi {
         'is_active':       ?isActive,
         'fields':          ?fields,
         'behavior':        ?behavior,
+        'on_complete':     ?onComplete,
         'trigger_sources': ?triggerSources,
       },
     );
