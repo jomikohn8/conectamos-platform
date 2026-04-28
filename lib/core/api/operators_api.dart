@@ -110,18 +110,6 @@ class OperatorsApi {
     );
   }
 
-  /// PATCH /operators/{id} — actualiza solo preferred_channel_id.
-  /// Pasa null para quitar el canal preferido.
-  static Future<void> patchPreferredChannel({
-    required String id,
-    required String? preferredChannelId,
-  }) async {
-    await ApiClient.instance.patch(
-      '/operators/$id',
-      data: {'preferred_channel_id': preferredChannelId},
-    );
-  }
-
   static Future<List<Map<String, dynamic>>> listOperatorFlows({
     required String operatorId,
   }) async {

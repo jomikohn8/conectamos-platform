@@ -8,10 +8,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/api/api_client.dart';
-import '../../core/api/channels_api.dart';
 import '../../core/api/operators_api.dart';
 import '../../core/providers/permissions_provider.dart';
-import '../../core/providers/tenant_provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/identity_config.dart';
 import 'widgets/operator_form_dialog.dart';
@@ -518,87 +516,12 @@ class _OperatorHeader extends StatelessWidget {
 
 // ── Tab DATOS ──────────────────────────────────────────────────────────────────
 
-class _DatosTab extends ConsumerStatefulWidget {
+class _DatosTab extends StatelessWidget {
   const _DatosTab({required this.op});
   final Map<String, dynamic> op;
 
   @override
-  ConsumerState<_DatosTab> createState() => _DatosTabState();
-}
-
-class _DatosTabState extends ConsumerState<_DatosTab> {
-  List<Map<String, dynamic>> _channels = [];
-  bool _loadingChannels = false;
-  String? _selectedChannelId;
-  bool _saving = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _selectedChannelId =
-        widget.op['preferred_channel_id'] as String?;
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadChannels());
-  }
-
-  Future<void> _loadChannels() async {
-    if (!mounted) return;
-    final tenantId = ref.read(activeTenantIdProvider);
-    if (tenantId.isEmpty) return;
-    setState(() => _loadingChannels = true);
-    try {
-      final channels = await ChannelsApi.listChannels(tenantId: tenantId);
-      if (mounted) {
-        setState(() {
-          _channels = channels;
-          _loadingChannels = false;
-        });
-      }
-    } catch (_) {
-      if (mounted) setState(() => _loadingChannels = false);
-    }
-  }
-
-  Future<void> _savePreferredChannel(String? channelId) async {
-    final operatorId = widget.op['id'] as String? ?? '';
-    if (operatorId.isEmpty) return;
-    setState(() => _saving = true);
-    try {
-      await OperatorsApi.patchPreferredChannel(
-        id: operatorId,
-        preferredChannelId: channelId,
-      );
-      if (!mounted) return;
-      setState(() {
-        _selectedChannelId = channelId;
-        _saving = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Canal preferido actualizado'),
-        backgroundColor: AppColors.ctOk,
-        duration: Duration(seconds: 2),
-      ));
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _saving = false);
-      String msg = 'Error al actualizar el canal preferido';
-      if (e is DioException) {
-        final body = e.response?.data;
-        if (body is Map) {
-          final detail = body['detail'] ?? body['message'];
-          if (detail != null) msg = detail.toString();
-        }
-      }
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(msg),
-        backgroundColor: AppColors.ctDanger,
-      ));
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final canManage = hasPermission(ref, 'operators', 'manage');
-    final op = widget.op;
     final meta = op['metadata'] as Map<String, dynamic>? ?? {};
     final nationality = op['nationality'] as String? ?? '';
     final identityNumber = op['identity_number'] as String? ?? '';
@@ -682,29 +605,6 @@ class _DatosTabState extends ConsumerState<_DatosTab> {
               );
             }),
           ],
-
-          // ── Canal preferido ─────────────────────────────────────────────
-          const SizedBox(height: 16),
-          const _SectionTitle('Canal preferido'),
-          const SizedBox(height: 8),
-          _loadingChannels
-              ? const SizedBox(
-                  height: 36,
-                  child: Center(
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: AppColors.ctTeal,
-                    ),
-                  ),
-                )
-              : _PreferredChannelDropdown(
-                  channels: _channels,
-                  selectedChannelId: _selectedChannelId,
-                  enabled: canManage && !_saving,
-                  saving: _saving,
-                  onChanged: canManage ? _savePreferredChannel : null,
-                ),
-
           const SizedBox(height: 16),
           const _SectionTitle('Auditoría'),
           const SizedBox(height: 12),
@@ -735,162 +635,6 @@ class _DatosTabState extends ConsumerState<_DatosTab> {
           }),
         ],
       ),
-    );
-  }
-}
-
-// ── Preferred channel dropdown ────────────────────────────────────────────────
-
-class _PreferredChannelDropdown extends StatelessWidget {
-  const _PreferredChannelDropdown({
-    required this.channels,
-    required this.selectedChannelId,
-    required this.enabled,
-    required this.saving,
-    required this.onChanged,
-  });
-
-  final List<Map<String, dynamic>> channels;
-  final String?                    selectedChannelId;
-  final bool                       enabled;
-  final bool                       saving;
-  final ValueChanged<String?>?     onChanged;
-
-  static Color _typeColor(String? type) => switch (type) {
-    'whatsapp' => const Color(0xFF25D366),
-    'telegram' => const Color(0xFF229ED9),
-    'sms'      => const Color(0xFF6B7280),
-    _          => AppColors.ctText3,
-  };
-
-  static IconData _typeIcon(String? type) => switch (type) {
-    'whatsapp' => Icons.chat_bubble_outline,
-    'telegram' => Icons.telegram,
-    'sms'      => Icons.sms_outlined,
-    _          => Icons.router_rounded,
-  };
-
-  @override
-  Widget build(BuildContext context) {
-    final fillColor =
-        enabled ? AppColors.ctSurface : AppColors.ctSurface2;
-
-    return Row(
-      children: [
-        Expanded(
-          child: DropdownButtonFormField<String>(
-            key:          ValueKey(selectedChannelId),
-            initialValue: selectedChannelId,
-            isExpanded:   true,
-            style: const TextStyle(
-              fontFamily: 'Geist',
-              fontSize:   13,
-              color:      AppColors.ctText,
-            ),
-            decoration: InputDecoration(
-              filled:      true,
-              fillColor:   fillColor,
-              isDense:     true,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical:   10,
-              ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: AppColors.ctBorder2),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: AppColors.ctBorder2),
-              ),
-              disabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: AppColors.ctBorder),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: AppColors.ctTeal),
-              ),
-            ),
-            items: [
-              const DropdownMenuItem<String>(
-                value: null,
-                child: Text(
-                  'Sin canal preferido',
-                  style: TextStyle(
-                    fontFamily: 'Geist',
-                    fontSize:   13,
-                    color:      AppColors.ctText3,
-                  ),
-                ),
-              ),
-              ...channels.map((ch) {
-                final id   = ch['id'] as String? ?? '';
-                final name = ch['display_name'] as String?
-                    ?? ch['name'] as String? ?? id;
-                final type  = ch['channel_type'] as String?
-                    ?? ch['type'] as String?;
-                final color = _typeColor(type);
-                final icon  = _typeIcon(type);
-                return DropdownMenuItem<String>(
-                  value: id,
-                  child: Row(
-                    children: [
-                      Icon(icon, size: 14, color: color),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          name,
-                          style: const TextStyle(
-                            fontFamily: 'Geist',
-                            fontSize:   13,
-                            color:      AppColors.ctText,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      if (type != null && type.isNotEmpty) ...[
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 5,
-                            vertical:   1,
-                          ),
-                          decoration: BoxDecoration(
-                            color: color.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            type,
-                            style: TextStyle(
-                              fontFamily:  'Geist',
-                              fontSize:    10,
-                              fontWeight:  FontWeight.w600,
-                              color:       color,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                );
-              }),
-            ],
-            onChanged: enabled ? onChanged : null,
-          ),
-        ),
-        if (saving) ...[
-          const SizedBox(width: 10),
-          const SizedBox(
-            width:  16,
-            height: 16,
-            child:  CircularProgressIndicator(
-              strokeWidth: 2,
-              color: AppColors.ctTeal,
-            ),
-          ),
-        ],
-      ],
     );
   }
 }
