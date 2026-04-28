@@ -81,7 +81,7 @@ class FlowsApi {
     final params = <String, dynamic>{'tenant_id': tenantId};
     if (flowSlug != null) params['flow_slug'] = flowSlug;
     final response = await ApiClient.instance.get(
-      '/api/v1/dashboard/',
+      '/api/v1/dashboard/executions',
       queryParameters: params,
     );
     return List<Map<String, dynamic>>.from(response.data);
@@ -92,7 +92,7 @@ class FlowsApi {
     required String executionId,
   }) async {
     final response = await ApiClient.instance.get(
-      '/api/v1/dashboard/$executionId',
+      '/api/v1/dashboard/executions/$executionId',
       queryParameters: {'tenant_id': tenantId},
     );
     return Map<String, dynamic>.from(response.data);
@@ -103,7 +103,7 @@ class FlowsApi {
     required List<Map<String, dynamic>> fieldValues,
   }) async {
     await ApiClient.instance.post(
-      '/api/v1/dashboard/$executionId/submit',
+      '/api/v1/dashboard/executions/$executionId/submit',
       data: {'field_values': fieldValues},
     );
   }
