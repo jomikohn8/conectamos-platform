@@ -20,7 +20,9 @@ String _formatDate(String? raw) {
     final time = DateFormat('HH:mm').format(dt);
     if (day == today) return 'Hoy $time';
     if (day == yesterday) return 'Ayer $time';
-    return '${DateFormat('dd MMM').format(dt)} · $time';
+    final d = dt.day.toString().padLeft(2, '0');
+    final m = dt.month.toString().padLeft(2, '0');
+    return '$d/$m · $time';
   } catch (_) {
     return raw;
   }
@@ -99,6 +101,9 @@ class _ExecutionsScreenState extends ConsumerState<ExecutionsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<String>(activeTenantIdProvider, (prev, next) {
+      if (next.isNotEmpty && next != prev) _load();
+    });
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
