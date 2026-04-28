@@ -84,7 +84,10 @@ class FlowsApi {
       '/api/v1/dashboard/executions',
       queryParameters: params,
     );
-    return List<Map<String, dynamic>>.from(response.data);
+    final raw = response.data;
+    final list = raw is List ? raw : (raw is Map ? (raw['items'] ?? raw['executions'] ?? raw['data'] ?? []) : []);
+    return List<Map<String, dynamic>>.from(
+        (list as List).whereType<Map>().map((e) => Map<String, dynamic>.from(e)));
   }
 
   static Future<Map<String, dynamic>> getExecution({

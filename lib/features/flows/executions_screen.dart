@@ -78,17 +78,13 @@ class _ExecutionsScreenState extends ConsumerState<ExecutionsScreen> {
         _loading = false;
       });
     } catch (e, st) {
-      debugPrint('EXECUTIONS_LOAD ERROR: ${e.runtimeType}');
-      String errorMsg;
-      if (e is DioException) {
-        errorMsg = e.response?.data?['detail']?.toString()
-            ?? 'Error ${e.response?.statusCode ?? 'de red'}';
-      } else {
-        errorMsg = 'Error inesperado';
-      }
-      if (!mounted) return;
-      setState(() { _error = errorMsg; _loading = false; });
+      debugPrint('EXECUTIONS_LOAD ERROR type: ${e.runtimeType}');
       debugPrint('EXECUTIONS_LOAD STACK: $st');
+      if (!mounted) return;
+      setState(() {
+        _error = 'No se pudo cargar. Verifica tu conexión.';
+        _loading = false;
+      });
     }
   }
 
