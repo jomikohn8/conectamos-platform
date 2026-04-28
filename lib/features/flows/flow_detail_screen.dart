@@ -202,7 +202,7 @@ class _FlowDetailScreenState extends ConsumerState<FlowDetailScreen>
     }
   }
 
-  Future<void> _save() async {
+  Future<void> _save({bool silent = false}) async {
     if (_saving) return;
     setState(() => _saving = true);
     try {
@@ -215,6 +215,7 @@ class _FlowDetailScreenState extends ConsumerState<FlowDetailScreen>
         behavior: {'conditions': _conditions},
         onComplete: {'actions': _actions},
         triggerSources: _triggerSources,
+        sendProactive: _sendProactive,
       );
       if (!mounted) return;
       final rawFields = updated['fields'];
@@ -239,11 +240,13 @@ class _FlowDetailScreenState extends ConsumerState<FlowDetailScreen>
         _actions = updatedActions;
         _saving = false;
       });
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Flujo guardado'),
-        backgroundColor: AppColors.ctOk,
-        duration: Duration(seconds: 2),
-      ));
+      if (!silent) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Flujo guardado'),
+          backgroundColor: AppColors.ctOk,
+          duration: Duration(seconds: 2),
+        ));
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() => _saving = false);
@@ -276,6 +279,7 @@ class _FlowDetailScreenState extends ConsumerState<FlowDetailScreen>
               _fields.add(updated);
             }
           });
+          _save(silent: true);
         },
       ),
     );
@@ -360,12 +364,18 @@ class _FlowDetailScreenState extends ConsumerState<FlowDetailScreen>
             flowId: widget.flowId,
             tenantId: ref.read(activeTenantIdProvider),
             sendProactive: _sendProactive,
-            onChanged: (updated) => setState(() => _conditions = updated),
+            onChanged: (updated) {
+              setState(() => _conditions = updated);
+              _save(silent: true);
+            },
           ),
           _AlCerrarTab(
             actions: _actions,
             canManage: canManage,
-            onChanged: (updated) => setState(() => _actions = updated),
+            onChanged: (updated) {
+              setState(() => _actions = updated);
+              _save(silent: true);
+            },
           ),
         ],
       ),
