@@ -42,6 +42,23 @@ String _dioError(Object e) {
   return e.toString();
 }
 
+String _extractFlowName(Map<String, dynamic> execution) {
+  final snapshot = execution['flow_definition_snapshot'];
+  if (snapshot is Map) {
+    return snapshot['name'] as String? ?? snapshot['slug'] as String? ?? '—';
+  }
+  return execution['flow_slug'] as String? ?? '—';
+}
+
+String _collapseValue(Map f) {
+  return (f['value_text'] ??
+          f['value_numeric']?.toString() ??
+          f['value_media_url'] ??
+          f['value_jsonb']?.toString() ??
+          '')
+      ?.toString() ?? '';
+}
+
 // ── Screen ────────────────────────────────────────────────────────────────────
 
 class ExecutionsScreen extends ConsumerStatefulWidget {
@@ -293,9 +310,7 @@ class _ExecutionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final name = execution['flow_name'] as String? ??
-        execution['flow_slug'] as String? ??
-        '—';
+    final name = _extractFlowName(execution);
     final status = execution['status'] as String? ?? '';
     final createdAt = execution['created_at'] as String?;
     final fieldValues = execution['field_values'];
@@ -390,6 +405,7 @@ class _ExecutionDetailSheetState
   bool _loadingDetail = true;
   bool _submitting = false;
   final Map<String, TextEditingController> _controllers = {};
+  final Map<String, String> _fieldLabels = {};
 
   @override
   void initState() {
@@ -415,14 +431,27 @@ class _ExecutionDetailSheetState
       );
       if (!mounted) return;
 
+      // Build field labels from snapshot
+      final snapshot = widget.execution['flow_definition_snapshot'];
+      if (snapshot is Map) {
+        final fields = snapshot['fields'];
+        if (fields is List) {
+          for (final f in fields.whereType<Map>()) {
+            final key = f['key'] as String? ?? f['id'] as String?;
+            final lbl = f['label'] as String?;
+            if (key != null && lbl != null) _fieldLabels[key] = lbl;
+          }
+        }
+      }
+
       // Build controllers for capturable fields (source != 'inherited')
       final fieldValues = detail['field_values'];
       if (fieldValues is List) {
         for (final f in fieldValues.whereType<Map>()) {
           final source = f['source'] as String?;
-          final fieldId = f['field_id'] as String?;
-          if (source != 'inherited' && fieldId != null) {
-            _controllers[fieldId] = TextEditingController();
+          final fieldKey = f['field_key'] as String?;
+          if (source != 'inherited' && fieldKey != null) {
+            _controllers[fieldKey] = TextEditingController();
           }
         }
       }
@@ -450,12 +479,12 @@ class _ExecutionDetailSheetState
     if (fieldValues is List) {
       for (final f in fieldValues.whereType<Map>()) {
         final source = f['source'] as String?;
-        final fieldId = f['field_id'] as String?;
+        final fieldKey = f['field_key'] as String?;
         final required = f['required'] as bool? ?? false;
-        if (source != 'inherited' && fieldId != null && required) {
-          final ctrl = _controllers[fieldId];
+        if (source != 'inherited' && fieldKey != null && required) {
+          final ctrl = _controllers[fieldKey];
           if (ctrl != null && ctrl.text.trim().isEmpty) {
-            final label = f['label'] as String? ?? fieldId;
+            final label = _fieldLabels[fieldKey] ?? fieldKey;
             ScaffoldMessenger.of(context).showSnackBar(SnackBar(
               content: Text('El campo "$label" es requerido'),
               backgroundColor: AppColors.ctWarn,
@@ -470,7 +499,7 @@ class _ExecutionDetailSheetState
     try {
       final executionId = widget.execution['id'] as String;
       final payload = _controllers.entries
-          .map((e) => {'field_id': e.key, 'value': e.value.text.trim()})
+          .map((e) => {'field_key': e.key, 'value': e.value.text.trim()})
           .toList();
       await FlowsApi.submitExecution(
         executionId: executionId,
@@ -542,20 +571,14 @@ class _ExecutionDetailSheetState
     final detail = _detail;
     if (detail == null) return const SizedBox.shrink();
 
-    final flowName = detail['flow_name'] as String? ??
-        widget.execution['flow_name'] as String? ??
-        '—';
-    final inheritedRaw = detail['inherited_fields'];
-    final inheritedFields =
-        inheritedRaw is List ? List<Map>.from(inheritedRaw.whereType<Map>()) : <Map>[];
-    final hasInherited = inheritedFields.isNotEmpty;
+    final flowName = _extractFlowName(widget.execution);
     final fieldValues = detail['field_values'];
-    final captureFields = fieldValues is List
-        ? fieldValues
-            .whereType<Map>()
-            .where((f) => f['source'] != 'inherited')
-            .toList()
+    final allFields = fieldValues is List
+        ? fieldValues.whereType<Map>().toList()
         : <Map>[];
+    final inheritedFields = allFields.where((f) => f['source'] == 'inherited').toList();
+    final hasInherited = inheritedFields.isNotEmpty;
+    final captureFields = allFields.where((f) => f['source'] != 'inherited').toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -585,8 +608,9 @@ class _ExecutionDetailSheetState
           ),
           const SizedBox(height: 4),
           ...inheritedFields.map((f) {
-            final label = f['label'] as String? ?? f['field_id'] ?? '—';
-            final value = f['value']?.toString() ?? '—';
+            final fieldKey = f['field_key'] as String? ?? '';
+            final label = _fieldLabels[fieldKey] ?? (fieldKey.isNotEmpty ? fieldKey : '—');
+            final value = _collapseValue(f).isNotEmpty ? _collapseValue(f) : '—';
             return Padding(
               padding: const EdgeInsets.symmetric(vertical: 4),
               child: Row(
@@ -644,9 +668,9 @@ class _ExecutionDetailSheetState
           )
         else
           ...captureFields.map((f) {
-            final fieldId = f['field_id'] as String? ?? '';
-            final label = f['label'] as String? ?? fieldId;
-            final ctrl = _controllers[fieldId] ?? TextEditingController();
+            final fieldKey = f['field_key'] as String? ?? '';
+            final label = _fieldLabels[fieldKey] ?? fieldKey;
+            final ctrl = _controllers[fieldKey] ?? TextEditingController();
             return Padding(
               padding: const EdgeInsets.only(bottom: 14),
               child: TextField(
