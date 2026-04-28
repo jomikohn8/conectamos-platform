@@ -3,7 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
+
 
 import '../../core/api/operators_api.dart';
 import '../../core/api/overview_api.dart';
@@ -511,7 +511,9 @@ class _DateButtonState extends State<_DateButton> {
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
-    final formatted = DateFormat('dd MMM yyyy', 'es_MX').format(now);
+    final d = now.day.toString().padLeft(2, '0');
+    final m = now.month.toString().padLeft(2, '0');
+    final formatted = '$d/$m/${now.year}';
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
