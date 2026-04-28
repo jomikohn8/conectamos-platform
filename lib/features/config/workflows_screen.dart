@@ -44,6 +44,30 @@ String _dioError(Object e) {
   return e.toString();
 }
 
+const _kAccentMap = {
+  'à': 'a', 'á': 'a', 'â': 'a', 'ã': 'a', 'ä': 'a', 'å': 'a',
+  'æ': 'ae', 'ç': 'c',
+  'è': 'e', 'é': 'e', 'ê': 'e', 'ë': 'e',
+  'ì': 'i', 'í': 'i', 'î': 'i', 'ï': 'i',
+  'ð': 'd', 'ñ': 'n',
+  'ò': 'o', 'ó': 'o', 'ô': 'o', 'õ': 'o', 'ö': 'o', 'ø': 'o',
+  'ù': 'u', 'ú': 'u', 'û': 'u', 'ü': 'u',
+  'ý': 'y', 'ÿ': 'y', 'þ': 'th', 'ß': 'ss',
+};
+
+String _slugify(String input) {
+  final lower = input.toLowerCase();
+  final buf = StringBuffer();
+  for (final rune in lower.runes) {
+    final ch = String.fromCharCode(rune);
+    buf.write(_kAccentMap[ch] ?? ch);
+  }
+  return buf
+      .toString()
+      .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
+      .replaceAll(RegExp(r'^-+|-+$'), '');
+}
+
 // ── Screen ────────────────────────────────────────────────────────────────────
 
 class WorkflowsScreen extends ConsumerStatefulWidget {
@@ -671,8 +695,12 @@ class _FlowFormDialogState extends State<_FlowFormDialog> {
   final _descCtrl = TextEditingController();
   String? _selectedWorkerId;
   bool _saving = false;
+  String? _slugError;
 
   bool get _isEdit => widget.flow != null;
+
+  String get _slug => _slugify(_nameCtrl.text.trim());
+  bool get _slugValid => _isEdit || _slug.length >= 3;
 
   @override
   void initState() {
@@ -684,10 +712,20 @@ class _FlowFormDialogState extends State<_FlowFormDialog> {
     if (widget.workers.isNotEmpty) {
       _selectedWorkerId = widget.workers.first['id'] as String?;
     }
+    _nameCtrl.addListener(_onNameChanged);
+  }
+
+  void _onNameChanged() {
+    if (!_isEdit && _slugError != null) {
+      setState(() => _slugError = null);
+    } else if (!_isEdit) {
+      setState(() {});
+    }
   }
 
   @override
   void dispose() {
+    _nameCtrl.removeListener(_onNameChanged);
     _nameCtrl.dispose();
     _descCtrl.dispose();
     super.dispose();
@@ -719,21 +757,24 @@ class _FlowFormDialogState extends State<_FlowFormDialog> {
       if (mounted) Navigator.pop(context);
     } catch (e) {
       if (!mounted) return;
-      setState(() => _saving = false);
       final isDio = e is DioException;
       final is409 = isDio && e.response?.statusCode == 409;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        backgroundColor: is409
-            ? const Color(0xFFF97316)
-            : AppColors.ctDanger,
-        content: Text(
-          is409
-              ? 'Ya existe un flujo con ese nombre'
-              : _dioError(e),
-          style: const TextStyle(fontFamily: 'Geist', color: Colors.white),
-        ),
-        duration: const Duration(seconds: 3),
-      ));
+      if (is409) {
+        setState(() {
+          _saving = false;
+          _slugError = 'Ya existe un flujo con este nombre';
+        });
+      } else {
+        setState(() => _saving = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          backgroundColor: AppColors.ctDanger,
+          content: Text(
+            _dioError(e),
+            style: const TextStyle(fontFamily: 'Geist', color: Colors.white),
+          ),
+          duration: const Duration(seconds: 3),
+        ));
+      }
     }
   }
 
@@ -775,6 +816,10 @@ class _FlowFormDialogState extends State<_FlowFormDialog> {
                 controller: _nameCtrl,
                 placeholder: 'Ej: Flujo 4 · Entregas',
               ),
+              if (!_isEdit && _nameCtrl.text.trim().isNotEmpty) ...[
+                const SizedBox(height: 6),
+                _SlugPreview(slug: _slug, error: _slugError),
+              ],
               const SizedBox(height: 14),
 
               // Worker
@@ -885,7 +930,8 @@ class _FlowFormDialogState extends State<_FlowFormDialog> {
                   const SizedBox(width: 10),
                   _PrimaryButton(
                     label: _saving ? 'Guardando...' : 'Guardar',
-                    onTap: _saving ? () {} : _submit,
+                    onTap: (_saving || !_slugValid) ? () {} : _submit,
+                    enabled: !_saving && _slugValid,
                   ),
                 ],
               ),
@@ -1114,28 +1160,85 @@ class _DialogField extends StatelessWidget {
   }
 }
 
+class _SlugPreview extends StatelessWidget {
+  const _SlugPreview({required this.slug, this.error});
+  final String slug;
+  final String? error;
+
+  @override
+  Widget build(BuildContext context) {
+    final isValid = error == null && slug.length >= 3;
+    if (error != null) {
+      return Row(
+        children: [
+          const Icon(Icons.error_outline, size: 13, color: Color(0xFFE24C4B)),
+          const SizedBox(width: 4),
+          Text(
+            error!,
+            style: const TextStyle(
+              fontFamily: 'Geist',
+              fontSize: 12,
+              color: Color(0xFFE24C4B),
+            ),
+          ),
+        ],
+      );
+    }
+    return Row(
+      children: [
+        Icon(
+          isValid ? Icons.check_circle_outline : Icons.warning_amber_outlined,
+          size: 13,
+          color: isValid ? const Color(0xFF107C41) : const Color(0xFFE24C4B),
+        ),
+        const SizedBox(width: 4),
+        Expanded(
+          child: Text(
+            isValid ? slug : (slug.isEmpty ? 'Nombre inválido' : 'Nombre inválido (slug: "$slug")'),
+            style: TextStyle(
+              fontFamily: 'Geist',
+              fontSize: 12,
+              color: isValid ? const Color(0xFF107C41) : const Color(0xFFE24C4B),
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _PrimaryButton extends StatelessWidget {
-  const _PrimaryButton({required this.label, required this.onTap});
+  const _PrimaryButton({
+    required this.label,
+    required this.onTap,
+    this.enabled = true,
+  });
   final String label;
   final VoidCallback onTap;
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: AppColors.ctTeal,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Text(
-          label,
-          style: const TextStyle(
-            fontFamily: 'Geist',
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: AppColors.ctNavy,
+      child: Opacity(
+        opacity: enabled ? 1.0 : 0.45,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            color: AppColors.ctTeal,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            label,
+            style: const TextStyle(
+              fontFamily: 'Geist',
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: AppColors.ctNavy,
+            ),
           ),
         ),
       ),
