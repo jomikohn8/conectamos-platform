@@ -357,7 +357,7 @@ class _FlowDetailScreenState extends ConsumerState<FlowDetailScreen>
         ),
       ),
       actions: [
-        if (_flow != null && hasPermission(ref, 'flow_integrations', 'view'))
+        if (_flow != null)
           IconButton(
             icon: const Icon(Icons.electrical_services_outlined, color: Colors.white70),
             tooltip: 'Integraciones',
