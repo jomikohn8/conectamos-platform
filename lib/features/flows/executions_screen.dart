@@ -64,12 +64,13 @@ class _ExecutionsScreenState extends ConsumerState<ExecutionsScreen> {
 
   Future<void> _load() async {
     if (!mounted) return;
+    final tenantId = ref.read(activeTenantIdProvider);
+    if (tenantId.isEmpty) return;
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
-      final tenantId = ref.read(activeTenantIdProvider);
       final data = await FlowsApi.listPendingExecutions(tenantId: tenantId);
       if (!mounted) return;
       setState(() {
