@@ -87,8 +87,14 @@ class FlowsApi {
     return Map<String, dynamic>.from(response.data);
   }
 
-  static Future<void> deleteFlow({required String flowId}) async {
-    await ApiClient.instance.delete('/flows/$flowId');
+  static Future<void> deleteFlow({
+    required String flowId,
+    required String tenantId,
+  }) async {
+    await ApiClient.instance.delete(
+      '/flows/$flowId',
+      queryParameters: {'tenant_id': tenantId},
+    );
   }
 
   // ── Integrations ────────────────────────────────────────────────────────────

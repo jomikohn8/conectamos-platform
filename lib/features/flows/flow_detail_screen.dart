@@ -343,6 +343,63 @@ class _FlowDetailScreenState extends ConsumerState<FlowDetailScreen>
     );
   }
 
+  Future<void> _confirmDelete() async {
+    final name = _flow?['name'] as String? ?? 'este flujo';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text(
+          'Eliminar flujo',
+          style: TextStyle(
+            fontFamily: 'Geist',
+            fontWeight: FontWeight.w600,
+            fontSize: 15,
+            color: AppColors.ctText,
+          ),
+        ),
+        content: Text(
+          '¿Eliminar "$name"? Esta acción desactivará el flujo. Las ejecuciones existentes no se verán afectadas.',
+          style: const TextStyle(
+            fontFamily: 'Geist',
+            fontSize: 13,
+            color: AppColors.ctText2,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text(
+              'Eliminar',
+              style: TextStyle(color: Color(0xFFE24C4B)),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      final tenantId = ref.read(activeTenantIdProvider);
+      await FlowsApi.deleteFlow(flowId: widget.flowId, tenantId: tenantId);
+      if (!mounted) return;
+      context.go('/flows');
+    } catch (e) {
+      if (!mounted) return;
+      final isDioException = e is DioException;
+      final status = isDioException ? e.response?.statusCode : null;
+      final msg = status == 409
+          ? 'Este flujo tiene ejecuciones activas y no puede eliminarse'
+          : _dioError(e);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(msg),
+        backgroundColor: AppColors.ctDanger,
+      ));
+    }
+  }
+
   // ── Build ───────────────────────────────────────────────────────────────────
 
   @override
@@ -392,6 +449,7 @@ class _FlowDetailScreenState extends ConsumerState<FlowDetailScreen>
             flow: _flow!,
             nameCtrl: _nameCtrl,
             descCtrl: _descCtrl,
+            canManage: canManage,
             triggerSources: _triggerSources,
             onTriggerToggle: (source) {
               setState(() {
@@ -404,6 +462,7 @@ class _FlowDetailScreenState extends ConsumerState<FlowDetailScreen>
                 }
               });
             },
+            onDelete: _confirmDelete,
           ),
           _CamposTab(
             fields: _fields,
@@ -524,15 +583,19 @@ class _InfoTab extends StatefulWidget {
     required this.flow,
     required this.nameCtrl,
     required this.descCtrl,
+    required this.canManage,
     required this.triggerSources,
     required this.onTriggerToggle,
+    required this.onDelete,
   });
 
   final Map<String, dynamic> flow;
   final TextEditingController nameCtrl;
   final TextEditingController descCtrl;
+  final bool canManage;
   final List<String> triggerSources;
   final void Function(String source) onTriggerToggle;
+  final VoidCallback onDelete;
 
   @override
   State<_InfoTab> createState() => _InfoTabState();
@@ -732,6 +795,34 @@ class _InfoTabState extends State<_InfoTab> {
             }).toList(),
           ),
           const SizedBox(height: 24),
+
+          if (widget.canManage) ...[
+            const Divider(color: AppColors.ctBorder),
+            const SizedBox(height: 16),
+            OutlinedButton.icon(
+              onPressed: widget.onDelete,
+              icon: const Icon(Icons.delete_outline,
+                  size: 16, color: Color(0xFFE24C4B)),
+              label: const Text(
+                'Eliminar flujo',
+                style: TextStyle(
+                  fontFamily: 'Geist',
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFFE24C4B),
+                ),
+              ),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: Color(0xFFE24C4B)),
+                backgroundColor: Colors.transparent,
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 16, vertical: 10),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8)),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
         ],
       ),
     );
