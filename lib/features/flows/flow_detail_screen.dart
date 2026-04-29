@@ -418,6 +418,9 @@ class _FlowDetailScreenState extends ConsumerState<FlowDetailScreen>
           _AlCerrarTab(
             actions: _actions,
             canManage: canManage,
+            tenantId: ref.read(activeTenantIdProvider),
+            tenantWorkerId: _flow?['tenant_worker_id'] as String? ?? '',
+            currentFlowSlug: _flow?['slug'] as String? ?? '',
             onChanged: (updated) {
               setState(() => _actions = updated);
               _save(silent: true);
@@ -1800,11 +1803,17 @@ class _AlCerrarTab extends StatefulWidget {
   const _AlCerrarTab({
     required this.actions,
     required this.canManage,
+    required this.tenantId,
+    required this.tenantWorkerId,
+    required this.currentFlowSlug,
     required this.onChanged,
   });
 
   final List<Map<String, dynamic>> actions;
   final bool canManage;
+  final String tenantId;
+  final String tenantWorkerId;
+  final String currentFlowSlug;
   final ValueChanged<List<Map<String, dynamic>>> onChanged;
 
   @override
@@ -1833,6 +1842,9 @@ class _AlCerrarTabState extends State<_AlCerrarTab> {
       context: context,
       builder: (_) => _ActionDialog(
         action: action,
+        tenantId: widget.tenantId,
+        tenantWorkerId: widget.tenantWorkerId,
+        currentFlowSlug: widget.currentFlowSlug,
         onSaved: (updated) {
           setState(() {
             if (action != null) {
@@ -2090,9 +2102,18 @@ class _ActionCard extends StatelessWidget {
 // ── _ActionDialog ─────────────────────────────────────────────────────────────
 
 class _ActionDialog extends StatefulWidget {
-  const _ActionDialog({required this.onSaved, this.action});
+  const _ActionDialog({
+    required this.onSaved,
+    required this.tenantId,
+    required this.tenantWorkerId,
+    required this.currentFlowSlug,
+    this.action,
+  });
 
   final Map<String, dynamic>? action;
+  final String tenantId;
+  final String tenantWorkerId;
+  final String currentFlowSlug;
   final void Function(Map<String, dynamic>) onSaved;
 
   @override
@@ -2102,8 +2123,11 @@ class _ActionDialog extends StatefulWidget {
 class _ActionDialogState extends State<_ActionDialog> {
   String _type = 'open_flow';
 
-  // open_flow
-  final _slugCtrl = TextEditingController();
+  // open_flow — replaced TextField with dropdown
+  String? _selectedFlowSlug;
+  List<Map<String, dynamic>> _availableFlows = [];
+  bool _loadingFlows = false;
+
   final _carryCtrl = TextEditingController();
   bool _carryAncestors = false;
 
@@ -2122,7 +2146,7 @@ class _ActionDialogState extends State<_ActionDialog> {
     final a = widget.action;
     if (a != null) {
       _type = a['type'] as String? ?? 'open_flow';
-      _slugCtrl.text = a['target_flow_slug'] as String? ?? '';
+      _selectedFlowSlug = a['target_flow_slug'] as String?;
       final cf = a['carry_fields'];
       _carryCtrl.text =
           cf is List ? cf.map((e) => e.toString()).join(', ') : '';
@@ -2131,11 +2155,38 @@ class _ActionDialogState extends State<_ActionDialog> {
       _includeAncestors = a['include_ancestors'] as bool? ?? false;
       _eventNameCtrl.text = a['event_name'] as String? ?? '';
     }
+    _loadFlows();
+  }
+
+  Future<void> _loadFlows() async {
+    if (widget.tenantWorkerId.isEmpty) return;
+    setState(() => _loadingFlows = true);
+    try {
+      final flows = await FlowsApi.getFlowsByWorker(
+        tenantId: widget.tenantId,
+        tenantWorkerId: widget.tenantWorkerId,
+      );
+      final filtered = flows
+          .where((f) => (f['slug'] as String?) != widget.currentFlowSlug)
+          .toList();
+      if (!mounted) return;
+      setState(() {
+        _availableFlows = filtered;
+        // If editing and selected slug not in list, keep it anyway
+        if (_selectedFlowSlug != null &&
+            !filtered.any((f) => f['slug'] == _selectedFlowSlug)) {
+          _selectedFlowSlug = null;
+        }
+        _loadingFlows = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loadingFlows = false);
+    }
   }
 
   @override
   void dispose() {
-    _slugCtrl.dispose();
     _carryCtrl.dispose();
     _integrationCtrl.dispose();
     _eventNameCtrl.dispose();
@@ -2150,8 +2201,8 @@ class _ActionDialogState extends State<_ActionDialog> {
     }
     switch (_type) {
       case 'open_flow':
-        if (_slugCtrl.text.trim().isEmpty) return;
-        updated['target_flow_slug'] = _slugCtrl.text.trim();
+        if (_selectedFlowSlug == null) return;
+        updated['target_flow_slug'] = _selectedFlowSlug!;
         final raw = _carryCtrl.text.trim();
         if (raw.isNotEmpty) {
           updated['carry_fields'] =
@@ -2268,11 +2319,68 @@ class _ActionDialogState extends State<_ActionDialog> {
 
               // Campos condicionales
               if (_type == 'open_flow') ...[
-                _FormField(
-                  label: 'Slug del flujo destino',
-                  controller: _slugCtrl,
-                  placeholder: 'ej. asignar-operador',
+                const Text(
+                  'Flujo destino',
+                  style: TextStyle(
+                    fontFamily: 'Geist',
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.ctText,
+                  ),
                 ),
+                const SizedBox(height: 6),
+                if (_loadingFlows)
+                  const Center(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      child: CircularProgressIndicator(
+                          color: AppColors.ctTeal, strokeWidth: 2),
+                    ),
+                  )
+                else if (_availableFlows.isEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: AppColors.ctBorder),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Text(
+                      'No hay flujos disponibles para este worker',
+                      style: TextStyle(
+                          fontFamily: 'Geist',
+                          fontSize: 13,
+                          color: AppColors.ctText2),
+                    ),
+                  )
+                else
+                  _DropdownContainer(
+                    child: DropdownButton<String>(
+                      value: _selectedFlowSlug,
+                      isExpanded: true,
+                      underline: const SizedBox.shrink(),
+                      dropdownColor: AppColors.ctSurface,
+                      hint: const Text('Selecciona un flujo',
+                          style: TextStyle(
+                              fontFamily: 'Geist',
+                              fontSize: 13,
+                              color: AppColors.ctText2)),
+                      items: _availableFlows.map((f) {
+                        final slug = f['slug'] as String? ?? '';
+                        final name = f['name'] as String? ?? slug;
+                        return DropdownMenuItem<String>(
+                          value: slug,
+                          child: Text(name,
+                              style: const TextStyle(
+                                  fontFamily: 'Geist',
+                                  fontSize: 13,
+                                  color: AppColors.ctText)),
+                        );
+                      }).toList(),
+                      onChanged: (v) =>
+                          setState(() => _selectedFlowSlug = v),
+                    ),
+                  ),
                 const SizedBox(height: 14),
                 _FormField(
                   label: 'Campos a heredar',
@@ -2331,7 +2439,11 @@ class _ActionDialogState extends State<_ActionDialog> {
                       label: 'Cancelar',
                       onTap: () => Navigator.pop(context)),
                   const SizedBox(width: 10),
-                  _PrimaryButton(label: 'Guardar', onTap: _submit),
+                  _PrimaryButton(
+                    label: 'Guardar',
+                    onTap: _submit,
+                    enabled: _type != 'open_flow' || _selectedFlowSlug != null,
+                  ),
                 ],
               ),
             ],

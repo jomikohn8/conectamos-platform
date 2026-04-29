@@ -11,6 +11,23 @@ class FlowsApi {
     return List<Map<String, dynamic>>.from(response.data);
   }
 
+  static Future<List<Map<String, dynamic>>> getFlowsByWorker({
+    required String tenantId,
+    required String tenantWorkerId,
+  }) async {
+    final response = await ApiClient.instance.get(
+      '/flows',
+      queryParameters: {
+        'tenant_id': tenantId,
+        'tenant_worker_id': tenantWorkerId,
+      },
+    );
+    final raw = response.data;
+    final list = raw is List ? raw : (raw is Map ? (raw['flows'] ?? raw['items'] ?? raw['data'] ?? []) : []);
+    return List<Map<String, dynamic>>.from(
+        (list as List).whereType<Map>().map((e) => Map<String, dynamic>.from(e)));
+  }
+
   static Future<Map<String, dynamic>> getFlow({
     required String tenantId,
     required String flowId,
