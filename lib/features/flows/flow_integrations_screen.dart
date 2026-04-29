@@ -134,43 +134,71 @@ class _FlowIntegrationsScreenState
   }
 
   Future<void> _showSecretDialog(Map<String, dynamic> integration) async {
-    final secret = integration['secret'] as String? ??
-        integration['api_key'] as String? ??
-        integration['token'] as String?;
+    final apiKeyPlain = integration['api_key_plain'] as String?;
+    final hmacSecretPlain = integration['hmac_secret_plain'] as String?;
+    final secret = apiKeyPlain ?? hmacSecretPlain;
+    final label = apiKeyPlain != null ? 'API Key' : 'HMAC Secret';
     if (secret == null || !mounted) return;
     await showDialog(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        title: const Text(
-          'Copia tu clave ahora',
-          style: TextStyle(
+        title: Text(
+          'Copia tu $label ahora',
+          style: const TextStyle(
             fontFamily: 'Geist',
             fontWeight: FontWeight.w600,
             fontSize: 15,
             color: AppColors.ctText,
           ),
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Esta clave secreta solo se muestra una vez. Guárdala en un lugar seguro.',
-              style: TextStyle(
-                fontFamily: 'Geist',
-                fontSize: 13,
-                color: AppColors.ctText2,
+        content: SizedBox(
+          width: 480,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.warning_amber_rounded,
+                      color: AppColors.ctDanger, size: 16),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Esta es la única vez que verás esta clave. Guárdala en un lugar seguro.',
+                      style: const TextStyle(
+                        fontFamily: 'Geist',
+                        fontSize: 13,
+                        color: AppColors.ctDanger,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ),
-            const SizedBox(height: 16),
-            _SecretBox(secret: secret),
-          ],
+              const SizedBox(height: 16),
+              Text(
+                label,
+                style: const TextStyle(
+                  fontFamily: 'Geist',
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.ctText2,
+                ),
+              ),
+              const SizedBox(height: 6),
+              _SecretBox(secret: secret),
+            ],
+          ),
         ),
         actions: [
-          TextButton(
+          ElevatedButton(
             onPressed: () => ctx.pop(),
-            child: const Text('Cerrar'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.ctTeal,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Entendido',
+                style: TextStyle(fontFamily: 'Geist', fontSize: 13)),
           ),
         ],
       ),
