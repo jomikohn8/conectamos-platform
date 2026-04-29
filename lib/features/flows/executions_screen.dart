@@ -45,8 +45,13 @@ String _dioError(Object e) {
 String _extractFlowName(Map<String, dynamic> execution) {
   final snapshot = execution['flow_definition_snapshot'];
   if (snapshot is Map) {
-    return snapshot['name'] as String? ?? snapshot['slug'] as String? ?? '—';
+    final name = snapshot['name'] as String?;
+    if (name != null && name.isNotEmpty) return name;
+    final slug = snapshot['slug'] as String?;
+    if (slug != null && slug.isNotEmpty) return slug;
   }
+  final flowName = execution['flow_name'] as String?;
+  if (flowName != null && flowName.isNotEmpty) return flowName;
   return execution['flow_slug'] as String? ?? '—';
 }
 
