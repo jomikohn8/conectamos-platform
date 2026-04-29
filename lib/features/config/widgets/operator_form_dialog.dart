@@ -273,6 +273,7 @@ class _OperatorFormDialogState extends ConsumerState<OperatorFormDialog> {
       final tenantId = ref.read(activeTenantIdProvider);
       final flows = await FlowsApi.listFlows(
         tenantId: tenantId.isNotEmpty ? tenantId : 'default',
+        triggerSource: 'conversational',
       );
       if (mounted) {
         setState(() {

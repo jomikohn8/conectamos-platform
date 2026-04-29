@@ -3,10 +3,13 @@ import 'package:conectamos_platform/core/api/api_client.dart';
 class FlowsApi {
   static Future<List<Map<String, dynamic>>> listFlows({
     required String tenantId,
+    String? triggerSource,
   }) async {
+    final params = <String, dynamic>{'tenant_id': tenantId};
+    if (triggerSource != null) params['trigger_source'] = triggerSource;
     final response = await ApiClient.instance.get(
       '/flows',
-      queryParameters: {'tenant_id': tenantId},
+      queryParameters: params,
     );
     return List<Map<String, dynamic>>.from(response.data);
   }
