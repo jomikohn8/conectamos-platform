@@ -362,6 +362,7 @@ class _EscalacionDetailSheetState
         : (esc['operator_name'] as String? ?? '—');
 
     final flowExecutionId = esc['flow_execution_id'] as String? ?? '—';
+    final flowName        = esc['flow_name'] as String?;
     final reason          = esc['reason'] as String? ?? '—';
     final workerCanResume = esc['worker_can_resume'] as bool? ?? false;
 
@@ -374,9 +375,10 @@ class _EscalacionDetailSheetState
         _infoRow('Razón', reason),
         _infoRow(
           'Flujo',
-          flowExecutionId.length > 8
-              ? '…${flowExecutionId.substring(flowExecutionId.length - 8)}'
-              : flowExecutionId,
+          flowName ??
+              (flowExecutionId.length > 8
+                  ? '…${flowExecutionId.substring(flowExecutionId.length - 8)}'
+                  : flowExecutionId),
           tooltip: flowExecutionId,
         ),
         _infoRow(
