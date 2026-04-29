@@ -1549,6 +1549,13 @@ class _ComportamientoTabState extends State<_ComportamientoTab> {
     if (old.sendProactive != widget.sendProactive) {
       _sendProactive = widget.sendProactive;
     }
+    // When conversational is removed from trigger sources, auto-disable
+    // send_proactive and persist immediately.
+    final wasConversational = old.triggerSources.contains('conversational');
+    final isConversational = widget.triggerSources.contains('conversational');
+    if (wasConversational && !isConversational && _sendProactive) {
+      _patchSendProactive(false);
+    }
   }
 
   Future<void> _patchSendProactive(bool value) async {
