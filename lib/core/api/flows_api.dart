@@ -172,7 +172,10 @@ class FlowsApi {
     required String tenantId,
     String? flowSlug,
   }) async {
-    final params = <String, dynamic>{'tenant_id': tenantId};
+    final params = <String, dynamic>{
+      'tenant_id': tenantId,
+      'status': 'pending_dashboard',
+    };
     if (flowSlug != null) params['flow_slug'] = flowSlug;
     final response = await ApiClient.instance.get(
       '/api/v1/dashboard/executions',
