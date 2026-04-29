@@ -399,10 +399,30 @@ class _IntegrationCard extends StatelessWidget {
                 ),
                 if (id.isNotEmpty) ...[
                   const SizedBox(height: 4),
-                  Text(
-                    'ID: $id',
-                    style: AppFonts.geist(
-                        fontSize: 11, color: AppColors.ctText3),
+                  Row(
+                    children: [
+                      Text(
+                        'ID: $id',
+                        style: AppFonts.geist(
+                            fontSize: 11, color: AppColors.ctText3),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.copy, size: 14),
+                        color: AppColors.ctText2,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        visualDensity: VisualDensity.compact,
+                        onPressed: () {
+                          Clipboard.setData(ClipboardData(text: id));
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('ID copiado'),
+                              duration: Duration(milliseconds: 1500),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
                   ),
                 ],
                 if (createdAt.isNotEmpty) ...[
