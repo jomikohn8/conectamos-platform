@@ -1098,6 +1098,7 @@ class _FieldDialogState extends State<_FieldDialog> {
   // select type state
   String _dataSourceBase = 'system:operators';
   String? _dataSourceFlowSlug;
+  String _fillStrategy = 'conversational_list';
   List<Map<String, dynamic>> _availableFlows = [];
   bool _loadingFlows = false;
 
@@ -1136,6 +1137,8 @@ class _FieldDialogState extends State<_FieldDialog> {
           _dataSourceBase = ds;
         }
       }
+      _fillStrategy = widget.field!['fill_strategy'] as String? ??
+          'conversational_list';
     }
     _labelCtrl.addListener(_onLabelChanged);
     if (_type == 'select') _loadFlows();
@@ -1184,8 +1187,10 @@ class _FieldDialogState extends State<_FieldDialog> {
     updated['required'] = _required;
     if (_type == 'select') {
       updated['data_source'] = _resolvedDataSource;
+      updated['fill_strategy'] = _fillStrategy;
     } else {
       updated.remove('data_source');
+      updated.remove('fill_strategy');
     }
     if (!_isEdit || updated['id'] == null) {
       updated['id'] =
@@ -1419,6 +1424,66 @@ class _FieldDialogState extends State<_FieldDialog> {
                       ),
                     ),
                 ],
+              ],
+
+              // Fill strategy (select type only)
+              if (_type == 'select') ...[
+                const SizedBox(height: 14),
+                const Text(
+                  'Cuando se ejecuta conversacionalmente',
+                  style: TextStyle(
+                    fontFamily: 'Geist',
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.ctText,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.ctSurface2,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.ctBorder2),
+                  ),
+                  child: DropdownButton<String>(
+                    value: _fillStrategy,
+                    isExpanded: true,
+                    underline: const SizedBox.shrink(),
+                    dropdownColor: AppColors.ctSurface,
+                    items: const [
+                      DropdownMenuItem(
+                        value: 'conversational_list',
+                        child: Text('Mostrar lista de opciones al operador',
+                            style: TextStyle(
+                                fontFamily: 'Geist',
+                                fontSize: 13,
+                                color: AppColors.ctText)),
+                      ),
+                      DropdownMenuItem(
+                        value: 'inherit_actor',
+                        child: Text('Usar el operador actual',
+                            style: TextStyle(
+                                fontFamily: 'Geist',
+                                fontSize: 13,
+                                color: AppColors.ctText)),
+                      ),
+                      DropdownMenuItem(
+                        value: 'defer_dashboard',
+                        child: Text('Pedir al supervisor en Tareas',
+                            style: TextStyle(
+                                fontFamily: 'Geist',
+                                fontSize: 13,
+                                color: AppColors.ctText)),
+                      ),
+                    ],
+                    onChanged: (v) {
+                      if (v != null) setState(() => _fillStrategy = v);
+                    },
+                  ),
+                ),
               ],
               const SizedBox(height: 14),
 
