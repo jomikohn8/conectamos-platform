@@ -406,11 +406,22 @@ class _ExecutionDetailSheetState
   bool _submitting = false;
   final Map<String, TextEditingController> _controllers = {};
   final Map<String, String> _fieldLabels = {};
+  // Ordered list of capturable fields from flow_definition_snapshot
+  final List<Map<String, dynamic>> _snapshotCaptureFields = [];
+  final Map<String, bool> _fieldRequired = {};
 
   @override
   void initState() {
     super.initState();
     _loadDetail();
+  }
+
+  bool get _canSubmit {
+    for (final entry in _controllers.entries) {
+      final required = _fieldRequired[entry.key] ?? false;
+      if (required && entry.value.text.trim().isEmpty) return false;
+    }
+    return true;
   }
 
   @override
@@ -431,7 +442,7 @@ class _ExecutionDetailSheetState
       );
       if (!mounted) return;
 
-      // Build field labels from snapshot
+      // Build field metadata from snapshot (source of truth for which fields exist)
       final snapshot = widget.execution['flow_definition_snapshot'];
       if (snapshot is Map) {
         final fields = snapshot['fields'];
@@ -439,19 +450,32 @@ class _ExecutionDetailSheetState
           for (final f in fields.whereType<Map>()) {
             final key = f['key'] as String? ?? f['id'] as String?;
             final lbl = f['label'] as String?;
-            if (key != null && lbl != null) _fieldLabels[key] = lbl;
+            final req = f['required'] as bool? ?? false;
+            final source = f['source'] as String?;
+            if (key == null) continue;
+            if (lbl != null) _fieldLabels[key] = lbl;
+            _fieldRequired[key] = req;
+            // Only show fields that are not inherited
+            if (source != 'inherited') {
+              _snapshotCaptureFields.add(Map<String, dynamic>.from(f));
+              final ctrl = TextEditingController();
+              ctrl.addListener(() { if (mounted) setState(() {}); });
+              _controllers[key] = ctrl;
+            }
           }
         }
       }
 
-      // Build controllers for capturable fields (source != 'inherited')
+      // Pre-populate controllers with existing field_values
       final fieldValues = detail['field_values'];
       if (fieldValues is List) {
         for (final f in fieldValues.whereType<Map>()) {
-          final source = f['source'] as String?;
           final fieldKey = f['field_key'] as String?;
-          if (source != 'inherited' && fieldKey != null) {
-            _controllers[fieldKey] = TextEditingController();
+          final value = _collapseValue(f);
+          if (fieldKey != null &&
+              _controllers.containsKey(fieldKey) &&
+              value.isNotEmpty) {
+            _controllers[fieldKey]!.text = value;
           }
         }
       }
@@ -474,24 +498,17 @@ class _ExecutionDetailSheetState
     final detail = _detail;
     if (detail == null) return;
 
-    // Validate required fields
-    final fieldValues = detail['field_values'];
-    if (fieldValues is List) {
-      for (final f in fieldValues.whereType<Map>()) {
-        final source = f['source'] as String?;
-        final fieldKey = f['field_key'] as String?;
-        final required = f['required'] as bool? ?? false;
-        if (source != 'inherited' && fieldKey != null && required) {
-          final ctrl = _controllers[fieldKey];
-          if (ctrl != null && ctrl.text.trim().isEmpty) {
-            final label = _fieldLabels[fieldKey] ?? fieldKey;
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-              content: Text('El campo "$label" es requerido'),
-              backgroundColor: AppColors.ctWarn,
-            ));
-            return;
-          }
-        }
+    // Validate required fields using snapshot definition
+    for (final entry in _controllers.entries) {
+      final fieldKey = entry.key;
+      final required = _fieldRequired[fieldKey] ?? false;
+      if (required && entry.value.text.trim().isEmpty) {
+        final label = _fieldLabels[fieldKey] ?? fieldKey;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('El campo "$label" es requerido'),
+          backgroundColor: AppColors.ctWarn,
+        ));
+        return;
       }
     }
 
@@ -573,12 +590,13 @@ class _ExecutionDetailSheetState
 
     final flowName = _extractFlowName(widget.execution);
     final fieldValues = detail['field_values'];
-    final allFields = fieldValues is List
+    final allFv = fieldValues is List
         ? fieldValues.whereType<Map>().toList()
         : <Map>[];
-    final inheritedFields = allFields.where((f) => f['source'] == 'inherited').toList();
+    final inheritedFields = allFv.where((f) => f['source'] == 'inherited').toList();
     final hasInherited = inheritedFields.isNotEmpty;
-    final captureFields = allFields.where((f) => f['source'] != 'inherited').toList();
+    // Capturable fields come from the snapshot definition, not field_values
+    final captureFields = _snapshotCaptureFields;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -668,8 +686,9 @@ class _ExecutionDetailSheetState
           )
         else
           ...captureFields.map((f) {
-            final fieldKey = f['field_key'] as String? ?? '';
-            final label = _fieldLabels[fieldKey] ?? fieldKey;
+            final fieldKey = f['key'] as String? ?? f['field_key'] as String? ?? '';
+            final label = _fieldLabels[fieldKey] ?? (f['label'] as String?) ?? fieldKey;
+            final isRequired = _fieldRequired[fieldKey] ?? false;
             final ctrl = _controllers[fieldKey] ?? TextEditingController();
             return Padding(
               padding: const EdgeInsets.only(bottom: 14),
@@ -681,7 +700,7 @@ class _ExecutionDetailSheetState
                   color: AppColors.ctText,
                 ),
                 decoration: InputDecoration(
-                  labelText: label,
+                  labelText: isRequired ? '$label *' : label,
                   labelStyle: const TextStyle(
                     fontFamily: 'Geist',
                     fontSize: 13,
@@ -716,7 +735,7 @@ class _ExecutionDetailSheetState
         SizedBox(
           width: double.infinity,
           child: ElevatedButton(
-            onPressed: _submitting ? null : _submit,
+            onPressed: (_submitting || !_canSubmit) ? null : _submit,
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.ctTeal,
               foregroundColor: AppColors.ctNavy,
