@@ -36,6 +36,19 @@ String _fieldKeyify(String input) {
   return key.length > 63 ? key.substring(0, 63) : key;
 }
 
+String _slugify(String input) {
+  final lower = input.toLowerCase();
+  final buf = StringBuffer();
+  for (final rune in lower.runes) {
+    final ch = String.fromCharCode(rune);
+    buf.write(_kFieldAccentMap[ch] ?? ch);
+  }
+  return buf
+      .toString()
+      .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
+      .replaceAll(RegExp(r'^-+|-+$'), '');
+}
+
 Color _hexColor(String? hex) {
   try {
     final h = (hex ?? '#9CA3AF').replaceAll('#', '');
@@ -115,8 +128,9 @@ class _FlowDetailScreenState extends ConsumerState<FlowDetailScreen>
 
   // Info tab controllers — initialized in _load()
   final _nameCtrl = TextEditingController();
-  final _slugCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
+
+  String get _derivedSlug => _slugify(_nameCtrl.text.trim());
   List<String> _triggerSources = [];
 
   // Campos tab state
@@ -140,7 +154,6 @@ class _FlowDetailScreenState extends ConsumerState<FlowDetailScreen>
   void dispose() {
     _tabCtrl.dispose();
     _nameCtrl.dispose();
-    _slugCtrl.dispose();
     _descCtrl.dispose();
     super.dispose();
   }
@@ -189,7 +202,6 @@ class _FlowDetailScreenState extends ConsumerState<FlowDetailScreen>
         _actions = actions;
         _sendProactive = (flow['send_proactive'] as bool?) ?? true;
         _nameCtrl.text = flow['name'] as String? ?? '';
-        _slugCtrl.text = flow['slug'] as String? ?? '';
         _descCtrl.text = flow['description'] as String? ?? '';
         _loading = false;
       });
@@ -209,7 +221,7 @@ class _FlowDetailScreenState extends ConsumerState<FlowDetailScreen>
       final updated = await FlowsApi.updateFlow(
         flowId: widget.flowId,
         name: _nameCtrl.text.trim(),
-        slug: _slugCtrl.text.trim(),
+        slug: _derivedSlug,
         description: _descCtrl.text.trim(),
         fields: _fields,
         behavior: {'conditions': _conditions},
@@ -377,7 +389,6 @@ class _FlowDetailScreenState extends ConsumerState<FlowDetailScreen>
           _InfoTab(
             flow: _flow!,
             nameCtrl: _nameCtrl,
-            slugCtrl: _slugCtrl,
             descCtrl: _descCtrl,
             triggerSources: _triggerSources,
             onTriggerToggle: (source) {
@@ -506,11 +517,10 @@ class _FlowDetailScreenState extends ConsumerState<FlowDetailScreen>
 
 // ── _InfoTab ──────────────────────────────────────────────────────────────────
 
-class _InfoTab extends StatelessWidget {
+class _InfoTab extends StatefulWidget {
   const _InfoTab({
     required this.flow,
     required this.nameCtrl,
-    required this.slugCtrl,
     required this.descCtrl,
     required this.triggerSources,
     required this.onTriggerToggle,
@@ -518,15 +528,35 @@ class _InfoTab extends StatelessWidget {
 
   final Map<String, dynamic> flow;
   final TextEditingController nameCtrl;
-  final TextEditingController slugCtrl;
   final TextEditingController descCtrl;
   final List<String> triggerSources;
   final void Function(String source) onTriggerToggle;
 
   @override
+  State<_InfoTab> createState() => _InfoTabState();
+}
+
+class _InfoTabState extends State<_InfoTab> {
+  @override
+  void initState() {
+    super.initState();
+    widget.nameCtrl.addListener(_onNameChanged);
+  }
+
+  @override
+  void dispose() {
+    widget.nameCtrl.removeListener(_onNameChanged);
+    super.dispose();
+  }
+
+  void _onNameChanged() => setState(() {});
+
+  @override
   Widget build(BuildContext context) {
-    final workerName = flow['worker_name'] as String?;
-    final workerColor = flow['worker_color'] as String?;
+    final workerName = widget.flow['worker_name'] as String?;
+    final workerColor = widget.flow['worker_color'] as String?;
+    final slug = _slugify(widget.nameCtrl.text.trim());
+    final slugValid = slug.length >= 2;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(22),
@@ -536,24 +566,73 @@ class _InfoTab extends StatelessWidget {
           // Nombre
           _FormField(
             label: 'Nombre',
-            controller: nameCtrl,
+            controller: widget.nameCtrl,
             placeholder: 'Ej: Flujo de entregas',
           ),
           const SizedBox(height: 16),
 
-          // Slug
-          _FormField(
-            label: 'Slug',
-            controller: slugCtrl,
-            placeholder: 'ej: flujo-de-entregas',
-            subtitle: 'Identificador único. Se usa en API e integraciones.',
+          // Slug (read-only, derivado del nombre)
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Slug',
+                style: TextStyle(
+                  fontFamily: 'Geist',
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.ctText,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: AppColors.ctSurface2,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppColors.ctBorder),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        slug.isEmpty ? '—' : slug,
+                        style: TextStyle(
+                          fontFamily: 'Geist',
+                          fontSize: 13,
+                          color: slug.isEmpty ? AppColors.ctText2 : AppColors.ctText,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Icon(
+                      slugValid ? Icons.check_circle_outline : Icons.warning_amber_rounded,
+                      size: 16,
+                      color: slugValid
+                          ? const Color(0xFF107C41)
+                          : const Color(0xFFE24C4B),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Identificador único. Derivado del nombre. Se usa en API e integraciones.',
+                style: TextStyle(
+                  fontFamily: 'Geist',
+                  fontSize: 11,
+                  color: AppColors.ctText2,
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 16),
 
           // Descripción
           _FormField(
             label: 'Descripción',
-            controller: descCtrl,
+            controller: widget.descCtrl,
             placeholder: 'Describe el propósito de este flujo...',
             maxLines: 3,
           ),
@@ -621,7 +700,7 @@ class _InfoTab extends StatelessWidget {
             runSpacing: 8,
             children: _kTriggerSources.map((entry) {
               final (value, label) = entry;
-              final selected = triggerSources.contains(value);
+              final selected = widget.triggerSources.contains(value);
               return FilterChip(
                 label: Text(
                   label,
@@ -635,7 +714,7 @@ class _InfoTab extends StatelessWidget {
                   ),
                 ),
                 selected: selected,
-                onSelected: (_) => onTriggerToggle(value),
+                onSelected: (_) => widget.onTriggerToggle(value),
                 selectedColor: AppColors.ctTealLight,
                 backgroundColor: AppColors.ctSurface2,
                 checkmarkColor: AppColors.ctTealDark,
@@ -2127,8 +2206,6 @@ class _ActionDialogState extends State<_ActionDialog> {
   String? _selectedFlowSlug;
   List<Map<String, dynamic>> _availableFlows = [];
   bool _loadingFlows = false;
-
-  final _carryCtrl = TextEditingController();
   bool _carryAncestors = false;
 
   // webhook_out
@@ -2147,9 +2224,6 @@ class _ActionDialogState extends State<_ActionDialog> {
     if (a != null) {
       _type = a['type'] as String? ?? 'open_flow';
       _selectedFlowSlug = a['target_flow_slug'] as String?;
-      final cf = a['carry_fields'];
-      _carryCtrl.text =
-          cf is List ? cf.map((e) => e.toString()).join(', ') : '';
       _carryAncestors = a['carry_ancestors'] as bool? ?? false;
       _integrationCtrl.text = a['integration_id'] as String? ?? '';
       _includeAncestors = a['include_ancestors'] as bool? ?? false;
@@ -2187,7 +2261,6 @@ class _ActionDialogState extends State<_ActionDialog> {
 
   @override
   void dispose() {
-    _carryCtrl.dispose();
     _integrationCtrl.dispose();
     _eventNameCtrl.dispose();
     super.dispose();
@@ -2203,14 +2276,8 @@ class _ActionDialogState extends State<_ActionDialog> {
       case 'open_flow':
         if (_selectedFlowSlug == null) return;
         updated['target_flow_slug'] = _selectedFlowSlug!;
-        final raw = _carryCtrl.text.trim();
-        if (raw.isNotEmpty) {
-          updated['carry_fields'] =
-              raw.split(',').map((s) => s.trim()).toList();
-        } else {
-          updated.remove('carry_fields');
-        }
         updated['carry_ancestors'] = _carryAncestors;
+        updated.remove('carry_fields');
         updated.remove('integration_id');
         updated.remove('include_ancestors');
         updated.remove('event_name');
@@ -2381,12 +2448,6 @@ class _ActionDialogState extends State<_ActionDialog> {
                           setState(() => _selectedFlowSlug = v),
                     ),
                   ),
-                const SizedBox(height: 14),
-                _FormField(
-                  label: 'Campos a heredar',
-                  controller: _carryCtrl,
-                  placeholder: 'ej. orden_id, cliente — separados por coma',
-                ),
                 const SizedBox(height: 8),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
