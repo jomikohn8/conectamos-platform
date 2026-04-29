@@ -515,12 +515,17 @@ class _ExecutionDetailSheetState
     setState(() => _submitting = true);
     try {
       final executionId = widget.execution['id'] as String;
-      final payload = _controllers.entries
-          .map((e) => {'field_key': e.key, 'value': e.value.text.trim()})
-          .toList();
+      final tenantId = (widget.execution['tenant_id'] as String?) ??
+          ref.read(activeTenantIdProvider) ??
+          '';
+      final fields = Map<String, String>.fromEntries(
+        _controllers.entries
+            .map((e) => MapEntry(e.key, e.value.text.trim())),
+      );
       await FlowsApi.submitExecution(
         executionId: executionId,
-        fieldValues: payload,
+        tenantId: tenantId,
+        fields: fields,
       );
       if (!mounted) return;
       Navigator.pop(context);

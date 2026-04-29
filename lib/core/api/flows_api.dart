@@ -212,11 +212,12 @@ class FlowsApi {
 
   static Future<void> submitExecution({
     required String executionId,
-    required List<Map<String, dynamic>> fieldValues,
+    required String tenantId,
+    required Map<String, String> fields,
   }) async {
     await ApiClient.instance.post(
       '/api/v1/dashboard/executions/$executionId/submit',
-      data: {'field_values': fieldValues},
+      data: {'tenant_id': tenantId, 'fields': fields},
     );
   }
 }
