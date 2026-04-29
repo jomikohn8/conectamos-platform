@@ -327,6 +327,8 @@ class _FlowDetailScreenState extends ConsumerState<FlowDetailScreen>
       context: context,
       builder: (_) => _FieldDialog(
         field: field,
+        tenantId: ref.read(activeTenantIdProvider),
+        tenantWorkerId: _flow?['tenant_worker_id'] as String? ?? '',
         onSaved: (updated) {
           setState(() {
             if (index != null) {
@@ -977,25 +979,55 @@ class _FieldRow extends StatelessWidget {
 class _FieldDialog extends StatefulWidget {
   const _FieldDialog({
     required this.onSaved,
+    required this.tenantId,
+    required this.tenantWorkerId,
     this.field,
   });
 
   final Map<String, dynamic>? field;
+  final String tenantId;
+  final String tenantWorkerId;
   final void Function(Map<String, dynamic>) onSaved;
 
   @override
   State<_FieldDialog> createState() => _FieldDialogState();
 }
 
+// Data source options for select fields
+const _kDataSources = [
+  ('system:operators', 'Operadores del tenant'),
+  ('system:operators_with_flow', 'Operadores con flow asignado'),
+];
+
 class _FieldDialogState extends State<_FieldDialog> {
   final _labelCtrl = TextEditingController();
   String _type = 'text';
   bool _required = false;
 
+  // select type state
+  String _dataSourceBase = 'system:operators';
+  String? _dataSourceFlowSlug;
+  List<Map<String, dynamic>> _availableFlows = [];
+  bool _loadingFlows = false;
+
   bool get _isEdit => widget.field != null;
 
   String get _fieldKey => _fieldKeyify(_labelCtrl.text.trim());
   bool get _fieldKeyValid => _fieldKey.length >= 2;
+
+  String get _resolvedDataSource {
+    if (_dataSourceBase == 'system:operators_with_flow') {
+      if (_dataSourceFlowSlug == null) return _dataSourceBase;
+      return 'system:operators_with_flow:$_dataSourceFlowSlug';
+    }
+    return _dataSourceBase;
+  }
+
+  bool get _selectValid =>
+      _type != 'select' ||
+      (_dataSourceBase == 'system:operators' ||
+          (_dataSourceBase == 'system:operators_with_flow' &&
+              _dataSourceFlowSlug != null));
 
   @override
   void initState() {
@@ -1004,11 +1036,44 @@ class _FieldDialogState extends State<_FieldDialog> {
       _labelCtrl.text = widget.field!['label'] as String? ?? '';
       _type = widget.field!['type'] as String? ?? 'text';
       _required = widget.field!['required'] as bool? ?? false;
+      final ds = widget.field!['data_source'] as String?;
+      if (ds != null) {
+        if (ds.startsWith('system:operators_with_flow:')) {
+          _dataSourceBase = 'system:operators_with_flow';
+          _dataSourceFlowSlug = ds.substring('system:operators_with_flow:'.length);
+        } else {
+          _dataSourceBase = ds;
+        }
+      }
     }
     _labelCtrl.addListener(_onLabelChanged);
+    if (_type == 'select') _loadFlows();
   }
 
   void _onLabelChanged() => setState(() {});
+
+  Future<void> _loadFlows() async {
+    if (widget.tenantWorkerId.isEmpty) return;
+    setState(() => _loadingFlows = true);
+    try {
+      final flows = await FlowsApi.getFlowsByWorker(
+        tenantId: widget.tenantId,
+        tenantWorkerId: widget.tenantWorkerId,
+      );
+      if (!mounted) return;
+      setState(() {
+        _availableFlows = flows;
+        if (_dataSourceFlowSlug != null &&
+            !flows.any((f) => f['slug'] == _dataSourceFlowSlug)) {
+          _dataSourceFlowSlug = null;
+        }
+        _loadingFlows = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loadingFlows = false);
+    }
+  }
 
   @override
   void dispose() {
@@ -1019,13 +1084,18 @@ class _FieldDialogState extends State<_FieldDialog> {
 
   void _submit() {
     final label = _labelCtrl.text.trim();
-    if (label.isEmpty || !_fieldKeyValid) return;
+    if (label.isEmpty || !_fieldKeyValid || !_selectValid) return;
 
     final updated = Map<String, dynamic>.from(widget.field ?? {});
     updated['label'] = label;
     updated['key'] = _fieldKey;
     updated['type'] = _type;
     updated['required'] = _required;
+    if (_type == 'select') {
+      updated['data_source'] = _resolvedDataSource;
+    } else {
+      updated.remove('data_source');
+    }
     if (!_isEdit || updated['id'] == null) {
       updated['id'] =
           DateTime.now().millisecondsSinceEpoch.toString();
@@ -1124,10 +1194,141 @@ class _FieldDialogState extends State<_FieldDialog> {
                     );
                   }).toList(),
                   onChanged: (v) {
-                    if (v != null) setState(() => _type = v);
+                    if (v != null) {
+                      setState(() => _type = v);
+                      if (v == 'select' && _availableFlows.isEmpty) {
+                        _loadFlows();
+                      }
+                    }
                   },
                 ),
               ),
+
+              // Data source (select type only)
+              if (_type == 'select') ...[
+                const SizedBox(height: 14),
+                const Text(
+                  'Fuente de datos',
+                  style: TextStyle(
+                    fontFamily: 'Geist',
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.ctText,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.ctSurface2,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.ctBorder2),
+                  ),
+                  child: DropdownButton<String>(
+                    value: _dataSourceBase,
+                    isExpanded: true,
+                    underline: const SizedBox.shrink(),
+                    dropdownColor: AppColors.ctSurface,
+                    items: _kDataSources.map((entry) {
+                      final (value, label) = entry;
+                      return DropdownMenuItem(
+                        value: value,
+                        child: Text(label,
+                            style: const TextStyle(
+                                fontFamily: 'Geist',
+                                fontSize: 13,
+                                color: AppColors.ctText)),
+                      );
+                    }).toList(),
+                    onChanged: (v) {
+                      if (v != null) {
+                        setState(() {
+                          _dataSourceBase = v;
+                          _dataSourceFlowSlug = null;
+                        });
+                        if (v == 'system:operators_with_flow' &&
+                            _availableFlows.isEmpty) {
+                          _loadFlows();
+                        }
+                      }
+                    },
+                  ),
+                ),
+                if (_dataSourceBase == 'system:operators_with_flow') ...[
+                  const SizedBox(height: 10),
+                  const Text(
+                    'Flow asignado',
+                    style: TextStyle(
+                      fontFamily: 'Geist',
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.ctText,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  if (_loadingFlows)
+                    const Center(
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(vertical: 10),
+                        child: CircularProgressIndicator(
+                            color: AppColors.ctTeal, strokeWidth: 2),
+                      ),
+                    )
+                  else if (_availableFlows.isEmpty)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: AppColors.ctBorder),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Text(
+                        'No hay flujos disponibles para este worker',
+                        style: TextStyle(
+                            fontFamily: 'Geist',
+                            fontSize: 13,
+                            color: AppColors.ctText2),
+                      ),
+                    )
+                  else
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppColors.ctSurface2,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppColors.ctBorder2),
+                      ),
+                      child: DropdownButton<String>(
+                        value: _dataSourceFlowSlug,
+                        isExpanded: true,
+                        underline: const SizedBox.shrink(),
+                        dropdownColor: AppColors.ctSurface,
+                        hint: const Text('Selecciona un flow',
+                            style: TextStyle(
+                                fontFamily: 'Geist',
+                                fontSize: 13,
+                                color: AppColors.ctText2)),
+                        items: _availableFlows.map((f) {
+                          final slug = f['slug'] as String? ?? '';
+                          final name = f['name'] as String? ?? slug;
+                          return DropdownMenuItem<String>(
+                            value: slug,
+                            child: Text(name,
+                                style: const TextStyle(
+                                    fontFamily: 'Geist',
+                                    fontSize: 13,
+                                    color: AppColors.ctText)),
+                          );
+                        }).toList(),
+                        onChanged: (v) =>
+                            setState(() => _dataSourceFlowSlug = v),
+                      ),
+                    ),
+                ],
+              ],
               const SizedBox(height: 14),
 
               // Required toggle
@@ -1166,8 +1367,8 @@ class _FieldDialogState extends State<_FieldDialog> {
                   const SizedBox(width: 10),
                   _PrimaryButton(
                     label: 'Guardar',
-                    onTap: _fieldKeyValid ? _submit : () {},
-                    enabled: _fieldKeyValid,
+                    onTap: (_fieldKeyValid && _selectValid) ? _submit : () {},
+                    enabled: _fieldKeyValid && _selectValid,
                   ),
                 ],
               ),
