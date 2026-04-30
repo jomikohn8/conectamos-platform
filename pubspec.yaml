@@ -63,6 +63,7 @@ flutter:
     - assets/images/Conectamos-Isotipo.svg
     - assets/images/Conectamos-Logotipo.svg
     - assets/images/login_background.svg
+    - assets/logos/
 
   fonts:
     - family: Onest

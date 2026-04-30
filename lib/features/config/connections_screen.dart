@@ -1180,7 +1180,6 @@ class _IntegrationLogo extends StatelessWidget {
     'alegra':     Color(0xFFFF6A1A),
   };
 
-  // Fallback initials (used when Image.network fails)
   static const _brandInitials = {
     'gdrive':     'G',
     'gcal':       'G',
@@ -1193,34 +1192,23 @@ class _IntegrationLogo extends StatelessWidget {
     'tableau':    'T',
     'quickbooks': 'Q',
     'alegra':     'A',
+    'gmail':      'G',
   };
 
-  // SimpleIcons CDN slugs
-  static const _simpleIconSlugs = {
-    'gdrive':     'googledrive',
-    'gcal':       'googlecalendar',
-    'onedrive':   'microsoftonedrive',
-    'outlook':    'microsoftoutlook',
-    'dropbox':    'dropbox',
-    'n8n':        'n8n',
-    'zapier':     'zapier',
-    'make':       'make',
-    'tableau':    'tableau',
-    'quickbooks': 'quickbooks',
-  };
-
-  // Hex color for the icon (no #)
-  static const _simpleIconColors = {
-    'gdrive':     '4285F4',
-    'gcal':       '0F9D58',
-    'onedrive':   '0078D4',
-    'outlook':    '0078D4',
-    'dropbox':    '0061FF',
-    'n8n':        'EA4B71',
-    'zapier':     'FF4A00',
-    'make':       '6C00CC',
-    'tableau':    'E8762D',
-    'quickbooks': '2CA01C',
+  // Local asset paths — SVG, PNG, WEBP
+  static const _assetPaths = {
+    'gdrive':     'assets/logos/drive.png',
+    'gcal':       'assets/logos/google_calendar.png',
+    'onedrive':   'assets/logos/ondrive.svg',
+    'outlook':    'assets/logos/outlook.png',
+    'dropbox':    'assets/logos/dropbox.svg',
+    'n8n':        'assets/logos/n8n.webp',
+    'zapier':     'assets/logos/zapier.png',
+    'make':       'assets/logos/make.png',
+    'tableau':    'assets/logos/tableau.svg',
+    'quickbooks': 'assets/logos/quickbooks.svg',
+    'alegra':     'assets/logos/alegra.png',
+    'gmail':      'assets/logos/gmail.png',
   };
 
   static const _apiIcons = {
@@ -1230,40 +1218,54 @@ class _IntegrationLogo extends StatelessWidget {
     'globe':   Icons.language_rounded,
   };
 
+  Widget _buildAsset(String path) {
+    final fallback = Text(
+      _brandInitials[logoKey] ?? logoKey[0].toUpperCase(),
+      style: AppFonts.onest(
+        fontSize: size * 0.35,
+        fontWeight: FontWeight.w700,
+        color: _brandBg[logoKey] ?? AppColors.ctTeal,
+      ),
+    );
+    if (path.endsWith('.svg')) {
+      return SvgPicture.asset(
+        path,
+        width: size * 0.58,
+        height: size * 0.58,
+        placeholderBuilder: (_) => fallback,
+      );
+    }
+    return Image.asset(
+      path,
+      width: size * 0.58,
+      height: size * 0.58,
+      errorBuilder: (_, error, stack) => fallback,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final brandColor = _brandBg[logoKey];
-    final slug = _simpleIconSlugs[logoKey];
-    final hexColor = _simpleIconColors[logoKey];
+    final assetPath = _assetPaths[logoKey];
     final apiIcon = _apiIcons[logoKey];
     final radius = BorderRadius.circular(size * 0.22);
 
-    if (slug != null) {
+    if (assetPath != null) {
       return Container(
         width: size, height: size,
         decoration: BoxDecoration(
           color: brandColor?.withValues(alpha: 0.1) ?? AppColors.ctSurface2,
           borderRadius: radius,
-          border: Border.all(color: brandColor?.withValues(alpha: 0.2) ?? AppColors.ctBorder),
-        ),
-        alignment: Alignment.center,
-        child: SvgPicture.network(
-          'https://cdn.simpleicons.org/$slug/$hexColor',
-          width: size * 0.58,
-          height: size * 0.58,
-          placeholderBuilder: (_) => Text(
-            _brandInitials[logoKey] ?? logoKey[0].toUpperCase(),
-            style: AppFonts.onest(
-              fontSize: size * 0.35,
-              fontWeight: FontWeight.w700,
-              color: brandColor ?? AppColors.ctTeal,
-            ),
+          border: Border.all(
+            color: brandColor?.withValues(alpha: 0.2) ?? AppColors.ctBorder,
           ),
         ),
+        alignment: Alignment.center,
+        child: _buildAsset(assetPath),
       );
     }
 
-    // API icon (code, webhook, key, globe)
+    // API icon (code, webhook, key, globe) — teal gradient
     return Container(
       width: size, height: size,
       decoration: BoxDecoration(
