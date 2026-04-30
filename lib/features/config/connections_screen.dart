@@ -6,6 +6,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../../core/api/flows_api.dart';
 import '../../core/api/ai_workers_api.dart';
 import '../../core/providers/tenant_provider.dart';
@@ -1246,14 +1247,14 @@ class _IntegrationLogo extends StatelessWidget {
           border: Border.all(color: brandColor?.withValues(alpha: 0.2) ?? AppColors.ctBorder),
         ),
         alignment: Alignment.center,
-        child: Image.network(
+        child: SvgPicture.network(
           'https://cdn.simpleicons.org/$slug/$hexColor',
           width: size * 0.58,
           height: size * 0.58,
-          errorBuilder: (_, error, stack) => Text(
+          placeholderBuilder: (_) => Text(
             _brandInitials[logoKey] ?? logoKey[0].toUpperCase(),
             style: AppFonts.onest(
-              fontSize: size * 0.38,
+              fontSize: size * 0.35,
               fontWeight: FontWeight.w700,
               color: brandColor ?? AppColors.ctTeal,
             ),
@@ -2110,7 +2111,16 @@ class _IntegrationsManagementSheetState
     final hmacSecretPlain = integration['hmac_secret_plain'] as String?;
     final secret = apiKeyPlain ?? hmacSecretPlain;
     final label = apiKeyPlain != null ? 'API Key' : 'HMAC Secret';
-    if (secret == null || !mounted) return;
+    if (!mounted) return;
+    if (secret == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text(
+          'Integración creada, pero no se pudo recuperar el secret. Contacta soporte.',
+        ),
+        duration: Duration(seconds: 5),
+      ));
+      return;
+    }
     await showDialog(
       context: context,
       barrierDismissible: false,
@@ -2183,7 +2193,9 @@ class _IntegrationsManagementSheetState
     final title = isInbound ? 'API REST de Conectamos' : 'Webhooks salientes';
 
     return Container(
-      height: MediaQuery.of(context).size.height * 0.72,
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.75,
+      ),
       decoration: const BoxDecoration(
         color: AppColors.ctSurface,
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
@@ -2226,8 +2238,7 @@ class _IntegrationsManagementSheetState
                     ],
                   ),
                 ),
-                if (!_loading)
-                  TextButton.icon(
+                TextButton.icon(
                     onPressed: _openCreate,
                     icon: const Icon(Icons.add_rounded, size: 16, color: _teal400),
                     label: Text(
