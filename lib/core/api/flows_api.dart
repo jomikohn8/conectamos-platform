@@ -102,6 +102,7 @@ class FlowsApi {
 
   // ── Integrations ────────────────────────────────────────────────────────────
 
+  // @deprecated — usar listIntegrationsByTenant
   static Future<List<Map<String, dynamic>>> listIntegrations({
     required String tenantId,
     required String flowId,
@@ -118,6 +119,7 @@ class FlowsApi {
         (list as List).whereType<Map>().map((e) => Map<String, dynamic>.from(e)));
   }
 
+  // @deprecated — usar createIntegrationForTenant
   static Future<Map<String, dynamic>> createIntegration({
     required String flowId,
     required String tenantId,
@@ -155,6 +157,7 @@ class FlowsApi {
     return Map<String, dynamic>.from(response.data);
   }
 
+  // @deprecated — usar deleteIntegrationById
   static Future<void> deleteIntegration({
     required String flowId,
     required String integrationId,
@@ -162,6 +165,62 @@ class FlowsApi {
   }) async {
     await ApiClient.instance.delete(
       '/flows/$flowId/integrations/$integrationId',
+      queryParameters: {'tenant_id': tenantId},
+    );
+  }
+
+  // ── Tenant-level integrations ────────────────────────────────────────────────
+
+  static Future<List<Map<String, dynamic>>> listIntegrationsByTenant({
+    required String tenantId,
+    String? tenantWorkerId,
+    String? integrationType,
+  }) async {
+    final params = <String, dynamic>{'tenant_id': tenantId};
+    if (tenantWorkerId != null) params['tenant_worker_id'] = tenantWorkerId;
+    if (integrationType != null) params['integration_type'] = integrationType;
+    final response = await ApiClient.instance.get(
+      '/integrations',
+      queryParameters: params,
+    );
+    final raw = response.data;
+    final list = raw is List
+        ? raw
+        : (raw is Map
+            ? (raw['integrations'] ?? raw['items'] ?? raw['data'] ?? [])
+            : []);
+    return List<Map<String, dynamic>>.from(
+        (list as List).whereType<Map>().map((e) => Map<String, dynamic>.from(e)));
+  }
+
+  static Future<Map<String, dynamic>> createIntegrationForTenant({
+    required String tenantId,
+    required String name,
+    required String integrationType,
+    required String tenantWorkerId,
+    String? endpointUrl,
+    int rateLimitPerMinute = 60,
+  }) async {
+    final response = await ApiClient.instance.post(
+      '/integrations',
+      queryParameters: {'tenant_id': tenantId},
+      data: {
+        'name': name,
+        'integration_type': integrationType,
+        'tenant_worker_id': tenantWorkerId,
+        'endpoint_url': ?endpointUrl,
+        'rate_limit_per_minute': rateLimitPerMinute,
+      },
+    );
+    return Map<String, dynamic>.from(response.data);
+  }
+
+  static Future<void> deleteIntegrationById({
+    required String tenantId,
+    required String integrationId,
+  }) async {
+    await ApiClient.instance.delete(
+      '/integrations/$integrationId',
       queryParameters: {'tenant_id': tenantId},
     );
   }

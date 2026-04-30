@@ -2,8 +2,13 @@
 // Centro de Aplicaciones — V1 (diseño aprobado)
 
 import 'dart:async';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/api/flows_api.dart';
+import '../../core/api/ai_workers_api.dart';
+import '../../core/providers/tenant_provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/widgets/app_shell.dart';
 
@@ -263,12 +268,32 @@ class _ConnectionsScreenState extends ConsumerState<ConnectionsScreen>
 
   void _onCardTap(Integration item) {
     if (item.state == IntegrationState.soon) return;
+    if (item.id == 'rest-api') {
+      _showManageSheet(item, 'inbound');
+      return;
+    }
+    if (item.id == 'webhooks') {
+      _showManageSheet(item, 'outbound');
+      return;
+    }
     final isConnected = _connectedIds.contains(item.id);
     if (isConnected || item.state == IntegrationState.attention) {
       _openManage(item);
     } else {
       _showOAuth(item);
     }
+  }
+
+  void _showManageSheet(Integration item, String typeFilter) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _IntegrationsManagementSheet(
+        item: item,
+        typeFilter: typeFilter,
+      ),
+    );
   }
 
   void _openManage(Integration item) {
@@ -1154,6 +1179,7 @@ class _IntegrationLogo extends StatelessWidget {
     'alegra':     Color(0xFFFF6A1A),
   };
 
+  // Fallback initials (used when Image.network fails)
   static const _brandInitials = {
     'gdrive':     'G',
     'gcal':       'G',
@@ -1168,6 +1194,34 @@ class _IntegrationLogo extends StatelessWidget {
     'alegra':     'A',
   };
 
+  // SimpleIcons CDN slugs
+  static const _simpleIconSlugs = {
+    'gdrive':     'googledrive',
+    'gcal':       'googlecalendar',
+    'onedrive':   'microsoftonedrive',
+    'outlook':    'microsoftoutlook',
+    'dropbox':    'dropbox',
+    'n8n':        'n8n',
+    'zapier':     'zapier',
+    'make':       'make',
+    'tableau':    'tableau',
+    'quickbooks': 'quickbooks',
+  };
+
+  // Hex color for the icon (no #)
+  static const _simpleIconColors = {
+    'gdrive':     '4285F4',
+    'gcal':       '0F9D58',
+    'onedrive':   '0078D4',
+    'outlook':    '0078D4',
+    'dropbox':    '0061FF',
+    'n8n':        'EA4B71',
+    'zapier':     'FF4A00',
+    'make':       '6C00CC',
+    'tableau':    'E8762D',
+    'quickbooks': '2CA01C',
+  };
+
   static const _apiIcons = {
     'code':    Icons.code_rounded,
     'webhook': Icons.webhook_rounded,
@@ -1178,29 +1232,37 @@ class _IntegrationLogo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final brandColor = _brandBg[logoKey];
+    final slug = _simpleIconSlugs[logoKey];
+    final hexColor = _simpleIconColors[logoKey];
     final apiIcon = _apiIcons[logoKey];
     final radius = BorderRadius.circular(size * 0.22);
 
-    if (brandColor != null) {
+    if (slug != null) {
       return Container(
         width: size, height: size,
         decoration: BoxDecoration(
-          color: brandColor.withValues(alpha: 0.12),
+          color: brandColor?.withValues(alpha: 0.1) ?? AppColors.ctSurface2,
           borderRadius: radius,
-          border: Border.all(color: brandColor.withValues(alpha: 0.2)),
+          border: Border.all(color: brandColor?.withValues(alpha: 0.2) ?? AppColors.ctBorder),
         ),
         alignment: Alignment.center,
-        child: Text(
-          _brandInitials[logoKey] ?? logoKey[0].toUpperCase(),
-          style: AppFonts.onest(
-            fontSize: size * 0.38,
-            fontWeight: FontWeight.w700,
-            color: brandColor,
+        child: Image.network(
+          'https://cdn.simpleicons.org/$slug/$hexColor',
+          width: size * 0.58,
+          height: size * 0.58,
+          errorBuilder: (_, error, stack) => Text(
+            _brandInitials[logoKey] ?? logoKey[0].toUpperCase(),
+            style: AppFonts.onest(
+              fontSize: size * 0.38,
+              fontWeight: FontWeight.w700,
+              color: brandColor ?? AppColors.ctTeal,
+            ),
           ),
         ),
       );
     }
 
+    // API icon (code, webhook, key, globe)
     return Container(
       width: size, height: size,
       decoration: BoxDecoration(
@@ -1910,4 +1972,876 @@ class _IconButtonState extends State<_IconButton> {
       ),
     );
   }
+}
+
+// ─── Integraciones API — Management sheet ────────────────────────────────────
+
+class _IntegrationsManagementSheet extends ConsumerStatefulWidget {
+  const _IntegrationsManagementSheet({
+    required this.item,
+    required this.typeFilter,
+  });
+  final Integration item;
+  final String typeFilter; // 'inbound' or 'outbound'
+
+  @override
+  ConsumerState<_IntegrationsManagementSheet> createState() =>
+      _IntegrationsManagementSheetState();
+}
+
+class _IntegrationsManagementSheetState
+    extends ConsumerState<_IntegrationsManagementSheet> {
+  List<Map<String, dynamic>> _items = [];
+  bool _loading = true;
+  String? _error;
+  bool _deleting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+  }
+
+  Future<void> _load() async {
+    if (!mounted) return;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final tenantId = ref.read(activeTenantIdProvider);
+      final all = await FlowsApi.listIntegrationsByTenant(tenantId: tenantId);
+      if (!mounted) return;
+      final filtered = all.where((i) {
+        final t = (i['integration_type'] as String? ?? '').toLowerCase();
+        if (widget.typeFilter == 'inbound') return t == 'api' || t == 'inbound';
+        return t == 'outbound' || t == 'webhook' || t == 'webhook_out';
+      }).toList();
+      setState(() {
+        _items = filtered;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = _connDioError(e);
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _delete(String id) async {
+    if (_deleting) return;
+    setState(() => _deleting = true);
+    try {
+      final tenantId = ref.read(activeTenantIdProvider);
+      await FlowsApi.deleteIntegrationById(tenantId: tenantId, integrationId: id);
+      if (!mounted) return;
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _deleting = false);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(_connDioError(e)),
+        backgroundColor: AppColors.ctDanger,
+        duration: const Duration(seconds: 3),
+      ));
+    }
+  }
+
+  void _confirmDelete(String id, String name) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text(
+          'Eliminar integración',
+          style: TextStyle(
+            fontFamily: 'Geist',
+            fontWeight: FontWeight.w600,
+            fontSize: 15,
+            color: AppColors.ctText,
+          ),
+        ),
+        content: Text(
+          '¿Eliminar "$name"? Esta acción no se puede deshacer.',
+          style: const TextStyle(
+            fontFamily: 'Geist',
+            fontSize: 13,
+            color: AppColors.ctText2,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              _delete(id);
+            },
+            child: const Text(
+              'Eliminar',
+              style: TextStyle(color: AppColors.ctDanger),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _openCreate() {
+    final tenantId = ref.read(activeTenantIdProvider);
+    showDialog(
+      context: context,
+      builder: (_) => _CreateTenantIntegrationDialog(
+        tenantId: tenantId,
+        defaultType: widget.typeFilter == 'inbound' ? 'api' : 'webhook',
+        onCreated: (integration) async {
+          await _showSecretDialog(integration);
+          await _load();
+        },
+      ),
+    );
+  }
+
+  Future<void> _showSecretDialog(Map<String, dynamic> integration) async {
+    final apiKeyPlain = integration['api_key_plain'] as String?;
+    final hmacSecretPlain = integration['hmac_secret_plain'] as String?;
+    final secret = apiKeyPlain ?? hmacSecretPlain;
+    final label = apiKeyPlain != null ? 'API Key' : 'HMAC Secret';
+    if (secret == null || !mounted) return;
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: Text(
+          'Copia tu $label ahora',
+          style: const TextStyle(
+            fontFamily: 'Geist',
+            fontWeight: FontWeight.w600,
+            fontSize: 15,
+            color: AppColors.ctText,
+          ),
+        ),
+        content: SizedBox(
+          width: 480,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.warning_amber_rounded,
+                      color: AppColors.ctDanger, size: 16),
+                  const SizedBox(width: 6),
+                  const Expanded(
+                    child: Text(
+                      'Esta es la única vez que verás esta clave. Guárdala en un lugar seguro.',
+                      style: TextStyle(
+                        fontFamily: 'Geist',
+                        fontSize: 13,
+                        color: AppColors.ctDanger,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Text(
+                label,
+                style: const TextStyle(
+                  fontFamily: 'Geist',
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.ctText2,
+                ),
+              ),
+              const SizedBox(height: 6),
+              _SecretBox(secret: secret),
+            ],
+          ),
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.ctTeal,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Entendido',
+                style: TextStyle(fontFamily: 'Geist', fontSize: 13)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isInbound = widget.typeFilter == 'inbound';
+    final title = isInbound ? 'API REST de Conectamos' : 'Webhooks salientes';
+
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.72,
+      decoration: const BoxDecoration(
+        color: AppColors.ctSurface,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      child: Column(
+        children: [
+          // Drag handle
+          Container(
+            width: 36,
+            height: 4,
+            margin: const EdgeInsets.only(top: 10),
+            decoration: BoxDecoration(
+              color: AppColors.ctBorder2,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          // Header
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 14, 16, 0),
+            child: Row(
+              children: [
+                _IntegrationLogo(logoKey: widget.item.logoKey, size: 40),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: AppFonts.onest(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: _ink900,
+                        ),
+                      ),
+                      Text(
+                        widget.item.short,
+                        style: AppFonts.geist(fontSize: 13, color: _steel400),
+                      ),
+                    ],
+                  ),
+                ),
+                if (!_loading)
+                  TextButton.icon(
+                    onPressed: _openCreate,
+                    icon: const Icon(Icons.add_rounded, size: 16, color: _teal400),
+                    label: Text(
+                      'Nueva',
+                      style: AppFonts.geist(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: _teal400,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const Divider(height: 20),
+          // Body
+          Expanded(
+            child: _loading
+                ? const Center(
+                    child: CircularProgressIndicator(color: _teal400),
+                  )
+                : _error != null
+                    ? Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              _error!,
+                              style: AppFonts.geist(
+                                  fontSize: 13, color: AppColors.ctDanger),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 12),
+                            TextButton(
+                              onPressed: _load,
+                              child: const Text('Reintentar'),
+                            ),
+                          ],
+                        ),
+                      )
+                    : _items.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.electrical_services_outlined,
+                                    size: 40, color: AppColors.ctBorder2),
+                                const SizedBox(height: 10),
+                                Text(
+                                  'Sin integraciones',
+                                  style: AppFonts.onest(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.ctText2,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Crea una nueva para empezar.',
+                                  style: AppFonts.geist(
+                                      fontSize: 13, color: AppColors.ctText3),
+                                ),
+                                const SizedBox(height: 20),
+                                ElevatedButton.icon(
+                                  onPressed: _openCreate,
+                                  icon: const Icon(Icons.add, size: 16),
+                                  label: const Text('Nueva integración'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.ctTeal,
+                                    foregroundColor: Colors.white,
+                                    textStyle: AppFonts.geist(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        : ListView.separated(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 20, vertical: 8),
+                            itemCount: _items.length,
+                            separatorBuilder: (_, index) =>
+                                const SizedBox(height: 8),
+                            itemBuilder: (ctx, i) {
+                              final intg = _items[i];
+                              final id = intg['id'] as String? ?? '';
+                              final name =
+                                  intg['name'] as String? ?? '(sin nombre)';
+                              final type =
+                                  intg['integration_type'] as String? ?? '';
+                              final isActive =
+                                  intg['is_active'] as bool? ?? true;
+                              return Container(
+                                padding: const EdgeInsets.all(14),
+                                decoration: BoxDecoration(
+                                  color: AppColors.ctSurface,
+                                  border: Border.all(color: AppColors.ctBorder),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Text(
+                                                name,
+                                                style: AppFonts.geist(
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: AppColors.ctText,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                        horizontal: 6,
+                                                        vertical: 2),
+                                                decoration: BoxDecoration(
+                                                  color: isActive
+                                                      ? AppColors.ctOkBg
+                                                      : AppColors.ctSurface2,
+                                                  borderRadius:
+                                                      BorderRadius.circular(4),
+                                                ),
+                                                child: Text(
+                                                  isActive ? 'Activo' : 'Inactivo',
+                                                  style: TextStyle(
+                                                    fontFamily: 'Geist',
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.w600,
+                                                    color: isActive
+                                                        ? AppColors.ctOkText
+                                                        : AppColors.ctText3,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            _connTypeLabel(type),
+                                            style: AppFonts.geist(
+                                                fontSize: 12, color: _steel400),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    _deleting
+                                        ? const SizedBox(
+                                            width: 20,
+                                            height: 20,
+                                            child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                color: _teal400),
+                                          )
+                                        : IconButton(
+                                            icon: const Icon(
+                                              Icons.delete_outline_rounded,
+                                              size: 18,
+                                              color: AppColors.ctText3,
+                                            ),
+                                            tooltip: 'Eliminar',
+                                            onPressed: id.isNotEmpty
+                                                ? () =>
+                                                    _confirmDelete(id, name)
+                                                : null,
+                                          ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Create tenant integration dialog ─────────────────────────────────────────
+
+class _CreateTenantIntegrationDialog extends ConsumerStatefulWidget {
+  const _CreateTenantIntegrationDialog({
+    required this.tenantId,
+    required this.defaultType,
+    required this.onCreated,
+  });
+  final String tenantId;
+  final String defaultType;
+  final Future<void> Function(Map<String, dynamic>) onCreated;
+
+  @override
+  ConsumerState<_CreateTenantIntegrationDialog> createState() =>
+      _CreateTenantIntegrationDialogState();
+}
+
+class _CreateTenantIntegrationDialogState
+    extends ConsumerState<_CreateTenantIntegrationDialog> {
+  final _nameCtrl = TextEditingController();
+  final _urlCtrl = TextEditingController();
+  late String _type;
+  String? _workerId;
+  List<Map<String, dynamic>> _workers = [];
+  bool _workersLoading = true;
+  bool _saving = false;
+  String? _error;
+  int _rateLimit = 60;
+
+  static const _kTypes = [
+    ('api', 'API Key'),
+    ('webhook', 'Webhook'),
+    ('n8n', 'n8n'),
+    ('zapier', 'Zapier'),
+    ('make', 'Make'),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _type = widget.defaultType;
+    _nameCtrl.addListener(() => setState(() {}));
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadWorkers());
+  }
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _urlCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadWorkers() async {
+    try {
+      final list =
+          await AiWorkersApi.listWorkers(tenantId: widget.tenantId);
+      if (!mounted) return;
+      setState(() {
+        _workers = list;
+        _workersLoading = false;
+        if (list.isNotEmpty) _workerId = list.first['id'] as String?;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _workersLoading = false);
+    }
+  }
+
+  Future<void> _submit() async {
+    if (_saving || _workerId == null) return;
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      final result = await FlowsApi.createIntegrationForTenant(
+        tenantId: widget.tenantId,
+        name: _nameCtrl.text.trim(),
+        integrationType: _type,
+        tenantWorkerId: _workerId!,
+        endpointUrl: _urlCtrl.text.trim().isEmpty ? null : _urlCtrl.text.trim(),
+        rateLimitPerMinute: _rateLimit,
+      );
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      await widget.onCreated(result);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _saving = false;
+        _error = _connDioError(e);
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final needsUrl = _type == 'webhook' || _type == 'n8n';
+    final nameValid = _nameCtrl.text.trim().isNotEmpty;
+    final canSubmit =
+        nameValid && _workerId != null && !_workersLoading && !_saving;
+
+    return AlertDialog(
+      title: const Text(
+        'Nueva integración',
+        style: TextStyle(
+          fontFamily: 'Geist',
+          fontWeight: FontWeight.w600,
+          fontSize: 15,
+          color: AppColors.ctText,
+        ),
+      ),
+      content: SizedBox(
+        width: 400,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Name
+            const Text(
+              'Nombre',
+              style: TextStyle(
+                fontFamily: 'Geist',
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: AppColors.ctText2,
+              ),
+            ),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _nameCtrl,
+              autofocus: true,
+              style: AppFonts.geist(fontSize: 13, color: AppColors.ctText),
+              decoration: InputDecoration(
+                hintText: 'Ej: Mi sistema externo',
+                hintStyle:
+                    AppFonts.geist(fontSize: 13, color: AppColors.ctText3),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(6),
+                  borderSide: const BorderSide(color: AppColors.ctBorder),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(6),
+                  borderSide: const BorderSide(color: AppColors.ctBorder),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            // Type
+            const Text(
+              'Tipo',
+              style: TextStyle(
+                fontFamily: 'Geist',
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: AppColors.ctText2,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: AppColors.ctBorder),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: DropdownButton<String>(
+                value: _type,
+                isExpanded: true,
+                underline: const SizedBox.shrink(),
+                style:
+                    AppFonts.geist(fontSize: 13, color: AppColors.ctText),
+                items: _kTypes
+                    .map((t) =>
+                        DropdownMenuItem(value: t.$1, child: Text(t.$2)))
+                    .toList(),
+                onChanged: (v) {
+                  if (v != null) setState(() => _type = v);
+                },
+              ),
+            ),
+            const SizedBox(height: 16),
+            // Worker
+            const Text(
+              'Worker',
+              style: TextStyle(
+                fontFamily: 'Geist',
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: AppColors.ctText2,
+              ),
+            ),
+            const SizedBox(height: 6),
+            _workersLoading
+                ? const SizedBox(
+                    height: 36,
+                    child: Center(
+                      child: SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: _teal400),
+                      ),
+                    ),
+                  )
+                : _workers.isEmpty
+                    ? Text(
+                        'No hay workers disponibles',
+                        style: AppFonts.geist(
+                            fontSize: 13, color: AppColors.ctText3),
+                      )
+                    : Container(
+                        decoration: BoxDecoration(
+                          border: Border.all(color: AppColors.ctBorder),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 12),
+                        child: DropdownButton<String>(
+                          value: _workerId,
+                          isExpanded: true,
+                          underline: const SizedBox.shrink(),
+                          style: AppFonts.geist(
+                              fontSize: 13, color: AppColors.ctText),
+                          items: _workers
+                              .map((w) => DropdownMenuItem<String>(
+                                    value: w['id'] as String?,
+                                    child: Text(
+                                      w['display_name'] as String? ??
+                                          w['name'] as String? ??
+                                          'Worker',
+                                    ),
+                                  ))
+                              .toList(),
+                          onChanged: (v) {
+                            if (v != null) setState(() => _workerId = v);
+                          },
+                        ),
+                      ),
+            if (needsUrl) ...[
+              const SizedBox(height: 14),
+              const Text(
+                'URL del endpoint',
+                style: TextStyle(
+                  fontFamily: 'Geist',
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.ctText2,
+                ),
+              ),
+              const SizedBox(height: 6),
+              TextField(
+                controller: _urlCtrl,
+                style: AppFonts.geist(fontSize: 13, color: AppColors.ctText),
+                decoration: InputDecoration(
+                  hintText: 'https://...',
+                  hintStyle:
+                      AppFonts.geist(fontSize: 13, color: AppColors.ctText3),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(6),
+                    borderSide: const BorderSide(color: AppColors.ctBorder),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(6),
+                    borderSide: const BorderSide(color: AppColors.ctBorder),
+                  ),
+                ),
+              ),
+            ],
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Text(
+                  'Límite por minuto:',
+                  style: AppFonts.geist(
+                      fontSize: 13, color: AppColors.ctText),
+                ),
+                const SizedBox(width: 12),
+                SizedBox(
+                  width: 72,
+                  child: TextField(
+                    keyboardType: TextInputType.number,
+                    style:
+                        AppFonts.geist(fontSize: 13, color: AppColors.ctText),
+                    controller:
+                        TextEditingController(text: _rateLimit.toString()),
+                    decoration: InputDecoration(
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 8),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(6),
+                        borderSide:
+                            const BorderSide(color: AppColors.ctBorder),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(6),
+                        borderSide:
+                            const BorderSide(color: AppColors.ctBorder),
+                      ),
+                    ),
+                    onChanged: (v) {
+                      final n = int.tryParse(v);
+                      if (n != null && n > 0) _rateLimit = n;
+                    },
+                  ),
+                ),
+              ],
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: 12),
+              Text(
+                _error!,
+                style: const TextStyle(
+                  fontFamily: 'Geist',
+                  fontSize: 12,
+                  color: AppColors.ctDanger,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _saving ? null : () => Navigator.of(context).pop(),
+          child: const Text('Cancelar'),
+        ),
+        ElevatedButton(
+          onPressed: canSubmit ? _submit : null,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.ctTeal,
+            foregroundColor: Colors.white,
+          ),
+          child: _saving
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: Colors.white),
+                )
+              : const Text('Crear',
+                  style: TextStyle(fontFamily: 'Geist', fontSize: 13)),
+        ),
+      ],
+    );
+  }
+}
+
+// ─── Secret box ───────────────────────────────────────────────────────────────
+
+class _SecretBox extends StatefulWidget {
+  const _SecretBox({required this.secret});
+  final String secret;
+
+  @override
+  State<_SecretBox> createState() => _SecretBoxState();
+}
+
+class _SecretBoxState extends State<_SecretBox> {
+  bool _copied = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.ctSurface2,
+        border: Border.all(color: AppColors.ctBorder),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      child: Row(
+        children: [
+          Expanded(
+            child: SelectableText(
+              widget.secret,
+              style: const TextStyle(
+                fontFamily: 'Geist',
+                fontSize: 13,
+                color: AppColors.ctText,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          IconButton(
+            icon: Icon(
+              _copied ? Icons.check : Icons.copy_outlined,
+              size: 16,
+              color: _copied ? AppColors.ctOk : AppColors.ctText3,
+            ),
+            tooltip: 'Copiar',
+            onPressed: () {
+              Clipboard.setData(ClipboardData(text: widget.secret));
+              setState(() => _copied = true);
+              Future.delayed(const Duration(seconds: 2), () {
+                if (mounted) setState(() => _copied = false);
+              });
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+String _connTypeLabel(String type) => switch (type) {
+      'api' => 'API Key',
+      'inbound' => 'Inbound',
+      'outbound' => 'Outbound',
+      'webhook' || 'webhook_out' => 'Webhook',
+      'zapier' => 'Zapier',
+      'make' => 'Make',
+      'n8n' => 'n8n',
+      _ => type,
+    };
+
+String _connDioError(Object e) {
+  if (e is DioException) {
+    final data = e.response?.data;
+    if (data is Map) {
+      final d = data['detail'];
+      if (d != null) return 'Error: $d';
+    }
+    final s = e.response?.statusCode;
+    if (s != null) return 'Error $s';
+  }
+  return e.toString();
 }

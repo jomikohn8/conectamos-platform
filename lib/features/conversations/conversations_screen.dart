@@ -766,6 +766,7 @@ class _OperatorAvatar extends StatelessWidget {
     required this.name,
     this.photoUrl,
     this.size = 40,
+    // ignore: unused_element_parameter
     this.bgColor = const Color(0xFFCCFBF1),
   });
   final String name;
