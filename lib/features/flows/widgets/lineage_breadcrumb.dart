@@ -50,9 +50,9 @@ class LineageBreadcrumb extends StatelessWidget {
 
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 22),
+      margin: const EdgeInsets.only(bottom: 20),
       decoration: BoxDecoration(
-        color: const Color(0xFFFAFAFA),
+        color: Colors.white,
         border: Border.all(color: const Color(0xFFE5E7EB)),
         borderRadius: BorderRadius.circular(12),
       ),
@@ -60,7 +60,7 @@ class LineageBreadcrumb extends StatelessWidget {
         builder: (ctx, bc) {
           final wide = bc.maxWidth >= 900;
           return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
             child: wide
                 ? _DesktopRow(
                     parent: parent,
@@ -102,22 +102,22 @@ class _DesktopRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
-      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         if (parent != null)
           _ParentChip(parent: parent!)
         else
           const _AbsentText('Sin flujo anterior'),
-        const _Connector(),
+        const _Dots(),
         _CurrentChip(flowName: currentFlowName, trigger: currentTrigger),
-        const _Connector(),
+        const _Dots(),
         if (child0 != null)
           _ChildChip(child: child0!)
         else
           const _AbsentText('Sin flujo posterior'),
         if (extraChildCount > 0) ...[
-          const _Connector(),
+          const _Dots(),
           _MoreChip(count: extraChildCount),
         ],
       ],
@@ -143,7 +143,7 @@ class _CompactRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
-      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         // ANTERIOR
@@ -167,7 +167,7 @@ class _CompactRow extends StatelessWidget {
             message: 'Sin flujo anterior',
             child: _EmptyCompactCircle(),
           ),
-        const _Connector(),
+        const _Dots(),
         // ACTUAL
         Tooltip(
           message: currentFlowName,
@@ -178,7 +178,7 @@ class _CompactRow extends StatelessWidget {
             iconColor: AppColors.ctTeal,
           ),
         ),
-        const _Connector(),
+        const _Dots(),
         // POSTERIOR
         if (child0 != null)
           Tooltip(
@@ -229,7 +229,8 @@ class _ParentChip extends StatelessWidget {
           if (id != null) context.go('/executions/$id');
         },
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          height: 36,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(
             color: bg,
             border: Border.all(color: bd),
@@ -242,7 +243,7 @@ class _ParentChip extends StatelessWidget {
               const Icon(Icons.arrow_back_rounded, size: 11, color: fg),
               const SizedBox(width: 8),
               Column(
-                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text('VINO DE',
@@ -295,7 +296,8 @@ class _CurrentChip extends StatelessWidget {
     return MouseRegion(
       cursor: SystemMouseCursors.basic,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        height: 36,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
         decoration: BoxDecoration(
           color: AppColors.ctNavy,
           border: Border.all(color: AppColors.ctNavy),
@@ -315,7 +317,7 @@ class _CurrentChip extends StatelessWidget {
             Icon(_typeIconFor(trigger), size: 11, color: AppColors.ctTeal),
             const SizedBox(width: 8),
             Column(
-              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text('ESTA EJECUCIÓN',
@@ -374,7 +376,8 @@ class _ChildChip extends StatelessWidget {
           if (id != null) context.go('/executions/$id');
         },
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          height: 36,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(
             color: bg,
             border: Border.all(color: bd),
@@ -385,7 +388,7 @@ class _ChildChip extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Column(
-                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text('DETONÓ',
@@ -448,18 +451,21 @@ class _MoreChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      height: 36,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
         color: const Color(0xFFF1F5F9),
         border: Border.all(color: const Color(0xFFE2E8F0)),
         borderRadius: BorderRadius.circular(99),
       ),
-      child: Text('+ $count más',
-          style: AppFonts.geist(
-            fontSize: 10,
-            fontWeight: FontWeight.w600,
-            color: const Color(0xFF64748B),
-          )),
+      child: Center(
+        child: Text('+ $count más',
+            style: AppFonts.geist(
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              color: const Color(0xFF64748B),
+            )),
+      ),
     );
   }
 }
@@ -472,9 +478,17 @@ class _AbsentText extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Text(label,
-        style: AppFonts.geist(fontSize: 11, color: const Color(0xFF94A3B8))
-            .copyWith(fontStyle: FontStyle.italic));
+    return SizedBox(
+      width: 120,
+      child: Center(
+        child: Text(
+          label,
+          textAlign: TextAlign.center,
+          style: AppFonts.geist(fontSize: 11, color: const Color(0xFF94A3B8))
+              .copyWith(fontStyle: FontStyle.italic),
+        ),
+      ),
+    );
   }
 }
 
@@ -537,15 +551,16 @@ class _EmptyCompactCircle extends StatelessWidget {
 
 // ── Dotted connector ──────────────────────────────────────────────────────────
 
-class _Connector extends StatelessWidget {
-  const _Connector();
+class _Dots extends StatelessWidget {
+  const _Dots();
 
   @override
   Widget build(BuildContext context) {
     return Row(
       mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        const SizedBox(width: 8),
+        const SizedBox(width: 12),
         ...List.generate(5, (i) => Padding(
               padding: EdgeInsets.only(right: i < 4 ? 3.0 : 0.0),
               child: Container(
@@ -557,7 +572,7 @@ class _Connector extends StatelessWidget {
                 ),
               ),
             )),
-        const SizedBox(width: 8),
+        const SizedBox(width: 12),
       ],
     );
   }
