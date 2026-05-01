@@ -2,208 +2,563 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 
-class LineageBreadcrumb extends StatelessWidget {
-  const LineageBreadcrumb({
-    super.key,
-    required this.exec,
-    required this.flow,
-  });
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
+IconData _typeIconFor(String? src) => switch (src) {
+      'conversacional' => Icons.chat_bubble_outline_rounded,
+      'api'            => Icons.code_rounded,
+      'dashboard'      => Icons.dashboard_outlined,
+      _                => Icons.bolt_rounded,
+    };
+
+String? _firstTrigger(List triggers) =>
+    triggers.isNotEmpty ? triggers.first?.toString() : null;
+
+// ── Public widget ─────────────────────────────────────────────────────────────
+
+class LineageBreadcrumb extends StatelessWidget {
+  const LineageBreadcrumb({super.key, required this.exec});
   final Map<String, dynamic> exec;
-  final Map<String, dynamic> flow;
 
   @override
   Widget build(BuildContext context) {
-    final parentExecId = exec['parent_execution_id'] as String?;
-    final flowName = flow['name'] as String? ?? '—';
-    final execId = exec['id'] as String? ?? '—';
+    // Safe dart2js casts
+    final rawParent = exec['parent'];
+    final parent = rawParent is Map
+        ? Map<String, dynamic>.from(rawParent)
+        : null;
 
-    if (parentExecId == null) return const SizedBox.shrink();
+    final rawChildren = exec['children'];
+    final children = rawChildren is List
+        ? List<Map<String, dynamic>>.from(
+            rawChildren
+                .whereType<Map>()
+                .map((e) => Map<String, dynamic>.from(e)))
+        : <Map<String, dynamic>>[];
 
-    final parentLabel = parentExecId.length >= 8
-        ? parentExecId.substring(0, 8).toUpperCase()
-        : parentExecId.toUpperCase();
+    final rawSnapshot = exec['flow_definition_snapshot'];
+    final snapshot = rawSnapshot is Map
+        ? Map<String, dynamic>.from(rawSnapshot)
+        : <String, dynamic>{};
+
+    final currentFlowName = snapshot['name'] as String? ?? '—';
+    final currentTrigger =
+        _firstTrigger(snapshot['trigger_sources'] as List? ?? []);
+
+    final child0 = children.isNotEmpty ? children.first : null;
+    final extraChildCount = children.length > 1 ? children.length - 1 : 0;
 
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(bottom: 22),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
         color: const Color(0xFFFAFAFA),
-        border: Border.all(color: AppColors.ctBorder),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Wrap(
-        spacing: 10,
-        runSpacing: 8,
-        alignment: WrapAlignment.start,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          Text('LINAJE',
-              style: AppFonts.geist(
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.1,
-                color: const Color(0xFF475569),
-              )),
-          _LineageChip(
-            kind: 'parent',
-            name: parentLabel,
-            execId: parentExecId,
-            onTap: () => context.go('/executions/$parentExecId'),
-          ),
-          const _DottedConnector(),
-          _LineageChip(
-            kind: 'current',
-            name: flowName,
-            execId: execId,
-          ),
-        ],
+      child: LayoutBuilder(
+        builder: (ctx, bc) {
+          final wide = bc.maxWidth >= 900;
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: wide
+                ? _DesktopRow(
+                    parent: parent,
+                    currentFlowName: currentFlowName,
+                    currentTrigger: currentTrigger,
+                    child0: child0,
+                    extraChildCount: extraChildCount,
+                  )
+                : _CompactRow(
+                    parent: parent,
+                    currentFlowName: currentFlowName,
+                    currentTrigger: currentTrigger,
+                    child0: child0,
+                  ),
+          );
+        },
       ),
     );
   }
 }
 
-// ── Chips ──────────────────────────────────────────────────────────────────
+// ── Desktop row ───────────────────────────────────────────────────────────────
 
-class _LineageChip extends StatelessWidget {
-  const _LineageChip({
-    required this.kind,
-    required this.name,
-    required this.execId,
+class _DesktopRow extends StatelessWidget {
+  const _DesktopRow({
+    required this.parent,
+    required this.currentFlowName,
+    required this.currentTrigger,
+    required this.child0,
+    required this.extraChildCount,
+  });
+
+  final Map<String, dynamic>? parent;
+  final String currentFlowName;
+  final String? currentTrigger;
+  final Map<String, dynamic>? child0;
+  final int extraChildCount;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        if (parent != null)
+          _ParentChip(parent: parent!)
+        else
+          const _AbsentText('Sin flujo anterior'),
+        const _Connector(),
+        _CurrentChip(flowName: currentFlowName, trigger: currentTrigger),
+        const _Connector(),
+        if (child0 != null)
+          _ChildChip(child: child0!)
+        else
+          const _AbsentText('Sin flujo posterior'),
+        if (extraChildCount > 0) ...[
+          const _Connector(),
+          _MoreChip(count: extraChildCount),
+        ],
+      ],
+    );
+  }
+}
+
+// ── Compact row ───────────────────────────────────────────────────────────────
+
+class _CompactRow extends StatelessWidget {
+  const _CompactRow({
+    required this.parent,
+    required this.currentFlowName,
+    required this.currentTrigger,
+    required this.child0,
+  });
+
+  final Map<String, dynamic>? parent;
+  final String currentFlowName;
+  final String? currentTrigger;
+  final Map<String, dynamic>? child0;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        // ANTERIOR
+        if (parent != null)
+          Tooltip(
+            message: parent!['flow_name'] as String? ?? '—',
+            child: _CompactCircle(
+              bg: const Color(0xFFEEF2FF),
+              border: const Color(0xFFC7D2FE),
+              icon: _typeIconFor(
+                  _firstTrigger(parent!['trigger_sources'] as List? ?? [])),
+              iconColor: const Color(0xFF4338CA),
+              onTap: () {
+                final id = parent!['id'] as String?;
+                if (id != null) context.go('/executions/$id');
+              },
+            ),
+          )
+        else
+          const Tooltip(
+            message: 'Sin flujo anterior',
+            child: _EmptyCompactCircle(),
+          ),
+        const _Connector(),
+        // ACTUAL
+        Tooltip(
+          message: currentFlowName,
+          child: _CompactCircle(
+            bg: AppColors.ctNavy,
+            border: AppColors.ctNavy,
+            icon: _typeIconFor(currentTrigger),
+            iconColor: AppColors.ctTeal,
+          ),
+        ),
+        const _Connector(),
+        // POSTERIOR
+        if (child0 != null)
+          Tooltip(
+            message: child0!['flow_name'] as String? ?? '—',
+            child: _CompactCircle(
+              bg: const Color(0xFFE6FBF6),
+              border: const Color(0xFF99F6E4),
+              icon: _typeIconFor(
+                  _firstTrigger(child0!['trigger_sources'] as List? ?? [])),
+              iconColor: const Color(0xFF0F766E),
+              onTap: () {
+                final id = child0!['id'] as String?;
+                if (id != null) context.go('/executions/$id');
+              },
+            ),
+          )
+        else
+          const Tooltip(
+            message: 'Sin flujo posterior',
+            child: _EmptyCompactCircle(),
+          ),
+      ],
+    );
+  }
+}
+
+// ── Chip: ANTERIOR ────────────────────────────────────────────────────────────
+
+class _ParentChip extends StatelessWidget {
+  const _ParentChip({required this.parent});
+  final Map<String, dynamic> parent;
+
+  @override
+  Widget build(BuildContext context) {
+    final flowName = parent['flow_name'] as String? ?? '—';
+    final shortId = parent['short_id'] as String? ?? '';
+    final trigger = _firstTrigger(parent['trigger_sources'] as List? ?? []);
+
+    const bg = Color(0xFFEEF2FF);
+    const bd = Color(0xFFC7D2FE);
+    const fg = Color(0xFF4338CA);
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: () {
+          final id = parent['id'] as String?;
+          if (id != null) context.go('/executions/$id');
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: bg,
+            border: Border.all(color: bd),
+            borderRadius: BorderRadius.circular(99),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              const Icon(Icons.arrow_back_rounded, size: 11, color: fg),
+              const SizedBox(width: 8),
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('VINO DE',
+                      style: TextStyle(
+                        fontFamily: 'Geist',
+                        fontSize: 9,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.08,
+                        color: fg.withValues(alpha: 0.65),
+                      )),
+                  Text(flowName,
+                      style: const TextStyle(
+                        fontFamily: 'Geist',
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                        color: fg,
+                      )),
+                ],
+              ),
+              const SizedBox(width: 8),
+              Container(width: 1, height: 20, color: bd),
+              const SizedBox(width: 8),
+              Icon(_typeIconFor(trigger), size: 11, color: fg),
+              if (shortId.isNotEmpty) ...[
+                const SizedBox(width: 4),
+                Text(shortId,
+                    style: TextStyle(
+                      fontFamily: 'Geist',
+                      fontSize: 10,
+                      color: const Color(0xFF6366F1).withValues(alpha: 0.7),
+                    )),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Chip: ACTUAL ──────────────────────────────────────────────────────────────
+
+class _CurrentChip extends StatelessWidget {
+  const _CurrentChip({required this.flowName, required this.trigger});
+  final String flowName;
+  final String? trigger;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.basic,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: AppColors.ctNavy,
+          border: Border.all(color: AppColors.ctNavy),
+          borderRadius: BorderRadius.circular(99),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x400F2937),
+              offset: Offset(0, 2),
+              blurRadius: 8,
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Icon(_typeIconFor(trigger), size: 11, color: AppColors.ctTeal),
+            const SizedBox(width: 8),
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('ESTA EJECUCIÓN',
+                    style: TextStyle(
+                      fontFamily: 'Geist',
+                      fontSize: 9,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.08,
+                      color: AppColors.ctTeal.withValues(alpha: 0.7),
+                    )),
+                Text(flowName,
+                    style: const TextStyle(
+                      fontFamily: 'Geist',
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    )),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Chip: POSTERIOR ───────────────────────────────────────────────────────────
+
+class _ChildChip extends StatelessWidget {
+  const _ChildChip({required this.child});
+  final Map<String, dynamic> child;
+
+  static Color _statusDotColor(String? status) => switch (status) {
+        'active' || 'in_progress' => const Color(0xFF3B82F6),
+        'abandoned' || 'escalated' => const Color(0xFFEF4444),
+        _ => const Color(0xFFF59E0B),
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    final flowName = child['flow_name'] as String? ?? '—';
+    final shortId = child['short_id'] as String? ?? '';
+    final status = child['status'] as String?;
+    final trigger = _firstTrigger(child['trigger_sources'] as List? ?? []);
+    final showDot = status != null && status != 'completed';
+
+    const bg = Color(0xFFE6FBF6);
+    const bd = Color(0xFF99F6E4);
+    const fg = Color(0xFF0F766E);
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: () {
+          final id = child['id'] as String?;
+          if (id != null) context.go('/executions/$id');
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: bg,
+            border: Border.all(color: bd),
+            borderRadius: BorderRadius.circular(99),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('DETONÓ',
+                      style: TextStyle(
+                        fontFamily: 'Geist',
+                        fontSize: 9,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.08,
+                        color: fg.withValues(alpha: 0.65),
+                      )),
+                  Text(flowName,
+                      style: const TextStyle(
+                        fontFamily: 'Geist',
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                        color: fg,
+                      )),
+                ],
+              ),
+              const SizedBox(width: 8),
+              Container(width: 1, height: 20, color: bd),
+              const SizedBox(width: 8),
+              Icon(_typeIconFor(trigger), size: 11, color: fg),
+              if (shortId.isNotEmpty) ...[
+                const SizedBox(width: 4),
+                Text(shortId,
+                    style: TextStyle(
+                      fontFamily: 'Geist',
+                      fontSize: 10,
+                      color: fg.withValues(alpha: 0.7),
+                    )),
+              ],
+              const SizedBox(width: 8),
+              const Icon(Icons.arrow_forward_rounded, size: 11, color: fg),
+              if (showDot) ...[
+                const SizedBox(width: 6),
+                Container(
+                  width: 6,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: _statusDotColor(status),
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── "+ N más" chip ────────────────────────────────────────────────────────────
+
+class _MoreChip extends StatelessWidget {
+  const _MoreChip({required this.count});
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1F5F9),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        borderRadius: BorderRadius.circular(99),
+      ),
+      child: Text('+ $count más',
+          style: AppFonts.geist(
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            color: const Color(0xFF64748B),
+          )),
+    );
+  }
+}
+
+// ── Absent text ───────────────────────────────────────────────────────────────
+
+class _AbsentText extends StatelessWidget {
+  const _AbsentText(this.label);
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(label,
+        style: AppFonts.geist(fontSize: 11, color: const Color(0xFF94A3B8))
+            .copyWith(fontStyle: FontStyle.italic));
+  }
+}
+
+// ── Compact circle ────────────────────────────────────────────────────────────
+
+class _CompactCircle extends StatelessWidget {
+  const _CompactCircle({
+    required this.bg,
+    required this.border,
+    required this.icon,
+    required this.iconColor,
     this.onTap,
   });
 
-  final String kind; // 'parent' | 'current' | 'child'
-  final String name;
-  final String execId;
+  final Color bg;
+  final Color border;
+  final IconData icon;
+  final Color iconColor;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    final (bg, fg, bd, iconData, eyebrow) = switch (kind) {
-      'parent' => (
-          const Color(0xFFEEF2FF),
-          const Color(0xFF4338CA),
-          const Color(0xFFC7D2FE),
-          Icons.arrow_back_rounded,
-          'VINO DE',
-        ),
-      'current' => (
-          AppColors.ctNavy,
-          Colors.white,
-          AppColors.ctNavy,
-          Icons.account_tree_rounded,
-          'ESTA EJECUCIÓN',
-        ),
-      _ => (
-          AppColors.ctTealLight,
-          const Color(0xFF0F766E),
-          const Color(0xFF99F6E4),
-          Icons.arrow_forward_rounded,
-          'DETONÓ',
-        ),
-    };
-
-    final isCurrent = kind == 'current';
-
-    Widget chip = Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+    Widget w = Container(
+      width: 32,
+      height: 32,
       decoration: BoxDecoration(
         color: bg,
-        border: Border.all(color: bd),
-        borderRadius: BorderRadius.circular(99),
-        boxShadow: isCurrent
-            ? [
-                const BoxShadow(
-                  color: Color(0x4D0B132B),
-                  offset: Offset(0, 1),
-                  blurRadius: 2,
-                ),
-              ]
-            : null,
+        border: Border.all(color: border),
+        shape: BoxShape.circle,
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 18, height: 18,
-            decoration: BoxDecoration(
-              color: isCurrent
-                  ? Colors.white.withValues(alpha: 0.12)
-                  : Colors.white.withValues(alpha: 0.6),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(iconData, size: 10, color: fg),
-          ),
-          const SizedBox(width: 8),
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(eyebrow,
-                  style: TextStyle(
-                    fontFamily: 'Geist',
-                    fontSize: 9,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.06,
-                    color: fg.withValues(alpha: 0.65),
-                  )),
-              Text(name,
-                  style: TextStyle(
-                    fontFamily: 'Geist',
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w600,
-                    color: fg,
-                  )),
-            ],
-          ),
-          if (!isCurrent) ...[
-            const SizedBox(width: 6),
-            Text(execId,
-                style: TextStyle(
-                  fontFamily: 'Geist',
-                  fontSize: 10,
-                  color: fg.withValues(alpha: 0.55),
-                  letterSpacing: -0.005,
-                )),
-          ],
-        ],
-      ),
+      child: Icon(icon, size: 14, color: iconColor),
     );
-
-    if (!isCurrent && onTap != null) {
-      chip = MouseRegion(
+    if (onTap != null) {
+      w = MouseRegion(
         cursor: SystemMouseCursors.click,
-        child: GestureDetector(onTap: onTap, child: chip),
+        child: GestureDetector(onTap: onTap, child: w),
       );
     }
-    return chip;
+    return w;
   }
 }
 
-
-class _DottedConnector extends StatelessWidget {
-  const _DottedConnector();
+class _EmptyCompactCircle extends StatelessWidget {
+  const _EmptyCompactCircle();
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 24,
-      height: 1.5,
-      child: Row(
-        children: List.generate(
-          6,
-          (_) => Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 1),
-            child: Container(
-              width: 3,
-              height: 1.5,
-              color: const Color(0xFFD1D5DB),
-            ),
-          ),
-        ),
+    return Container(
+      width: 32,
+      height: 32,
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        shape: BoxShape.circle,
       ),
+      child: const Icon(Icons.remove_rounded, size: 14, color: Color(0xFFCBD5E1)),
+    );
+  }
+}
+
+// ── Dotted connector ──────────────────────────────────────────────────────────
+
+class _Connector extends StatelessWidget {
+  const _Connector();
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const SizedBox(width: 8),
+        ...List.generate(5, (i) => Padding(
+              padding: EdgeInsets.only(right: i < 4 ? 3.0 : 0.0),
+              child: Container(
+                width: 3,
+                height: 3,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFD1D5DB),
+                  shape: BoxShape.circle,
+                ),
+              ),
+            )),
+        const SizedBox(width: 8),
+      ],
     );
   }
 }

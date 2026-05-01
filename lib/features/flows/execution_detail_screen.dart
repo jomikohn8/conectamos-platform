@@ -117,7 +117,7 @@ class _ExecutionDetailScreenState
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        LineageBreadcrumb(exec: exec, flow: flow),
+                        LineageBreadcrumb(exec: exec),
                         LayoutBuilder(
                           builder: (ctx, constraints) {
                             final wide = constraints.maxWidth >= 900;
