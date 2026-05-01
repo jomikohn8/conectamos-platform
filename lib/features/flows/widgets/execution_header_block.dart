@@ -1,0 +1,534 @@
+import 'dart:math' as math;
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import '../../../core/theme/app_theme.dart';
+
+// ── Public widget ────────────────────────────────────────────────────────────
+
+class ExecutionHeaderBlock extends StatelessWidget {
+  const ExecutionHeaderBlock({
+    super.key,
+    required this.exec,
+    required this.flow,
+  });
+
+  final Map<String, dynamic> exec;
+  final Map<String, dynamic> flow;
+
+  @override
+  Widget build(BuildContext context) {
+    final status = exec['status'] as String? ?? 'completed';
+    final progress = (exec['progress'] as Map?)?.cast<String, dynamic>() ?? {};
+    final filled = (progress['filled'] as num?)?.toInt() ?? 0;
+    final total = (progress['total'] as num?)?.toInt() ?? 1;
+    final flowType = flow['type'] as String? ?? 'conversacional';
+    final flowName = flow['name'] as String? ?? exec['flow_name'] as String? ?? '—';
+    final execId = exec['id'] as String? ?? '—';
+    final operator_ = (exec['operator'] as Map?)?.cast<String, dynamic>() ?? {};
+    final opName = operator_['name'] as String? ?? 'Sin operador';
+    final opAvatar = operator_['avatar'] as String?;
+    final waitingFor = exec['waiting_for'] as String? ?? exec['waitingFor'] as String?;
+    final failureReason = exec['failure_reason'] as String? ?? exec['failureReason'] as String?;
+    final flowSlug = flow['slug'] as String? ?? exec['flow_slug'] as String? ?? exec['flowSlug'] as String? ?? '';
+
+    final eyebrow = switch (flowType) {
+      'api'       => 'Ejecución vía API',
+      'dashboard' => 'Ejecución desde dashboard',
+      _           => 'Ejecución conversacional',
+    };
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(24, 18, 24, 16),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(bottom: BorderSide(color: AppColors.ctBorder)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _ProgressRing(filled: filled, total: total, status: status, size: 48),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Wrap(
+                      spacing: 8,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        Text(eyebrow,
+                            style: AppFonts.geist(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.ctTeal,
+                              letterSpacing: 0.08,
+                            ).copyWith(decoration: TextDecoration.none)),
+                        const Text('·', style: TextStyle(fontSize: 10, color: Color(0xFF94A3B8))),
+                        Text(execId,
+                            style: const TextStyle(
+                              fontFamily: 'Geist',
+                              fontSize: 11,
+                              color: Color(0xFF94A3B8),
+                              letterSpacing: -0.005,
+                            )),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(flowName,
+                        style: AppFonts.onest(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.ctNavy,
+                          letterSpacing: -0.025,
+                        )),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        _StatusPill(status: status),
+                        _TypeBadge(flowType: flowType),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text('por ', style: AppFonts.geist(fontSize: 12, color: const Color(0xFF6B7280))),
+                            _Avatar(src: opAvatar, name: opName, size: 18),
+                            const SizedBox(width: 5),
+                            Text(opName,
+                                style: AppFonts.geist(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.ctNavy)),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _SmallButton(
+                    label: 'Ver definición',
+                    icon: Icons.open_in_new_rounded,
+                    onTap: () {
+                      if (flowSlug.isNotEmpty) context.go('/flows/$flowSlug');
+                    },
+                  ),
+                  const SizedBox(width: 6),
+                  _SmallButton(
+                    label: 'Exportar',
+                    icon: Icons.download_rounded,
+                    onTap: () {},
+                  ),
+                  const SizedBox(width: 6),
+                  Container(width: 1, height: 24, color: AppColors.ctBorder),
+                  const SizedBox(width: 6),
+                  _GhostIconButton(icon: Icons.more_horiz_rounded, onTap: () {}),
+                ],
+              ),
+            ],
+          ),
+          if (status == 'failed' && failureReason != null) ...[
+            const SizedBox(height: 12),
+            _FailedBanner(reason: failureReason),
+          ],
+          if (status == 'in-progress') ...[
+            const SizedBox(height: 12),
+            _InProgressBanner(waitingFor: waitingFor),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// ── Progress Ring ─────────────────────────────────────────────────────────────
+
+class _ProgressRing extends StatelessWidget {
+  const _ProgressRing({
+    required this.filled,
+    required this.total,
+    required this.status,
+    required this.size,
+  });
+
+  final int filled;
+  final int total;
+  final String status;
+  final double size;
+
+  Color get _color => switch (status) {
+    'completed'   => AppColors.ctOk,
+    'in-progress' => AppColors.ctInfo,
+    'failed'      => AppColors.ctDanger,
+    _             => AppColors.ctTeal,
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: CustomPaint(
+        painter: _RingPainter(
+          filled: filled,
+          total: total,
+          progressColor: _color,
+        ),
+        child: Center(
+          child: Text('$filled/$total',
+              style: AppFonts.onest(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: AppColors.ctNavy,
+                letterSpacing: -0.02,
+              )),
+        ),
+      ),
+    );
+  }
+}
+
+class _RingPainter extends CustomPainter {
+  _RingPainter({required this.filled, required this.total, required this.progressColor});
+  final int filled;
+  final int total;
+  final Color progressColor;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = (size.width - 6) / 2;
+
+    final bgPaint = Paint()
+      ..color = const Color(0xFFE5E7EB)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3;
+    canvas.drawCircle(center, radius, bgPaint);
+
+    final pct = total > 0 ? filled / total : 0.0;
+    if (pct > 0) {
+      final fgPaint = Paint()
+        ..color = progressColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3
+        ..strokeCap = StrokeCap.round;
+      canvas.drawArc(
+        Rect.fromCircle(center: center, radius: radius),
+        -math.pi / 2,
+        2 * math.pi * pct,
+        false,
+        fgPaint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_RingPainter old) =>
+      old.filled != filled || old.total != total || old.progressColor != progressColor;
+}
+
+// ── Banners ───────────────────────────────────────────────────────────────────
+
+class _FailedBanner extends StatelessWidget {
+  const _FailedBanner({required this.reason});
+  final String reason;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.ctRedBg,
+        border: Border.all(color: const Color(0xFFFECACA)),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.error_outline_rounded, size: 16, color: AppColors.ctDanger),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Motivo de falla',
+                    style: AppFonts.geist(
+                        fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.ctRedText)),
+                const SizedBox(height: 2),
+                Text(reason,
+                    style: AppFonts.geist(fontSize: 13, color: AppColors.ctRedText)),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          OutlinedButton(
+            onPressed: () {},
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.ctDanger,
+              side: const BorderSide(color: Color(0xFFFECACA)),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              minimumSize: Size.zero,
+              textStyle: AppFonts.geist(fontSize: 12, fontWeight: FontWeight.w600),
+            ),
+            child: const Text('Ver escalación'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InProgressBanner extends StatefulWidget {
+  const _InProgressBanner({required this.waitingFor});
+  final String? waitingFor;
+
+  @override
+  State<_InProgressBanner> createState() => _InProgressBannerState();
+}
+
+class _InProgressBannerState extends State<_InProgressBanner>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  late Animation<double> _opacity;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 1400))
+      ..repeat(reverse: true);
+    _opacity = Tween<double>(begin: 0.4, end: 1.0).animate(_ctrl);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEFF6FF),
+        border: Border.all(color: const Color(0xFFBFDBFE)),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          AnimatedBuilder(
+            animation: _opacity,
+            builder: (context2, child2) => Opacity(
+              opacity: _opacity.value,
+              child: Container(
+                width: 8, height: 8,
+                decoration: const BoxDecoration(
+                  color: AppColors.ctInfo,
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text.rich(
+              TextSpan(children: [
+                TextSpan(
+                    text: 'En espera del operador',
+                    style: AppFonts.geist(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.ctInfoText)),
+                if (widget.waitingFor != null) ...[
+                  TextSpan(
+                      text: ' · El AI Worker pidió: ',
+                      style: AppFonts.geist(fontSize: 13, color: const Color(0xFF475569))),
+                  TextSpan(
+                      text: widget.waitingFor,
+                      style: AppFonts.geist(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.ctNavy)),
+                ],
+              ]),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Text('Última actividad hace 2 min',
+              style: AppFonts.geist(fontSize: 11, color: const Color(0xFF94A3B8))),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Small helpers ─────────────────────────────────────────────────────────────
+
+class _StatusPill extends StatelessWidget {
+  const _StatusPill({required this.status});
+  final String status;
+
+  @override
+  Widget build(BuildContext context) {
+    final (bg, fg, bd, label) = switch (status) {
+      'completed'   => (AppColors.ctOkBg, AppColors.ctOkText, const Color(0xFFA7F3D0), 'Completado'),
+      'in-progress' => (AppColors.ctInfoBg, AppColors.ctInfoText, const Color(0xFFBFDBFE), 'En curso'),
+      'failed'      => (AppColors.ctRedBg, AppColors.ctRedText, const Color(0xFFFECACA), 'Fallido'),
+      _             => (AppColors.ctSurface2, AppColors.ctText2, AppColors.ctBorder, status),
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: bg,
+        border: Border.all(color: bd),
+        borderRadius: BorderRadius.circular(99),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+              width: 6, height: 6,
+              decoration: BoxDecoration(color: fg, shape: BoxShape.circle)),
+          const SizedBox(width: 5),
+          Text(label,
+              style:
+                  AppFonts.geist(fontSize: 11, fontWeight: FontWeight.w600, color: fg)),
+        ],
+      ),
+    );
+  }
+}
+
+class _TypeBadge extends StatelessWidget {
+  const _TypeBadge({required this.flowType});
+  final String flowType;
+
+  @override
+  Widget build(BuildContext context) {
+    final (bg, fg, bd, icon, label) = switch (flowType) {
+      'api'       => (AppColors.ctInfoBg, AppColors.ctInfoText, const Color(0xFFBFDBFE), Icons.code_rounded, 'API / Sistema'),
+      'dashboard' => (AppColors.ctNavy, Colors.white, AppColors.ctNavy, Icons.dashboard_outlined, 'Dashboard'),
+      _           => (AppColors.ctTealLight, const Color(0xFF0F766E), const Color(0xFF99F6E4), Icons.chat_bubble_outline_rounded, 'Conversacional'),
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: bg,
+        border: Border.all(color: bd),
+        borderRadius: BorderRadius.circular(99),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 11, color: fg),
+          const SizedBox(width: 4),
+          Text(label,
+              style:
+                  AppFonts.geist(fontSize: 11, fontWeight: FontWeight.w600, color: fg)),
+        ],
+      ),
+    );
+  }
+}
+
+class _Avatar extends StatelessWidget {
+  const _Avatar({required this.name, required this.size, this.src});
+  final String? src;
+  final String name;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final initials = name
+        .split(' ')
+        .where((p) => p.isNotEmpty)
+        .take(2)
+        .map((p) => p[0].toUpperCase())
+        .join();
+    return ClipOval(
+      child: SizedBox(
+        width: size, height: size,
+        child: src != null
+            ? Image.network(src!, fit: BoxFit.cover,
+                errorBuilder: (ctx, err, stack) => _InitialAvatar(initials: initials, size: size))
+            : _InitialAvatar(initials: initials, size: size),
+      ),
+    );
+  }
+}
+
+class _InitialAvatar extends StatelessWidget {
+  const _InitialAvatar({required this.initials, required this.size});
+  final String initials;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size, height: size,
+      color: const Color(0xFFE0F2FE),
+      child: Center(
+        child: Text(initials,
+            style: AppFonts.geist(
+                fontSize: size * 0.36,
+                fontWeight: FontWeight.w600,
+                color: AppColors.ctInfoText)),
+      ),
+    );
+  }
+}
+
+class _SmallButton extends StatelessWidget {
+  const _SmallButton({required this.label, required this.icon, required this.onTap});
+  final String label;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton.icon(
+      onPressed: onTap,
+      icon: Icon(icon, size: 13),
+      label: Text(label),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: AppColors.ctText2,
+        side: const BorderSide(color: AppColors.ctBorder),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        minimumSize: Size.zero,
+        textStyle:
+            AppFonts.geist(fontSize: 12, fontWeight: FontWeight.w600),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+    );
+  }
+}
+
+class _GhostIconButton extends StatelessWidget {
+  const _GhostIconButton({required this.icon, required this.onTap});
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      onPressed: onTap,
+      icon: Icon(icon),
+      iconSize: 16,
+      color: AppColors.ctText2,
+      style: IconButton.styleFrom(
+        padding: const EdgeInsets.all(6),
+        minimumSize: Size.zero,
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
+    );
+  }
+}

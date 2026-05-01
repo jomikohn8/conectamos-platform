@@ -44,6 +44,10 @@ dependencies:
   # Sticky headers
   sticky_headers: ^0.3.0
 
+  # Maps (execution detail — location field renderer)
+  flutter_map: ^7.0.2
+  latlong2: ^0.9.1
+
   # Path URL strategy (Flutter Web)
   flutter_web_plugins:
     sdk: flutter
