@@ -1245,7 +1245,6 @@ class _IntegrationLogo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final brandColor = _brandBg[logoKey];
     final assetPath = _assetPaths[logoKey];
     final apiIcon = _apiIcons[logoKey];
     final radius = BorderRadius.circular(size * 0.22);
@@ -1254,11 +1253,8 @@ class _IntegrationLogo extends StatelessWidget {
       return Container(
         width: size, height: size,
         decoration: BoxDecoration(
-          color: brandColor?.withValues(alpha: 0.1) ?? AppColors.ctSurface2,
+          color: Colors.transparent,
           borderRadius: radius,
-          border: Border.all(
-            color: brandColor?.withValues(alpha: 0.2) ?? AppColors.ctBorder,
-          ),
         ),
         alignment: Alignment.center,
         child: _buildAsset(assetPath),
