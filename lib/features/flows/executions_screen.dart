@@ -166,7 +166,7 @@ class _ExecutionsScreenState extends ConsumerState<ExecutionsScreen> {
               separatorBuilder: (context2, i) => const SizedBox(height: 8),
               itemBuilder: (context2, i) => _ExecutionCard(
                 execution: _executions[i],
-                onTap: () => context.go('/flows/runs/${_executions[i]['id']}'),
+                onTap: () => context.go('/executions/${_executions[i]['id']}'),
               ),
             ),
           ),

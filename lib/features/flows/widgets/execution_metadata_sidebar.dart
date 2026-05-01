@@ -57,11 +57,30 @@ class ExecutionMetadataSidebar extends StatelessWidget {
       }
     }
 
-    // Channel (now a nested Map)
+    // Channel (nested Map or fallback to actor_type)
     final channelRaw = exec['channel'];
-    final channelMap = channelRaw is Map ? channelRaw : null;
-    final channelType = channelMap?['channel_type'] as String? ?? '';
-    final channelDisplayName = channelMap?['display_name'] as String? ?? '—';
+    final Map<String, dynamic>? channelMap = channelRaw is Map
+        ? Map<String, dynamic>.from(channelRaw)
+        : null;
+    final channelType = channelMap?['channel_type'] as String?;
+    final channelDisplayName = channelMap?['display_name'] as String?;
+    // Fallback: infer from actor_type when channel is null
+    final actorType = exec['actor_type'] as String?;
+    final inferredChannelType = channelType ??
+        switch (actorType) {
+          'operator'    => 'whatsapp',
+          'tenant_user' => 'dashboard',
+          'system'      => 'api',
+          _             => null,
+        };
+    final resolvedDisplayName = channelDisplayName ??
+        switch (inferredChannelType) {
+          'whatsapp'  => 'WhatsApp',
+          'telegram'  => 'Telegram',
+          'api'       => 'API',
+          'dashboard' => 'Dashboard',
+          _           => null,
+        };
 
     final operatorRaw = exec['operator'];
     final Map<String, dynamic>? operator_ = operatorRaw is Map
@@ -117,10 +136,10 @@ class ExecutionMetadataSidebar extends StatelessWidget {
                 ),
                 _KV(
                   label: 'Canal',
-                  value: channelMap != null
+                  value: inferredChannelType != null
                       ? _ChannelLabel(
-                          channelType: channelType,
-                          displayName: channelDisplayName)
+                          channelType: inferredChannelType,
+                          displayName: resolvedDisplayName ?? '—')
                       : Text('—',
                           style: AppFonts.geist(
                               fontSize: 12, color: AppColors.ctNavy)),

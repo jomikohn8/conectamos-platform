@@ -14,19 +14,15 @@ class LineageBreadcrumb extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final parentRaw = exec['parent'];
-    final parent = parentRaw is Map
-        ? Map<String, dynamic>.from(parentRaw)
-        : null;
-    final rawChildren = exec['children'] as List? ?? [];
-    final children = rawChildren
-        .whereType<Map>()
-        .map((e) => Map<String, dynamic>.from(e))
-        .toList();
+    final parentExecId = exec['parent_execution_id'] as String?;
     final flowName = flow['name'] as String? ?? '—';
     final execId = exec['id'] as String? ?? '—';
 
-    if (parent == null && children.isEmpty) return const SizedBox.shrink();
+    if (parentExecId == null) return const SizedBox.shrink();
+
+    final parentLabel = parentExecId.length >= 8
+        ? parentExecId.substring(0, 8).toUpperCase()
+        : parentExecId.toUpperCase();
 
     return Container(
       width: double.infinity,
@@ -50,42 +46,18 @@ class LineageBreadcrumb extends StatelessWidget {
                 letterSpacing: 0.1,
                 color: const Color(0xFF475569),
               )),
-          if (parent != null) ...[
-            _LineageChip(
-              kind: 'parent',
-              name: parent['name'] as String? ?? '—',
-              execId: parent['execId'] as String? ?? parent['exec_id'] as String? ?? '',
-              onTap: () {
-                final id = parent['execId'] as String? ??
-                    parent['exec_id'] as String?;
-                if (id != null) context.go('/flows/runs/$id');
-              },
-            ),
-            const _DottedConnector(),
-          ],
+          _LineageChip(
+            kind: 'parent',
+            name: parentLabel,
+            execId: parentExecId,
+            onTap: () => context.go('/executions/$parentExecId'),
+          ),
+          const _DottedConnector(),
           _LineageChip(
             kind: 'current',
             name: flowName,
             execId: execId,
           ),
-          if (children.isNotEmpty) ...[
-            const _DottedConnector(),
-            ...children.take(4).map((c) {
-              final cId = c['execId'] as String? ?? c['exec_id'] as String? ?? '';
-              final cStatus = c['status'] as String? ?? 'completed';
-              return _LineageChip(
-                kind: 'child',
-                name: c['name'] as String? ?? '—',
-                execId: cId,
-                status: cStatus,
-                onTap: () {
-                  if (cId.isNotEmpty) context.go('/flows/runs/$cId');
-                },
-              );
-            }),
-            if (children.length > 4)
-              _MoreChildrenChip(count: children.length - 4),
-          ],
         ],
       ),
     );
@@ -99,14 +71,12 @@ class _LineageChip extends StatelessWidget {
     required this.kind,
     required this.name,
     required this.execId,
-    this.status,
     this.onTap,
   });
 
   final String kind; // 'parent' | 'current' | 'child'
   final String name;
   final String execId;
-  final String? status;
   final VoidCallback? onTap;
 
   @override
@@ -198,18 +168,6 @@ class _LineageChip extends StatelessWidget {
                   letterSpacing: -0.005,
                 )),
           ],
-          if (status != null && status != 'completed') ...[
-            const SizedBox(width: 4),
-            Container(
-              width: 6, height: 6,
-              decoration: BoxDecoration(
-                color: status == 'in-progress'
-                    ? AppColors.ctInfo
-                    : AppColors.ctDanger,
-                shape: BoxShape.circle,
-              ),
-            ),
-          ],
         ],
       ),
     );
@@ -224,25 +182,6 @@ class _LineageChip extends StatelessWidget {
   }
 }
 
-class _MoreChildrenChip extends StatelessWidget {
-  const _MoreChildrenChip({required this.count});
-  final int count;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: AppColors.ctSurface2,
-        border: Border.all(color: AppColors.ctBorder),
-        borderRadius: BorderRadius.circular(99),
-      ),
-      child: Text('+ $count más',
-          style: AppFonts.geist(
-              fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.ctText2)),
-    );
-  }
-}
 
 class _DottedConnector extends StatelessWidget {
   const _DottedConnector();

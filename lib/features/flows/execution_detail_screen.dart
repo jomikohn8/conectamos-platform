@@ -315,44 +315,48 @@ class _FieldsBlockState extends State<_FieldsBlock> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // ── Title + subtitle ────────────────────────────────────────────
-        Column(
+        // ── Title + type filter icons ───────────────────────────────────
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Campos capturados',
-                style: AppFonts.onest(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.ctNavy,
-                  letterSpacing: -0.02,
-                )),
-            const SizedBox(height: 2),
-            Text('$filled de $total campos con valor',
-                style: AppFonts.geist(
-                    fontSize: 12, color: const Color(0xFF6B7280))),
-          ],
-        ),
-        const SizedBox(height: 10),
-        // ── Type filter icons ───────────────────────────────────────────
-        Row(
-          children: [
-            for (final (type, icon, label) in _typeOrder)
-              Padding(
-                padding: const EdgeInsets.only(right: 6),
-                child: _TypeFilterIcon(
-                  icon: icon,
-                  label: label,
-                  exists: presentTypes.contains(type),
-                  active: !_hiddenTypes.contains(type),
-                  onToggle: () => setState(() {
-                    if (_hiddenTypes.contains(type)) {
-                      _hiddenTypes.remove(type);
-                    } else {
-                      _hiddenTypes.add(type);
-                    }
-                  }),
-                ),
-              ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Campos capturados',
+                    style: AppFonts.onest(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.ctNavy,
+                      letterSpacing: -0.02,
+                    )),
+                const SizedBox(height: 2),
+                Text('$filled de $total campos con valor',
+                    style: AppFonts.geist(
+                        fontSize: 12, color: const Color(0xFF6B7280))),
+              ],
+            ),
+            Row(
+              children: [
+                for (final (type, icon, label) in _typeOrder)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 4),
+                    child: _TypeFilterIcon(
+                      icon: icon,
+                      label: label,
+                      exists: presentTypes.contains(type),
+                      active: !_hiddenTypes.contains(type),
+                      onToggle: () => setState(() {
+                        if (_hiddenTypes.contains(type)) {
+                          _hiddenTypes.remove(type);
+                        } else {
+                          _hiddenTypes.add(type);
+                        }
+                      }),
+                    ),
+                  ),
+              ],
+            ),
           ],
         ),
         const SizedBox(height: 14),

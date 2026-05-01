@@ -170,7 +170,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             ),
           ),
           GoRoute(
-            path: '/flows/runs/:executionId',
+            path: '/executions/:executionId',
             pageBuilder: (context, state) {
               final executionId = state.pathParameters['executionId'] ?? '';
               return NoTransitionPage(
