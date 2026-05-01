@@ -31,34 +31,45 @@ class ExecutionMetadataSidebar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final status = exec['status'] as String? ?? 'completed';
     final execId = exec['id'] as String? ?? '—';
-    final startedAt = exec['started_at'] as String? ?? exec['startedAt'] as String?;
-    final completedAt = exec['completed_at'] as String? ?? exec['completedAt'] as String?;
-    final duration = exec['duration'] as String? ?? '—';
-    final channel = exec['channel'] as String? ?? '—';
-    final progress = (exec['progress'] as Map?)?.cast<String, dynamic>() ?? {};
-    final filled = (progress['filled'] as num?)?.toInt() ?? 0;
-    final total = (progress['total'] as num?)?.toInt() ?? 0;
+    final startedAt = exec['created_at'] as String?;
+    final completedAt = exec['completed_at'] as String?;
+    // Compute progress from field_values + snapshot fields
+    final rawFvList = exec['field_values'] as List? ?? [];
+    int filled = 0;
+    for (final fv in rawFvList.whereType<Map>()) {
+      if (fv['value_text'] != null || fv['value_numeric'] != null ||
+          fv['value_media_url'] != null || fv['value_jsonb'] != null) { filled++; }
+    }
+    final total = (flow['fields'] as List?)?.length ?? 0;
 
-    final operator_ = (exec['operator'] as Map?)?.cast<String, dynamic>() ?? {};
-    final opName = operator_['name'] as String? ?? 'Sin operador';
-    final opRole = operator_['role'] as String? ?? '';
-    final opAvatar = operator_['avatar'] as String?;
+    // Channel (now a nested Map)
+    final channelMap = (exec['channel'] as Map?)?.cast<String, dynamic>();
+    final channelType = channelMap?['channel_type'] as String? ?? '';
+    final channelDisplayName = channelMap?['display_name'] as String? ?? '—';
+
+    final operator_ = (exec['operator'] as Map?)?.cast<String, dynamic>();
+    final opName = operator_?['name'] as String? ?? 'Sin operador';
+    final opAvatar = operator_?['profile_picture_url'] as String?;
 
     final flowName = flow['name'] as String? ?? '—';
-    final flowSlug = flow['slug'] as String? ?? exec['flow_slug'] as String? ?? exec['flowSlug'] as String? ?? '';
+    final flowSlug = flow['slug'] as String? ?? '';
     final flowDesc = flow['description'] as String? ?? '';
-    final flowType = flow['type'] as String? ?? 'conversacional';
-    final worker = (flow['worker'] as Map?)?.cast<String, dynamic>() ?? {};
-    final workerName = worker['name'] as String? ?? '—';
-    final workerRole = worker['role'] as String? ?? '';
-    final behavior = (flow['behavior'] as Map?)?.cast<String, dynamic>() ?? {};
-    final onComplete = (behavior['onComplete'] as List?)?.cast<String>() ?? [];
-    final emits = (behavior['emits'] as List?)?.cast<String>() ?? [];
+    final triggerSources = flow['trigger_sources'] as List?;
+    final flowType = triggerSources?.firstOrNull?.toString() ?? 'conversacional';
 
-    final inheritedValues = (exec['inherited_values'] as Map?)?.cast<String, dynamic>() ??
-        (exec['inheritedValues'] as Map?)?.cast<String, dynamic>() ?? {};
+    // Worker now at exec['worker'] (not flow['worker'])
+    final worker = (exec['worker'] as Map?)?.cast<String, dynamic>();
+    final workerName = worker?['name'] as String? ?? '—';
+    final workerRole = worker?['role'] as String? ?? '';
+
+    // on_complete from snapshot
+    final rawOnComplete = flow['on_complete'];
+    final onComplete = rawOnComplete is List
+        ? rawOnComplete.whereType<String>().toList()
+        : <String>[];
+
+    final inheritedValues = <String, dynamic>{};
 
     return ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 320),
@@ -82,23 +93,19 @@ class ExecutionMetadataSidebar extends StatelessWidget {
                 _KV(label: 'Iniciada', value: Text(_fmtDateLong(startedAt),
                     style: AppFonts.geist(fontSize: 12, color: AppColors.ctNavy))),
                 _KV(
-                  label: status == 'in-progress' ? 'Tiempo activo' : 'Finalizada',
-                  value: Text(
-                      status == 'in-progress' ? duration : _fmtDateLong(completedAt),
+                  label: 'Finalizada',
+                  value: Text(_fmtDateLong(completedAt),
                       style: AppFonts.geist(fontSize: 12, color: AppColors.ctNavy)),
                 ),
                 _KV(
-                  label: 'Duración total',
-                  value: Text(duration,
-                      style: const TextStyle(
-                          fontFamily: 'Geist',
-                          fontSize: 12,
-                          color: AppColors.ctNavy,
-                          fontFeatures: [FontFeature.tabularFigures()])),
-                ),
-                _KV(
                   label: 'Canal',
-                  value: _ChannelLabel(channel: channel),
+                  value: channelMap != null
+                      ? _ChannelLabel(
+                          channelType: channelType,
+                          displayName: channelDisplayName)
+                      : Text('—',
+                          style: AppFonts.geist(
+                              fontSize: 12, color: AppColors.ctNavy)),
                 ),
                 _KV(
                   label: 'Progreso',
@@ -138,10 +145,6 @@ class ExecutionMetadataSidebar extends StatelessWidget {
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
                               color: AppColors.ctNavy)),
-                      if (opRole.isNotEmpty)
-                        Text(opRole,
-                            style: AppFonts.geist(
-                                fontSize: 12, color: const Color(0xFF475569))),
                     ],
                   ),
                 ),
@@ -200,48 +203,51 @@ class ExecutionMetadataSidebar extends StatelessWidget {
                       style: AppFonts.geist(
                           fontSize: 12, color: const Color(0xFF475569), height: 1.55)),
                 ],
-                const SizedBox(height: 10),
-                // Worker sub-card
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: AppColors.ctSurface2,
-                    border: Border.all(color: AppColors.ctBorder),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 24, height: 24,
-                        decoration: BoxDecoration(
-                          color: AppColors.ctNavy,
-                          borderRadius: BorderRadius.circular(6),
+                if (worker != null) ...[
+                  const SizedBox(height: 10),
+                  // Worker sub-card
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: AppColors.ctSurface2,
+                      border: Border.all(color: AppColors.ctBorder),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 24, height: 24,
+                          decoration: BoxDecoration(
+                            color: AppColors.ctNavy,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Icon(Icons.auto_awesome_rounded,
+                              size: 12, color: AppColors.ctTeal),
                         ),
-                        child: const Icon(Icons.auto_awesome_rounded,
-                            size: 12, color: AppColors.ctTeal),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(workerName,
-                                style: AppFonts.geist(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppColors.ctNavy)),
-                            if (workerRole.isNotEmpty)
-                              Text(workerRole,
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(workerName,
                                   style: AppFonts.geist(
-                                      fontSize: 10, color: const Color(0xFF475569))),
-                          ],
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.ctNavy)),
+                              if (workerRole.isNotEmpty)
+                                Text(workerRole,
+                                    style: AppFonts.geist(
+                                        fontSize: 10,
+                                        color: const Color(0xFF475569))),
+                            ],
+                          ),
                         ),
-                      ),
-                      _Badge(label: 'IA'),
-                    ],
+                        _Badge(label: 'IA'),
+                      ],
+                    ),
                   ),
-                ),
+                ],
               ],
             ),
           ),
@@ -315,38 +321,6 @@ class ExecutionMetadataSidebar extends StatelessWidget {
                           ),
                         )).toList(),
                   ),
-                if (emits.isNotEmpty) ...[
-                  const SizedBox(height: 10),
-                  Text('EVENTOS EMITIDOS',
-                      style: AppFonts.geist(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.06,
-                        color: const Color(0xFF94A3B8),
-                      )),
-                  const SizedBox(height: 6),
-                  Wrap(
-                    spacing: 5,
-                    runSpacing: 5,
-                    children: emits
-                        .map((e) => Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 7, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF1F5F9),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(e,
-                                  style: const TextStyle(
-                                    fontFamily: 'Geist',
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w500,
-                                    color: AppColors.ctNavy,
-                                  )),
-                            ))
-                        .toList(),
-                  ),
-                ],
               ],
             ),
           ),
@@ -432,30 +406,38 @@ class _KV extends StatelessWidget {
 }
 
 class _ChannelLabel extends StatelessWidget {
-  const _ChannelLabel({required this.channel});
-  final String channel;
+  const _ChannelLabel({required this.channelType, required this.displayName});
+  final String channelType;
+  final String displayName;
 
   @override
   Widget build(BuildContext context) {
     final IconData icon;
     final Color color;
-    if (channel.contains('WhatsApp')) {
-      icon = Icons.chat_rounded;
-      color = const Color(0xFF25D366);
-    } else if (channel.contains('API')) {
-      icon = Icons.code_rounded;
-      color = AppColors.ctInfo;
-    } else {
-      icon = Icons.dashboard_outlined;
-      color = const Color(0xFF475569);
+    switch (channelType) {
+      case 'whatsapp':
+        icon = Icons.chat_rounded;
+        color = const Color(0xFF25D366);
+      case 'telegram':
+        icon = Icons.send_rounded;
+        color = const Color(0xFF229ED9);
+      case 'api':
+        icon = Icons.code_rounded;
+        color = AppColors.ctInfo;
+      default:
+        icon = Icons.dashboard_outlined;
+        color = const Color(0xFF475569);
     }
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         Icon(icon, size: 14, color: color),
         const SizedBox(width: 6),
-        Text(channel,
-            style: AppFonts.geist(fontSize: 12, color: AppColors.ctNavy)),
+        Flexible(
+          child: Text(displayName,
+              overflow: TextOverflow.ellipsis,
+              style: AppFonts.geist(fontSize: 12, color: AppColors.ctNavy)),
+        ),
       ],
     );
   }

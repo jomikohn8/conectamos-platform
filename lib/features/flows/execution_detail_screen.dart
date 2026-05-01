@@ -42,32 +42,12 @@ class _ExecutionDetailScreenState
       final tenantId = ref.read(activeTenantIdProvider);
       final raw = await FlowsApi.getExecution(
           tenantId: tenantId, executionId: widget.executionId);
-
-      // The API may return flow definition nested or at top level
-      final flowRaw = (raw['flow'] as Map?)?.cast<String, dynamic>();
-      Map<String, dynamic> flow;
-
-      if (flowRaw != null && flowRaw.isNotEmpty) {
-        flow = flowRaw;
-      } else {
-        // Fetch flow definition separately using flow_slug
-        final slug = raw['flow_slug'] as String? ??
-            raw['flowSlug'] as String? ??
-            '';
-        if (slug.isNotEmpty) {
-          try {
-            flow = await FlowsApi.getFlow(tenantId: tenantId, flowId: slug);
-          } catch (_) {
-            flow = _fallbackFlow(raw);
-          }
-        } else {
-          flow = _fallbackFlow(raw);
-        }
-      }
-
+      final snapshot =
+          (raw['flow_definition_snapshot'] as Map?)?.cast<String, dynamic>() ??
+              {};
       setState(() {
         _exec = raw;
-        _flow = flow;
+        _flow = snapshot;
         _loading = false;
       });
     } catch (e) {
@@ -76,19 +56,6 @@ class _ExecutionDetailScreenState
         _loading = false;
       });
     }
-  }
-
-  /// Build a minimal flow map from execution data when no definition is available.
-  Map<String, dynamic> _fallbackFlow(Map<String, dynamic> exec) {
-    return {
-      'slug': exec['flow_slug'] ?? exec['flowSlug'] ?? '',
-      'name': exec['flow_name'] ?? exec['flowName'] ?? 'Flujo',
-      'description': '',
-      'type': exec['flow_type'] ?? exec['flowType'] ?? 'conversacional',
-      'worker': exec['worker'] ?? {},
-      'fields': exec['fields'] ?? [],
-      'behavior': exec['behavior'] ?? {'onComplete': [], 'emits': []},
-    };
   }
 
   @override
@@ -218,6 +185,41 @@ class _FieldsBlock extends StatelessWidget {
   final Map<String, dynamic> exec;
   final Map<String, dynamic> flow;
 
+  static bool _fvHasValue(Map<String, dynamic> fv) =>
+      fv['value_text'] != null ||
+      fv['value_numeric'] != null ||
+      fv['value_media_url'] != null ||
+      fv['value_jsonb'] != null;
+
+  static dynamic _resolveValue(String type, Map<String, dynamic> fv) {
+    return switch (type) {
+      'number'   => fv['value_numeric'],
+      'media'    => _resolveMedia(fv),
+      'location' => _resolveLocation(fv),
+      _          => fv['value_text'],
+    };
+  }
+
+  static List<String> _resolveMedia(Map<String, dynamic> fv) {
+    final jsonb = fv['value_jsonb'];
+    if (jsonb is Map) {
+      final url = jsonb['url'] as String?;
+      if (url != null) return [url];
+    }
+    final mediaUrl = fv['value_media_url'] as String?;
+    if (mediaUrl != null) return [mediaUrl];
+    return [];
+  }
+
+  static Map<String, dynamic>? _resolveLocation(Map<String, dynamic> fv) {
+    final jsonb = fv['value_jsonb'];
+    if (jsonb is! Map) return null;
+    final result = Map<String, dynamic>.from(jsonb.cast<String, dynamic>());
+    final address = fv['value_text'] as String?;
+    if (address != null) result['address'] = address;
+    return result;
+  }
+
   @override
   Widget build(BuildContext context) {
     final rawFields = flow['fields'] as List? ?? [];
@@ -226,20 +228,40 @@ class _FieldsBlock extends StatelessWidget {
         .map((f) => f.cast<String, dynamic>())
         .toList();
 
-    final values = (exec['values'] as Map?)?.cast<String, dynamic>() ?? {};
-    final pending = (exec['pending'] as List?)?.cast<String>() ?? [];
-    final inheritedValues = (exec['inherited_values'] as Map?)?.cast<String, dynamic>() ??
-        (exec['inheritedValues'] as Map?)?.cast<String, dynamic>() ?? {};
+    // Build field_values lookup keyed by field_key
+    final rawFvList = exec['field_values'] as List? ?? [];
+    final fvMap = <String, Map<String, dynamic>>{};
+    for (final item in rawFvList.whereType<Map>()) {
+      final k = item['field_key'] as String? ?? '';
+      if (k.isNotEmpty) fvMap[k] = item.cast<String, dynamic>();
+    }
 
-    final progress = (exec['progress'] as Map?)?.cast<String, dynamic>() ?? {};
-    final filled = (progress['filled'] as num?)?.toInt() ?? 0;
-    final total = (progress['total'] as num?)?.toInt() ?? 0;
+    // Progress
+    final filled = fvMap.values.where(_fvHasValue).length;
+    final total = fields.length;
 
-    // Legacy fields: in values but not in flow.fields
-    final knownSlugs = fields.map((f) => f['slug'] as String? ?? '').toSet();
-    final legacySlugs = values.keys.where((k) => !knownSlugs.contains(k)).toList();
+    // Resolve values and pending list
+    final values = <String, dynamic>{};
+    final pending = <String>[];
+    for (final field in fields) {
+      final key = field['key'] as String? ?? '';
+      final fv = fvMap[key];
+      if (fv == null || !_fvHasValue(fv)) {
+        pending.add(key);
+      } else {
+        values[key] = _resolveValue(field['type'] as String? ?? 'text', fv);
+      }
+    }
 
-    if (fields.isEmpty && values.isEmpty) {
+    // Legacy: field_values whose key is not in defined fields
+    final knownKeys = fields.map((f) => f['key'] as String? ?? '').toSet();
+    final legacyKeys = fvMap.keys.where((k) => !knownKeys.contains(k)).toList();
+    final legacyValues = <String, dynamic>{
+      for (final k in legacyKeys)
+        k: fvMap[k]!['value_text'] ?? fvMap[k]!['value_numeric'] ?? '—',
+    };
+
+    if (fields.isEmpty && fvMap.isEmpty) {
       return Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -248,9 +270,8 @@ class _FieldsBlock extends StatelessWidget {
           const SizedBox(height: 8),
           Text('Este flujo no tiene campos definidos',
               style: AppFonts.geist(
-                  fontSize: 14,
-                  color: const Color(0xFF94A3B8))
-                .copyWith(fontStyle: FontStyle.italic)),
+                      fontSize: 14, color: const Color(0xFF94A3B8))
+                  .copyWith(fontStyle: FontStyle.italic)),
         ],
       );
     }
@@ -273,7 +294,7 @@ class _FieldsBlock extends StatelessWidget {
                       )),
                   const SizedBox(height: 2),
                   Text(
-                      '$filled de $total requeridos · definidos en el flujo',
+                      '$filled de $total campos con valor',
                       style: AppFonts.geist(
                           fontSize: 12, color: const Color(0xFF6B7280))),
                 ],
@@ -285,21 +306,19 @@ class _FieldsBlock extends StatelessWidget {
         LayoutBuilder(
           builder: (ctx, constraints) {
             final totalWidth = constraints.maxWidth;
-            final gap = 14.0;
-
+            const gap = 14.0;
             return _WrapGrid(
               fields: fields,
               values: values,
               pending: pending,
-              inheritedValues: inheritedValues,
               totalWidth: totalWidth,
               gap: gap,
             );
           },
         ),
-        if (legacySlugs.isNotEmpty) ...[
+        if (legacyKeys.isNotEmpty) ...[
           const SizedBox(height: 22),
-          _LegacyFieldsCard(slugs: legacySlugs, values: values),
+          _LegacyFieldsCard(slugs: legacyKeys, values: legacyValues),
         ],
       ],
     );
@@ -311,7 +330,6 @@ class _WrapGrid extends StatelessWidget {
     required this.fields,
     required this.values,
     required this.pending,
-    required this.inheritedValues,
     required this.totalWidth,
     required this.gap,
   });
@@ -319,25 +337,22 @@ class _WrapGrid extends StatelessWidget {
   final List<Map<String, dynamic>> fields;
   final Map<String, dynamic> values;
   final List<String> pending;
-  final Map<String, dynamic> inheritedValues;
   final double totalWidth;
   final double gap;
 
   @override
   Widget build(BuildContext context) {
-    // Simulate a 2-column grid using Wrap
     final halfWidth = (totalWidth - gap) / 2;
 
     final List<Widget> items = fields.map((field) {
-      final slug = field['slug'] as String? ?? '';
-      final value = values[slug] ?? inheritedValues[slug];
-      final isPending = pending.contains(slug);
-      final isInherited = !values.containsKey(slug) && inheritedValues.containsKey(slug);
+      final key = field['key'] as String? ?? '';
+      final value = values[key];
+      final isPending = pending.contains(key);
       final card = FieldCard(
         field: field,
         value: value,
         isPending: isPending,
-        isInherited: isInherited,
+        isInherited: false,
       );
       final isWide = card.isWide;
       return SizedBox(

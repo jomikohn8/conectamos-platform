@@ -18,18 +18,26 @@ class ExecutionHeaderBlock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final status = exec['status'] as String? ?? 'completed';
-    final progress = (exec['progress'] as Map?)?.cast<String, dynamic>() ?? {};
-    final filled = (progress['filled'] as num?)?.toInt() ?? 0;
-    final total = (progress['total'] as num?)?.toInt() ?? 1;
-    final flowType = flow['type'] as String? ?? 'conversacional';
-    final flowName = flow['name'] as String? ?? exec['flow_name'] as String? ?? '—';
-    final execId = exec['id'] as String? ?? '—';
-    final operator_ = (exec['operator'] as Map?)?.cast<String, dynamic>() ?? {};
-    final opName = operator_['name'] as String? ?? 'Sin operador';
-    final opAvatar = operator_['avatar'] as String?;
+    // Compute progress from field_values + snapshot fields
+    final rawFvList = exec['field_values'] as List? ?? [];
+    int filled = 0;
+    for (final fv in rawFvList.whereType<Map>()) {
+      if (fv['value_text'] != null || fv['value_numeric'] != null ||
+          fv['value_media_url'] != null || fv['value_jsonb'] != null) { filled++; }
+    }
+    final total = ((flow['fields'] as List?)?.length ?? 0).clamp(1, 9999);
+    final triggerSources = flow['trigger_sources'] as List?;
+    final flowType = triggerSources?.firstOrNull?.toString() ?? 'conversacional';
+    final flowName = flow['name'] as String? ?? '—';
+    final execId = (exec['id'] as String? ?? '').isNotEmpty
+        ? (exec['id'] as String).substring(0, 8).toUpperCase()
+        : '—';
+    final operator_ = (exec['operator'] as Map?)?.cast<String, dynamic>();
+    final opName = operator_?['name'] as String? ?? 'Sin operador';
+    final opAvatar = operator_?['profile_picture_url'] as String?;
     final waitingFor = exec['waiting_for'] as String? ?? exec['waitingFor'] as String?;
     final failureReason = exec['failure_reason'] as String? ?? exec['failureReason'] as String?;
-    final flowSlug = flow['slug'] as String? ?? exec['flow_slug'] as String? ?? exec['flowSlug'] as String? ?? '';
+    final flowSlug = flow['slug'] as String? ?? '';
 
     final eyebrow = switch (flowType) {
       'api'       => 'Ejecución vía API',
@@ -136,11 +144,11 @@ class ExecutionHeaderBlock extends StatelessWidget {
               ),
             ],
           ),
-          if (status == 'failed' && failureReason != null) ...[
+          if ((status == 'failed' || status == 'escalated') && failureReason != null) ...[
             const SizedBox(height: 12),
             _FailedBanner(reason: failureReason),
           ],
-          if (status == 'in-progress') ...[
+          if (status == 'in_progress' || status == 'active') ...[
             const SizedBox(height: 12),
             _InProgressBanner(waitingFor: waitingFor),
           ],
@@ -166,10 +174,11 @@ class _ProgressRing extends StatelessWidget {
   final double size;
 
   Color get _color => switch (status) {
-    'completed'   => AppColors.ctOk,
-    'in-progress' => AppColors.ctInfo,
-    'failed'      => AppColors.ctDanger,
-    _             => AppColors.ctTeal,
+    'completed'                    => AppColors.ctOk,
+    'in_progress' || 'active'     => AppColors.ctInfo,
+    'failed' || 'escalated'       => AppColors.ctDanger,
+    'paused'                       => AppColors.ctWarn,
+    _                              => AppColors.ctTeal,
   };
 
   @override
@@ -380,10 +389,13 @@ class _StatusPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (bg, fg, bd, label) = switch (status) {
-      'completed'   => (AppColors.ctOkBg, AppColors.ctOkText, const Color(0xFFA7F3D0), 'Completado'),
-      'in-progress' => (AppColors.ctInfoBg, AppColors.ctInfoText, const Color(0xFFBFDBFE), 'En curso'),
-      'failed'      => (AppColors.ctRedBg, AppColors.ctRedText, const Color(0xFFFECACA), 'Fallido'),
-      _             => (AppColors.ctSurface2, AppColors.ctText2, AppColors.ctBorder, status),
+      'completed'                => (AppColors.ctOkBg, AppColors.ctOkText, const Color(0xFFA7F3D0), 'Completado'),
+      'in_progress' || 'active' => (AppColors.ctInfoBg, AppColors.ctInfoText, const Color(0xFFBFDBFE), 'En curso'),
+      'paused'                   => (AppColors.ctWarnBg, AppColors.ctWarnText, const Color(0xFFFDE68A), 'Pausado'),
+      'abandoned'                => (AppColors.ctSurface2, AppColors.ctText2, AppColors.ctBorder, 'Abandonado'),
+      'escalated'                => (AppColors.ctRedBg, AppColors.ctRedText, const Color(0xFFFECACA), 'Escalado'),
+      'failed'                   => (AppColors.ctRedBg, AppColors.ctRedText, const Color(0xFFFECACA), 'Fallido'),
+      _                          => (AppColors.ctSurface2, AppColors.ctText2, AppColors.ctBorder, status),
     };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),

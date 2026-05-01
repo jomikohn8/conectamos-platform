@@ -25,6 +25,7 @@ class FieldCard extends StatelessWidget {
   bool get _isWide {
     final type = field['type'] as String? ?? 'text';
     return type == 'photo' ||
+        type == 'media' ||
         type == 'location' ||
         (type == 'text' && field['multiline'] == true);
   }
@@ -77,7 +78,7 @@ class _FieldHeader extends StatelessWidget {
         'date'     => Icons.calendar_month_rounded,
         'yesno'    => Icons.toggle_on_rounded,
         'select'   => Icons.checklist_rounded,
-        'photo'    => Icons.camera_alt_rounded,
+        'photo' || 'media' => Icons.camera_alt_rounded,
         'location' => Icons.location_on_rounded,
         _          => Icons.notes_rounded,
       };
@@ -88,6 +89,7 @@ class _FieldHeader extends StatelessWidget {
         'yesno'    => 'Sí / No',
         'select'   => 'Selección',
         'photo'    => 'Foto',
+        'media'    => 'Foto/Media',
         'location' => 'Ubicación',
         _          => 'Texto',
       };
@@ -95,8 +97,8 @@ class _FieldHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final type = field['type'] as String? ?? 'text';
-    final label = field['label'] as String? ?? field['slug'] as String? ?? '—';
-    final slug = field['slug'] as String? ?? '';
+    final label = field['label'] as String? ?? field['key'] as String? ?? '—';
+    final slug = field['key'] as String? ?? '';
     final required = field['required'] == true;
 
     final (tileBg, tileFg, tileBd) = isPending
@@ -208,19 +210,19 @@ class _FieldValue extends StatelessWidget {
     final type = field['type'] as String? ?? 'text';
     final isPending = value == null;
 
-    if (isPending && type != 'photo' && type != 'location') {
+    if (isPending && type != 'photo' && type != 'media' && type != 'location') {
       return const _PendingSlot();
     }
 
     return switch (type) {
-      'text'     => _TextValue(value: value, multiline: field['multiline'] == true),
-      'number'   => _NumberValue(value: value, unit: field['unit'] as String?),
-      'date'     => _DateValue(value: value),
-      'yesno'    => _YesNoValue(value: value),
-      'select'   => _SelectValue(value: value, options: field['options'] as List? ?? []),
-      'photo'    => _PhotoGallery(photos: _toPhotoList(value)),
-      'location' => _LocationMap(value: _toLocation(value)),
-      _          => _TextValue(value: value?.toString(), multiline: false),
+      'text'           => _TextValue(value: value, multiline: field['multiline'] == true),
+      'number'         => _NumberValue(value: value, unit: field['unit'] as String?),
+      'date'           => _DateValue(value: value),
+      'yesno'          => _YesNoValue(value: value),
+      'select'         => _SelectValue(value: value, options: field['options'] as List? ?? []),
+      'photo' || 'media' => _PhotoGallery(photos: _toPhotoList(value)),
+      'location'       => _LocationMap(value: _toLocation(value)),
+      _                => _TextValue(value: value?.toString(), multiline: false),
     };
   }
 
@@ -779,7 +781,7 @@ class _LocationMap extends StatelessWidget {
     final lat = (value!['lat'] as num?)?.toDouble() ?? 0;
     final lng = (value!['lng'] as num?)?.toDouble() ?? 0;
     final address = value!['address'] as String? ?? '';
-    if ((lat == 0 && lng == 0) || address.isEmpty) return const _PendingSlot();
+    if (lat == 0 && lng == 0) return const _PendingSlot();
 
     final point = LatLng(lat, lng);
 
