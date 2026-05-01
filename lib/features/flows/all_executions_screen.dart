@@ -183,7 +183,7 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
         final exec = _executions[i] as Map<String, dynamic>;
         return _ExecutionRow(
           execution: exec,
-          onTap: () => context.go('/flows/runs/${exec['id']}'),
+          onTap: () => context.go('/flows/runs/${exec['execution_id'] ?? exec['id']}'),
         );
       },
     );
