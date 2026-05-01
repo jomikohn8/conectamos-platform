@@ -22,7 +22,7 @@ class TenantInfo {
   final String? logoUrl;
 
   factory TenantInfo.fromMap(Map<String, dynamic> m) => TenantInfo(
-        id: m['id'] as String? ?? '',
+        id: (m['id'] as String? ?? '').trim(),
         slug: m['slug'] as String? ?? '',
         displayName: m['display_name'] as String? ??
             m['name'] as String? ??
@@ -64,7 +64,7 @@ class TenantNotifier extends StateNotifier<TenantState> {
       TenantInfo? active;
 
       // 1. Restore from localStorage if present and valid
-      final savedId = html.window.localStorage[_kStorageKey] ?? '';
+      final savedId = (html.window.localStorage[_kStorageKey] ?? '').trim();
       if (savedId.isNotEmpty) {
         final matches = tenants.where((t) => t.id == savedId);
         if (matches.isNotEmpty) active = matches.first;

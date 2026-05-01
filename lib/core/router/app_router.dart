@@ -41,9 +41,15 @@ const _kRoutePermissions = {
 };
 
 final routerProvider = Provider<GoRouter>((ref) {
-  // Refresca el router cuando cargan los permisos
+  // Refresca el router cuando cargan los permisos o cambia el estado de auth
   final refresher = ValueNotifier<int>(0);
   ref.listen(userPermissionsProvider, (prev, next) => refresher.value++);
+  final authSub = Supabase.instance.client.auth.onAuthStateChange
+      .listen((_) => refresher.value++);
+  ref.onDispose(authSub.cancel);
+
+  // Preserva la ruta destino al redirigir al login en deep-link / reload
+  String? pendingRedirect;
 
   return GoRouter(
     initialLocation: '/overview',
@@ -68,8 +74,17 @@ final routerProvider = Provider<GoRouter>((ref) {
       // Redirect bare / to /overview
       if (loc == '/') return '/overview';
 
-      if (user == null && !isLoggingIn) return '/login';
-      if (user != null && isLoggingIn) return '/overview';
+      if (user == null && !isLoggingIn) {
+        // Guardar la ruta destino para restaurarla después del login
+        if (loc != '/overview') pendingRedirect = state.uri.toString();
+        return '/login';
+      }
+      if (user != null && isLoggingIn) {
+        // Si hay ruta pendiente (deep-link en reload), restaurarla
+        final dest = pendingRedirect;
+        pendingRedirect = null;
+        return dest ?? '/overview';
+      }
 
       // Guard de permisos (solo cuando ya cargaron)
       final perms = ref.read(userPermissionsProvider).valueOrNull;
