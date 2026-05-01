@@ -460,13 +460,10 @@ class _OperatorFieldsBodyState extends ConsumerState<OperatorFieldsBody> {
                   color: AppColors.ctText,
                 )),
             const SizedBox(height: 6),
-            const Text(
+            Text(
               'Agrega campos personalizados para enriquecer los perfiles de tus operadores',
               textAlign: TextAlign.center,
-              style: TextStyle(
-                  fontFamily: 'Geist',
-                  fontSize: 13,
-                  color: AppColors.ctText2),
+              style: AppTextStyles.body.copyWith(color: AppColors.ctText2),
             ),
             if (canManage) ...[
               const SizedBox(height: 20),
@@ -652,10 +649,7 @@ class _FieldCard extends StatelessWidget {
                   if (fieldKey.isNotEmpty) ...[
                     const SizedBox(width: 8),
                     Text(fieldKey,
-                        style: const TextStyle(
-                            fontFamily: 'Geist',
-                            fontSize: 11,
-                            color: AppColors.ctText3)),
+                        style: AppTextStyles.bodySmall.copyWith(color: AppColors.ctText3)),
                   ],
                 ]),
               ],
@@ -756,10 +750,7 @@ class _InactiveFieldCard extends StatelessWidget {
                   if (fieldKey.isNotEmpty) ...[
                     const SizedBox(width: 8),
                     Text(fieldKey,
-                        style: const TextStyle(
-                            fontFamily: 'Geist',
-                            fontSize: 11,
-                            color: AppColors.ctText3)),
+                        style: AppTextStyles.bodySmall.copyWith(color: AppColors.ctText3)),
                   ],
                 ]),
               ],

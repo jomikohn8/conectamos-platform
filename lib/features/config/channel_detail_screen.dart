@@ -8,13 +8,13 @@ import '../../core/api/channels_api.dart';
 import '../../core/api/operators_api.dart';
 import '../../core/api/templates_api.dart';
 import '../../core/providers/tenant_provider.dart';
-import '../../core/theme/colors.dart';
+import '../../core/theme/app_theme.dart';
 import 'template_create_dialog.dart';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const _kColorPalette = [
-  '#2DD4BF', '#818CF8', '#FB923C', '#F472B6', '#34D399', '#60A5FA',
+  '#59E0CC', '#818CF8', '#FB923C', '#F472B6', '#34D399', '#60A5FA',
 ];
 
 const _kChannelTypeConfig = {
@@ -183,8 +183,7 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen>
         appBar: _buildAppBar(),
         body: Center(
           child: Text('Error: $_error',
-              style: const TextStyle(
-                  fontFamily: 'Geist', fontSize: 13, color: AppColors.ctDanger)),
+              style: AppTextStyles.body.copyWith(color: AppColors.ctDanger)),
         ),
       );
     }
@@ -474,14 +473,11 @@ class _InfoTabState extends State<_InfoTab> {
           _SectionCard(
             title: 'Operadores asignados',
             child: _assignedOps.isEmpty
-                ? const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 12),
+                ? Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
                     child: Text(
                       'Sin operadores asignados.',
-                      style: TextStyle(
-                          fontFamily: 'Geist',
-                          fontSize: 13,
-                          color: AppColors.ctText2),
+                      style: AppTextStyles.body.copyWith(color: AppColors.ctText2),
                     ),
                   )
                 : Column(
@@ -961,11 +957,7 @@ class _TemplatesTabState extends State<_TemplatesTab> {
               const SizedBox(width: 12),
               Text(
                 '${_templates.length} plantillas',
-                style: const TextStyle(
-                  fontFamily: 'Geist',
-                  fontSize: 13,
-                  color: AppColors.ctText2,
-                ),
+                style: AppTextStyles.body.copyWith(color: AppColors.ctText2),
               ),
               const Spacer(),
               _syncing
@@ -986,14 +978,10 @@ class _TemplatesTabState extends State<_TemplatesTab> {
           child: _loading
               ? const Center(child: CircularProgressIndicator())
               : _templates.isEmpty
-                  ? const Center(
+                  ? Center(
                       child: Text(
                         'Sin plantillas. Sincroniza para obtenerlas.',
-                        style: TextStyle(
-                          fontFamily: 'Geist',
-                          fontSize: 13,
-                          color: AppColors.ctText2,
-                        ),
+                        style: AppTextStyles.body.copyWith(color: AppColors.ctText2),
                       ),
                     )
                   : ListView.separated(
@@ -1069,11 +1057,7 @@ class _TemplatesTabState extends State<_TemplatesTab> {
                                       padding: const EdgeInsets.only(top: 4),
                                       child: Text(
                                         t['language'] as String,
-                                        style: const TextStyle(
-                                          fontFamily: 'Geist',
-                                          fontSize: 11,
-                                          color: AppColors.ctText3,
-                                        ),
+                                        style: AppTextStyles.bodySmall.copyWith(color: AppColors.ctText3),
                                       ),
                                     ),
                                 ],
@@ -1208,13 +1192,9 @@ class _WelcomeTabState extends State<_WelcomeTab> {
             _FieldLabel('Seleccionar plantilla aprobada'),
             const SizedBox(height: 8),
             if (_approved.isEmpty)
-              const Text(
+              Text(
                 'No hay plantillas aprobadas. Sincroniza en la pestaña Plantillas.',
-                style: TextStyle(
-                  fontFamily: 'Geist',
-                  fontSize: 13,
-                  color: AppColors.ctText2,
-                ),
+                style: AppTextStyles.body.copyWith(color: AppColors.ctText2),
               )
             else
               Container(
@@ -1242,11 +1222,7 @@ class _WelcomeTabState extends State<_WelcomeTab> {
                           value: t['id'] as String?,
                           child: Text(
                             t['name'] as String? ?? t['id'].toString(),
-                            style: const TextStyle(
-                              fontFamily: 'Geist',
-                              fontSize: 13,
-                              color: AppColors.ctText,
-                            ),
+                            style: AppTextStyles.body,
                           ),
                         ),
                     ],
@@ -1270,11 +1246,7 @@ class _WelcomeTabState extends State<_WelcomeTab> {
                 ),
                 child: Text(
                   _preview!['body_text'] as String? ?? '(sin texto de cuerpo)',
-                  style: const TextStyle(
-                    fontFamily: 'Geist',
-                    fontSize: 13,
-                    color: AppColors.ctText,
-                  ),
+                  style: AppTextStyles.body,
                 ),
               ),
             ],
@@ -1484,10 +1456,7 @@ class _WorkerDropdown extends StatelessWidget {
                 value: w['id'].toString(),
                 child: Text(
                   w['display_name'] as String? ?? w['id'].toString(),
-                  style: const TextStyle(
-                      fontFamily: 'Geist',
-                      fontSize: 13,
-                      color: AppColors.ctText),
+                  style: AppTextStyles.body,
                 ),
               ),
           ],
@@ -1529,11 +1498,7 @@ class _OperatorRow extends StatelessWidget {
           Expanded(
             child: Text(
               name,
-              style: const TextStyle(
-                fontFamily: 'Geist',
-                fontSize: 13,
-                color: AppColors.ctText,
-              ),
+              style: AppTextStyles.body,
             ),
           ),
         ],

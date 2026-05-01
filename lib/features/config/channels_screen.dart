@@ -301,7 +301,7 @@ class _ChannelRowState extends State<_ChannelRow> {
   Widget build(BuildContext context) {
     final ch          = widget.channel;
     final name        = ch['display_name'] as String? ?? ch['name'] as String? ?? '—';
-    final colorHex    = ch['color'] as String? ?? '#2DD4BF';
+    final colorHex    = ch['color'] as String? ?? '#59E0CC';
     final channelType = ch['channel_type'] as String? ?? 'whatsapp';
     final isActive    = ch['is_active'] as bool? ?? false;
     final workerName  = ch['worker_name']  as String? ?? '';
@@ -470,7 +470,7 @@ class _CreateChannelStepperState extends State<_CreateChannelStepper> {
   late final TextEditingController _tokenCtrl;
   late final TextEditingController _pinCtrl;
   late final TextEditingController _pinConfirmCtrl;
-  String _color             = '#2DD4BF';
+  String _color             = '#59E0CC';
   bool   _tokenVisible      = false;
   bool   _pinVisible        = false;
   bool   _pinConfirmVisible = false;

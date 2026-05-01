@@ -38,7 +38,7 @@ class FieldCard extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        border: Border.all(color: const Color(0xFFE5E7EB)),
+        border: Border.all(color: AppColors.ctBorder),
         borderRadius: BorderRadius.circular(16),
         boxShadow: const [
           BoxShadow(
@@ -105,7 +105,7 @@ class _FieldHeader extends StatelessWidget {
         ? (AppColors.ctWarnBg, AppColors.ctWarnText, const Color(0xFFFDE68A))
         : isInherited
             ? (const Color(0xFFEEF2FF), const Color(0xFF4338CA), const Color(0xFFC7D2FE))
-            : (AppColors.ctTealLight, const Color(0xFF0F766E), const Color(0xFF99F6E4));
+            : (AppColors.ctTealLight, AppColors.ctTealText, const Color(0xFF99F6E4));
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -168,7 +168,7 @@ class _SmallBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (bg, fg, bd) = switch (tone) {
-      'teal'  => (AppColors.ctTealLight, const Color(0xFF0F766E), const Color(0xFF99F6E4)),
+      'teal'  => (AppColors.ctTealLight, AppColors.ctTealText, const Color(0xFF99F6E4)),
       'info'  => (AppColors.ctInfoBg, AppColors.ctInfoText, const Color(0xFFBFDBFE)),
       'warn'  => (AppColors.ctWarnBg, AppColors.ctWarnText, const Color(0xFFFDE68A)),
       _       => (AppColors.ctSurface2, AppColors.ctText2, AppColors.ctBorder),
@@ -226,10 +226,29 @@ class _FieldValue extends StatelessWidget {
     };
   }
 
+  static String? _extractPhotoUrl(Map<String, dynamic> fv) {
+    final fromJsonb = (fv['value_jsonb'] as Map?)?['url'] as String?;
+    final fromUrl = fv['value_media_url'] as String?;
+    return fromJsonb ?? fromUrl;
+  }
+
   static List<String> _toPhotoList(dynamic v) {
     if (v == null) return [];
-    if (v is List) return v.map((e) => e.toString()).toList();
-    return [v.toString()];
+    if (v is List) {
+      return v.map((e) => e.toString()).where((s) => s.isNotEmpty).toList();
+    }
+    if (v is Map) {
+      // Raw fv row: has value_jsonb / value_media_url keys
+      if (v.containsKey('value_jsonb') || v.containsKey('value_media_url')) {
+        final url = _extractPhotoUrl(Map<String, dynamic>.from(v));
+        return url != null ? [url] : [];
+      }
+      // value_jsonb Map: {"url": "https://..."}
+      final url = v['url'] as String?;
+      return url != null ? [url] : [];
+    }
+    final s = v.toString();
+    return s.isNotEmpty ? [s] : [];
   }
 
   static Map<String, dynamic>? _toLocation(dynamic v) {
@@ -253,7 +272,7 @@ class _TextValue extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: const Color(0xFFF1F3F5),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
+        border: Border.all(color: AppColors.ctBorder),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Text(
@@ -348,7 +367,7 @@ class _DateValue extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: const Color(0xFFF1F3F5),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
+        border: Border.all(color: AppColors.ctBorder),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -358,7 +377,7 @@ class _DateValue extends StatelessWidget {
             padding: const EdgeInsets.symmetric(vertical: 5),
             decoration: BoxDecoration(
               color: Colors.white,
-              border: Border.all(color: const Color(0xFFE5E7EB)),
+              border: Border.all(color: AppColors.ctBorder),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Column(
@@ -493,7 +512,7 @@ class _SelectValue extends StatelessWidget {
           decoration: BoxDecoration(
             color: isSel ? AppColors.ctTealLight : Colors.white,
             border: Border.all(
-                color: isSel ? AppColors.ctTeal : const Color(0xFFE5E7EB)),
+                color: isSel ? AppColors.ctTeal : AppColors.ctBorder),
             borderRadius: BorderRadius.circular(99),
           ),
           child: Row(
@@ -501,14 +520,14 @@ class _SelectValue extends StatelessWidget {
             children: [
               if (isSel) ...[
                 const Icon(Icons.check_rounded,
-                    size: 12, color: Color(0xFF0F766E)),
+                    size: 12, color: AppColors.ctTealText),
                 const SizedBox(width: 6),
               ],
               Text(label,
                   style: AppFonts.geist(
                     fontSize: 12,
                     fontWeight: isSel ? FontWeight.w600 : FontWeight.w500,
-                    color: isSel ? const Color(0xFF0F766E) : const Color(0xFF94A3B8),
+                    color: isSel ? AppColors.ctTealText : const Color(0xFF94A3B8),
                   )),
             ],
           ),
@@ -834,7 +853,7 @@ class _LocationMap extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
             color: const Color(0xFFF1F3F5),
-            border: Border.all(color: const Color(0xFFE5E7EB)),
+            border: Border.all(color: AppColors.ctBorder),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Row(

@@ -198,12 +198,7 @@ class _PrimaryButtonState extends State<_PrimaryButton> {
           ),
           child: Text(
             widget.label,
-            style: const TextStyle(
-              fontFamily: 'Geist',
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: AppColors.ctNavy,
-            ),
+            style: AppTextStyles.formLabel.copyWith(color: AppColors.ctNavy),
           ),
         ),
       ),
@@ -468,9 +463,9 @@ class _TabPill extends StatelessWidget {
 
 Widget _platformIcon(String? channelType) {
   final color = channelType == 'whatsapp'
-      ? const Color(0xFF25D366)
+      ? AppColors.ctWa
       : channelType == 'telegram'
-          ? const Color(0xFF229ED9)
+          ? AppColors.ctTg
           : Colors.grey;
   final label = channelType == 'whatsapp'
       ? 'W'
@@ -566,12 +561,7 @@ class _ChannelSelectorBar extends StatelessWidget {
                           (channelUnread[chId]! > 99)
                               ? '99+'
                               : '${channelUnread[chId]}',
-                          style: const TextStyle(
-                            fontFamily: 'Geist',
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.ctNavy,
-                          ),
+                          style: AppTextStyles.badge.copyWith(color: AppColors.ctNavy),
                         ),
                       ),
                     ],
@@ -673,23 +663,23 @@ String _outboundSenderName(Map<String, dynamic> msg) {
         ),
       );
     case 'human':
-      return (nameColor: const Color(0xFF66E2D0), badge: null);
+      return (nameColor: AppColors.ctTealHover, badge: null);
     case 'external':
       return (
-        nameColor: const Color(0xFF6B7280),
+        nameColor: AppColors.ctText2,
         badge: _OriginBadge(
           label: 'Externo',
-          bg: const Color(0xFFF3F4F6),
-          fg: const Color(0xFF6B7280),
+          bg: AppColors.ctSurface2,
+          fg: AppColors.ctText2,
         ),
       );
     default:
       return (
-        nameColor: const Color(0xFF6B7280),
+        nameColor: AppColors.ctText2,
         badge: _OriginBadge(
           label: 'Sistema',
-          bg: const Color(0xFFF3F4F6),
-          fg: const Color(0xFF6B7280),
+          bg: AppColors.ctSurface2,
+          fg: AppColors.ctText2,
         ),
       );
   }
@@ -732,10 +722,10 @@ String _initials(String name) {
 Color _hexColor(String? hex) {
   try {
     final h = (hex ?? '#9CA3AF').replaceAll('#', '');
-    if (h.length != 6) return const Color(0xFF9CA3AF);
+    if (h.length != 6) return AppColors.ctText3;
     return Color(int.parse('FF$h', radix: 16));
   } catch (_) {
-    return const Color(0xFF9CA3AF);
+    return AppColors.ctText3;
   }
 }
 
@@ -767,7 +757,7 @@ class _OperatorAvatar extends StatelessWidget {
     this.photoUrl,
     this.size = 40,
     // ignore: unused_element_parameter
-    this.bgColor = const Color(0xFFCCFBF1),
+    this.bgColor = AppColors.ctTealLight,
   });
   final String name;
   final String? photoUrl;
@@ -810,7 +800,7 @@ class _OperatorAvatar extends StatelessWidget {
           fontFamily: 'Geist',
           fontSize: size * 0.35,
           fontWeight: FontWeight.w600,
-          color: const Color(0xFF0F766E),
+          color: AppColors.ctTealText,
         ),
       ),
     );
@@ -1224,8 +1214,8 @@ class _ApiConvoItemState extends State<_ApiConvoItem> {
                       height: 10,
                       decoration: BoxDecoration(
                         color: widget.isWindowOpen
-                            ? const Color(0xFF10B981)
-                            : const Color(0xFF9CA3AF),
+                            ? AppColors.ctOk
+                            : AppColors.ctText3,
                         shape: BoxShape.circle,
                         border: Border.all(color: Colors.white, width: 1.5),
                       ),
@@ -1257,11 +1247,7 @@ class _ApiConvoItemState extends State<_ApiConvoItem> {
                         ),
                         Text(
                           widget.time,
-                          style: const TextStyle(
-                            fontFamily: 'Geist',
-                            fontSize: 10,
-                            color: AppColors.ctText3,
-                          ),
+                          style: AppTextStyles.caption,
                         ),
                       ],
                     ),
@@ -1281,21 +1267,13 @@ class _ApiConvoItemState extends State<_ApiConvoItem> {
                                     const SizedBox(width: 3),
                                     Text(
                                       _mediaLabel(widget.mediaType!),
-                                      style: const TextStyle(
-                                        fontFamily: 'Geist',
-                                        fontSize: 11,
-                                        color: AppColors.ctText2,
-                                      ),
+                                      style: AppTextStyles.bodySmall,
                                     ),
                                   ],
                                 )
                               : Text(
                                   widget.preview ?? 'Sin mensajes',
-                                  style: const TextStyle(
-                                    fontFamily: 'Geist',
-                                    fontSize: 11,
-                                    color: AppColors.ctText2,
-                                  ),
+                                  style: AppTextStyles.bodySmall,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
@@ -1307,7 +1285,7 @@ class _ApiConvoItemState extends State<_ApiConvoItem> {
                             constraints: const BoxConstraints(
                                 minWidth: 18, minHeight: 18),
                             decoration: const BoxDecoration(
-                              color: Color(0xFF2DD4BF),
+                              color: AppColors.ctTeal,
                               shape: BoxShape.circle,
                             ),
                             child: Text(
@@ -1318,7 +1296,7 @@ class _ApiConvoItemState extends State<_ApiConvoItem> {
                                 fontFamily: 'Geist',
                                 fontSize: 10,
                                 fontWeight: FontWeight.w700,
-                                color: Color(0xFF0F2937),
+                                color: AppColors.ctNavy,
                               ),
                               textAlign: TextAlign.center,
                             ),
@@ -1434,16 +1412,12 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
           padding:
               const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
           decoration: BoxDecoration(
-            color: const Color(0xFFF3F4F6),
+            color: AppColors.ctSurface2,
             borderRadius: BorderRadius.circular(12),
           ),
           child: Text(
             label,
-            style: const TextStyle(
-              fontSize: 11,
-              color: Color(0xFF6B7280),
-              fontFamily: 'Geist',
-            ),
+            style: AppTextStyles.bodySmall,
           ),
         ),
       );
@@ -1757,14 +1731,14 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
       final String errorMsg = _dioErrorMessage(e);
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(errorMsg),
-        backgroundColor: const Color(0xFFEF4444),
+        backgroundColor: AppColors.ctDanger,
       ));
     } catch (e) {
       if (!mounted) return;
       setState(() { _sending = false; _isDragOver = false; });
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text('Error al enviar archivo: $e'),
-        backgroundColor: const Color(0xFFEF4444),
+        backgroundColor: AppColors.ctDanger,
       ));
     }
   }
@@ -1819,14 +1793,14 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
           content: Text('✅ Solicitud de ubicación enviada'),
-          backgroundColor: Color(0xFF10B981),
+          backgroundColor: AppColors.ctOk,
         ));
       }
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
           content: Text('❌ Error al enviar solicitud'),
-          backgroundColor: Color(0xFFEF4444),
+          backgroundColor: AppColors.ctDanger,
         ));
       }
     }
@@ -1883,7 +1857,7 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text('No se pudo acceder al micrófono: $e'),
-          backgroundColor: const Color(0xFFEF4444),
+          backgroundColor: AppColors.ctDanger,
         ));
       }
     }
@@ -1909,7 +1883,7 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
           content: Text('No se capturó audio. Intenta de nuevo.'),
-          backgroundColor: Color(0xFFEF4444),
+          backgroundColor: AppColors.ctDanger,
         ));
       }
       return;
@@ -1923,7 +1897,7 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
             content: Text('No se capturó audio. Intenta de nuevo.'),
-            backgroundColor: Color(0xFFEF4444),
+            backgroundColor: AppColors.ctDanger,
           ));
         }
         return;
@@ -1963,7 +1937,7 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
             content: Text('No se capturó audio. Intenta de nuevo.'),
-            backgroundColor: Color(0xFFEF4444),
+            backgroundColor: AppColors.ctDanger,
           ));
         }
         return;
@@ -1975,7 +1949,7 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text('Error al procesar audio: $e'),
-          backgroundColor: const Color(0xFFEF4444),
+          backgroundColor: AppColors.ctDanger,
         ));
       }
     }
@@ -2107,8 +2081,8 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
   }
 
   Color _channelSendColor(String? channelType) {
-    if (channelType == 'whatsapp') return const Color(0xFF25D366);
-    if (channelType == 'telegram') return const Color(0xFF229ED9);
+    if (channelType == 'whatsapp') return AppColors.ctWa;
+    if (channelType == 'telegram') return AppColors.ctTg;
     return AppColors.ctTeal;
   }
 
@@ -2184,7 +2158,7 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
           });
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
             content: Text('✅ Ubicación enviada'),
-            backgroundColor: Color(0xFF10B981),
+            backgroundColor: AppColors.ctOk,
           ));
         }
       } on DioException catch (e) {
@@ -2193,7 +2167,7 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
           final isInvalid = e.response?.statusCode == 400;
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: Text(isInvalid ? '❌ URL de Google Maps no válida' : '❌ Error al enviar ubicación'),
-            backgroundColor: const Color(0xFFEF4444),
+            backgroundColor: AppColors.ctDanger,
           ));
         }
       } catch (e) {
@@ -2201,7 +2175,7 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
           setState(() => _sending = false);
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
             content: Text('❌ Error al enviar ubicación'),
-            backgroundColor: Color(0xFFEF4444),
+            backgroundColor: AppColors.ctDanger,
           ));
         }
       }
@@ -2252,7 +2226,7 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(msg),
-            backgroundColor: const Color(0xFFEF4444),
+            backgroundColor: AppColors.ctDanger,
           ),
         );
       }
@@ -2262,7 +2236,7 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error al enviar: $e'),
-            backgroundColor: const Color(0xFFEF4444),
+            backgroundColor: AppColors.ctDanger,
           ),
         );
       }
@@ -2360,23 +2334,19 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
   }
 
   Widget _emptyState() {
-    return const Center(
+    return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
+          const Icon(
             Icons.chat_bubble_outline_rounded,
             size: 48,
             color: AppColors.ctText3,
           ),
-          SizedBox(height: 12),
+          const SizedBox(height: 12),
           Text(
             'Selecciona una conversación',
-            style: TextStyle(
-              fontFamily: 'Geist',
-              fontSize: 14,
-              color: AppColors.ctText3,
-            ),
+            style: AppTextStyles.body.copyWith(color: AppColors.ctText3),
           ),
         ],
       ),
@@ -2492,13 +2462,9 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
                     const Icon(Icons.cloud_off_rounded,
                         size: 40, color: AppColors.ctText3),
                     const SizedBox(height: 12),
-                    const Text(
+                    Text(
                       'No se pudieron cargar los mensajes',
-                      style: TextStyle(
-                        fontFamily: 'Geist',
-                        fontSize: 13,
-                        color: AppColors.ctText3,
-                      ),
+                      style: AppTextStyles.body.copyWith(color: AppColors.ctText3),
                     ),
                     const SizedBox(height: 16),
                     OutlinedButton.icon(
@@ -2574,26 +2540,21 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
                                     children: [
                                       const Expanded(
                                         child: Divider(
-                                          color: Color(0xFF2DD4BF),
+                                          color: AppColors.ctTeal,
                                           thickness: 0.5,
                                         ),
                                       ),
-                                      const Padding(
-                                        padding: EdgeInsets.symmetric(
+                                      Padding(
+                                        padding: const EdgeInsets.symmetric(
                                             horizontal: 10),
                                         child: Text(
                                           'Mensajes nuevos',
-                                          style: TextStyle(
-                                            fontFamily: 'Geist',
-                                            fontSize: 11,
-                                            color: Color(0xFF2DD4BF),
-                                            fontWeight: FontWeight.w600,
-                                          ),
+                                          style: AppTextStyles.badge.copyWith(color: AppColors.ctTeal),
                                         ),
                                       ),
                                       const Expanded(
                                         child: Divider(
-                                          color: Color(0xFF2DD4BF),
+                                          color: AppColors.ctTeal,
                                           thickness: 0.5,
                                         ),
                                       ),
@@ -2620,11 +2581,11 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
         if (_isSupervisorMode && isWhatsapp && _windowOpen == false)
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            color: const Color(0xFFFEF3C7),
+            color: AppColors.ctWarnBg,
             child: Row(
               children: [
                 const Icon(Icons.timer_outlined,
-                    size: 18, color: Color(0xFF92400E)),
+                    size: 18, color: AppColors.ctWarnText),
                 const SizedBox(width: 10),
                 const Expanded(
                   child: Text(
@@ -2632,7 +2593,7 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
                     style: TextStyle(
                       fontFamily: 'Geist',
                       fontSize: 12,
-                      color: Color(0xFF92400E),
+                      color: AppColors.ctWarnText,
                     ),
                   ),
                 ),
@@ -2647,7 +2608,7 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
                     padding: const EdgeInsets.symmetric(
                         horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF92400E),
+                      color: AppColors.ctWarnText,
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: const Text(
@@ -2691,20 +2652,15 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
               color: AppColors.ctTeal.withValues(alpha: 0.12),
-              child: const Row(
+              child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.arrow_downward_rounded,
+                  const Icon(Icons.arrow_downward_rounded,
                       size: 13, color: AppColors.ctTealDark),
-                  SizedBox(width: 6),
+                  const SizedBox(width: 6),
                   Text(
                     'Nuevo mensaje',
-                    style: TextStyle(
-                      fontFamily: 'Geist',
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.ctTealDark,
-                    ),
+                    style: AppTextStyles.formLabel.copyWith(color: AppColors.ctTealDark),
                   ),
                 ],
               ),
@@ -2898,7 +2854,7 @@ class _ApiChatHeader extends StatelessWidget {
                             horizontal: 7, vertical: 2),
                         decoration: BoxDecoration(
                           color: windowOpen!
-                              ? const Color(0xFFD1FAE5)
+                              ? AppColors.ctOkBg
                               : AppColors.ctSurface2,
                           borderRadius: BorderRadius.circular(20),
                         ),
@@ -2909,7 +2865,7 @@ class _ApiChatHeader extends StatelessWidget {
                             fontSize: 10,
                             fontWeight: FontWeight.w500,
                             color: windowOpen!
-                                ? const Color(0xFF065F46)
+                                ? AppColors.ctOkText
                                 : AppColors.ctText3,
                           ),
                         ),
@@ -2923,11 +2879,7 @@ class _ApiChatHeader extends StatelessWidget {
                       // available in the conversation object (currently not
                       // returned by /conversations — would require extra request).
                       : 'Sin flujos asignados',
-                  style: const TextStyle(
-                    fontFamily: 'Geist',
-                    fontSize: 11,
-                    color: AppColors.ctText2,
-                  ),
+                  style: AppTextStyles.bodySmall,
                 ),
               ],
             ),
@@ -3036,12 +2988,7 @@ class _ActiveFlowPillState extends State<_ActiveFlowPill> {
           const SizedBox(width: 6),
           Text(
             flowName,
-            style: const TextStyle(
-              fontFamily: 'Geist',
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: AppColors.ctTeal,
-            ),
+            style: AppTextStyles.formLabel.copyWith(color: AppColors.ctTeal),
           ),
         ],
       ),
@@ -3156,8 +3103,8 @@ class _ApiMessageBubbleState extends State<_ApiMessageBubble> {
           left: BorderSide(
             width: 3,
             color: isOut
-                ? const Color(0xFF2DD4BF)
-                : const Color(0xFF9CA3AF),
+                ? AppColors.ctTeal
+                : AppColors.ctText3,
           ),
         ),
       ),
@@ -3167,12 +3114,7 @@ class _ApiMessageBubbleState extends State<_ApiMessageBubble> {
         children: [
           Text(
             name,
-            style: const TextStyle(
-              fontFamily: 'Geist',
-              fontSize: 10,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF2DD4BF),
-            ),
+            style: AppTextStyles.badge.copyWith(color: AppColors.ctTeal),
           ),
           const SizedBox(height: 2),
           Text(
@@ -3303,11 +3245,7 @@ class _ApiMessageBubbleState extends State<_ApiMessageBubble> {
                   children: [
                     Text(
                       widget.time,
-                      style: const TextStyle(
-                        fontFamily: 'Geist',
-                        color: Colors.white,
-                        fontSize: 10,
-                      ),
+                      style: AppTextStyles.caption.copyWith(color: Colors.white),
                     ),
                     if (widget.isOutbound) ...[
                       const SizedBox(width: 3),
@@ -3786,7 +3724,7 @@ class _ReplyBar extends StatelessWidget {
             width: 3,
             height: 36,
             decoration: BoxDecoration(
-              color: const Color(0xFF2DD4BF),
+              color: AppColors.ctTeal,
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -3799,27 +3737,18 @@ class _ReplyBar extends StatelessWidget {
                 Row(
                   children: [
                     const Icon(Icons.reply_rounded,
-                        size: 13, color: Color(0xFF2DD4BF)),
+                        size: 13, color: AppColors.ctTeal),
                     const SizedBox(width: 4),
                     Text(
                       'Respondiendo a $name',
-                      style: const TextStyle(
-                        fontFamily: 'Geist',
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF2DD4BF),
-                      ),
+                      style: AppTextStyles.badge.copyWith(color: AppColors.ctTeal),
                     ),
                   ],
                 ),
                 const SizedBox(height: 2),
                 Text(
                   preview,
-                  style: const TextStyle(
-                    fontFamily: 'Geist',
-                    fontSize: 11,
-                    color: AppColors.ctText2,
-                  ),
+                  style: AppTextStyles.bodySmall,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -4057,7 +3986,7 @@ class _ChatInputState extends State<_ChatInput>
                 width: 10,
                 height: 10,
                 decoration: const BoxDecoration(
-                  color: Color(0xFFEF4444),
+                  color: AppColors.ctDanger,
                   shape: BoxShape.circle,
                 ),
               ),
@@ -4130,10 +4059,10 @@ class _ChatInputState extends State<_ChatInput>
                   offset: const Offset(0, -175),
                   itemBuilder: (context) => [
                     _buildAttachItem('image', Icons.image_rounded,
-                        const Color(0xFF3B82F6), 'Imagen'),
+                        AppColors.ctInfo, 'Imagen'),
                     _buildAttachItem('doc',
                         Icons.description_rounded,
-                        const Color(0xFFEF4444), 'Documento'),
+                        AppColors.ctDanger, 'Documento'),
                     _buildAttachItem(
                         'location-request',
                         Icons.location_searching_rounded,
@@ -4676,7 +4605,7 @@ class _FeedFiltersState extends State<_FeedFilters> {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: const BoxDecoration(
         color: Colors.white,
-        border: Border(bottom: BorderSide(color: Color(0xFFE5E7EB))),
+        border: Border(bottom: BorderSide(color: AppColors.ctBorder)),
       ),
       child: Row(
         children: [
@@ -4768,12 +4697,12 @@ class _FeedFiltersState extends State<_FeedFilters> {
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(7),
                     borderSide: const BorderSide(
-                        color: Color(0xFFE5E7EB)),
+                        color: AppColors.ctBorder),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(7),
                     borderSide: const BorderSide(
-                        color: Color(0xFFE5E7EB)),
+                        color: AppColors.ctBorder),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(7),
@@ -4813,19 +4742,19 @@ class _FeedMessages extends StatefulWidget {
 
   static const _avatarColors = [
     Color(0xFFDCFCE7),
-    Color(0xFFDBEAFE),
-    Color(0xFFFEF3C7),
+    AppColors.ctInfoBg,
+    AppColors.ctWarnBg,
     Color(0xFFFCE7F3),
     Color(0xFFEDE9FE),
-    Color(0xFFFFEDD5),
+    AppColors.ctOrangeBg,
   ];
   static const _avatarTextColors = [
     Color(0xFF166534),
-    Color(0xFF1E40AF),
-    Color(0xFF92400E),
+    AppColors.ctInfoText,
+    AppColors.ctWarnText,
     Color(0xFF9D174D),
     Color(0xFF5B21B6),
-    Color(0xFF9A3412),
+    AppColors.ctOrangeText,
   ];
 
   static Color _avatarBg(String phone) =>
@@ -4887,16 +4816,12 @@ class _FeedMessagesState extends State<_FeedMessages> {
           padding:
               const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
           decoration: BoxDecoration(
-            color: const Color(0xFFF3F4F6),
+            color: AppColors.ctSurface2,
             borderRadius: BorderRadius.circular(12),
           ),
           child: Text(
             label,
-            style: const TextStyle(
-              fontSize: 11,
-              color: Color(0xFF6B7280),
-              fontFamily: 'Geist',
-            ),
+            style: AppTextStyles.bodySmall,
           ),
         ),
       );
@@ -4932,11 +4857,7 @@ class _FeedMessagesState extends State<_FeedMessages> {
               widget.hasActiveFilters
                   ? 'Ningún mensaje coincide con los filtros activos.'
                   : 'Aún no hay mensajes en este canal.',
-              style: const TextStyle(
-                fontFamily: 'Geist',
-                fontSize: 13,
-                color: AppColors.ctText2,
-              ),
+              style: AppTextStyles.pageSubtitle,
             ),
             if (widget.hasActiveFilters && widget.onClearFilters != null) ...[
               const SizedBox(height: 16),
@@ -4951,11 +4872,7 @@ class _FeedMessagesState extends State<_FeedMessages> {
                   ),
                   child: const Text(
                     'Limpiar filtros',
-                    style: TextStyle(
-                      fontFamily: 'Geist',
-                      fontSize: 13,
-                      color: AppColors.ctText2,
-                    ),
+                    style: AppTextStyles.pageSubtitle,
                   ),
                 ),
               ),
@@ -5349,11 +5266,7 @@ class _FeedInboundBubble extends StatelessWidget {
               children: [
                 Text(
                   '$name · $chatId',
-                  style: const TextStyle(
-                    fontSize: 10,
-                    color: Color(0xFF9CA3AF),
-                    fontFamily: 'Geist',
-                  ),
+                  style: AppTextStyles.caption,
                 ),
                 const SizedBox(height: 2),
                 Container(
@@ -5368,7 +5281,7 @@ class _FeedInboundBubble extends StatelessWidget {
                       bottomLeft: Radius.circular(10),
                       bottomRight: Radius.circular(10),
                     ),
-                    border: Border.all(color: const Color(0xFFE5E7EB)),
+                    border: Border.all(color: AppColors.ctBorder),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -5380,11 +5293,7 @@ class _FeedInboundBubble extends StatelessWidget {
                         alignment: Alignment.centerRight,
                         child: Text(
                           time,
-                          style: const TextStyle(
-                            fontSize: 10,
-                            color: Color(0xFF9CA3AF),
-                            fontFamily: 'Geist',
-                          ),
+                          style: AppTextStyles.caption,
                         ),
                       ),
                     ],
@@ -5437,7 +5346,7 @@ class _FeedOutboundBubble extends StatelessWidget {
             size: 12, color: baseColor.withValues(alpha: 0.5));
       case 'failed':
         return const Icon(Icons.error_outline,
-            size: 12, color: Color(0xFF991B1B));
+            size: 12, color: AppColors.ctRedText);
       default:
         return Icon(Icons.check,
             size: 12, color: baseColor.withValues(alpha: 0.5));
@@ -5479,11 +5388,7 @@ class _FeedOutboundBubble extends StatelessWidget {
                     ],
                     Text(
                       '$senderName → $toPhone',
-                      style: const TextStyle(
-                        fontSize: 10,
-                        color: Color(0xFF9CA3AF),
-                        fontFamily: 'Geist',
-                      ),
+                      style: AppTextStyles.caption,
                     ),
                   ],
                 ),
@@ -5757,7 +5662,7 @@ class _DateFilterModalState extends State<_DateFilterModal> {
                             fontFamily: 'Geist',
                             fontSize: 11,
                             fontWeight: FontWeight.w500,
-                            color: Color(0xFF6B7280),
+                            color: AppColors.ctText2,
                           ),
                         ),
                         const SizedBox(height: 4),
@@ -5792,7 +5697,7 @@ class _DateFilterModalState extends State<_DateFilterModal> {
                             fontFamily: 'Geist',
                             fontSize: 11,
                             fontWeight: FontWeight.w500,
-                            color: Color(0xFF6B7280),
+                            color: AppColors.ctText2,
                           ),
                         ),
                         const SizedBox(height: 4),
@@ -5876,7 +5781,7 @@ class _DateFilterModalState extends State<_DateFilterModal> {
                       style: TextStyle(
                         fontFamily: 'Geist',
                         fontSize: 12,
-                        color: Color(0xFF6B7280),
+                        color: AppColors.ctText2,
                       ),
                     ),
                   ),
@@ -6225,9 +6130,9 @@ class _NewMessageDialogState extends ConsumerState<_NewMessageDialog> {
                           )),
                         ],
                         if (_filteredOps.isEmpty && _filteredIam.isEmpty)
-                          const Padding(
-                            padding: EdgeInsets.all(24),
-                            child: Center(child: Text('Sin resultados', style: TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText3))),
+                          Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: Center(child: Text('Sin resultados', style: AppTextStyles.body.copyWith(color: AppColors.ctText3))),
                           ),
                       ],
                     ),
@@ -6300,7 +6205,7 @@ class _NewMessageDialogState extends ConsumerState<_NewMessageDialog> {
                   children: [
                     Text(name, style: const TextStyle(fontFamily: 'Geist', fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.ctNavy)),
                     if (phone.isNotEmpty)
-                      Text(phone, style: const TextStyle(fontFamily: 'Geist', fontSize: 11, color: AppColors.ctText3)),
+                      Text(phone, style: AppTextStyles.bodySmall.copyWith(color: AppColors.ctText3)),
                   ],
                 ),
               ],
@@ -6309,12 +6214,12 @@ class _NewMessageDialogState extends ConsumerState<_NewMessageDialog> {
           const SizedBox(height: 12),
           // Window status
           if (_checkingWindow)
-            const Padding(
-              padding: EdgeInsets.only(bottom: 8),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
               child: Row(children: [
-                SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)),
-                SizedBox(width: 8),
-                Text('Verificando ventana de 24h…', style: TextStyle(fontFamily: 'Geist', fontSize: 11, color: AppColors.ctText3)),
+                const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)),
+                const SizedBox(width: 8),
+                Text('Verificando ventana de 24h…', style: AppTextStyles.bodySmall.copyWith(color: AppColors.ctText3)),
               ]),
             )
           else
@@ -6323,7 +6228,7 @@ class _NewMessageDialogState extends ConsumerState<_NewMessageDialog> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: _windowOpen ? const Color(0xFFD1FAE5) : const Color(0xFFFEF3C7),
+                  color: _windowOpen ? AppColors.ctOkBg : AppColors.ctWarnBg,
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Row(
@@ -6332,7 +6237,7 @@ class _NewMessageDialogState extends ConsumerState<_NewMessageDialog> {
                     Icon(
                       _windowOpen ? Icons.check_circle_outline : Icons.warning_amber_rounded,
                       size: 13,
-                      color: _windowOpen ? const Color(0xFF065F46) : const Color(0xFF92400E),
+                      color: _windowOpen ? AppColors.ctOkText : AppColors.ctWarnText,
                     ),
                     const SizedBox(width: 6),
                     Text(
@@ -6342,7 +6247,7 @@ class _NewMessageDialogState extends ConsumerState<_NewMessageDialog> {
                       style: TextStyle(
                         fontFamily: 'Geist',
                         fontSize: 11,
-                        color: _windowOpen ? const Color(0xFF065F46) : const Color(0xFF92400E),
+                        color: _windowOpen ? AppColors.ctOkText : AppColors.ctWarnText,
                       ),
                     ),
                   ],
@@ -6431,8 +6336,8 @@ class _NewMessageDialogState extends ConsumerState<_NewMessageDialog> {
             const SizedBox(height: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(color: const Color(0xFFFEE2E2), borderRadius: BorderRadius.circular(6)),
-              child: Text(_sendError!, style: const TextStyle(fontFamily: 'Geist', fontSize: 11, color: Color(0xFF991B1B))),
+              decoration: BoxDecoration(color: AppColors.ctRedBg, borderRadius: BorderRadius.circular(6)),
+              child: Text(_sendError!, style: AppTextStyles.bodySmall.copyWith(color: AppColors.ctRedText)),
             ),
           ],
           const SizedBox(height: 16),
@@ -6508,7 +6413,7 @@ class _NmRecipientItemState extends State<_NmRecipientItem> {
                 backgroundColor: AppColors.ctTeal.withValues(alpha: 0.12),
                 child: Text(
                   widget.name.isNotEmpty ? widget.name[0].toUpperCase() : '?',
-                  style: const TextStyle(fontFamily: 'Geist', fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.ctTeal),
+                  style: AppTextStyles.badge.copyWith(color: AppColors.ctTeal),
                 ),
               ),
               const SizedBox(width: 10),
@@ -6517,7 +6422,7 @@ class _NmRecipientItemState extends State<_NmRecipientItem> {
                 children: [
                   Text(widget.name, style: const TextStyle(fontFamily: 'Geist', fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.ctNavy)),
                   if (widget.phone.isNotEmpty)
-                    Text(widget.phone, style: const TextStyle(fontFamily: 'Geist', fontSize: 11, color: AppColors.ctText3)),
+                    Text(widget.phone, style: AppTextStyles.bodySmall.copyWith(color: AppColors.ctText3)),
                 ],
               ),
               const Spacer(),
@@ -6587,7 +6492,7 @@ class _NmTemplateDropdown extends StatelessWidget {
       items: templates.map((t) {
         final id = (t['id'] ?? t['template_id'])?.toString() ?? '';
         final name = (t['name'] ?? t['template_name'] ?? id).toString();
-        return DropdownMenuItem(value: id, child: Text(name, style: const TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctNavy)));
+        return DropdownMenuItem(value: id, child: Text(name, style: AppTextStyles.body.copyWith(color: AppColors.ctNavy)));
       }).toList(),
       onChanged: onChanged,
       dropdownColor: AppColors.ctSurface,
@@ -6649,8 +6554,8 @@ class _MediaPreviewDialogState extends State<_MediaPreviewDialog> {
   }
 
   Color get _docColor {
-    if (_ext == 'pdf') return const Color(0xFFEF4444);
-    if (['doc', 'docx'].contains(_ext)) return const Color(0xFF3B82F6);
+    if (_ext == 'pdf') return AppColors.ctDanger;
+    if (['doc', 'docx'].contains(_ext)) return AppColors.ctInfo;
     if (['xls', 'xlsx'].contains(_ext)) return const Color(0xFF22C55E);
     if (['ppt', 'pptx'].contains(_ext)) return const Color(0xFFF97316);
     return AppColors.ctText3;
@@ -6701,13 +6606,13 @@ class _MediaPreviewDialogState extends State<_MediaPreviewDialog> {
                           children: [
                             Text(
                               widget.filename,
-                              style: const TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctNavy),
+                              style: AppTextStyles.body.copyWith(color: AppColors.ctNavy),
                               overflow: TextOverflow.ellipsis,
                             ),
                             if (widget.audioDuration != null)
                               Text(
                                 '${widget.audioDuration! ~/ 60}:${(widget.audioDuration! % 60).toString().padLeft(2, '0')}',
-                                style: const TextStyle(fontFamily: 'Geist', fontSize: 11, color: AppColors.ctText3),
+                                style: AppTextStyles.bodySmall.copyWith(color: AppColors.ctText3),
                               ),
                           ],
                         ),
@@ -6737,7 +6642,7 @@ class _MediaPreviewDialogState extends State<_MediaPreviewDialog> {
                             ),
                             Text(
                               _sizeLabel,
-                              style: const TextStyle(fontFamily: 'Geist', fontSize: 11, color: AppColors.ctText3),
+                              style: AppTextStyles.bodySmall.copyWith(color: AppColors.ctText3),
                             ),
                           ],
                         ),

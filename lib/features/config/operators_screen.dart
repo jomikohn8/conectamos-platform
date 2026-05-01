@@ -190,11 +190,7 @@ class _ActionBar extends StatelessWidget {
                 SizedBox(height: 1),
                 Text(
                   'Gestiona los operadores y sus permisos de acceso',
-                  style: TextStyle(
-                    fontFamily: 'Geist',
-                    fontSize: 11,
-                    color: AppColors.ctText2,
-                  ),
+                  style: AppTextStyles.bodySmall,
                 ),
               ],
             ),
@@ -361,16 +357,12 @@ class _OperatorsBodyState extends State<_OperatorsBody> {
 
               // Filas
               if (rows.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 32),
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 32),
                   child: Center(
                     child: Text(
                       'Sin resultados para los filtros aplicados.',
-                      style: TextStyle(
-                        fontFamily: 'Geist',
-                        fontSize: 13,
-                        color: AppColors.ctText2,
-                      ),
+                      style: AppTextStyles.body.copyWith(color: AppColors.ctText2),
                     ),
                   ),
                 )
@@ -401,11 +393,7 @@ class _OperatorsBodyState extends State<_OperatorsBody> {
           padding: const EdgeInsets.only(top: 10),
           child: Text(
             '${rows.length} de ${widget.operators.length} operadores',
-            style: const TextStyle(
-              fontFamily: 'Geist',
-              fontSize: 12,
-              color: AppColors.ctText2,
-            ),
+            style: AppTextStyles.navItem,
           ),
         ),
       ],
@@ -565,11 +553,7 @@ class _OperatorRowState extends State<_OperatorRow> {
                               SizedBox(width: 3),
                               Text(
                                 'WhatsApp verificado',
-                                style: TextStyle(
-                                  fontFamily: 'Geist',
-                                  fontSize: 11,
-                                  color: AppColors.ctText2,
-                                ),
+                                style: AppTextStyles.bodySmall,
                               ),
                             ],
                           )
@@ -608,11 +592,7 @@ class _OperatorRowState extends State<_OperatorRow> {
               flex: 2,
               child: Text(
                 phone,
-                style: const TextStyle(
-                  fontFamily: 'Geist',
-                  fontSize: 13,
-                  color: AppColors.ctText,
-                ),
+                style: AppTextStyles.body,
               ),
             ),
 
@@ -646,11 +626,7 @@ class _OperatorRowState extends State<_OperatorRow> {
               flex: 2,
               child: Text(
                 _formatLastEvent(lastEventAt),
-                style: const TextStyle(
-                  fontFamily: 'Geist',
-                  fontSize: 12,
-                  color: AppColors.ctText2,
-                ),
+                style: AppTextStyles.navItem,
               ),
             ),
 
@@ -789,11 +765,7 @@ class _FilterDropdown extends StatelessWidget {
             value: value,
             isDense: true,
             isExpanded: true,
-            style: const TextStyle(
-              fontFamily: 'Geist',
-              fontSize: 13,
-              color: AppColors.ctText,
-            ),
+            style: AppTextStyles.body,
             icon: const Icon(
               Icons.keyboard_arrow_down_rounded,
               size: 16,
@@ -834,12 +806,7 @@ class _StatusBadge extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: TextStyle(
-          fontFamily: 'Geist',
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-          color: textColor,
-        ),
+        style: AppTextStyles.badge.copyWith(color: textColor),
       ),
     );
   }
@@ -1005,12 +972,7 @@ class _PrimaryButtonState extends State<_PrimaryButton> {
           ),
           child: Text(
             widget.label,
-            style: const TextStyle(
-              fontFamily: 'Geist',
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: AppColors.ctNavy,
-            ),
+            style: AppTextStyles.tenantName.copyWith(color: AppColors.ctNavy),
           ),
         ),
       ),

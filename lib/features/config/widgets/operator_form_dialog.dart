@@ -43,7 +43,7 @@ String _formatTelegramExpiry(String iso) {
 
 Color _avatarColor(String name) {
   const palette = [
-    Color(0xFF2DD4BF),
+    AppColors.ctTeal,
     Color(0xFF818CF8),
     Color(0xFFFB923C),
     Color(0xFFF472B6),

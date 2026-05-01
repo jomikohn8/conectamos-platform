@@ -370,7 +370,7 @@ class ExecutionMetadataSidebar extends StatelessWidget {
 // ── Private helpers ───────────────────────────────────────────────────────────
 
 List<Widget> _withDividers(List<Widget> items) {
-  const divider = Divider(color: Color(0xFFE5E7EB), thickness: 1, height: 1);
+  const divider = Divider(color: AppColors.ctBorder, thickness: 1, height: 1);
   final result = <Widget>[];
   for (var i = 0; i < items.length; i++) {
     result.add(items[i]);
@@ -464,10 +464,10 @@ class _ChannelLabel extends StatelessWidget {
     switch (channelType) {
       case 'whatsapp':
         icon = Icons.chat_rounded;
-        color = const Color(0xFF25D366);
+        color = AppColors.ctWa;
       case 'telegram':
         icon = Icons.send_rounded;
-        color = const Color(0xFF229ED9);
+        color = AppColors.ctTg;
       case 'api':
         icon = Icons.code_rounded;
         color = AppColors.ctInfo;
@@ -537,7 +537,7 @@ class _Badge extends StatelessWidget {
           style: AppFonts.geist(
               fontSize: 10,
               fontWeight: FontWeight.w600,
-              color: const Color(0xFF0F766E))),
+              color: AppColors.ctTealText)),
     );
   }
 }

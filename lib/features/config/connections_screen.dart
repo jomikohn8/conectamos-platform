@@ -15,9 +15,7 @@ import '../../shared/widgets/app_shell.dart';
 
 // ─── Design tokens locales ────────────────────────────────────────────────────
 
-const _ink900   = Color(0xFF0B132B);
-const _teal300  = Color(0xFF66E2D0);
-const _teal400  = Color(0xFF59E0CC);
+const _teal400  = AppColors.ctTeal;
 const _teal500  = Color(0xFF5BC0BE);
 const _steel300 = Color(0xFFA9C6D8);
 const _steel400 = Color(0xFF7B92A7);
@@ -453,7 +451,7 @@ class _ScreenHeader extends StatelessWidget {
                   style: AppFonts.onest(
                     fontSize: 32,
                     fontWeight: FontWeight.w700,
-                    color: _ink900,
+                    color: AppColors.ctNavy,
                     height: 1.1,
                     letterSpacing: -0.04 * 32,
                   ),
@@ -500,7 +498,7 @@ class _StatWidget extends StatelessWidget {
           style: AppFonts.onest(
             fontSize: 32,
             fontWeight: FontWeight.w700,
-            color: _ink900,
+            color: AppColors.ctNavy,
             height: 1,
           ),
         ),
@@ -578,7 +576,7 @@ class _TabState extends State<_Tab> {
 
   @override
   Widget build(BuildContext context) {
-    final color = widget.active ? _ink900 : (_hovered ? AppColors.ctText : AppColors.ctText2);
+    final color = widget.active ? AppColors.ctNavy : (_hovered ? AppColors.ctText : AppColors.ctText2);
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hovered = true),
@@ -611,7 +609,7 @@ class _TabState extends State<_Tab> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                 decoration: BoxDecoration(
-                  color: widget.active ? _ink900.withValues(alpha: 0.08) : _surface100,
+                  color: widget.active ? AppColors.ctNavy.withValues(alpha: 0.08) : _surface100,
                   borderRadius: BorderRadius.circular(1024),
                 ),
                 child: Text(
@@ -619,7 +617,7 @@ class _TabState extends State<_Tab> {
                   style: AppFonts.geist(
                     fontSize: 11,
                     fontWeight: FontWeight.w500,
-                    color: widget.active ? _ink900 : _steel400,
+                    color: widget.active ? AppColors.ctNavy : _steel400,
                   ),
                 ),
               ),
@@ -762,8 +760,8 @@ class _CategoryItemState extends State<_CategoryItem> {
     Color countColor;
 
     if (widget.active) {
-      bg = _ink900;
-      iconColor = _teal300;
+      bg = AppColors.ctNavy;
+      iconColor = AppColors.ctTealHover;
       textColor = Colors.white;
       countColor = Colors.white.withValues(alpha: 0.6);
     } else if (_hovered) {
@@ -962,7 +960,7 @@ class _SectionBlock extends StatelessWidget {
               style: AppFonts.onest(
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
-                color: _ink900,
+                color: AppColors.ctNavy,
                 letterSpacing: -0.03 * 18,
               ),
             ),
@@ -1087,7 +1085,7 @@ class _IntegrationCardState extends State<_IntegrationCard> {
                   style: AppFonts.onest(
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
-                    color: _ink900,
+                    color: AppColors.ctNavy,
                     letterSpacing: -0.02 * 15,
                   ),
                 ),
@@ -1268,7 +1266,7 @@ class _IntegrationLogo extends StatelessWidget {
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [_teal300, _teal500],
+          colors: [AppColors.ctTealHover, _teal500],
         ),
         borderRadius: radius,
       ),
@@ -1276,7 +1274,7 @@ class _IntegrationLogo extends StatelessWidget {
       child: Icon(
         apiIcon ?? Icons.extension_rounded,
         size: size * 0.48,
-        color: _ink900,
+        color: AppColors.ctNavy,
       ),
     );
   }
@@ -1354,7 +1352,7 @@ class _OAuthDialogState extends State<_OAuthDialog> {
                   Container(
                     width: 40, height: 40,
                     decoration: BoxDecoration(
-                      color: _ink900,
+                      color: AppColors.ctNavy,
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: const Icon(Icons.bolt_rounded, color: _teal400, size: 22),
@@ -1382,7 +1380,7 @@ class _OAuthDialogState extends State<_OAuthDialog> {
                 const SizedBox(height: 16),
                 Text(
                   '¡${widget.item.name} conectado!',
-                  style: AppFonts.onest(fontSize: 20, fontWeight: FontWeight.w700, color: _ink900),
+                  style: AppFonts.onest(fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.ctNavy),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
@@ -1402,7 +1400,7 @@ class _OAuthDialogState extends State<_OAuthDialog> {
                 const SizedBox(height: 16),
                 Text(
                   'Autorizando con ${widget.item.name}…',
-                  style: AppFonts.onest(fontSize: 18, fontWeight: FontWeight.w700, color: _ink900),
+                  style: AppFonts.onest(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.ctNavy),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
@@ -1414,7 +1412,7 @@ class _OAuthDialogState extends State<_OAuthDialog> {
               ] else ...[
                 Text(
                   'Conectar ${widget.item.name}',
-                  style: AppFonts.onest(fontSize: 20, fontWeight: FontWeight.w700, color: _ink900),
+                  style: AppFonts.onest(fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.ctNavy),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
@@ -1580,7 +1578,7 @@ class _ManageDrawer extends StatelessWidget {
                           style: AppFonts.onest(
                             fontSize: 20,
                             fontWeight: FontWeight.w700,
-                            color: _ink900,
+                            color: AppColors.ctNavy,
                             letterSpacing: -0.03 * 20,
                           ),
                         ),
@@ -1681,7 +1679,7 @@ class _ManageDrawer extends StatelessWidget {
                       children: [
                         _ActivityRow(color: _success, text: 'Sincronización completada · ${item.lastSync ?? 'hace 4 min'}'),
                         const _ActivityRow(color: _success, text: '3 archivos nuevos importados · hace 1 h'),
-                        const _ActivityRow(color: Color(0xFF3B82F6), text: 'Permisos actualizados · ayer'),
+                        const _ActivityRow(color: AppColors.ctInfo, text: 'Permisos actualizados · ayer'),
                       ],
                     ),
                   ],
@@ -1833,7 +1831,7 @@ class _PrimaryButtonState extends State<_PrimaryButton> {
             style: AppFonts.geist(
               fontSize: widget.small ? 12 : 13,
               fontWeight: FontWeight.w600,
-              color: _ink900,
+              color: AppColors.ctNavy,
             ),
             textAlign: TextAlign.center,
           ),
@@ -2226,7 +2224,7 @@ class _IntegrationsManagementSheetState
                         style: AppFonts.onest(
                           fontSize: 16,
                           fontWeight: FontWeight.w700,
-                          color: _ink900,
+                          color: AppColors.ctNavy,
                         ),
                       ),
                       Text(
@@ -2800,11 +2798,7 @@ class _SecretBoxState extends State<_SecretBox> {
           Expanded(
             child: SelectableText(
               widget.secret,
-              style: const TextStyle(
-                fontFamily: 'Geist',
-                fontSize: 13,
-                color: AppColors.ctText,
-              ),
+              style: AppTextStyles.body,
             ),
           ),
           const SizedBox(width: 8),

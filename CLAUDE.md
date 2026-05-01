@@ -1,6 +1,9 @@
-# CLAUDE.md
+# CLAUDE.md — conectamos-platform
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file is the single source of guidance for Claude Code working in this repository.
+Read it fully before touching any file. Do not invent patterns not described here.
+
+---
 
 ## Commands
 
@@ -11,7 +14,7 @@ flutter pub get
 # Run in Chrome (only supported target — Flutter Web)
 flutter run -d chrome
 
-# Analyze (run before every commit)
+# Analyze (run before every commit — fix all warnings before delivering)
 flutter analyze
 
 # Build for production
@@ -26,9 +29,11 @@ dart run build_runner build --delete-conflicting-outputs
 
 There are no unit or widget tests in this project.
 
-## Architecture
+---
 
-**Flutter Web SPA** targeting Chrome. No mobile/desktop targets.
+## Architecture overview
+
+**Flutter Web SPA** targeting Chrome only. No mobile/desktop targets.
 
 ### Data flow
 
@@ -37,7 +42,9 @@ Supabase Realtime (stream)  ──→  ConsumerStatefulWidget (setState)  ──
 FastAPI backend (Dio)        ──→  fire-and-forget or await in handler
 ```
 
-All authenticated requests go through `ApiClient` (Dio, `lib/core/api/api_client.dart`), which injects `Authorization: Bearer {supabase_access_token}` via an `InterceptorsWrapper`. The backend base URL is `https://conectamos-meta-api.vercel.app`.
+All authenticated requests go through `ApiClient` (Dio, `lib/core/api/api_client.dart`),
+which injects `Authorization: Bearer {supabase_access_token}` via `InterceptorsWrapper`.
+Backend base URL: `https://conectamos-meta-api.vercel.app`.
 
 Supabase is used directly for:
 - Auth (email+password)
@@ -46,63 +53,442 @@ Supabase is used directly for:
 
 ### Multi-tenancy
 
-Every screen and query is scoped by `activeTenantIdProvider` (a Riverpod `Provider<String>`). When `activeTenantIdProvider` changes (user switches tenant), all streams re-subscribe and all lists reload. Never hardcode tenant IDs — always `ref.read(activeTenantIdProvider)`.
+Every screen and query is scoped by `activeTenantIdProvider` (Riverpod `Provider<String>`).
+When it changes, all streams re-subscribe and all lists reload.
+**Never hardcode tenant IDs** — always `ref.read(activeTenantIdProvider)`.
 
-The superadmin (`miguel@conectamos.mx`) can switch tenants; all other users see only their own tenant. Tenant selection persists in `localStorage` key `conectamos_active_tenant`.
+Superadmin (`miguel@conectamos.mx`) can switch tenants; other users see only their own.
+Tenant selection persists in `localStorage` key `conectamos_active_tenant`.
 
 ### Shell layout
 
-`AppShell` (`lib/shared/widgets/app_shell.dart`) wraps all authenticated routes via `ShellRoute` in go_router. It renders a collapsible sidebar + topbar. Screens inject title/subtitle/actions via providers (`topbarTitleProvider`, etc.). Auth screens (`/login`, `/forgot-password`, `/reset-password`, `/activate`) bypass the shell entirely.
+`AppShell` (`lib/shared/widgets/app_shell.dart`) wraps all authenticated routes via
+`StatefulShellRoute.indexedStack` in go_router (13 branches). Navigation state is preserved
+per branch via `goBranch()`. Collapsible sidebar + topbar.
+Auth screens (`/login`, `/forgot-password`, `/reset-password`, `/activate`) bypass the shell.
 
-### Conversations screen
+`_kRouteBranchIndex` map in `app_shell.dart` links route path prefixes to branch indices —
+update it whenever a new top-level route is added.
 
-`lib/features/conversations/conversations_screen.dart` (~3500 lines) is the most complex file. Key architecture:
+Screens inject title/subtitle/actions via providers (`topbarTitleProvider`, etc.).
 
-- `_TabOperador`: sidebar `_ConvoList` (240px, fixed) + `_ChatPanel` (flexible). The outer `Row` uses `CrossAxisAlignment.stretch` to ensure both panels fill the available height.
-- `_ChatPanelState` subscribes to `SupabaseMessages.streamMessages()` via `StreamSubscription`. On first emit: determines `_firstUnreadMessageId`, schedules two `addPostFrameCallback` jumps to reach the true scroll bottom. On subsequent emits: auto-scrolls only if already at bottom (`_atBottom` threshold ≤ 100px).
-- `_windowOpen` (`bool?`): `null` = stream loading, `true` = last inbound < 24h ago, `false` = window closed. Input and send button are disabled when `!= true`. Badge and banner are hidden for non-WhatsApp channels.
-- Read receipts are sent sequentially (50ms delay between) to avoid burst POSTs.
-- Outbound message origin is visualized via `_outboundOriginStyle()` → `_OriginBadge` (IA / Sistema / green name for human).
-- `_pendingReactions` holds optimistic emoji state, keyed by `wa_message_id`. Updated before the POST, reverted in `catch`.
-- Active channel is exposed via `selectedChannelIdProvider` / `selectedChannelTypeProvider` (global `StateProvider<String?>` in the same file). `_ActionBar` reads these as a `ConsumerWidget` and passes them as query params when navigating to `/broadcast`.
-- 422 errors from `/messages/send` surface the backend `detail` field directly in the UI snackbar.
+---
 
-### Broadcasts screen
+## Directory structure & file naming
 
-`lib/features/broadcasts/broadcast_screen.dart` receives `channel_id` and `channel_type` via go_router query parameters (set by `_ActionBar` in conversations). Key behavior:
+```
+lib/
+  core/
+    api/          — static API classes, one file per domain: [domain]_api.dart
+    router/
+      app_router.dart   — single go_router instance
+    theme/
+      colors.dart       — AppColors constants
+      app_theme.dart    — AppFonts helpers + AppTextStyles tokens
+  features/
+    config/       — configuration screens (channels, flows, operators)
+    settings/     — tenant settings
+    [module]/     — one folder per feature
+  shared/
+    widgets/      — shared widgets (AppShell, etc.)
+```
 
-- `isTelegram` flag (derived from `channel_type == 'telegram'`) hides the mode toggle and template dropdown — Telegram only supports free-text.
-- `channel_id` is required in the POST body; submit is blocked with a snackbar if empty.
-- A channel context banner (color-coded by type) is shown above the form.
+**Naming rules:**
+- Screens: `[name]_screen.dart`
+- Detail screens with tabs: `[name]_detail_screen.dart`
+- API classes: `[domain]_api.dart` in `lib/core/api/`
 
-### Channels & WhatsApp Embedded Signup
+---
 
-`lib/features/config/channels_screen.dart` — the "Conectar con WhatsApp Business" button uses the Facebook Embedded Signup flow:
+## Routing (go_router)
 
-- FB SDK (`connect.facebook.net/en_US/sdk.js`) and a JS wrapper `_fbLaunchSignup` are injected at runtime via `dart:html` in `_initFbSdk()` (called once via `static bool _fbSdkInitialized`).
-- The `@JS('_fbLaunchSignup')` binding uses `dart:js_interop`; callbacks are passed with `.toJS`.
-- `FB.login()` must be called **synchronously from the user gesture** (`onTap`) — no `async` gap before it.
+**File:** `lib/core/router/app_router.dart`
+
+The router uses `StatefulShellRoute.indexedStack` with 13 named branches. Each branch
+corresponds to a top-level route and preserves scroll/state independently.
+
+```dart
+GoRoute(
+  path: '/flows/:flowId',
+  pageBuilder: (context, state) {
+    final flowId = state.pathParameters['flowId'] ?? '';
+    return NoTransitionPage(
+      child: FlowDetailScreen(flowId: flowId),
+    );
+  },
+),
+```
+
+**Rules:**
+- All authenticated routes go inside `StatefulShellRoute` branches.
+- Sub-routes (e.g. `/flows/:flowId`) are nested inside the parent branch route.
+- Always use `NoTransitionPage` — no transition animations.
+- Extract path params with `state.pathParameters['key'] ?? ''`.
+- Add new routes next to others in the same domain.
+- Update `_kRouteBranchIndex` in `app_shell.dart` for any new top-level path.
+
+`kMockMode = false` (in `lib/core/config.dart`) — when false, unauthenticated users redirect
+to `/login`; authenticated users at `/login` go to `/overview`. Public auth routes skip guard.
+
+---
+
+## API classes
+
+**Reference file:** `lib/core/api/flows_api.dart`
+
+```dart
+static Future<Map<String, dynamic>> getFlow({
+  required String tenantId,
+  required String flowId,
+}) async {
+  final resp = await ApiClient.dio.get(
+    '/flows/$flowId',
+    queryParameters: {'tenant_id': tenantId},
+  );
+  return resp.data as Map<String, dynamic>;
+}
+```
+
+**Rules:**
+- Methods are always static — never instantiate the class.
+- `tenant_id` always as query parameter (`queryParameters:`), never in the body.
+- Use `ApiClient.dio` — never create Dio instances directly.
+- Return types by method type:
+  - `list*` → `List<Map<String, dynamic>>`
+  - `get*`, `create*`, `update*` → `Map<String, dynamic>`
+  - `delete*` → `void`
+
+---
+
+## Detail screens with tabs (canonical pattern)
+
+**Reference:** `OperatorDetailScreen`, `ChannelDetailScreen`
+
+```dart
+class FlowDetailScreen extends ConsumerStatefulWidget {
+  const FlowDetailScreen({super.key, required this.flowId});
+  final String flowId;
+
+  @override
+  ConsumerState<FlowDetailScreen> createState() => _FlowDetailScreenState();
+}
+
+class _FlowDetailScreenState extends ConsumerState<FlowDetailScreen>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabCtrl = TabController(length: 4, vsync: this);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+  }
+
+  @override
+  void dispose() {
+    _tabCtrl.dispose();
+    super.dispose();
+  }
+}
+```
+
+**AppBar with TabBar:**
+```dart
+appBar: AppBar(
+  bottom: TabBar(
+    controller: _tabCtrl,
+    labelColor: AppColors.ctTeal,
+    unselectedLabelColor: AppColors.ctText2,
+    indicatorColor: AppColors.ctTeal,
+    labelStyle: const TextStyle(
+      fontFamily: 'Geist',
+      fontSize: 12,
+      fontWeight: FontWeight.w600,
+    ),
+    tabs: const [Tab(text: 'INFO'), Tab(text: 'CAMPOS'), ...],
+  ),
+),
+```
+
+**Body:**
+```dart
+body: Column(
+  children: [
+    _ScreenHeader(data: _data),
+    Expanded(
+      child: TabBarView(
+        controller: _tabCtrl,
+        children: [_InfoTab(...), _CamposTab(...), ...],
+      ),
+    ),
+  ],
+),
+```
+
+> If the number of tabs varies by condition, create `TabController` inside `_load()` instead of `initState()`.
+
+---
+
+## Async state pattern
+
+Every screen with async data uses this exact pattern — no variations:
+
+```dart
+bool _loading = true;
+String? _error;
+Map<String, dynamic>? _flow; // replace type as needed
+
+Future<void> _load() async {
+  setState(() { _loading = true; _error = null; });
+  try {
+    final tenantId = ref.read(activeTenantIdProvider);
+    final data = await FlowsApi.getFlow(tenantId: tenantId, flowId: widget.flowId);
+    setState(() { _flow = data; _loading = false; });
+  } catch (e) {
+    setState(() { _error = e.toString(); _loading = false; });
+  }
+}
+```
+
+**Loading state:** `Center(child: CircularProgressIndicator(color: AppColors.ctTeal))`
+**Error state:** `Center(child: Text(_error!, style: TextStyle(color: AppColors.ctDanger)))`
+
+---
+
+## Drag-to-reorder
+
+Use `SliverReorderableList` — **never** `ReorderableListView`.
+**Reference:** `lib/features/settings/operator_fields_screen.dart:502`
+
+```dart
+SliverReorderableList(
+  itemCount: _fields.length,
+  onReorder: canManage ? _onReorder : (oldIndex, newIndex) {},
+  itemBuilder: (context, i) {
+    final field = _fields[i];
+    final id = field['id'] as String? ?? i.toString();
+    return _FieldCard(
+      key: ValueKey(id),  // REQUIRED — must be unique and stable
+      field: field,
+      index: i,
+      canManage: canManage,
+      onEdit: () => _openEdit(field),
+    );
+  },
+),
+```
+
+**Drag handle inside item:**
+```dart
+ReorderableDragStartListener(
+  index: index,
+  child: Icon(Icons.drag_handle),
+)
+```
+
+**onReorder logic:**
+```dart
+void _onReorder(int oldIndex, int newIndex) {
+  setState(() {
+    if (newIndex > oldIndex) newIndex--;
+    final item = _fields.removeAt(oldIndex);
+    _fields.insert(newIndex, item);
+  });
+}
+```
+
+When `canManage` is false, pass `(_, __) {}` to disable without breaking the widget.
+
+---
+
+## Design System v1.0
+
+Cascade: **Tokens → AppShell → Screen archetypes → Components**
+
+### Color tokens (`lib/core/theme/colors.dart`)
+
+**Never inline hex values** — always `AppColors.*`.
+
+| Token | Hex | Use |
+|---|---|---|
+| `ctTeal` | `#59E0CC` | Primary accent, active state, primary buttons |
+| `ctNavy` | `#0B132B` | AppBar background, primary button bg, sidebar bg |
+| `ctTealLight` | `#CCFBF1` | Active nav bg, badge teal bg |
+| `ctBg` | `#F9FAFB` | Page background |
+| `ctSurface` | `#FFFFFF` | Card, dialog, input backgrounds |
+| `ctSurface2` | `#F3F4F6` | Secondary surface, table header bg |
+| `ctBorder` | `#E5E7EB` | Default borders |
+| `ctBorder2` | `#D1D5DB` | Input borders |
+| `ctText` | `#111827` | Primary text |
+| `ctText2` | `#6B7280` | Secondary labels, inactive tabs |
+| `ctText3` | `#9CA3AF` | Tertiary / placeholder text |
+| `ctOk` | `#10B981` | Success indicator |
+| `ctOkBg` | `#D1FAE5` | Success badge / background |
+| `ctWarn` | `#F59E0B` | Warning indicator |
+| `ctWarnBg` | `#FEF3C7` | Warning badge / background |
+| `ctDanger` | `#EF4444` | Errors, destructive actions |
+| `ctRedBg` | `#FEE2E2` | Error badge / background |
+| `ctInfoBg` | `#DBEAFE` | Info badge background |
+| `ctOrangeBg` | `#FFEDD5` | Orange badge background |
+| `ctSidebarBg` | `#0E1829` | Sidebar dark background (AppShell) |
+
+### Typography (`lib/core/theme/app_theme.dart`)
+
+**Two font families only — no google_fonts, no Inter:**
+- `Onest` (variable font, local) → display, titles, KPI values, card headings, buttons ≥13px w600+
+- `Geist` (variable font, local) → body, labels, metadata, inputs, code
+
+```dart
+// Helpers
+AppFonts.onest({required double size, FontWeight weight = FontWeight.w400, Color? color, ...})
+AppFonts.geist({required double size, FontWeight weight = FontWeight.w400, Color? color, ...})
+```
+
+### AppTextStyles tokens (`lib/core/theme/app_theme.dart`)
+
+All tokens are `const TextStyle`. Import `app_theme.dart` to use them.
+
+| Token | Family | Size | Weight | Color | Use |
+|---|---|---|---|---|---|
+| `AppTextStyles.pageTitle` | Onest | 15 | w700 | ctText | Screen headings |
+| `AppTextStyles.pageSubtitle` | Geist | 12 | w400 | ctText2 | Screen subtitles |
+| `AppTextStyles.cardTitle` | Onest | 13 | w600 | ctText | Card / section headings |
+| `AppTextStyles.topbarTitle` | Onest | 13 | w700 | white | Topbar title |
+| `AppTextStyles.topbarSubtitle` | Geist | 10 | w400 | white45 | Topbar subtitle |
+| `AppTextStyles.navItem` | Geist | 12 | w500 | ctText2 | Sidebar nav items |
+| `AppTextStyles.navItemActive` | Geist | 12 | w600 | tealText | Sidebar active nav |
+| `AppTextStyles.navSectionLabel` | Geist | 10 | w600 | ctText3 | Sidebar section labels |
+| `AppTextStyles.formLabel` | Geist | 12 | w600 | ctText | Form field labels |
+| `AppTextStyles.body` | Geist | 13 | w400 | ctText | Body text, list items |
+| `AppTextStyles.bodySmall` | Geist | 11 | w400 | ctText2 | Small body text |
+| `AppTextStyles.caption` | Geist | 10 | w400 | ctText3 | Captions, timestamps |
+| `AppTextStyles.badge` | Geist | 11 | w600 | — | Badge text (apply color via copyWith) |
+| `AppTextStyles.tenantLabel` | Geist | 9 | w600 | ctText3 | Tenant selector label |
+| `AppTextStyles.tenantName` | Onest | 12 | w700 | white | Tenant name in topbar |
+| `AppTextStyles.btnPrimary` | Geist | 13 | w700 | ctNavy | Primary button label |
+| `AppTextStyles.btnSecondary` | Geist | 13 | w500 | ctText | Secondary button label |
+| `AppTextStyles.kpiValue` | Onest | 28 | w700 | ctText | KPI large number |
+| `AppTextStyles.kpiLabel` | Geist | 10 | w600 | ctText2 | KPI label (letterSpacing 0.07) |
+
+**Migration rule for existing inline TextStyles:**
+- Color-only diff → use `AppTextStyles.X.copyWith(color: AppColors.Y)`
+- Multiple diffs (size + color + weight) → leave inline
+- **Skip** these contexts — never replace: `Theme`, `InputDecoration`, `ButtonStyle`, `AppBar`, `TabBar`, `AlertDialog`
+- When using `.copyWith()` in a widget tree, remove `const` from the parent widget (`.copyWith()` is non-const)
+
+### Border radius tokens
+
+| Token | Value | Use |
+|---|---|---|
+| `rSm` | 6px | Badges, filter chips |
+| `rMd` | 10px | Cards, inputs, buttons |
+| `rLg` | 14px | Modals, panels |
+| `rXl` | 20px | Full-screen overlays |
+
+### Spacing scale
+
+4, 8, 12, 16, 20, 24, 32, 40, 48 — use multiples of 4.
+
+### AppShell anatomy
+
+**Topbar** (`height: 52px`, background: `ctNavy`):
+- Left: isotipo SVG + wordmark "Conectam**OS**" (OS in ctTeal)
+- Divider + screen title/subtitle (injected via providers)
+- Right: KPI chips, tenant selector, bell icon, avatar
+
+**Sidebar** (`width: 220px expanded / 56px collapsed`, background: `ctSidebarBg` = `#0E1829`):
+- Dark navy background (not light surface)
+- Section labels: `navSectionLabel` style
+- Nav items: `navItem` style; active: tealLight bg + teal left border + `navItemActive` style
+- Collapse toggle at bottom
+
+**Navigation via `goBranch()`** — never `context.go()` for top-level shell nav.
+
+### Components
+
+**Badges:**
+```dart
+// Semantic variants via color combinations
+// ok: ctOkBg bg / ok-text color
+// warn: ctWarnBg bg / warn-text color
+// danger: ctRedBg bg / danger-text color
+// teal: ctTealLight bg / teal-text color
+// navy: ctNavy bg / ctTeal text
+// neutral: ctSurface2 bg / ctText2 text
+```
+
+**Primary button:** navy bg + ctTeal text + Geist 13 w700
+**Ghost button:** ctSurface2 bg + ctBorder border + ctText text
+
+**Input focus ring:** `ctTeal` border + `rgba(89,224,204,.2)` box-shadow
+
+**KPI card:** white surface, 3px colored top bar, kpiLabel + kpiValue tokens
+
+**Table header:** ctSurface2 bg, Geist 10 w700 uppercase letterSpacing 0.07, ctText2 color
+
+**Filter chips:** active = ctNavy bg + ctTeal text; inactive = transparent + ctBorder border
+
+---
+
+## Permissions & guards
+
+```dart
+final perms = ref.watch(userPermissionsProvider);
+final canManage = perms.contains('flows.manage');
+```
+
+Relevant permission strings:
+- `flows.view` — view list and detail
+- `flows.manage` — create, edit, delete
+- `flow_executions.execute_dashboard` — view and act on "Tareas"
+- `flow_integrations.manage` — manage flow integrations
+
+---
+
+## Screen-specific notes
+
+### Conversations (`lib/features/conversations/conversations_screen.dart`, ~3500 lines)
+
+- `_TabOperador`: sidebar `_ConvoList` (240px fixed) + `_ChatPanel` (flexible). Outer `Row` uses `CrossAxisAlignment.stretch`.
+- `_ChatPanelState` subscribes to `SupabaseMessages.streamMessages()`. On first emit: determines `_firstUnreadMessageId`, schedules two `addPostFrameCallback` jumps to scroll bottom. On subsequent emits: auto-scrolls only if `_atBottom` threshold ≤ 100px.
+- `_windowOpen` (`bool?`): `null` = loading, `true` = last inbound < 24h, `false` = closed. Input disabled when `!= true`. Badge/banner hidden for non-WhatsApp channels.
+- Read receipts sent sequentially (50ms delay) to avoid burst POSTs.
+- `_pendingReactions`: optimistic emoji state keyed by `wa_message_id`. Updated before POST, reverted on catch.
+- `selectedChannelIdProvider` / `selectedChannelTypeProvider` — global `StateProvider<String?>` in this file. `_ActionBar` passes them as query params to `/broadcast`.
+- 422 errors from `/messages/send` surface the backend `detail` field in the UI snackbar.
+
+### Broadcasts (`lib/features/broadcasts/broadcast_screen.dart`)
+
+- Receives `channel_id` and `channel_type` via go_router query params.
+- `isTelegram` flag (from `channel_type == 'telegram'`) hides mode toggle and template dropdown.
+- `channel_id` required in POST body; submit blocked with snackbar if empty.
+
+### Channels & WhatsApp Embedded Signup (`lib/features/config/channels_screen.dart`)
+
+- FB SDK injected at runtime via `dart:html` in `_initFbSdk()` (once, guarded by `static bool _fbSdkInitialized`).
+- `@JS('_fbLaunchSignup')` binding uses `dart:js_interop`; callbacks passed with `.toJS`.
+- `FB.login()` **must** be called synchronously from the user gesture (`onTap`) — no `async` gap.
 - Config: `appId: '4149613485350757'`, `config_id: '2145617199565998'`, `response_type: 'code'`, `override_default_response_type: true`.
-- On success, calls `POST /channels/embedded-signup` with `{code, tenant_id}`.
+- On success: `POST /channels/embedded-signup` with `{code, tenant_id}`.
 - `_embeddedSignupInProgress` guards against duplicate calls.
-- WhatsApp credential flow (stepper + channel detail): `verify-credentials` → `activate-whatsapp` → save. Both steps must succeed before proceeding.
+- Credential flow stepper: `verify-credentials` → `activate-whatsapp` → save. Both must succeed.
 
-### Operators screen
+### Operators (`lib/features/config/operators_screen.dart`)
 
-`lib/features/config/operators_screen.dart` — key behaviors:
+- Flow pre-population handles both string IDs and map objects (`op['flows']` can be either).
+- `metadata` key omitted entirely when `telegramChatId == null` — never send explicit null.
+- "Vincular vía Telegram" button: appears when operator has Telegram flow but no chat ID (edit mode only). Calls `POST /operators/{id}/send-telegram-invite` per unique Telegram channel. Telegram validation is warning-only, not blocking.
 
-- Flow pre-population handles both string IDs and map objects from the backend (`op['flows']` can be either).
-- `metadata` key is omitted entirely when `telegramChatId == null` — never send explicit null (backend would overwrite existing value).
-- "Vincular vía Telegram" button appears when the operator has a Telegram flow selected but no chat ID entered (edit mode only). Calls `POST /operators/{id}/send-telegram-invite` for each unique Telegram channel in the selected flows. Telegram validation is warning-only, not blocking.
+### Flows list (`lib/features/config/workflows_screen.dart`)
 
-### Routing & auth guards
+- `_FlowCard.onTap` navigates to `/flows/${flow['id']}` via `context.go(...)` — no more edit dialog.
+- Create dialog (`_openForm(flow: null)`) is kept for quick creation.
+- Edit dialog removed — editing lives in `FlowDetailScreen`.
 
-`lib/core/router/app_router.dart`: `kMockMode = false` (in `lib/core/config.dart`) bypasses all auth. When `false`, unauthenticated users are redirected to `/login`; authenticated users at `/login` go to `/overview`. Public auth routes (`/forgot-password`, `/reset-password`, `/activate`) skip the guard.
+---
 
-### Theme & design tokens
+## CI/CD
 
-Always use `AppColors` constants (`lib/core/theme/colors.dart`) — never inline hex values. Typography: `Onest` for headings/buttons ≥ 15px or w600+; `Geist` (local font) for body text. `AppFonts.onest(...)` and `AppFonts.geist(...)` helpers are in `app_theme.dart`.
-
-### CI/CD
-
-Push to `main` → GitHub Actions → `flutter build web --release` → `firebase deploy --only hosting`. Production URL: `https://conectamos-platform-poc.web.app`. Requires `FIREBASE_TOKEN` secret in GitHub Actions.
+Push to `main` → GitHub Actions → `flutter build web --release` → `firebase deploy --only hosting`.
+Production URL: `https://conectamos-platform-poc.web.app`.
+Requires `FIREBASE_TOKEN` secret in GitHub Actions.

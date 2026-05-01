@@ -63,11 +63,7 @@ class _ActionBar extends ConsumerWidget {
                 SizedBox(height: 1),
                 Text(
                   'Configura las métricas que quieres ver',
-                  style: TextStyle(
-                    fontFamily: 'Geist',
-                    fontSize: 11,
-                    color: AppColors.ctText2,
-                  ),
+                  style: AppTextStyles.topbarSubtitle,
                 ),
               ],
             ),
@@ -515,11 +511,7 @@ class _SuggestionChipState extends State<_SuggestionChip> {
               const SizedBox(width: 4),
               Text(
                 widget.label,
-                style: const TextStyle(
-                  fontFamily: 'Geist',
-                  fontSize: 12,
-                  color: AppColors.ctText2,
-                ),
+                style: AppTextStyles.navItem,
               ),
             ],
           ),
@@ -840,14 +832,9 @@ class _AlertasCard extends StatelessWidget {
           color: AppColors.ctRedBg,
           borderRadius: BorderRadius.circular(20),
         ),
-        child: const Text(
+        child: Text(
           '2 activas',
-          style: TextStyle(
-            fontFamily: 'Geist',
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-            color: AppColors.ctRedText,
-          ),
+          style: AppTextStyles.badge.copyWith(color: AppColors.ctRedText),
         ),
       ),
       child: Column(
@@ -912,21 +899,12 @@ class _AlertaRowState extends State<_AlertaRow> {
                 children: [
                   Text(
                     a.operator,
-                    style: const TextStyle(
-                      fontFamily: 'Geist',
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.ctText,
-                    ),
+                    style: AppTextStyles.tenantName,
                   ),
                   const SizedBox(height: 2),
                   Text(
                     a.desc,
-                    style: const TextStyle(
-                      fontFamily: 'Geist',
-                      fontSize: 11,
-                      color: AppColors.ctText2,
-                    ),
+                    style: AppTextStyles.bodySmall,
                   ),
                 ],
               ),
@@ -1031,11 +1009,7 @@ class _SesionesCard extends StatelessWidget {
       title: 'Sesiones abiertas',
       trailing: Text(
         '${_kSesiones.length} activas',
-        style: const TextStyle(
-          fontFamily: 'Geist',
-          fontSize: 11,
-          color: AppColors.ctText2,
-        ),
+        style: AppTextStyles.bodySmall,
       ),
       child: Column(
         children: _kSesiones.map((s) => _SesionRow(item: s)).toList(),
@@ -1089,11 +1063,7 @@ class _SesionRow extends StatelessWidget {
                 ),
                 Text(
                   'desde ${item.since}',
-                  style: const TextStyle(
-                    fontFamily: 'Geist',
-                    fontSize: 10,
-                    color: AppColors.ctText3,
-                  ),
+                  style: AppTextStyles.caption,
                 ),
               ],
             ),
@@ -1146,13 +1116,9 @@ class _EventosCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return _DashCard(
       title: 'Eventos por hora',
-      trailing: const Text(
+      trailing: Text(
         '143 hoy',
-        style: TextStyle(
-          fontFamily: 'Geist',
-          fontSize: 11,
-          color: AppColors.ctText2,
-        ),
+        style: AppTextStyles.bodySmall,
       ),
       child: _BarChart(
         values: _kEventosBars,
@@ -1328,12 +1294,7 @@ class _FlujoRow extends StatelessWidget {
               ),
               Text(
                 '${item.active} activos',
-                style: TextStyle(
-                  fontFamily: 'Geist',
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: item.color,
-                ),
+                style: AppTextStyles.badge.copyWith(color: item.color),
               ),
               const SizedBox(width: 6),
               Text(

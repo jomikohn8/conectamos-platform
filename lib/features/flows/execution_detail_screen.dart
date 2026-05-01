@@ -333,7 +333,7 @@ class _FieldsBlockState extends State<_FieldsBlock> {
                 const SizedBox(height: 2),
                 Text('$filled de $total campos con valor',
                     style: AppFonts.geist(
-                        fontSize: 12, color: const Color(0xFF6B7280))),
+                        fontSize: 12, color: AppColors.ctText2)),
               ],
             ),
             Row(
@@ -407,15 +407,15 @@ class _TypeFilterIcon extends StatelessWidget {
 
     if (!exists) {
       bg = const Color(0xFFF1F3F5);
-      border = const Color(0xFFE5E7EB);
+      border = AppColors.ctBorder;
       iconColor = const Color(0xFFCBD5E1);
     } else if (active) {
-      bg = const Color(0xFFCCFBF1);
-      border = const Color(0xFF59E0CC);
-      iconColor = const Color(0xFF0F766E);
+      bg = AppColors.ctTealLight;
+      border = AppColors.ctTeal;
+      iconColor = AppColors.ctTealText;
     } else {
       bg = Colors.white;
-      border = const Color(0xFFE5E7EB);
+      border = AppColors.ctBorder;
       iconColor = const Color(0xFF94A3B8);
     }
 
@@ -591,7 +591,7 @@ class _MessagesBlock extends StatelessWidget {
                   Row(
                     children: [
                       const Icon(Icons.chat_rounded,
-                          size: 16, color: Color(0xFF25D366)),
+                          size: 16, color: AppColors.ctWa),
                       const SizedBox(width: 8),
                       Text('Conversación relacionada',
                           style: AppFonts.onest(
@@ -606,7 +606,7 @@ class _MessagesBlock extends StatelessWidget {
                   Text(
                       '${messages.length} mensajes · todos los archivos quedaron registrados',
                       style: AppFonts.geist(
-                          fontSize: 12, color: const Color(0xFF6B7280))),
+                          fontSize: 12, color: AppColors.ctText2)),
                 ],
               ),
             ),

@@ -3,6 +3,8 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../core/theme/colors.dart';
+
 // ── Background ────────────────────────────────────────────────────────────────
 
 class AuthBackground extends StatelessWidget {
@@ -13,22 +15,22 @@ class AuthBackground extends StatelessWidget {
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        Positioned.fill(child: Container(color: const Color(0xFF0B132B))),
+        Positioned.fill(child: Container(color: AppColors.ctNavy)),
 
         // Blob teal 1 — top-left large
         Positioned(
           top: -320, left: -360,
-          child: _Blob(width: 880, height: 880, color: const Color(0xFF66E2D0), opacity: 0.55, blur: 110, circle: true),
+          child: _Blob(width: 880, height: 880, color: AppColors.ctTealHover, opacity: 0.55, blur: 110, circle: true),
         ),
         // Blob teal 2 — center-left
         Positioned(
           top: 120, left: -240,
-          child: _Blob(width: 640, height: 640, color: const Color(0xFF66E2D0), opacity: 0.38, blur: 100, circle: true),
+          child: _Blob(width: 640, height: 640, color: AppColors.ctTealHover, opacity: 0.38, blur: 100, circle: true),
         ),
         // Blob steel — top-right
         Positioned(
           top: -160, right: -200,
-          child: _Blob(width: 700, height: 520, color: const Color(0xFF3A506B), opacity: 0.60, blur: 120, circle: false),
+          child: _Blob(width: 700, height: 520, color: AppColors.ctInk700, opacity: 0.60, blur: 120, circle: false),
         ),
         // Blob warm teal — bottom-right
         Positioned(
@@ -128,11 +130,11 @@ class _HelpLinkState extends State<_HelpLink> {
           borderRadius: BorderRadius.circular(999),
           border: Border.all(
             color: _hovered
-                ? const Color(0xFF59E0CC).withValues(alpha: 0.5)
+                ? AppColors.ctTeal.withValues(alpha: 0.5)
                 : Colors.white.withValues(alpha: 0.12),
           ),
           color: _hovered
-              ? const Color(0xFF59E0CC).withValues(alpha: 0.10)
+              ? AppColors.ctTeal.withValues(alpha: 0.10)
               : Colors.white.withValues(alpha: 0.04),
         ),
         child: Row(
@@ -245,11 +247,11 @@ class AuthCardHead extends StatelessWidget {
             gradient: const LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [Color(0xFF3A506B), Color(0xFF0B132B)],
+              colors: [AppColors.ctInk700, AppColors.ctNavy],
             ),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF0B132B).withValues(alpha: 0.35),
+                color: AppColors.ctNavy.withValues(alpha: 0.35),
                 blurRadius: 16,
                 offset: const Offset(0, 6),
               ),
@@ -259,7 +261,7 @@ class AuthCardHead extends StatelessWidget {
             child: SvgPicture.asset(
               'assets/images/Conectamos-Isotipo.svg',
               width: 26,
-              colorFilter: const ColorFilter.mode(Color(0xFF59E0CC), BlendMode.srcIn),
+              colorFilter: const ColorFilter.mode(AppColors.ctTeal, BlendMode.srcIn),
             ),
           ),
         ),
@@ -275,7 +277,7 @@ class AuthCardHead extends StatelessWidget {
               fontSize: 22,
               height: 1.2,
               letterSpacing: -0.6,
-              color: Color(0xFF0B132B),
+              color: AppColors.ctNavy,
             ),
             children: [
               TextSpan(text: before),
@@ -365,11 +367,11 @@ class _AuthFieldState extends State<AuthField> {
     final Color borderColor = hasError
         ? const Color(0xFFFCA5A5)
         : _focused
-            ? const Color(0xFF59E0CC)
+            ? AppColors.ctTeal
             : const Color(0xFFE3E6EB);
 
     final List<BoxShadow>? shadows = _focused && !hasError
-        ? [BoxShadow(color: const Color(0xFF59E0CC).withValues(alpha: 0.20), blurRadius: 0, spreadRadius: 3)]
+        ? [BoxShadow(color: AppColors.ctTeal.withValues(alpha: 0.20), blurRadius: 0, spreadRadius: 3)]
         : hasError
             ? [BoxShadow(color: const Color(0xFFE24C4B).withValues(alpha: 0.12), blurRadius: 0, spreadRadius: 3)]
             : null;
@@ -383,7 +385,7 @@ class _AuthFieldState extends State<AuthField> {
             fontFamily: 'Geist',
             fontSize: 12.5,
             fontWeight: FontWeight.w600,
-            color: Color(0xFF0B132B),
+            color: AppColors.ctNavy,
           ),
         ),
         const SizedBox(height: 6),
@@ -403,7 +405,7 @@ class _AuthFieldState extends State<AuthField> {
                 Icon(
                   widget.icon,
                   size: 18,
-                  color: _focused ? const Color(0xFF3A506B) : const Color(0xFF9AA0A3),
+                  color: _focused ? AppColors.ctInk700 : const Color(0xFF9AA0A3),
                 ),
                 const SizedBox(width: 8),
               ],
@@ -419,7 +421,7 @@ class _AuthFieldState extends State<AuthField> {
                   style: const TextStyle(
                     fontFamily: 'Geist',
                     fontSize: 14,
-                    color: Color(0xFF0B132B),
+                    color: AppColors.ctNavy,
                     letterSpacing: -0.1,
                   ),
                   decoration: InputDecoration(
@@ -516,10 +518,10 @@ class _AuthPrimaryButtonState extends State<AuthPrimaryButton> {
           width: double.infinity,
           decoration: BoxDecoration(
             color: disabled
-                ? const Color(0xFF59E0CC).withValues(alpha: 0.55)
+                ? AppColors.ctTeal.withValues(alpha: 0.55)
                 : _hovered
-                    ? const Color(0xFF66E2D0)
-                    : const Color(0xFF59E0CC),
+                    ? AppColors.ctTealHover
+                    : AppColors.ctTeal,
             borderRadius: BorderRadius.circular(12),
             boxShadow: disabled
                 ? null
@@ -553,7 +555,7 @@ class _AuthPrimaryButtonState extends State<AuthPrimaryButton> {
                   width: 20, height: 20,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF0B132B)),
+                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.ctNavy),
                   ),
                 )
               else
@@ -566,13 +568,13 @@ class _AuthPrimaryButtonState extends State<AuthPrimaryButton> {
                         fontFamily: 'Geist',
                         fontWeight: FontWeight.w700,
                         fontSize: 15,
-                        color: Color(0xFF0B132B),
+                        color: AppColors.ctNavy,
                         letterSpacing: -0.3,
                       ),
                     ),
                     if (widget.trailingIcon != null) ...[
                       const SizedBox(width: 8),
-                      Icon(widget.trailingIcon, size: 16, color: const Color(0xFF0B132B)),
+                      Icon(widget.trailingIcon, size: 16, color: AppColors.ctNavy),
                     ],
                   ],
                 ),
@@ -601,7 +603,7 @@ class AuthAlert extends StatelessWidget {
         color: _isError ? const Color(0xFFFEF2F2) : const Color(0xFFF0FDFA),
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
-          color: _isError ? const Color(0xFFFECACA) : const Color(0xFFCCFBF1),
+          color: _isError ? const Color(0xFFFECACA) : AppColors.ctTealLight,
         ),
       ),
       child: Row(
@@ -610,7 +612,7 @@ class AuthAlert extends StatelessWidget {
           Icon(
             _isError ? Icons.error_outline_rounded : Icons.check_circle_outline_rounded,
             size: 16,
-            color: _isError ? const Color(0xFFB42E2D) : const Color(0xFF0F766E),
+            color: _isError ? const Color(0xFFB42E2D) : AppColors.ctTealText,
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -620,7 +622,7 @@ class AuthAlert extends StatelessWidget {
                 fontFamily: 'Geist',
                 fontSize: 13,
                 letterSpacing: -0.1,
-                color: _isError ? const Color(0xFFB42E2D) : const Color(0xFF0F766E),
+                color: _isError ? const Color(0xFFB42E2D) : AppColors.ctTealText,
                 height: 1.4,
               ),
             ),
@@ -683,7 +685,7 @@ class _AuthSuccessBlockState extends State<AuthSuccessBlock>
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: const Color(0xFF59E0CC)
+                      color: AppColors.ctTeal
                           .withValues(alpha: (1.0 - _pulse.value) * 0.35),
                     ),
                   ),
@@ -709,7 +711,7 @@ class _AuthSuccessBlockState extends State<AuthSuccessBlock>
             fontWeight: FontWeight.w700,
             fontSize: 20,
             letterSpacing: -0.5,
-            color: Color(0xFF0B132B),
+            color: AppColors.ctNavy,
           ),
         ),
         const SizedBox(height: 8),

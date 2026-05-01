@@ -52,10 +52,10 @@ String _slugify(String input) {
 Color _hexColor(String? hex) {
   try {
     final h = (hex ?? '#9CA3AF').replaceAll('#', '');
-    if (h.length != 6) return const Color(0xFF9CA3AF);
+    if (h.length != 6) return AppColors.ctText3;
     return Color(int.parse('FF$h', radix: 16));
   } catch (_) {
-    return const Color(0xFF9CA3AF);
+    return AppColors.ctText3;
   }
 }
 
@@ -684,11 +684,7 @@ class _InfoTabState extends State<_InfoTab> {
               const SizedBox(height: 4),
               const Text(
                 'Identificador único. Derivado del nombre. Se usa en API e integraciones.',
-                style: TextStyle(
-                  fontFamily: 'Geist',
-                  fontSize: 11,
-                  color: AppColors.ctText2,
-                ),
+                style: AppTextStyles.bodySmall,
               ),
             ],
           ),
@@ -707,12 +703,7 @@ class _InfoTabState extends State<_InfoTab> {
           if (workerName != null) ...[
             const Text(
               'Worker asignado',
-              style: TextStyle(
-                fontFamily: 'Geist',
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-                color: AppColors.ctText,
-              ),
+              style: AppTextStyles.btnSecondary,
             ),
             const SizedBox(height: 8),
             Container(
@@ -737,11 +728,7 @@ class _InfoTabState extends State<_InfoTab> {
                   const SizedBox(width: 8),
                   Text(
                     workerName,
-                    style: const TextStyle(
-                      fontFamily: 'Geist',
-                      fontSize: 13,
-                      color: AppColors.ctText2,
-                    ),
+                    style: AppTextStyles.body.copyWith(color: AppColors.ctText2),
                   ),
                 ],
               ),
@@ -752,12 +739,7 @@ class _InfoTabState extends State<_InfoTab> {
           // Trigger sources
           const Text(
             '¿Desde dónde se puede iniciar este flujo?',
-            style: TextStyle(
-              fontFamily: 'Geist',
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-              color: AppColors.ctText,
-            ),
+            style: AppTextStyles.btnSecondary,
           ),
           const SizedBox(height: 10),
           Wrap(
@@ -890,17 +872,13 @@ class _CamposTab extends StatelessWidget {
         ),
 
         if (fields.isEmpty)
-          const SliverToBoxAdapter(
+          SliverToBoxAdapter(
             child: Padding(
-              padding: EdgeInsets.all(32),
+              padding: const EdgeInsets.all(32),
               child: Center(
                 child: Text(
                   'Sin campos configurados',
-                  style: TextStyle(
-                    fontFamily: 'Geist',
-                    fontSize: 13,
-                    color: AppColors.ctText2,
-                  ),
+                  style: AppTextStyles.body.copyWith(color: AppColors.ctText2),
                 ),
               ),
             ),
@@ -1006,11 +984,7 @@ class _FieldRow extends StatelessWidget {
                       ),
                       Text(
                         typeLabel,
-                        style: const TextStyle(
-                          fontFamily: 'Geist',
-                          fontSize: 11,
-                          color: AppColors.ctText2,
-                        ),
+                        style: AppTextStyles.bodySmall,
                       ),
                     ],
                   ),
@@ -1246,12 +1220,7 @@ class _FieldDialogState extends State<_FieldDialog> {
               // Type
               const Text(
                 'Tipo',
-                style: TextStyle(
-                  fontFamily: 'Geist',
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.ctText,
-                ),
+                style: AppTextStyles.btnSecondary,
               ),
               const SizedBox(height: 6),
               Container(
@@ -1279,11 +1248,7 @@ class _FieldDialogState extends State<_FieldDialog> {
                           const SizedBox(width: 8),
                           Text(
                             label,
-                            style: const TextStyle(
-                              fontFamily: 'Geist',
-                              fontSize: 13,
-                              color: AppColors.ctText,
-                            ),
+                            style: AppTextStyles.body,
                           ),
                         ],
                       ),
@@ -1305,12 +1270,7 @@ class _FieldDialogState extends State<_FieldDialog> {
                 const SizedBox(height: 14),
                 const Text(
                   'Fuente de datos',
-                  style: TextStyle(
-                    fontFamily: 'Geist',
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.ctText,
-                  ),
+                  style: AppTextStyles.btnSecondary,
                 ),
                 const SizedBox(height: 6),
                 Container(
@@ -1330,11 +1290,7 @@ class _FieldDialogState extends State<_FieldDialog> {
                       final (value, label) = entry;
                       return DropdownMenuItem(
                         value: value,
-                        child: Text(label,
-                            style: const TextStyle(
-                                fontFamily: 'Geist',
-                                fontSize: 13,
-                                color: AppColors.ctText)),
+                        child: Text(label, style: AppTextStyles.body),
                       );
                     }).toList(),
                     onChanged: (v) {
@@ -1355,12 +1311,7 @@ class _FieldDialogState extends State<_FieldDialog> {
                   const SizedBox(height: 10),
                   const Text(
                     'Flow asignado',
-                    style: TextStyle(
-                      fontFamily: 'Geist',
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      color: AppColors.ctText,
-                    ),
+                    style: AppTextStyles.btnSecondary,
                   ),
                   const SizedBox(height: 6),
                   if (_loadingFlows)
@@ -1379,12 +1330,9 @@ class _FieldDialogState extends State<_FieldDialog> {
                         border: Border.all(color: AppColors.ctBorder),
                         borderRadius: BorderRadius.circular(6),
                       ),
-                      child: const Text(
+                      child: Text(
                         'No hay flujos disponibles para este worker',
-                        style: TextStyle(
-                            fontFamily: 'Geist',
-                            fontSize: 13,
-                            color: AppColors.ctText2),
+                        style: AppTextStyles.body.copyWith(color: AppColors.ctText2),
                       ),
                     )
                   else
@@ -1431,12 +1379,7 @@ class _FieldDialogState extends State<_FieldDialog> {
                 const SizedBox(height: 14),
                 const Text(
                   'Cuando se ejecuta conversacionalmente',
-                  style: TextStyle(
-                    fontFamily: 'Geist',
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.ctText,
-                  ),
+                  style: AppTextStyles.btnSecondary,
                 ),
                 const SizedBox(height: 6),
                 Container(
@@ -1493,12 +1436,7 @@ class _FieldDialogState extends State<_FieldDialog> {
                   const Expanded(
                     child: Text(
                       'Requerido',
-                      style: TextStyle(
-                        fontFamily: 'Geist',
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                        color: AppColors.ctText,
-                      ),
+                      style: AppTextStyles.btnSecondary,
                     ),
                   ),
                   Switch(
@@ -1553,11 +1491,7 @@ class _EmptyState extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             message,
-            style: const TextStyle(
-              fontFamily: 'Geist',
-              fontSize: 13,
-              color: AppColors.ctText2,
-            ),
+            style: AppTextStyles.body.copyWith(color: AppColors.ctText2),
             textAlign: TextAlign.center,
           ),
         ],

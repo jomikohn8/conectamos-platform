@@ -8,9 +8,6 @@ import '../../core/theme/app_theme.dart';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const _kColorPalette = [
-  '#2DD4BF', '#818CF8', '#FB923C', '#F472B6', '#34D399', '#60A5FA',
-];
 
 const _kTypeConfig = {
   'logistics':   (label: 'Logística', bg: Color(0xFFDBEAFE), fg: Color(0xFF1E40AF)),
@@ -237,11 +234,7 @@ class _ActionBar extends StatelessWidget {
                 SizedBox(height: 1),
                 Text(
                   'Workers de IA contratados para tu operación',
-                  style: TextStyle(
-                    fontFamily: 'Geist',
-                    fontSize: 11,
-                    color: AppColors.ctText2,
-                  ),
+                  style: AppTextStyles.bodySmall,
                 ),
               ],
             ),
@@ -271,13 +264,9 @@ class _EmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text(
+            Text(
               'No tienes workers contratados aún.',
-              style: TextStyle(
-                fontFamily: 'Geist',
-                fontSize: 13,
-                color: AppColors.ctText2,
-              ),
+              style: AppTextStyles.body.copyWith(color: AppColors.ctText2),
             ),
             const SizedBox(height: 14),
             _PrimaryBtn(label: 'Ver catálogo', onTap: onOpenCatalog),
@@ -383,7 +372,7 @@ class _WorkerRowState extends State<_WorkerRow> {
     final w            = widget.worker;
     final displayName  = w['display_name'] as String? ?? w['catalog_name'] as String? ?? '—';
     final description  = w['catalog_description'] as String? ?? '';
-    final colorHex     = w['catalog_color'] as String? ?? _kColorPalette.first;
+    final colorHex     = w['catalog_color'] as String? ?? '#59E0CC';
     final workerType   = w['catalog_worker_type'] as String? ?? 'custom';
     final webhookUrl   = w['catalog_webhook_url'] as String? ?? '';
     final isActive     = w['is_active'] as bool? ?? false;
@@ -436,11 +425,7 @@ class _WorkerRowState extends State<_WorkerRow> {
                           const SizedBox(height: 2),
                           Text(
                             description,
-                            style: const TextStyle(
-                              fontFamily: 'Geist',
-                              fontSize: 12,
-                              color: AppColors.ctText2,
-                            ),
+                            style: AppTextStyles.navItem,
                             overflow: TextOverflow.ellipsis,
                           ),
                         ],
@@ -469,11 +454,7 @@ class _WorkerRowState extends State<_WorkerRow> {
               flex: 3,
               child: Text(
                 webhookUrl,
-                style: const TextStyle(
-                  fontFamily: 'Geist',
-                  fontSize: 12,
-                  color: AppColors.ctText2,
-                ),
+                style: AppTextStyles.navItem,
                 overflow: TextOverflow.ellipsis,
               ),
             ),
@@ -491,10 +472,7 @@ class _WorkerRowState extends State<_WorkerRow> {
                   ),
                   child: Text(
                     isActive ? 'Activo' : 'Inactivo',
-                    style: TextStyle(
-                      fontFamily: 'Geist',
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
+                    style: AppTextStyles.badge.copyWith(
                       color: isActive ? AppColors.ctOkText : AppColors.ctText2,
                     ),
                   ),
@@ -623,11 +601,7 @@ class _RenameDialogState extends State<_RenameDialog> {
                 const SizedBox(height: 4),
                 Text(
                   'Nombre original: $originalName',
-                  style: const TextStyle(
-                    fontFamily: 'Geist',
-                    fontSize: 12,
-                    color: AppColors.ctText2,
-                  ),
+                  style: AppTextStyles.navItem,
                 ),
               ],
               const SizedBox(height: 20),
@@ -818,11 +792,7 @@ class _CatalogDialogState extends State<_CatalogDialog> {
                   SizedBox(height: 4),
                   Text(
                     'Selecciona un worker para agregarlo a tu operación.',
-                    style: TextStyle(
-                      fontFamily: 'Geist',
-                      fontSize: 12,
-                      color: AppColors.ctText2,
-                    ),
+                    style: AppTextStyles.navItem,
                   ),
                 ],
               ),
@@ -833,16 +803,12 @@ class _CatalogDialogState extends State<_CatalogDialog> {
             // Catalog list
             Flexible(
               child: widget.catalog.isEmpty
-                  ? const Padding(
-                      padding: EdgeInsets.all(32),
+                  ? Padding(
+                      padding: const EdgeInsets.all(32),
                       child: Center(
                         child: Text(
                           'No hay workers en el catálogo.',
-                          style: TextStyle(
-                            fontFamily: 'Geist',
-                            fontSize: 13,
-                            color: AppColors.ctText2,
-                          ),
+                          style: AppTextStyles.body.copyWith(color: AppColors.ctText2),
                         ),
                       ),
                     )
@@ -854,7 +820,7 @@ class _CatalogDialogState extends State<_CatalogDialog> {
                         final catalogId   = item['id'] as String? ?? '';
                         final name        = item['name'] as String? ?? item['display_name'] as String? ?? '—';
                         final description = item['description'] as String? ?? '';
-                        final colorHex    = item['color'] as String? ?? _kColorPalette[i % _kColorPalette.length];
+                        final colorHex    = item['color'] as String? ?? '#59E0CC';
                         final isPublished = item['is_published'] as bool? ?? true;
                         final contracted  = _isContracted(catalogId);
                         final contracting = _contracting.contains(catalogId);
@@ -912,11 +878,7 @@ class _CatalogDialogState extends State<_CatalogDialog> {
                                       const SizedBox(height: 3),
                                       Text(
                                         description,
-                                        style: const TextStyle(
-                                          fontFamily: 'Geist',
-                                          fontSize: 12,
-                                          color: AppColors.ctText2,
-                                        ),
+                                        style: AppTextStyles.navItem,
                                       ),
                                     ],
                                     if (skills.isNotEmpty) ...[
@@ -935,11 +897,7 @@ class _CatalogDialogState extends State<_CatalogDialog> {
                                             ),
                                             child: Text(
                                               s,
-                                              style: const TextStyle(
-                                                fontFamily: 'Geist',
-                                                fontSize: 11,
-                                                color: AppColors.ctText2,
-                                              ),
+                                              style: AppTextStyles.bodySmall,
                                             ),
                                           );
                                         }).toList(),
@@ -981,15 +939,11 @@ class _CatalogDialogState extends State<_CatalogDialog> {
                                         color: AppColors.ctOkBg,
                                         borderRadius: BorderRadius.circular(20),
                                       ),
-                                      child: const Text(
+                                      child: Text(
                                         'Contratado',
-                                        style: TextStyle(
-                                          fontFamily: 'Geist',
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w600,
+                                        style: AppTextStyles.badge.copyWith(
                                           color: AppColors.ctOkText,
-                                        ),
-                                      ),
+                                        )),
                                     )
                                   else
                                     contracting
@@ -1055,12 +1009,7 @@ class _TypeBadge extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: TextStyle(
-          fontFamily: 'Geist',
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-          color: fg,
-        ),
+        style: AppTextStyles.badge.copyWith(color: fg),
       ),
     );
   }
@@ -1162,12 +1111,7 @@ class _GhostBtnState extends State<_GhostBtn> {
           ),
           child: Text(
             widget.label,
-            style: const TextStyle(
-              fontFamily: 'Geist',
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-              color: AppColors.ctText2,
-            ),
+            style: AppTextStyles.btnSecondary.copyWith(color: AppColors.ctText2),
           ),
         ),
       ),

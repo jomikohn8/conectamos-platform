@@ -25,9 +25,6 @@ dependencies:
   # Auth + DB
   supabase_flutter: ^2.9.0
 
-  # Fonts
-  google_fonts: ^6.2.1
-
   # SVG
   flutter_svg: ^2.0.10+1
 

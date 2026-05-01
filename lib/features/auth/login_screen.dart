@@ -95,27 +95,23 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             ),
             Expanded(
               flex: 10,
-              child: Center(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(56, 40, 40, 40),
-                  child: _buildCard(),
-                ),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(56, 40, 40, 40),
+                child: Center(child: _buildCard()),
               ),
             ),
           ],
         );
       }
-      return Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: _buildCard(),
-        ),
+      return SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Center(child: _buildCard()),
       );
     });
   }
 
   Widget _buildLeftPane() {
-    return Padding(
+    return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(16, 40, 56, 40),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -248,18 +244,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 label: 'Mantener sesión',
                 onChanged: (v) => setState(() => _remember = v),
               ),
-              MouseRegion(
-                cursor: SystemMouseCursors.click,
-                child: GestureDetector(
-                  onTap: () => context.go('/forgot-password'),
-                  child: const Text(
-                    '¿Olvidaste tu contraseña?',
-                    style: TextStyle(
-                      fontFamily: 'Geist',
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      color: Color(0xFF5BC0BE),
-                      letterSpacing: -0.1,
+              Flexible(
+                child: MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: GestureDetector(
+                    onTap: () => context.go('/forgot-password'),
+                    child: const Text(
+                      '¿Olvidaste tu contraseña?',
+                      style: TextStyle(
+                        fontFamily: 'Geist',
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: Color(0xFF5BC0BE),
+                        letterSpacing: -0.1,
+                      ),
                     ),
                   ),
                 ),
@@ -327,8 +325,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             decoration: const BoxDecoration(
               border: Border(top: BorderSide(color: Color(0xFFF1F1F1))),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+            child: Wrap(
+              alignment: WrapAlignment.center,
               children: [
                 const Text(
                   '¿Tienes una invitación? ',

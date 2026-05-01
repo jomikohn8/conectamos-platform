@@ -1,112 +1,181 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'colors.dart';
 
 abstract final class AppTextStyles {
-  static TextStyle get _base => GoogleFonts.inter();
+  // ── Títulos de página / screen title ─────────────────────────────────────
+  // Onest 700 · 15px · −0.02em (DS: Screen title)
+  static const TextStyle pageTitle = TextStyle(
+    fontFamily: 'Onest',
+    fontSize: 15,
+    fontWeight: FontWeight.w700,
+    color: AppColors.ctText,
+    letterSpacing: -0.02,
+  );
 
-  // Títulos de página
-  static TextStyle get pageTitle => _base.copyWith(
-        fontSize: 22,
-        fontWeight: FontWeight.w700,
-        color: AppColors.ctText,
-      );
+  // Geist 400 · 13px · −0.01em
+  static const TextStyle pageSubtitle = TextStyle(
+    fontFamily: 'Geist',
+    fontSize: 13,
+    fontWeight: FontWeight.w400,
+    color: AppColors.ctText2,
+    letterSpacing: -0.01,
+  );
 
-  static TextStyle get pageSubtitle => _base.copyWith(
-        fontSize: 14,
-        fontWeight: FontWeight.w400,
-        color: AppColors.ctText2,
-      );
+  // ── Títulos de sección / card ─────────────────────────────────────────────
+  // Onest 600 · 13px · −0.02em (DS: Section heading)
+  static const TextStyle cardTitle = TextStyle(
+    fontFamily: 'Onest',
+    fontSize: 13,
+    fontWeight: FontWeight.w600,
+    color: AppColors.ctText,
+    letterSpacing: -0.02,
+  );
 
-  // Títulos de sección / card
-  static TextStyle get cardTitle => _base.copyWith(
-        fontSize: 15,
-        fontWeight: FontWeight.w600,
-        color: AppColors.ctText,
-      );
+  // ── Topbar ────────────────────────────────────────────────────────────────
+  // Onest 700 · 15px · −0.02em
+  static const TextStyle topbarTitle = TextStyle(
+    fontFamily: 'Onest',
+    fontSize: 15,
+    fontWeight: FontWeight.w700,
+    color: AppColors.ctText,
+    letterSpacing: -0.02,
+  );
 
-  // Topbar
-  static TextStyle get topbarTitle => _base.copyWith(
-        fontSize: 15,
-        fontWeight: FontWeight.w700,
-        color: AppColors.ctText,
-      );
+  // Geist 400 · 11px
+  static const TextStyle topbarSubtitle = TextStyle(
+    fontFamily: 'Geist',
+    fontSize: 11,
+    fontWeight: FontWeight.w400,
+    color: AppColors.ctText2,
+    letterSpacing: -0.01,
+  );
 
-  static TextStyle get topbarSubtitle => _base.copyWith(
-        fontSize: 11,
-        fontWeight: FontWeight.w400,
-        color: AppColors.ctText2,
-      );
+  // ── Sidebar ───────────────────────────────────────────────────────────────
+  // Geist 400 · 12px · −0.01em
+  static const TextStyle navItem = TextStyle(
+    fontFamily: 'Geist',
+    fontSize: 12,
+    fontWeight: FontWeight.w400,
+    color: AppColors.ctText2,
+    letterSpacing: -0.01,
+  );
 
-  // Sidebar nav item
-  static TextStyle get navItem => _base.copyWith(
-        fontSize: 12,
-        fontWeight: FontWeight.w500,
-        color: AppColors.ctText2,
-      );
+  // Geist 600 · 12px · −0.01em
+  static const TextStyle navItemActive = TextStyle(
+    fontFamily: 'Geist',
+    fontSize: 12,
+    fontWeight: FontWeight.w600,
+    color: AppColors.ctTeal,
+    letterSpacing: -0.01,
+  );
 
-  static TextStyle get navItemActive => _base.copyWith(
-        fontSize: 12,
-        fontWeight: FontWeight.w600,
-        color: AppColors.ctTealDark,
-      );
+  // Geist 700 · 9px · +0.08em · uppercase (DS: Eyebrow / section label)
+  static const TextStyle navSectionLabel = TextStyle(
+    fontFamily: 'Geist',
+    fontSize: 9,
+    fontWeight: FontWeight.w700,
+    color: AppColors.ctText3,
+    letterSpacing: 0.08,
+  );
 
-  static TextStyle get navSectionLabel => _base.copyWith(
-        fontSize: 10,
-        fontWeight: FontWeight.w600,
-        color: AppColors.ctText3,
-        letterSpacing: 0.8,
-      );
+  // ── Formularios ───────────────────────────────────────────────────────────
+  // Geist 600 · 12px · −0.01em (DS: Label / metadata)
+  static const TextStyle formLabel = TextStyle(
+    fontFamily: 'Geist',
+    fontSize: 12,
+    fontWeight: FontWeight.w600,
+    color: AppColors.ctText,
+    letterSpacing: -0.01,
+  );
 
-  // Labels de formulario
-  static TextStyle get formLabel => _base.copyWith(
-        fontSize: 13,
-        fontWeight: FontWeight.w500,
-        color: AppColors.ctText,
-      );
+  // ── Cuerpo / datos ────────────────────────────────────────────────────────
+  // Geist 400 · 13px · −0.01em (DS: Body / chat message)
+  static const TextStyle body = TextStyle(
+    fontFamily: 'Geist',
+    fontSize: 13,
+    fontWeight: FontWeight.w400,
+    color: AppColors.ctText,
+    letterSpacing: -0.01,
+  );
 
-  // Cuerpo / datos
-  static TextStyle get body => _base.copyWith(
-        fontSize: 14,
-        fontWeight: FontWeight.w400,
-        color: AppColors.ctText,
-      );
+  // Geist 400 · 11px
+  static const TextStyle bodySmall = TextStyle(
+    fontFamily: 'Geist',
+    fontSize: 11,
+    fontWeight: FontWeight.w400,
+    color: AppColors.ctText2,
+    letterSpacing: -0.01,
+  );
 
-  static TextStyle get bodySmall => _base.copyWith(
-        fontSize: 12,
-        fontWeight: FontWeight.w400,
-        color: AppColors.ctText2,
-      );
+  // Geist 400 · 10px (DS: Timestamp / caption)
+  static const TextStyle caption = TextStyle(
+    fontFamily: 'Geist',
+    fontSize: 10,
+    fontWeight: FontWeight.w400,
+    color: AppColors.ctText3,
+  );
 
-  // Badge / tag
-  static TextStyle get badge => _base.copyWith(
-        fontSize: 11,
-        fontWeight: FontWeight.w600,
-      );
+  // ── Badges / tags ─────────────────────────────────────────────────────────
+  // Geist 600 · 11px · −0.01em
+  static const TextStyle badge = TextStyle(
+    fontFamily: 'Geist',
+    fontSize: 11,
+    fontWeight: FontWeight.w600,
+    letterSpacing: -0.01,
+  );
 
-  // Tenant chip label
-  static TextStyle get tenantLabel => _base.copyWith(
-        fontSize: 10,
-        fontWeight: FontWeight.w500,
-        color: AppColors.ctText3,
-      );
+  // ── Tenant / chips ────────────────────────────────────────────────────────
+  static const TextStyle tenantLabel = TextStyle(
+    fontFamily: 'Geist',
+    fontSize: 10,
+    fontWeight: FontWeight.w500,
+    color: AppColors.ctText3,
+    letterSpacing: -0.01,
+  );
 
-  static TextStyle get tenantName => _base.copyWith(
-        fontSize: 12,
-        fontWeight: FontWeight.w600,
-        color: AppColors.ctText,
-      );
+  static const TextStyle tenantName = TextStyle(
+    fontFamily: 'Geist',
+    fontSize: 12,
+    fontWeight: FontWeight.w600,
+    color: AppColors.ctText,
+    letterSpacing: -0.01,
+  );
 
-  // Botón primario
-  static TextStyle get btnPrimary => _base.copyWith(
-        fontSize: 14,
-        fontWeight: FontWeight.w600,
-        color: AppColors.ctNavy,
-      );
+  // ── Botones ───────────────────────────────────────────────────────────────
+  // Geist 700 · 13px · −0.01em (DS: Button / primary action)
+  static const TextStyle btnPrimary = TextStyle(
+    fontFamily: 'Geist',
+    fontSize: 13,
+    fontWeight: FontWeight.w700,
+    color: AppColors.ctNavy,
+    letterSpacing: -0.01,
+  );
 
-  static TextStyle get btnSecondary => _base.copyWith(
-        fontSize: 14,
-        fontWeight: FontWeight.w500,
-        color: AppColors.ctText,
-      );
+  // Geist 500 · 13px · −0.01em
+  static const TextStyle btnSecondary = TextStyle(
+    fontFamily: 'Geist',
+    fontSize: 13,
+    fontWeight: FontWeight.w500,
+    color: AppColors.ctText,
+    letterSpacing: -0.01,
+  );
+
+  // ── KPI values ────────────────────────────────────────────────────────────
+  // Onest 700 · 28px · −0.03em (DS: KPI value)
+  static const TextStyle kpiValue = TextStyle(
+    fontFamily: 'Onest',
+    fontSize: 28,
+    fontWeight: FontWeight.w700,
+    color: AppColors.ctText,
+    letterSpacing: -0.03,
+  );
+
+  // Geist 600 · 10px · +0.07em · uppercase (DS: KPI label)
+  static const TextStyle kpiLabel = TextStyle(
+    fontFamily: 'Geist',
+    fontSize: 10,
+    fontWeight: FontWeight.w600,
+    color: AppColors.ctText2,
+    letterSpacing: 0.07,
+  );
 }

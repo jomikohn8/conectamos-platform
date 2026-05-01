@@ -195,11 +195,7 @@ class _WorkflowsScreenState extends ConsumerState<WorkflowsScreen> {
           children: [
             Text(
               _error!,
-              style: const TextStyle(
-                fontFamily: 'Geist',
-                fontSize: 13,
-                color: AppColors.ctDanger,
-              ),
+              style: AppTextStyles.body.copyWith(color: AppColors.ctDanger),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 12),
@@ -213,13 +209,9 @@ class _WorkflowsScreenState extends ConsumerState<WorkflowsScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text(
+            Text(
               'No hay flujos configurados aún',
-              style: TextStyle(
-                fontFamily: 'Geist',
-                fontSize: 13,
-                color: AppColors.ctText2,
-              ),
+              style: AppTextStyles.body.copyWith(color: AppColors.ctText2),
             ),
             const SizedBox(height: 12),
             if (canManage) _PrimaryButton(label: '+ Crear primer flujo', onTap: () => _openForm()),
@@ -283,11 +275,7 @@ class _ActionBar extends StatelessWidget {
                 SizedBox(height: 1),
                 Text(
                   'Configura los flujos de reporte de tus operadores',
-                  style: TextStyle(
-                    fontFamily: 'Geist',
-                    fontSize: 11,
-                    color: AppColors.ctText2,
-                  ),
+                  style: AppTextStyles.bodySmall,
                 ),
               ],
             ),
@@ -631,11 +619,7 @@ class _FieldRow extends StatelessWidget {
                 ),
                 child: Text(
                   type,
-                  style: const TextStyle(
-                    fontFamily: 'Geist',
-                    fontSize: 11,
-                    color: AppColors.ctText2,
-                  ),
+                  style: AppTextStyles.bodySmall,
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -845,21 +829,13 @@ class _FlowFormDialogState extends State<_FlowFormDialog> {
                   ),
                   child: Text(
                     editWorkerName ?? '—',
-                    style: const TextStyle(
-                      fontFamily: 'Geist',
-                      fontSize: 13,
-                      color: AppColors.ctText2,
-                    ),
+                    style: AppTextStyles.body.copyWith(color: AppColors.ctText2),
                   ),
                 )
               else if (widget.workers.isEmpty)
-                const Text(
+                Text(
                   'No hay workers disponibles',
-                  style: TextStyle(
-                    fontFamily: 'Geist',
-                    fontSize: 13,
-                    color: AppColors.ctText2,
-                  ),
+                  style: AppTextStyles.body.copyWith(color: AppColors.ctText2),
                 )
               else
                 Container(
@@ -895,11 +871,7 @@ class _FlowFormDialogState extends State<_FlowFormDialog> {
                             const SizedBox(width: 8),
                             Text(
                               wName,
-                              style: const TextStyle(
-                                fontFamily: 'Geist',
-                                fontSize: 13,
-                                color: AppColors.ctText,
-                              ),
+                              style: AppTextStyles.body,
                             ),
                           ],
                         ),
@@ -960,11 +932,7 @@ class _MetadataChip extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: const TextStyle(
-          fontFamily: 'Geist',
-          fontSize: 11,
-          color: AppColors.ctText2,
-        ),
+        style: AppTextStyles.bodySmall,
       ),
     );
   }
@@ -998,11 +966,7 @@ class _WorkerChip extends StatelessWidget {
           const SizedBox(width: 5),
           Text(
             name,
-            style: const TextStyle(
-              fontFamily: 'Geist',
-              fontSize: 11,
-              color: AppColors.ctText2,
-            ),
+            style: AppTextStyles.bodySmall,
           ),
         ],
       ),

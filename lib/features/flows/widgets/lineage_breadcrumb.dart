@@ -53,7 +53,7 @@ class LineageBreadcrumb extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 20),
       decoration: BoxDecoration(
         color: Colors.white,
-        border: Border.all(color: const Color(0xFFE5E7EB)),
+        border: Border.all(color: AppColors.ctBorder),
         borderRadius: BorderRadius.circular(12),
       ),
       child: LayoutBuilder(
@@ -188,7 +188,7 @@ class _CompactRow extends StatelessWidget {
               border: const Color(0xFF99F6E4),
               icon: _typeIconFor(
                   _firstTrigger(child0!['trigger_sources'] as List? ?? [])),
-              iconColor: const Color(0xFF0F766E),
+              iconColor: AppColors.ctTealText,
               onTap: () {
                 final id = child0!['id'] as String?;
                 if (id != null) context.go('/executions/$id');
@@ -351,9 +351,9 @@ class _ChildChip extends StatelessWidget {
   final Map<String, dynamic> child;
 
   static Color _statusDotColor(String? status) => switch (status) {
-        'active' || 'in_progress' => const Color(0xFF3B82F6),
-        'abandoned' || 'escalated' => const Color(0xFFEF4444),
-        _ => const Color(0xFFF59E0B),
+        'active' || 'in_progress' => AppColors.ctInfo,
+        'abandoned' || 'escalated' => AppColors.ctDanger,
+        _ => AppColors.ctWarn,
       };
 
   @override
@@ -366,7 +366,7 @@ class _ChildChip extends StatelessWidget {
 
     const bg = Color(0xFFE6FBF6);
     const bd = Color(0xFF99F6E4);
-    const fg = Color(0xFF0F766E);
+    const fg = AppColors.ctTealText;
 
     return MouseRegion(
       cursor: SystemMouseCursors.click,
@@ -567,7 +567,7 @@ class _Dots extends StatelessWidget {
                 width: 3,
                 height: 3,
                 decoration: const BoxDecoration(
-                  color: Color(0xFFD1D5DB),
+                  color: AppColors.ctBorder2,
                   shape: BoxShape.circle,
                 ),
               ),

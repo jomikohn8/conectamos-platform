@@ -724,11 +724,7 @@ class _BroadcastHeader extends StatelessWidget {
                 SizedBox(height: 1),
                 Text(
                   'Envía un mensaje masivo a tus operadores',
-                  style: TextStyle(
-                    fontFamily: 'Geist',
-                    fontSize: 11,
-                    color: AppColors.ctText2,
-                  ),
+                  style: AppTextStyles.topbarSubtitle,
                 ),
               ],
             ),
@@ -853,10 +849,10 @@ class _FormColumn extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
             color: channelId.isEmpty
-                ? const Color(0xFFFEF3C7)
+                ? AppColors.ctWarnBg
                 : (isTelegram
                     ? const Color(0xFFEDE9FE)
-                    : const Color(0xFFD1FAE5)),
+                    : AppColors.ctOkBg),
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
               color: channelId.isEmpty
@@ -877,10 +873,10 @@ class _FormColumn extends StatelessWidget {
                         : Icons.chat_bubble_outline_rounded),
                 size: 14,
                 color: channelId.isEmpty
-                    ? const Color(0xFF92400E)
+                    ? AppColors.ctWarnText
                     : (isTelegram
                         ? const Color(0xFF7C3AED)
-                        : const Color(0xFF065F46)),
+                        : AppColors.ctOkText),
               ),
               const SizedBox(width: 8),
               Text(
@@ -892,10 +888,10 @@ class _FormColumn extends StatelessWidget {
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
                   color: channelId.isEmpty
-                      ? const Color(0xFF92400E)
+                      ? AppColors.ctWarnText
                       : (isTelegram
                           ? const Color(0xFF7C3AED)
-                          : const Color(0xFF065F46)),
+                          : AppColors.ctOkText),
                 ),
               ),
             ],
@@ -936,13 +932,9 @@ class _FormColumn extends StatelessWidget {
                   const SizedBox(height: 10),
                 ],
                 if (templates.isEmpty)
-                  const Text(
+                  Text(
                     'No hay plantillas APPROVED disponibles.',
-                    style: TextStyle(
-                      fontFamily: 'Geist',
-                      fontSize: 12,
-                      color: AppColors.ctText2,
-                    ),
+                    style: AppTextStyles.navItem,
                   )
                 else
                   _TemplateDropdown(
@@ -1030,7 +1022,7 @@ class _FormColumn extends StatelessWidget {
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
                   color: selectedCount > 0
-                      ? const Color(0xFFCCFBF1)
+                      ? AppColors.ctTealLight
                       : AppColors.ctSurface2,
                   borderRadius: BorderRadius.circular(8),
                 ),
@@ -1049,10 +1041,7 @@ class _FormColumn extends StatelessWidget {
                       '$selectedCount operador'
                       '${selectedCount != 1 ? 'es' : ''} seleccionado'
                       '${selectedCount != 1 ? 's' : ''}',
-                      style: TextStyle(
-                        fontFamily: 'Geist',
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
+                      style: AppTextStyles.tenantName.copyWith(
                         color: selectedCount > 0
                             ? AppColors.ctTeal
                             : AppColors.ctText3,
@@ -1180,11 +1169,7 @@ class _PreviewColumn extends StatelessWidget {
                     ),
                     child: Text(
                       previewText,
-                      style: const TextStyle(
-                        fontFamily: 'Geist',
-                        fontSize: 13,
-                        color: Color(0xFF111827),
-                      ),
+                      style: AppTextStyles.body,
                     ),
                   ),
                 ),
@@ -1217,13 +1202,9 @@ class _PreviewColumn extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               if (filtered.isEmpty)
-                const Text(
+                Text(
                   'Ningún operador coincide con los filtros.',
-                  style: TextStyle(
-                    fontFamily: 'Geist',
-                    fontSize: 12,
-                    color: AppColors.ctText2,
-                  ),
+                  style: AppTextStyles.navItem,
                 )
               else
                 ...filtered.map((op) {
@@ -1252,21 +1233,12 @@ class _PreviewColumn extends StatelessWidget {
                             children: [
                               Text(
                                 name,
-                                style: const TextStyle(
-                                  fontFamily: 'Geist',
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w500,
-                                  color: AppColors.ctText,
-                                ),
+                                style: AppTextStyles.btnSecondary,
                               ),
                               if (phone.isNotEmpty)
                                 Text(
                                   phone,
-                                  style: const TextStyle(
-                                    fontFamily: 'Geist',
-                                    fontSize: 11,
-                                    color: AppColors.ctText2,
-                                  ),
+                                  style: AppTextStyles.bodySmall,
                                 ),
                             ],
                           ),
@@ -1279,8 +1251,8 @@ class _PreviewColumn extends StatelessWidget {
                                 horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
                               color: windowOpen
-                                  ? const Color(0xFFD1FAE5)
-                                  : const Color(0xFFFEE2E2),
+                                  ? AppColors.ctOkBg
+                                  : AppColors.ctRedBg,
                               borderRadius: BorderRadius.circular(10),
                             ),
                             child: Text(
@@ -1290,8 +1262,8 @@ class _PreviewColumn extends StatelessWidget {
                                 fontSize: 10,
                                 fontWeight: FontWeight.w600,
                                 color: windowOpen
-                                    ? const Color(0xFF065F46)
-                                    : const Color(0xFF991B1B),
+                                    ? AppColors.ctOkText
+                                    : AppColors.ctRedText,
                               ),
                             ),
                           ),
@@ -1337,10 +1309,7 @@ class _PreviewColumn extends StatelessWidget {
                         color: AppColors.ctNavy,
                         borderRadius: BorderRadius.circular(6),
                       ),
-                      textStyle: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 11,
-                          fontFamily: 'Geist'),
+                      textStyle: AppTextStyles.bodySmall.copyWith(color: Colors.white),
                       child: Opacity(opacity: 0.5, child: row),
                     );
                   }
@@ -1424,20 +1393,12 @@ class _HistorySection extends ConsumerWidget {
                 ),
                 error: (e, _) => Text(
                   'Error al cargar historial: $e',
-                  style: const TextStyle(
-                    fontFamily: 'Geist',
-                    fontSize: 12,
-                    color: AppColors.ctText2,
-                  ),
+                  style: AppTextStyles.navItem,
                 ),
                 data: (history) => history.isEmpty
-                    ? const Text(
+                    ? Text(
                         'No hay broadcasts enviados aún.',
-                        style: TextStyle(
-                          fontFamily: 'Geist',
-                          fontSize: 13,
-                          color: AppColors.ctText2,
-                        ),
+                        style: AppTextStyles.body.copyWith(color: AppColors.ctText2),
                       )
                     : Column(
                         children: history
@@ -1501,20 +1462,12 @@ class _HistoryItem extends StatelessWidget {
                   if (preview.isNotEmpty)
                     Text(
                       preview,
-                      style: const TextStyle(
-                        fontFamily: 'Geist',
-                        fontSize: 13,
-                        color: AppColors.ctText,
-                      ),
+                      style: AppTextStyles.body,
                     ),
                   const SizedBox(height: 2),
                   Text(
                     dateStr,
-                    style: const TextStyle(
-                      fontFamily: 'Geist',
-                      fontSize: 11,
-                      color: AppColors.ctText2,
-                    ),
+                    style: AppTextStyles.bodySmall,
                   ),
                 ],
               ),
@@ -1527,11 +1480,7 @@ class _HistoryItem extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   '$sent enviados · $failed fallaron',
-                  style: const TextStyle(
-                    fontFamily: 'Geist',
-                    fontSize: 11,
-                    color: AppColors.ctText2,
-                  ),
+                  style: AppTextStyles.bodySmall,
                 ),
               ],
             ),
@@ -1622,11 +1571,7 @@ class _BroadcastDetailDialog extends StatelessWidget {
                         ),
                         child: Text(
                           msgText,
-                          style: const TextStyle(
-                            fontFamily: 'Geist',
-                            fontSize: 13,
-                            color: AppColors.ctText,
-                          ),
+                          style: AppTextStyles.body,
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -1653,11 +1598,7 @@ class _BroadcastDetailDialog extends StatelessWidget {
                               Expanded(
                                 child: Text(
                                   name,
-                                  style: const TextStyle(
-                                    fontFamily: 'Geist',
-                                    fontSize: 13,
-                                    color: AppColors.ctText,
-                                  ),
+                                  style: AppTextStyles.body,
                                 ),
                               ),
                               _StatusBadge(status: rStatus),
@@ -1724,12 +1665,7 @@ class _Label extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       text,
-      style: const TextStyle(
-        fontFamily: 'Geist',
-        fontSize: 12,
-        fontWeight: FontWeight.w600,
-        color: AppColors.ctText,
-      ),
+      style: AppTextStyles.tenantName,
     );
   }
 }
@@ -1794,10 +1730,7 @@ class _ToggleItem extends StatelessWidget {
         ),
         child: Text(
           label,
-          style: TextStyle(
-            fontFamily: 'Geist',
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
+          style: AppTextStyles.tenantName.copyWith(
             color: active ? AppColors.ctTeal : AppColors.ctText2,
           ),
         ),
@@ -1816,8 +1749,7 @@ class _BuildTextField extends StatelessWidget {
       controller: ctrl,
       maxLines: 5,
       minLines: 3,
-      style: const TextStyle(
-          fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText),
+      style: AppTextStyles.body,
       decoration: InputDecoration(
         hintText:
             'Escribe el mensaje que recibirán todos los operadores...',
@@ -1882,8 +1814,7 @@ class _TemplateDropdown extends StatelessWidget {
                 fontSize: 13,
                 color: AppColors.ctText3),
           ),
-          style: const TextStyle(
-              fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText),
+          style: AppTextStyles.body,
           icon: const Icon(
             Icons.keyboard_arrow_down_rounded,
             size: 16,
@@ -1944,10 +1875,7 @@ class _FilterChipState extends State<_FilterChip> {
           ),
           child: Text(
             widget.label,
-            style: TextStyle(
-              fontFamily: 'Geist',
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
+            style: AppTextStyles.tenantName.copyWith(
               color: widget.selected ? Colors.white : AppColors.ctText2,
             ),
           ),
@@ -2052,7 +1980,7 @@ class _ConfirmBox extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFFFEF3C7),
+        color: AppColors.ctWarnBg,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: const Color(0xFFFDE68A)),
       ),
@@ -2062,7 +1990,7 @@ class _ConfirmBox extends StatelessWidget {
           Row(
             children: [
               const Icon(Icons.warning_amber_rounded,
-                  size: 16, color: Color(0xFF92400E)),
+                  size: 16, color: AppColors.ctWarnText),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -2071,7 +1999,7 @@ class _ConfirmBox extends StatelessWidget {
                     fontFamily: 'Geist',
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF92400E),
+                    color: AppColors.ctWarnText,
                   ),
                 ),
               ),
@@ -2105,23 +2033,19 @@ class _WarningBanner extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFFFEF3C7),
+        color: AppColors.ctWarnBg,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: const Color(0xFFFDE68A)),
       ),
       child: Row(
         children: [
           const Icon(Icons.warning_amber_rounded,
-              size: 14, color: Color(0xFF92400E)),
+              size: 14, color: AppColors.ctWarnText),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               message,
-              style: const TextStyle(
-                fontFamily: 'Geist',
-                fontSize: 11,
-                color: Color(0xFF92400E),
-              ),
+              style: AppTextStyles.bodySmall.copyWith(color: AppColors.ctWarnText),
             ),
           ),
         ],
@@ -2172,8 +2096,7 @@ class _ResultBanner extends StatelessWidget {
         Expanded(
           child: Text(
             message,
-            style: TextStyle(
-                fontFamily: 'Geist', fontSize: 13, color: textColor),
+            style: AppTextStyles.body.copyWith(color: textColor),
           ),
         ),
       ],
@@ -2213,10 +2136,7 @@ class _ResultBanner extends StatelessWidget {
           initiallyExpanded: false,
           subtitle: Text(
             'Ver detalle de errores (${errors.length})',
-            style: TextStyle(
-                fontFamily: 'Geist',
-                fontSize: 11,
-                color: textColor.withValues(alpha: 0.8)),
+            style: AppTextStyles.bodySmall.copyWith(color: textColor.withValues(alpha: 0.8)),
           ),
           children: errors.map((e) {
             final phone  = e['phone']?.toString() ??
@@ -2237,10 +2157,7 @@ class _ResultBanner extends StatelessWidget {
                   Expanded(
                     child: Text(
                       '$phone — $errMsg',
-                      style: TextStyle(
-                          fontFamily: 'Geist',
-                          fontSize: 11,
-                          color: textColor),
+                      style: AppTextStyles.bodySmall.copyWith(color: textColor),
                     ),
                   ),
                 ],
@@ -2273,8 +2190,8 @@ class _StatusBadge extends StatelessWidget {
         textColor = AppColors.ctRedText;
         label     = 'Fallido';
       case 'partial':
-        bg        = const Color(0xFFFEF3C7);
-        textColor = const Color(0xFF92400E);
+        bg        = AppColors.ctWarnBg;
+        textColor = AppColors.ctWarnText;
         label     = 'Parcial';
       default:
         bg        = AppColors.ctSurface2;
@@ -2290,12 +2207,7 @@ class _StatusBadge extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: TextStyle(
-          fontFamily: 'Geist',
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-          color: textColor,
-        ),
+        style: AppTextStyles.badge.copyWith(color: textColor),
       ),
     );
   }
@@ -2393,12 +2305,7 @@ class _OutlineButtonState extends State<_OutlineButton> {
           ),
           child: Text(
             widget.label,
-            style: const TextStyle(
-              fontFamily: 'Geist',
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-              color: AppColors.ctText2,
-            ),
+            style: AppTextStyles.btnSecondary.copyWith(color: AppColors.ctText2),
           ),
         ),
       ),
@@ -2441,12 +2348,7 @@ class _VarChipState extends State<_VarChip> {
           ),
           child: Text(
             '+ {${widget.label}}',
-            style: const TextStyle(
-              fontFamily: 'Geist',
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: AppColors.ctTealDark,
-            ),
+            style: AppTextStyles.badge.copyWith(color: AppColors.ctTealDark),
           ),
         ),
       ),
@@ -2516,7 +2418,7 @@ class _FlowCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: const Color(0xFFCCFBF1),
+        color: AppColors.ctTealLight,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: AppColors.ctTeal),
       ),
@@ -2532,12 +2434,7 @@ class _FlowCard extends StatelessWidget {
             children: [
               Text(
                 label,
-                style: const TextStyle(
-                  fontFamily: 'Geist',
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.ctTealDark,
-                ),
+                style: AppTextStyles.tenantName.copyWith(color: AppColors.ctTealDark),
               ),
               const Text(
                 'Worker activo',
@@ -2593,7 +2490,7 @@ class _AddFlowChipState extends State<_AddFlowChip> {
           padding:
               const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
-            color: _hovered ? const Color(0xFFCCFBF1) : Colors.transparent,
+            color: _hovered ? AppColors.ctTealLight : Colors.transparent,
             borderRadius: BorderRadius.circular(8),
             border: Border.all(color: AppColors.ctTeal, width: 1.5),
           ),
@@ -2605,12 +2502,7 @@ class _AddFlowChipState extends State<_AddFlowChip> {
               const SizedBox(width: 4),
               Text(
                 widget.label,
-                style: const TextStyle(
-                  fontFamily: 'Geist',
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.ctTeal,
-                ),
+                style: AppTextStyles.tenantName.copyWith(color: AppColors.ctTeal),
               ),
             ],
           ),

@@ -125,127 +125,140 @@ final routerProvider = Provider<GoRouter>((ref) {
           return NoTransitionPage(child: ResetPasswordScreen(token: token));
         },
       ),
-      ShellRoute(
-        pageBuilder: (context, state, child) => NoTransitionPage(
-          child: AppShell(child: child),
+      StatefulShellRoute.indexedStack(
+        pageBuilder: (context, state, navigationShell) => NoTransitionPage(
+          child: AppShell(navigationShell: navigationShell),
         ),
-        routes: [
-          GoRoute(
-            path: '/overview',
-            pageBuilder: (context, state) => const NoTransitionPage(
-              child: OverviewScreen(),
+        branches: [
+          // Branch 0 — Overview
+          StatefulShellBranch(routes: [
+            GoRoute(
+              path: '/overview',
+              pageBuilder: (c, s) => const NoTransitionPage(child: OverviewScreen()),
             ),
-          ),
-          GoRoute(
-            path: '/conversations',
-            pageBuilder: (context, state) => const NoTransitionPage(
-              child: ConversationsScreen(),
+          ]),
+          // Branch 1 — Conversations
+          StatefulShellBranch(routes: [
+            GoRoute(
+              path: '/conversations',
+              pageBuilder: (c, s) => const NoTransitionPage(child: ConversationsScreen()),
             ),
-          ),
-          GoRoute(
-            path: '/broadcast',
-            pageBuilder: (context, state) => const NoTransitionPage(
-              child: BroadcastScreen(),
+          ]),
+          // Branch 2 — Broadcast
+          StatefulShellBranch(routes: [
+            GoRoute(
+              path: '/broadcast',
+              pageBuilder: (c, s) => const NoTransitionPage(child: BroadcastScreen()),
             ),
-          ),
-          GoRoute(
-            path: '/dashboard',
-            pageBuilder: (context, state) => const NoTransitionPage(
-              child: DashboardScreen(),
+          ]),
+          // Branch 3 — Dashboard
+          StatefulShellBranch(routes: [
+            GoRoute(
+              path: '/dashboard',
+              pageBuilder: (c, s) => const NoTransitionPage(child: DashboardScreen()),
             ),
-          ),
-          GoRoute(
-            path: '/operators',
-            pageBuilder: (context, state) => const NoTransitionPage(
-              child: OperatorsScreen(),
+          ]),
+          // Branch 4 — Operators
+          StatefulShellBranch(routes: [
+            GoRoute(
+              path: '/operators',
+              pageBuilder: (c, s) => const NoTransitionPage(child: OperatorsScreen()),
+              routes: [
+                GoRoute(
+                  path: ':id',
+                  pageBuilder: (c, s) => NoTransitionPage(
+                    child: OperatorDetailScreen(operatorId: s.pathParameters['id'] ?? ''),
+                  ),
+                ),
+              ],
             ),
-          ),
-          GoRoute(
-            path: '/executions',
-            pageBuilder: (context, state) => const NoTransitionPage(
-              child: AllExecutionsScreen(),
+          ]),
+          // Branch 5 — Executions
+          StatefulShellBranch(routes: [
+            GoRoute(
+              path: '/executions',
+              pageBuilder: (c, s) => const NoTransitionPage(child: AllExecutionsScreen()),
+              routes: [
+                GoRoute(
+                  path: ':executionId',
+                  pageBuilder: (c, s) => NoTransitionPage(
+                    child: ExecutionDetailScreen(executionId: s.pathParameters['executionId'] ?? ''),
+                  ),
+                ),
+              ],
             ),
-          ),
-          GoRoute(
-            path: '/tareas',
-            pageBuilder: (context, state) => const NoTransitionPage(
-              child: ExecutionsScreen(),
+          ]),
+          // Branch 6 — Tareas
+          StatefulShellBranch(routes: [
+            GoRoute(
+              path: '/tareas',
+              pageBuilder: (c, s) => const NoTransitionPage(child: ExecutionsScreen()),
             ),
-          ),
-          GoRoute(
-            path: '/escalaciones',
-            pageBuilder: (context, state) => const NoTransitionPage(
-              child: EscalacionesScreen(),
+          ]),
+          // Branch 7 — Escalaciones
+          StatefulShellBranch(routes: [
+            GoRoute(
+              path: '/escalaciones',
+              pageBuilder: (c, s) => const NoTransitionPage(child: EscalacionesScreen()),
             ),
-          ),
-          GoRoute(
-            path: '/flows',
-            pageBuilder: (context, state) => const NoTransitionPage(
-              child: WorkflowsScreen(),
+          ]),
+          // Branch 8 — Flows
+          StatefulShellBranch(routes: [
+            GoRoute(
+              path: '/flows',
+              pageBuilder: (c, s) => const NoTransitionPage(child: WorkflowsScreen()),
+              routes: [
+                GoRoute(
+                  path: ':flowId',
+                  pageBuilder: (c, s) => NoTransitionPage(
+                    child: FlowDetailScreen(flowId: s.pathParameters['flowId'] ?? ''),
+                  ),
+                ),
+              ],
             ),
-          ),
-          GoRoute(
-            path: '/executions/:executionId',
-            pageBuilder: (context, state) {
-              final executionId = state.pathParameters['executionId'] ?? '';
-              return NoTransitionPage(
-                  child: ExecutionDetailScreen(executionId: executionId));
-            },
-          ),
-          GoRoute(
-            path: '/flows/:flowId',
-            pageBuilder: (context, state) {
-              final flowId = state.pathParameters['flowId'] ?? '';
-              return NoTransitionPage(child: FlowDetailScreen(flowId: flowId));
-            },
-          ),
-          GoRoute(
-            path: '/workers',
-            pageBuilder: (context, state) => const NoTransitionPage(
-              child: AiWorkersScreen(),
+          ]),
+          // Branch 9 — Workers
+          StatefulShellBranch(routes: [
+            GoRoute(
+              path: '/workers',
+              pageBuilder: (c, s) => const NoTransitionPage(child: AiWorkersScreen()),
             ),
-          ),
-          GoRoute(
-            path: '/channels',
-            pageBuilder: (context, state) => const NoTransitionPage(
-              child: ChannelsScreen(),
+          ]),
+          // Branch 10 — Channels
+          StatefulShellBranch(routes: [
+            GoRoute(
+              path: '/channels',
+              pageBuilder: (c, s) => const NoTransitionPage(child: ChannelsScreen()),
+              routes: [
+                GoRoute(
+                  path: ':channelId',
+                  pageBuilder: (c, s) => NoTransitionPage(
+                    child: ChannelDetailScreen(channelId: s.pathParameters['channelId'] ?? ''),
+                  ),
+                ),
+              ],
             ),
-          ),
-          GoRoute(
-            path: '/channels/:channelId',
-            pageBuilder: (context, state) {
-              final channelId = state.pathParameters['channelId'] ?? '';
-              return NoTransitionPage(
-                child: ChannelDetailScreen(channelId: channelId),
-              );
-            },
-          ),
-          GoRoute(
-            path: '/connections',
-            pageBuilder: (context, state) => const NoTransitionPage(
-              child: ConnectionsScreen(),
+          ]),
+          // Branch 11 — Connections
+          StatefulShellBranch(routes: [
+            GoRoute(
+              path: '/connections',
+              pageBuilder: (c, s) => const NoTransitionPage(child: ConnectionsScreen()),
             ),
-          ),
-          GoRoute(
-            path: '/settings',
-            pageBuilder: (context, state) => const NoTransitionPage(
-              child: SettingsScreen(),
+          ]),
+          // Branch 12 — Settings
+          StatefulShellBranch(routes: [
+            GoRoute(
+              path: '/settings',
+              pageBuilder: (c, s) => const NoTransitionPage(child: SettingsScreen()),
+              routes: [
+                GoRoute(
+                  path: 'operator-fields',
+                  pageBuilder: (c, s) => const NoTransitionPage(child: OperatorFieldsScreen()),
+                ),
+              ],
             ),
-          ),
-          GoRoute(
-            path: '/settings/operator-fields',
-            pageBuilder: (context, state) => const NoTransitionPage(
-              child: OperatorFieldsScreen(),
-            ),
-          ),
-          GoRoute(
-            path: '/operators/:id',
-            pageBuilder: (context, state) {
-              final id = state.pathParameters['id'] ?? '';
-              return NoTransitionPage(
-                  child: OperatorDetailScreen(operatorId: id));
-            },
-          ),
+          ]),
         ],
       ),
     ],

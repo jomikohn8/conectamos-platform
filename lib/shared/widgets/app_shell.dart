@@ -4,6 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../core/api/overview_api.dart';
 import '../../core/config.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/providers/escalaciones_provider.dart';
@@ -26,11 +27,18 @@ final activeTenantProvider = Provider<String>((ref) {
   return ref.watch(currentTenantProvider);
 });
 
+/// KPIs del tenant activo — usado en el topbar.
+final _kpiDataProvider = FutureProvider.autoDispose
+    .family<Map<String, dynamic>, String>((ref, tenantId) async {
+  if (tenantId.isEmpty) return {};
+  return OverviewApi.getKpis(tenantId: tenantId);
+});
+
 // ── AppShell ──────────────────────────────────────────────────────────────────
 
 class AppShell extends ConsumerStatefulWidget {
-  const AppShell({super.key, required this.child});
-  final Widget child;
+  const AppShell({super.key, required this.navigationShell});
+  final StatefulNavigationShell navigationShell;
 
   @override
   ConsumerState<AppShell> createState() => _AppShellState();
@@ -63,6 +71,7 @@ class _AppShellState extends ConsumerState<AppShell> {
         }
       });
     });
+
     return Scaffold(
       backgroundColor: AppColors.ctBg,
       body: Column(
@@ -72,16 +81,8 @@ class _AppShellState extends ConsumerState<AppShell> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const _Sidebar(),
-                Expanded(
-                  child: Column(
-                    children: [
-                      // Cada pantalla gestiona su propio scroll internamente
-                      Expanded(child: widget.child),
-                      const _Footer(),
-                    ],
-                  ),
-                ),
+                _Sidebar(navigationShell: widget.navigationShell),
+                Expanded(child: widget.navigationShell),
               ],
             ),
           ),
@@ -90,6 +91,24 @@ class _AppShellState extends ConsumerState<AppShell> {
     );
   }
 }
+
+// ── Branch index map — sincronizado con el orden de StatefulShellRoute ────────
+
+const _kRouteBranchIndex = {
+  '/overview':      0,
+  '/conversations': 1,
+  '/broadcast':     2,
+  '/dashboard':     3,
+  '/operators':     4,
+  '/executions':    5,
+  '/tareas':        6,
+  '/escalaciones':  7,
+  '/flows':         8,
+  '/workers':       9,
+  '/channels':      10,
+  '/connections':   11,
+  '/settings':      12,
+};
 
 // ── TOPBAR ────────────────────────────────────────────────────────────────────
 
@@ -98,71 +117,87 @@ class _Topbar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final collapsed = ref.watch(sidebarCollapsedProvider);
-    final email     = ref.watch(currentUserEmailProvider);
+    final collapsed  = ref.watch(sidebarCollapsedProvider);
+    final email      = ref.watch(currentUserEmailProvider);
+    final tenantId   = ref.watch(activeTenantIdProvider);
+    final tenantName = ref.watch(activeTenantDisplayProvider);
+    final kpiAsync   = ref.watch(_kpiDataProvider(tenantId));
 
     return Container(
       height: 52,
-      decoration: BoxDecoration(
-        color: AppColors.ctNavy,
+      decoration: const BoxDecoration(
+        color: AppColors.ctSurface,
         border: Border(
-          bottom: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+          bottom: BorderSide(color: AppColors.ctBorder, width: 1),
         ),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 10),
       child: Row(
         children: [
-          // Botón colapsar / expandir sidebar
+          // [A] Toggle hamburguesa
           _TopbarIconBtn(
             icon: collapsed ? Icons.menu_rounded : Icons.menu_open_rounded,
             tooltip: collapsed ? 'Expandir sidebar' : 'Colapsar sidebar',
-            onTap: () => ref
-                .read(sidebarCollapsedProvider.notifier)
-                .state = !collapsed,
-          ),
-          const SizedBox(width: 10),
-
-          // Logo: isotipo + wordmark
-          SvgPicture.asset(
-            'assets/images/Conectamos-Isotipo.svg',
-            height: 22,
-            fit: BoxFit.contain,
-            colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
+            onTap: () =>
+                ref.read(sidebarCollapsedProvider.notifier).state = !collapsed,
           ),
           const SizedBox(width: 8),
+
+          // [B] Isotipo teal
+          SvgPicture.asset(
+            'assets/images/Conectamos-Isotipo.svg',
+            height: 13,
+            fit: BoxFit.contain,
+            colorFilter: const ColorFilter.mode(AppColors.ctTeal, BlendMode.srcIn),
+          ),
+          const SizedBox(width: 6),
+
+          // [C] Wordmark
           RichText(
-            text: TextSpan(
-              style: AppFonts.onest(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-              ),
-              children: const [
+            text: const TextSpan(
+              children: [
                 TextSpan(
                   text: 'Conectam',
-                  style: TextStyle(fontFamily: 'Geist', color: Colors.white),
+                  style: TextStyle(
+                    fontFamily: 'Geist',
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.ctNavy,
+                    letterSpacing: -0.26,
+                  ),
                 ),
                 TextSpan(
                   text: 'OS',
-                  style: TextStyle(fontFamily: 'Geist', color: AppColors.ctTeal),
+                  style: TextStyle(
+                    fontFamily: 'Geist',
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.ctTealText,
+                    letterSpacing: -0.26,
+                  ),
                 ),
               ],
             ),
           ),
 
+          // [D] Spacer
           const Spacer(),
 
-          // Chip/dropdown de tenant
-          if (email == 'miguel@conectamos.mx')
-            const _TenantDropdown()
-          else
-            _TenantChip(name: ref.watch(activeTenantDisplayProvider)),
+          // [E] KPI chips
+          kpiAsync.whenOrNull(
+            data: (kpis) => kpis.isEmpty ? null : _KpiChips(kpis: kpis),
+          ) ?? const SizedBox.shrink(),
           const SizedBox(width: 8),
 
-          // Divider vertical
-          Container(width: 1, height: 20, color: Colors.white.withValues(alpha: 0.15)),
-          const SizedBox(width: 12),
+          // [F] Tenant selector
+          _TenantSelector(name: tenantName),
+          const SizedBox(width: 8),
 
-          // Avatar + email con menú desplegable
+          // [G] Campana
+          const _BellIcon(),
+          const SizedBox(width: 6),
+
+          // [H] Avatar / menú de usuario
           _UserMenu(email: email),
         ],
       ),
@@ -170,131 +205,159 @@ class _Topbar extends ConsumerWidget {
   }
 }
 
-// ── Tenant chip (otros usuarios) ──────────────────────────────────────────────
+// ── Tenant selector (topbar) ──────────────────────────────────────────────────
 
-class _TenantChip extends StatelessWidget {
-  const _TenantChip({required this.name});
+class _TenantSelector extends ConsumerWidget {
+  const _TenantSelector({required this.name});
   final String name;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     if (name.isEmpty) return const SizedBox.shrink();
+    final tenants    = ref.watch(allTenantsProvider);
+    final hasMultiple = tenants.length > 1;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+        color: AppColors.ctSurface2,
+        borderRadius: BorderRadius.circular(7),
+        border: Border.all(color: AppColors.ctBorder),
       ),
-      child: Text(
-        name,
-        style: const TextStyle(
-          fontFamily: 'Geist',
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-          color: Colors.white,
-        ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            name,
+            style: const TextStyle(
+              fontFamily: 'Geist',
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: AppColors.ctText,
+              letterSpacing: -0.11,
+            ),
+          ),
+          if (hasMultiple) ...[
+            const SizedBox(width: 4),
+            const Icon(Icons.keyboard_arrow_down, size: 14, color: AppColors.ctText3),
+          ],
+        ],
       ),
     );
   }
 }
 
-// ── Tenant dropdown (superadmin) ──────────────────────────────────────────────
+// ── Campana (no-op) ───────────────────────────────────────────────────────────
 
-class _TenantDropdown extends ConsumerWidget {
-  const _TenantDropdown();
+class _BellIcon extends StatelessWidget {
+  const _BellIcon();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final allTenants = ref.watch(allTenantsProvider);
-    final active     = ref.watch(activeTenantInfoProvider);
-
-    if (allTenants.isEmpty) {
-      return _TenantChip(name: active?.displayName ?? '');
-    }
-
-    return Theme(
-      data: Theme.of(context).copyWith(
-        popupMenuTheme: PopupMenuThemeData(
-          color: AppColors.ctSurface,
-          elevation: 8,
-          shadowColor: Colors.black.withValues(alpha: 0.12),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-            side: const BorderSide(color: AppColors.ctBorder),
-          ),
-          menuPadding: const EdgeInsets.symmetric(vertical: 6),
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 28,
+      height: 28,
+      child: Container(
+        width: 28,
+        height: 28,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(6),
         ),
-      ),
-      child: PopupMenuButton<TenantInfo>(
-        offset: const Offset(0, 44),
-        onSelected: (t) =>
-            ref.read(tenantNotifierProvider.notifier).select(t),
-        itemBuilder: (_) => allTenants
-            .map(
-              (t) => PopupMenuItem<TenantInfo>(
-                value: t,
-                height: 40,
-                padding: const EdgeInsets.symmetric(horizontal: 14),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        t.displayName,
-                        style: TextStyle(
-                          fontFamily: 'Geist',
-                          fontSize: 13,
-                          fontWeight: t.id == active?.id
-                              ? FontWeight.w600
-                              : FontWeight.w500,
-                          color: AppColors.ctText,
-                        ),
-                      ),
-                    ),
-                    if (t.id == active?.id)
-                      const Icon(Icons.check_rounded,
-                          size: 14, color: AppColors.ctTeal),
-                  ],
-                ),
-              ),
-            )
-            .toList(),
-        child: MouseRegion(
-          cursor: SystemMouseCursors.click,
-          child: Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.10),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  active?.displayName ?? '…',
-                  style: const TextStyle(
-                    fontFamily: 'Geist',
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(width: 4),
-                Icon(
-                  Icons.keyboard_arrow_down_rounded,
-                  size: 14,
-                  color: Colors.white.withValues(alpha: 0.5),
-                ),
-              ],
-            ),
-          ),
+        alignment: Alignment.center,
+        child: const Icon(
+          Icons.notifications_outlined,
+          size: 16,
+          color: AppColors.ctText2,
         ),
+        // TODO: badge de notificaciones — pendiente módulo de notificaciones
       ),
     );
   }
 }
+
+// ── KPI chips ─────────────────────────────────────────────────────────────────
+
+class _KpiChips extends StatelessWidget {
+  const _KpiChips({required this.kpis});
+  final Map<String, dynamic> kpis;
+
+  @override
+  Widget build(BuildContext context) {
+    final activeOps   = (kpis['operators_active'] as num?)?.toInt();
+    final flowsActive = (kpis['flows_active']     as num?)?.toInt();
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (activeOps != null)
+          _StatusChip(
+            dot: AppColors.ctOk,
+            bg: AppColors.ctOkBg,
+            border: const Color(0xFFA7F3D0),
+            textColor: AppColors.ctOkText,
+            label: '$activeOps activos',
+          ),
+        if (activeOps != null && flowsActive != null)
+          const SizedBox(width: 5),
+        if (flowsActive != null)
+          _StatusChip(
+            dot: AppColors.ctTeal,
+            bg: AppColors.ctTealLight,
+            border: const Color(0xFF99F6E4),
+            textColor: AppColors.ctTealText,
+            label: '$flowsActive flujos',
+          ),
+      ],
+    );
+  }
+}
+
+class _StatusChip extends StatelessWidget {
+  const _StatusChip({
+    required this.dot,
+    required this.bg,
+    required this.border,
+    required this.textColor,
+    required this.label,
+  });
+  final Color dot;
+  final Color bg;
+  final Color border;
+  final Color textColor;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(100),
+        border: Border.all(color: border),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 5,
+            height: 5,
+            decoration: BoxDecoration(color: dot, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontFamily: 'Geist',
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              color: textColor,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 
 // ── Botón de icono en topbar ───────────────────────────────────────────────────
 
@@ -328,14 +391,14 @@ class _TopbarIconBtnState extends State<_TopbarIconBtn> {
           onTap: widget.onTap,
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 120),
-            width: 32,
-            height: 32,
+            width: 26,
+            height: 26,
             decoration: BoxDecoration(
-              color: _hovered ? Colors.white.withValues(alpha: 0.08) : Colors.transparent,
-              borderRadius: BorderRadius.circular(7),
+              color: _hovered ? AppColors.ctSurface2 : Colors.transparent,
+              borderRadius: BorderRadius.circular(6),
             ),
             alignment: Alignment.center,
-            child: Icon(widget.icon, size: 20, color: Colors.white.withValues(alpha: 0.7)),
+            child: Icon(widget.icon, size: 16, color: AppColors.ctText3),
           ),
         ),
       ),
@@ -391,7 +454,7 @@ class _UserMenu extends ConsumerWidget {
         ),
       ),
       child: PopupMenuButton<_UserMenuAction>(
-        offset: const Offset(0, 44),
+        offset: const Offset(0, 34),
         constraints: const BoxConstraints(minWidth: 200),
         onSelected: (action) => _handleAction(context, ref, action),
         itemBuilder: (context) => [
@@ -435,44 +498,47 @@ class _UserMenu extends ConsumerWidget {
             color: AppColors.ctDanger,
           ),
         ],
-        // Trigger: avatar + email + chevron
+        // Trigger: email (responsivo) + avatar con inicial
         child: MouseRegion(
           cursor: SystemMouseCursors.click,
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
+              if (MediaQuery.of(context).size.width > 1100) ...[
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 160),
+                  child: Text(
+                    email,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontFamily: 'Geist',
+                      fontSize: 11,
+                      fontWeight: FontWeight.w400,
+                      color: AppColors.ctText2,
+                      letterSpacing: -0.11,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+              ],
               Container(
-                width: 30,
-                height: 30,
+                width: 28,
+                height: 28,
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.15),
+                  color: AppColors.ctTealLight,
                   shape: BoxShape.circle,
+                  border: Border.all(color: const Color(0xFF99F6E4), width: 1),
                 ),
                 alignment: Alignment.center,
                 child: Text(
                   initial,
                   style: const TextStyle(
                     fontFamily: 'Geist',
-                    fontSize: 12,
+                    fontSize: 11,
                     fontWeight: FontWeight.w700,
-                    color: Colors.white,
+                    color: AppColors.ctTealText,
                   ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                email,
-                style: TextStyle(
-                  fontFamily: 'Geist',
-                  fontSize: 12,
-                  color: Colors.white.withValues(alpha: 0.6),
-                ),
-              ),
-              const SizedBox(width: 4),
-              Icon(
-                Icons.keyboard_arrow_down_rounded,
-                size: 16,
-                color: Colors.white.withValues(alpha: 0.5),
               ),
             ],
           ),
@@ -546,50 +612,34 @@ class _MenuItemTileState extends State<_MenuItemTile> {
 // ── SIDEBAR ───────────────────────────────────────────────────────────────────
 
 class _Sidebar extends ConsumerWidget {
-  const _Sidebar();
+  const _Sidebar({required this.navigationShell});
+  final StatefulNavigationShell navigationShell;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final collapsed    = ref.watch(sidebarCollapsedProvider);
     final currentRoute = GoRouterState.of(context).matchedLocation;
-    final tenantName   = ref.watch(activeTenantDisplayProvider);
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
       curve: Curves.easeInOut,
-      width: collapsed ? 56 : 220,
+      width: collapsed ? 52 : 220,
       decoration: const BoxDecoration(
-        color: AppColors.ctSurface,
-        border: Border(right: BorderSide(color: AppColors.ctBorder)),
+        color: AppColors.ctSidebarBg,
+        border: Border(right: BorderSide(color: Color(0x0FFFFFFF), width: 1)),
       ),
       // ClipRect evita que el contenido se desborde durante la animación
       child: ClipRect(
         child: OverflowBox(
           alignment: Alignment.topLeft,
-          minWidth: collapsed ? 56 : 220,
-          maxWidth: collapsed ? 56 : 220,
+          minWidth: collapsed ? 52 : 220,
+          maxWidth: collapsed ? 52 : 220,
           child: SizedBox(
-            width: collapsed ? 56 : 220,
+            width: collapsed ? 52 : 220,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 8),
-
-                // Nombre del tenant activo (solo cuando el sidebar está expandido)
-                if (!collapsed && tenantName.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(14, 0, 14, 6),
-                    child: Text(
-                      tenantName,
-                      style: const TextStyle(
-                        fontFamily: 'Geist',
-                        fontSize: 10,
-                        fontWeight: FontWeight.w500,
-                        color: AppColors.ctText3,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
 
                 // Nav items con scroll
                 Expanded(
@@ -608,6 +658,7 @@ class _Sidebar extends ConsumerWidget {
                           route: '/overview',
                           currentRoute: currentRoute,
                           collapsed: collapsed,
+                          navigationShell: navigationShell,
                         ),
                         if (hasPermission(ref, 'flows', 'view'))
                           _NavItem(
@@ -616,6 +667,7 @@ class _Sidebar extends ConsumerWidget {
                             route: '/executions',
                             currentRoute: currentRoute,
                             collapsed: collapsed,
+                            navigationShell: navigationShell,
                           ),
                         _NavItem(
                           icon: Icons.chat_bubble_outline_rounded,
@@ -623,11 +675,13 @@ class _Sidebar extends ConsumerWidget {
                           route: '/conversations',
                           currentRoute: currentRoute,
                           collapsed: collapsed,
+                          navigationShell: navigationShell,
                         ),
                         if (hasPermission(ref, 'escalations', 'view'))
                           _EscalacionesNavItem(
-                            currentRoute: currentRoute,
-                            collapsed:    collapsed,
+                            currentRoute:    currentRoute,
+                            collapsed:       collapsed,
+                            navigationShell: navigationShell,
                           ),
                         if (hasPermission(ref, 'flow_executions', 'execute_dashboard'))
                           _ExpandableNavItem(
@@ -656,6 +710,7 @@ class _Sidebar extends ConsumerWidget {
                           route: '/workers',
                           currentRoute: currentRoute,
                           collapsed: collapsed,
+                          navigationShell: navigationShell,
                         ),
                         if (hasPermission(ref, 'flows', 'view'))
                           _NavItem(
@@ -664,6 +719,7 @@ class _Sidebar extends ConsumerWidget {
                             route: '/flows',
                             currentRoute: currentRoute,
                             collapsed: collapsed,
+                            navigationShell: navigationShell,
                           ),
                         const SizedBox(height: 4),
                         // ── Configuración ─────────────────────────────────
@@ -680,6 +736,7 @@ class _Sidebar extends ConsumerWidget {
                               route: '/channels',
                               currentRoute: currentRoute,
                               collapsed: collapsed,
+                              navigationShell: navigationShell,
                             ),
                           if (hasPermission(ref, 'operators', 'view'))
                             _NavItem(
@@ -688,6 +745,7 @@ class _Sidebar extends ConsumerWidget {
                               route: '/operators',
                               currentRoute: currentRoute,
                               collapsed: collapsed,
+                              navigationShell: navigationShell,
                             ),
                           if (hasPermission(ref, 'settings', 'view')) ...[
                             _NavItem(
@@ -696,6 +754,7 @@ class _Sidebar extends ConsumerWidget {
                               route: '/connections',
                               currentRoute: currentRoute,
                               collapsed: collapsed,
+                              navigationShell: navigationShell,
                             ),
                             _NavItem(
                               icon: Icons.settings_outlined,
@@ -703,6 +762,7 @@ class _Sidebar extends ConsumerWidget {
                               route: '/settings',
                               currentRoute: currentRoute,
                               collapsed: collapsed,
+                              navigationShell: navigationShell,
                             ),
                           ],
                         ],
@@ -736,19 +796,19 @@ class _NavSection extends StatelessWidget {
     if (collapsed) {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        child: Container(height: 1, color: AppColors.ctBorder),
+        child: Container(height: 1, color: const Color(0x0FFFFFFF)),
       );
     }
     return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 3),
+      padding: const EdgeInsets.fromLTRB(16, 10, 14, 3),
       child: Text(
         label.toUpperCase(),
         style: const TextStyle(
           fontFamily: 'Geist',
-          fontSize: 10,
-          fontWeight: FontWeight.w600,
-          color: AppColors.ctText3,
-          letterSpacing: 0.8,
+          fontSize: 9,
+          fontWeight: FontWeight.w700,
+          color: Color(0x40FFFFFF),
+          letterSpacing: 0.10,
         ),
       ),
     );
@@ -764,6 +824,7 @@ class _NavItem extends StatefulWidget {
     required this.route,
     required this.currentRoute,
     required this.collapsed,
+    required this.navigationShell,
     this.badgeCount,
   });
   final IconData icon;
@@ -771,6 +832,7 @@ class _NavItem extends StatefulWidget {
   final String route;
   final String currentRoute;
   final bool collapsed;
+  final StatefulNavigationShell navigationShell;
   final int? badgeCount;
 
   @override
@@ -791,7 +853,17 @@ class _NavItemState extends State<_NavItem> {
       onExit:  (_) => setState(() => _hovered = false),
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
-        onTap: () => context.go(widget.route),
+        onTap: () {
+          final branchIndex = _kRouteBranchIndex[widget.route];
+          if (branchIndex != null) {
+            widget.navigationShell.goBranch(
+              branchIndex,
+              initialLocation: branchIndex == widget.navigationShell.currentIndex,
+            );
+          } else {
+            context.go(widget.route);
+          }
+        },
         child: widget.collapsed
             ? _buildCollapsed()
             : _buildExpanded(),
@@ -824,15 +896,15 @@ class _NavItemState extends State<_NavItem> {
     final hasBadge = (widget.badgeCount ?? 0) > 0;
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 1, horizontal: 6),
-      width: 44,
-      height: 36,
+      width: 36,
+      height: 32,
       decoration: BoxDecoration(
         color: _isActive
-            ? AppColors.ctTealLight
+            ? const Color(0x1A59E0CC)
             : _hovered
-                ? AppColors.ctSurface2
+                ? const Color(0x0DFFFFFF)
                 : Colors.transparent,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(7),
       ),
       alignment: Alignment.center,
       child: Stack(
@@ -842,10 +914,10 @@ class _NavItemState extends State<_NavItem> {
             widget.icon,
             size: 18,
             color: _isActive
-                ? AppColors.ctTealDark
+                ? AppColors.ctTeal
                 : _hovered
-                    ? AppColors.ctText2
-                    : AppColors.ctText3,
+                    ? const Color(0xCCFFFFFF)
+                    : const Color(0x66FFFFFF),
           ),
           if (hasBadge)
             Positioned(
@@ -855,7 +927,7 @@ class _NavItemState extends State<_NavItem> {
                 width: 8,
                 height: 8,
                 decoration: const BoxDecoration(
-                  color: AppColors.ctDanger,
+                  color: AppColors.ctTeal,
                   shape: BoxShape.circle,
                 ),
               ),
@@ -870,19 +942,21 @@ class _NavItemState extends State<_NavItem> {
     final badgeCount = widget.badgeCount ?? 0;
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 1, horizontal: 6),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
       decoration: BoxDecoration(
         color: _isActive
-            ? AppColors.ctTealLight
+            ? const Color(0x1A59E0CC)
             : _hovered
-                ? AppColors.ctSurface2
+                ? const Color(0x0DFFFFFF)
                 : Colors.transparent,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(7),
         border: _isActive
             ? const Border(
                 left: BorderSide(color: AppColors.ctTeal, width: 2),
               )
-            : null,
+            : const Border(
+                left: BorderSide(color: Colors.transparent, width: 2),
+              ),
       ),
       child: Row(
         children: [
@@ -890,25 +964,25 @@ class _NavItemState extends State<_NavItem> {
             widget.icon,
             size: 16,
             color: _isActive
-                ? AppColors.ctTealDark
+                ? AppColors.ctTeal
                 : _hovered
-                    ? AppColors.ctText2
-                    : AppColors.ctText3,
+                    ? const Color(0xCCFFFFFF)
+                    : const Color(0x66FFFFFF),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 9),
           Expanded(
             child: Text(
               widget.label,
               style: TextStyle(
                 fontFamily: 'Geist',
                 fontSize: 12,
-                fontWeight:
-                    _isActive ? FontWeight.w600 : FontWeight.w500,
+                fontWeight: _isActive ? FontWeight.w600 : FontWeight.w400,
                 color: _isActive
-                    ? AppColors.ctTealDark
+                    ? AppColors.ctTeal
                     : _hovered
-                        ? AppColors.ctText
-                        : AppColors.ctText2,
+                        ? const Color(0xCCFFFFFF)
+                        : const Color(0x8CFFFFFF),
+                letterSpacing: -0.12,
               ),
               overflow: TextOverflow.ellipsis,
             ),
@@ -916,18 +990,21 @@ class _NavItemState extends State<_NavItem> {
           if (badgeCount > 0) ...[
             const SizedBox(width: 4),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+              constraints: const BoxConstraints(minWidth: 15),
+              height: 15,
+              padding: const EdgeInsets.symmetric(horizontal: 4),
               decoration: BoxDecoration(
-                color: AppColors.ctDanger,
+                color: AppColors.ctTeal,
                 borderRadius: BorderRadius.circular(8),
               ),
+              alignment: Alignment.center,
               child: Text(
                 badgeCount > 99 ? '99+' : '$badgeCount',
                 style: const TextStyle(
                   fontFamily: 'Geist',
-                  fontSize: 10,
+                  fontSize: 9,
                   fontWeight: FontWeight.w700,
-                  color: Colors.white,
+                  color: AppColors.ctNavy,
                 ),
               ),
             ),
@@ -944,20 +1021,23 @@ class _EscalacionesNavItem extends ConsumerWidget {
   const _EscalacionesNavItem({
     required this.currentRoute,
     required this.collapsed,
+    required this.navigationShell,
   });
   final String currentRoute;
   final bool   collapsed;
+  final StatefulNavigationShell navigationShell;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final count = ref.watch(openEscalationsCountProvider).valueOrNull ?? 0;
     return _NavItem(
-      icon:         Icons.warning_amber_rounded,
-      label:        'Escalaciones',
-      route:        '/escalaciones',
-      currentRoute: currentRoute,
-      collapsed:    collapsed,
-      badgeCount:   count > 0 ? count : null,
+      icon:            Icons.warning_amber_rounded,
+      label:           'Escalaciones',
+      route:           '/escalaciones',
+      currentRoute:    currentRoute,
+      collapsed:       collapsed,
+      navigationShell: navigationShell,
+      badgeCount:      count > 0 ? count : null,
     );
   }
 }
@@ -1029,14 +1109,18 @@ class _ExpandableNavItemState extends State<_ExpandableNavItem> {
         ),
         child: Container(
           margin: const EdgeInsets.symmetric(vertical: 1, horizontal: 6),
-          width: 44, height: 36,
+          width: 36, height: 32,
           decoration: BoxDecoration(
-            color: _anyChildActive ? AppColors.ctTealLight : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
+            color: _anyChildActive
+                ? const Color(0x1A59E0CC)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(7),
           ),
           alignment: Alignment.center,
           child: Icon(widget.icon, size: 18,
-              color: _anyChildActive ? AppColors.ctTealDark : AppColors.ctText3),
+              color: _anyChildActive
+                  ? AppColors.ctTeal
+                  : const Color(0x66FFFFFF)),
         ),
       );
     }
@@ -1053,34 +1137,40 @@ class _ExpandableNavItemState extends State<_ExpandableNavItem> {
             onTap: () => setState(() => _expanded = !_expanded),
             child: Container(
               margin: const EdgeInsets.symmetric(vertical: 1, horizontal: 6),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
               decoration: BoxDecoration(
                 color: _anyChildActive
-                    ? AppColors.ctTealLight
-                    : _hovered ? AppColors.ctSurface2 : Colors.transparent,
-                borderRadius: BorderRadius.circular(8),
+                    ? const Color(0x1A59E0CC)
+                    : _hovered ? const Color(0x0DFFFFFF) : Colors.transparent,
+                borderRadius: BorderRadius.circular(7),
                 border: _anyChildActive
                     ? const Border(
                         left: BorderSide(color: AppColors.ctTeal, width: 2))
-                    : null,
+                    : const Border(
+                        left: BorderSide(color: Colors.transparent, width: 2)),
               ),
               child: Row(
                 children: [
                   Icon(widget.icon, size: 16,
                       color: _anyChildActive
-                          ? AppColors.ctTealDark
-                          : _hovered ? AppColors.ctText2 : AppColors.ctText3),
-                  const SizedBox(width: 8),
+                          ? AppColors.ctTeal
+                          : _hovered
+                              ? const Color(0xCCFFFFFF)
+                              : const Color(0x66FFFFFF)),
+                  const SizedBox(width: 9),
                   Expanded(
                     child: Text(widget.label,
                         style: TextStyle(
                           fontFamily: 'Geist',
                           fontSize: 12,
                           fontWeight: _anyChildActive
-                              ? FontWeight.w600 : FontWeight.w500,
+                              ? FontWeight.w600 : FontWeight.w400,
                           color: _anyChildActive
-                              ? AppColors.ctTealDark
-                              : _hovered ? AppColors.ctText : AppColors.ctText2,
+                              ? AppColors.ctTeal
+                              : _hovered
+                                  ? const Color(0xCCFFFFFF)
+                                  : const Color(0x8CFFFFFF),
+                          letterSpacing: -0.12,
                         ),
                         overflow: TextOverflow.ellipsis),
                   ),
@@ -1090,7 +1180,8 @@ class _ExpandableNavItemState extends State<_ExpandableNavItem> {
                         : Icons.keyboard_arrow_down_rounded,
                     size: 14,
                     color: _anyChildActive
-                        ? AppColors.ctTealDark : AppColors.ctText3,
+                        ? AppColors.ctTeal
+                        : const Color(0x66FFFFFF),
                   ),
                 ],
               ),
@@ -1127,33 +1218,39 @@ class _SubItemTileState extends State<_SubItemTile> {
         onTap: () => context.go(widget.sub.route),
         child: Container(
           margin: const EdgeInsets.only(left: 24, right: 6, top: 1, bottom: 1),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
           decoration: BoxDecoration(
             color: active
-                ? AppColors.ctTealLight
-                : _hovered ? AppColors.ctSurface2 : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
+                ? const Color(0x1A59E0CC)
+                : _hovered ? const Color(0x0DFFFFFF) : Colors.transparent,
+            borderRadius: BorderRadius.circular(7),
             border: active
                 ? const Border(
                     left: BorderSide(color: AppColors.ctTeal, width: 2))
-                : null,
+                : const Border(
+                    left: BorderSide(color: Colors.transparent, width: 2)),
           ),
           child: Row(
             children: [
               Icon(widget.sub.icon, size: 14,
                   color: active
-                      ? AppColors.ctTealDark
-                      : _hovered ? AppColors.ctText2 : AppColors.ctText3),
-              const SizedBox(width: 8),
+                      ? AppColors.ctTeal
+                      : _hovered
+                          ? const Color(0xCCFFFFFF)
+                          : const Color(0x66FFFFFF)),
+              const SizedBox(width: 9),
               Expanded(
                 child: Text(widget.sub.label,
                     style: TextStyle(
                       fontFamily: 'Geist',
                       fontSize: 11,
-                      fontWeight: active ? FontWeight.w600 : FontWeight.w500,
+                      fontWeight: active ? FontWeight.w600 : FontWeight.w400,
                       color: active
-                          ? AppColors.ctTealDark
-                          : _hovered ? AppColors.ctText : AppColors.ctText2,
+                          ? AppColors.ctTeal
+                          : _hovered
+                              ? const Color(0xCCFFFFFF)
+                              : const Color(0x8CFFFFFF),
+                      letterSpacing: -0.12,
                     ),
                     overflow: TextOverflow.ellipsis),
               ),
@@ -1165,139 +1262,4 @@ class _SubItemTileState extends State<_SubItemTile> {
   }
 }
 
-// ── Disabled nav item (Coming Soon) ───────────────────────────────────────────
 
-class _DisabledNavItem extends StatefulWidget {
-  const _DisabledNavItem({
-    required this.icon,
-    required this.label,
-    required this.collapsed,
-  });
-  final IconData icon;
-  final String label;
-  final bool collapsed;
-
-  @override
-  State<_DisabledNavItem> createState() => _DisabledNavItemState();
-}
-
-class _DisabledNavItemState extends State<_DisabledNavItem> {
-  bool _hovered = false;
-
-  Widget _buildCollapsed() {
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 1, horizontal: 6),
-      width: 44,
-      height: 36,
-      decoration: BoxDecoration(
-        color: _hovered ? AppColors.ctSurface2 : Colors.transparent,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      alignment: Alignment.center,
-      child: Opacity(
-        opacity: 0.4,
-        child: Icon(widget.icon, size: 18, color: AppColors.ctText3),
-      ),
-    );
-  }
-
-  Widget _buildExpanded() {
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 1, horizontal: 6),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        color: _hovered ? AppColors.ctSurface2 : Colors.transparent,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Opacity(
-        opacity: 0.4,
-        child: Row(
-          children: [
-            Icon(widget.icon, size: 16, color: AppColors.ctText3),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                widget.label,
-                style: const TextStyle(
-                  fontFamily: 'Geist',
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.ctText2,
-                ),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final content = Tooltip(
-      message: 'Próximamente',
-      preferBelow: false,
-      waitDuration: Duration.zero,
-      decoration: BoxDecoration(
-        color: AppColors.ctNavy,
-        borderRadius: BorderRadius.circular(6),
-      ),
-      textStyle: const TextStyle(
-        fontFamily: 'Geist',
-        fontSize: 12,
-        color: Colors.white,
-      ),
-      child: MouseRegion(
-        onEnter: (_) => setState(() => _hovered = true),
-        onExit:  (_) => setState(() => _hovered = false),
-        cursor: SystemMouseCursors.forbidden,
-        child: widget.collapsed ? _buildCollapsed() : _buildExpanded(),
-      ),
-    );
-
-    return content;
-  }
-}
-
-// ── FOOTER ────────────────────────────────────────────────────────────────────
-
-class _Footer extends StatelessWidget {
-  const _Footer();
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      child: Container(
-        height: 36,
-        color: AppColors.ctNavy,
-        child: Center(
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SvgPicture.asset(
-                'assets/images/Conectamos-Isotipo.svg',
-                height: 14,
-                fit: BoxFit.contain,
-                colorFilter: const ColorFilter.mode(
-                  AppColors.ctTeal,
-                  BlendMode.srcIn,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                'Built with ❤️  Powered by 🤖',
-                style: TextStyle(
-                  fontFamily: 'Geist',
-                  fontSize: 11,
-                  color: AppColors.ctTeal.withValues(alpha: 0.8),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}

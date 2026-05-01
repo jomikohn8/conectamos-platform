@@ -226,7 +226,7 @@ class _PermissionsSection extends ConsumerWidget {
       error: (e, _) => Center(
         child: Text(
           'Error al cargar roles: $e',
-          style: const TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctDanger),
+          style: AppTextStyles.body.copyWith(color: AppColors.ctDanger),
         ),
       ),
       data: (roles) {
@@ -334,11 +334,7 @@ class _ActionBar extends StatelessWidget {
               SizedBox(height: 1),
               Text(
                 'Configuración general del tenant',
-                style: TextStyle(
-                  fontFamily: 'Geist',
-                  fontSize: 11,
-                  color: AppColors.ctText2,
-                ),
+                style: AppTextStyles.bodySmall,
               ),
             ],
           ),
@@ -615,11 +611,7 @@ class _BillingCardState extends ConsumerState<_BillingCard> {
                     const SizedBox(height: 2),
                     Text(
                       _requiereCfdi ? 'Sí, requiere factura' : 'No requiere factura',
-                      style: const TextStyle(
-                        fontFamily: 'Geist',
-                        fontSize: 11,
-                        color: AppColors.ctText2,
-                      ),
+                      style: AppTextStyles.bodySmall,
                     ),
                   ],
                 ),
@@ -1062,12 +1054,7 @@ class _UserRowState extends ConsumerState<_UserRow> {
                   if (_name.isNotEmpty)
                     Text(
                       _name,
-                      style: const TextStyle(
-                        fontFamily: 'Geist',
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                        color: AppColors.ctText,
-                      ),
+                      style: AppTextStyles.btnSecondary,
                     ),
                   Text(
                     _email,

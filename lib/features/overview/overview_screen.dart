@@ -481,11 +481,7 @@ class _ActionBar extends ConsumerWidget {
                 const SizedBox(height: 1),
                 Text(
                   subtitle,
-                  style: const TextStyle(
-                    fontFamily: 'Geist',
-                    fontSize: 11,
-                    color: AppColors.ctText2,
-                  ),
+                  style: AppTextStyles.topbarSubtitle,
                 ),
               ],
             ),
@@ -815,11 +811,7 @@ class _OperatorGridState extends State<_OperatorGrid> {
             Expanded(
               child: Text(
                 'Error al cargar operadores: $_error',
-                style: const TextStyle(
-                  fontFamily: 'Geist',
-                  fontSize: 12,
-                  color: AppColors.ctRedText,
-                ),
+                style: AppTextStyles.formLabel.copyWith(color: AppColors.ctRedText),
               ),
             ),
             const SizedBox(width: 8),
@@ -842,15 +834,11 @@ class _OperatorGridState extends State<_OperatorGrid> {
     }
 
     if (_operators.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.all(32),
+      return Padding(
+        padding: const EdgeInsets.all(32),
         child: Text(
           'No hay operadores registrados.',
-          style: TextStyle(
-            fontFamily: 'Geist',
-            fontSize: 13,
-            color: AppColors.ctText2,
-          ),
+          style: AppTextStyles.body.copyWith(color: AppColors.ctText2),
         ),
       );
     }
@@ -1053,12 +1041,7 @@ class StatusBadge extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: TextStyle(
-          fontFamily: 'Geist',
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-          color: textColor,
-        ),
+        style: AppTextStyles.badge.copyWith(color: textColor),
       ),
     );
   }

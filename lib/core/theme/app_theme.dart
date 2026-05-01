@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'colors.dart';
 
 export 'colors.dart';
@@ -17,7 +16,8 @@ abstract final class AppFonts {
     double? height,
     double? letterSpacing,
   }) =>
-      GoogleFonts.onest(
+      TextStyle(
+        fontFamily: 'Onest',
         fontSize: fontSize,
         fontWeight: fontWeight,
         color: color,
@@ -56,7 +56,8 @@ abstract final class AppTheme {
         outline: AppColors.ctBorder,
         error: AppColors.ctDanger,
       ),
-      textTheme: GoogleFonts.onestTextTheme(base.textTheme)
+      textTheme: base.textTheme
+          .apply(fontFamily: 'Onest')
           .copyWith(
             bodyMedium: const TextStyle(fontFamily: 'Geist', fontSize: 14),
             bodySmall: const TextStyle(fontFamily: 'Geist', fontSize: 12),

@@ -407,11 +407,7 @@ class _ErrorState extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             message,
-            style: const TextStyle(
-              fontFamily: 'Geist',
-              fontSize:   13,
-              color:      AppColors.ctText2,
-            ),
+            style: AppTextStyles.pageSubtitle,
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 16),

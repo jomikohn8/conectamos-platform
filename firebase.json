@@ -1,5 +1,6 @@
 {
   "hosting": {
+    "site": "conectamos-platform-poc",
     "public": "build/web",
     "ignore": [
       "firebase.json",

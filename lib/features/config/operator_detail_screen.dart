@@ -474,12 +474,7 @@ class _OperatorHeader extends StatelessWidget {
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(st.label,
-                          style: TextStyle(
-                            fontFamily: 'Geist',
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: st.fg,
-                          )),
+                          style: AppTextStyles.badge.copyWith(color: st.fg)),
                     ),
                   ],
                 ),
@@ -488,10 +483,7 @@ class _OperatorHeader extends StatelessWidget {
                   const Icon(Icons.phone, size: 14, color: AppColors.ctText2),
                   const SizedBox(width: 4),
                   Text(phone,
-                      style: const TextStyle(
-                          fontFamily: 'Geist',
-                          fontSize: 13,
-                          color: AppColors.ctText2)),
+                      style: AppTextStyles.body.copyWith(color: AppColors.ctText2)),
                 ]),
                 if (email != null && email.isNotEmpty) ...[
                   const SizedBox(height: 3),
@@ -500,10 +492,7 @@ class _OperatorHeader extends StatelessWidget {
                         size: 14, color: AppColors.ctText2),
                     const SizedBox(width: 4),
                     Text(email,
-                        style: const TextStyle(
-                            fontFamily: 'Geist',
-                            fontSize: 13,
-                            color: AppColors.ctText2)),
+                        style: AppTextStyles.body.copyWith(color: AppColors.ctText2)),
                   ]),
                 ],
               ],
@@ -732,13 +721,9 @@ class _DatosTabState extends ConsumerState<_DatosTab> {
               ),
             )
           else if (_orderedTypes.isEmpty)
-            const Text(
+            Text(
               'Sin canales disponibles. Asigna flows al operador primero.',
-              style: TextStyle(
-                fontFamily: 'Geist',
-                fontSize:   13,
-                color:      AppColors.ctText3,
-              ),
+              style: AppTextStyles.body.copyWith(color: AppColors.ctText3),
             )
           else
             _ChannelTypeOrderList(
@@ -1085,10 +1070,7 @@ class _FlowCardState extends State<_FlowCard> {
                       : isWa
                           ? 'WhatsApp'
                           : 'Canal',
-                  style: const TextStyle(
-                      fontFamily: 'Geist',
-                      fontSize: 12,
-                      color: AppColors.ctText2),
+                  style: AppTextStyles.navItem,
                 ),
               ],
             ),
@@ -1102,13 +1084,8 @@ class _FlowCardState extends State<_FlowCard> {
                 color: AppColors.ctRedBg,
                 borderRadius: BorderRadius.circular(20),
               ),
-              child: const Text('Sin vincular',
-                  style: TextStyle(
-                    fontFamily: 'Geist',
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.ctRedText,
-                  )),
+              child: Text('Sin vincular',
+                  style: AppTextStyles.badge.copyWith(color: AppColors.ctRedText)),
             ),
             const SizedBox(width: 8),
             SizedBox(
@@ -1126,12 +1103,9 @@ class _FlowCardState extends State<_FlowCard> {
                         width: 12,
                         height: 12,
                         child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Text('Enviar invitación',
-                        style: TextStyle(
-                          fontFamily: 'Geist',
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF0088CC),
+                    : Text('Enviar invitación',
+                        style: AppTextStyles.badge.copyWith(
+                          color: const Color(0xFF0088CC),
                         )),
               ),
             ),
@@ -1143,18 +1117,13 @@ class _FlowCardState extends State<_FlowCard> {
                 color: AppColors.ctOkBg,
                 borderRadius: BorderRadius.circular(20),
               ),
-              child: const Row(
+              child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.check_circle, size: 12, color: AppColors.ctOk),
-                  SizedBox(width: 4),
+                  const Icon(Icons.check_circle, size: 12, color: AppColors.ctOk),
+                  const SizedBox(width: 4),
                   Text('Vinculado',
-                      style: TextStyle(
-                        fontFamily: 'Geist',
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.ctOkText,
-                      )),
+                      style: AppTextStyles.badge.copyWith(color: AppColors.ctOkText)),
                 ],
               ),
             ),
@@ -1290,10 +1259,7 @@ class _HistorialTabState extends State<_HistorialTab> {
                   fontSize: 14,
                   fontWeight: FontWeight.w600)),
           subtitle: Text(_fmtDate(startedAt),
-              style: const TextStyle(
-                  fontFamily: 'Geist',
-                  fontSize: 12,
-                  color: AppColors.ctText2)),
+              style: AppTextStyles.navItem),
           trailing: Container(
             padding:
                 const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -1302,12 +1268,8 @@ class _HistorialTabState extends State<_HistorialTab> {
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(sessionStatus,
-                style: TextStyle(
-                  fontFamily: 'Geist',
-                  fontSize: 11,
-                  color: isCompleted
-                      ? AppColors.ctOkText
-                      : AppColors.ctText2,
+                style: AppTextStyles.bodySmall.copyWith(
+                  color: isCompleted ? AppColors.ctOkText : AppColors.ctText2,
                 )),
           ),
           children: [_SessionFields(session: s)],
@@ -1347,16 +1309,10 @@ class _SessionFields extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text('${e.key}: ',
-                          style: const TextStyle(
-                              fontFamily: 'Geist',
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600)),
+                          style: AppTextStyles.formLabel),
                       Expanded(
                         child: Text(e.value.toString(),
-                            style: const TextStyle(
-                                fontFamily: 'Geist',
-                                fontSize: 12,
-                                color: AppColors.ctText2)),
+                            style: AppTextStyles.navItem),
                       ),
                     ],
                   ),
@@ -1693,9 +1649,7 @@ class _FieldLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Text(text,
-        style: const TextStyle(
-            fontFamily: 'Geist', fontSize: 11, color: AppColors.ctText2));
+    return Text(text, style: AppTextStyles.bodySmall);
   }
 }
 

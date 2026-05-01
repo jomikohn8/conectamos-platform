@@ -199,11 +199,7 @@ class _EmptyState extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             'Las ejecuciones que requieren tu atención aparecerán aquí.',
-            style: const TextStyle(
-              fontFamily: 'Geist',
-              fontSize: 13,
-              color: AppColors.ctText3,
-            ),
+            style: AppTextStyles.body.copyWith(color: AppColors.ctText3),
             textAlign: TextAlign.center,
           ),
         ],
@@ -229,11 +225,7 @@ class _ErrorState extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             message,
-            style: const TextStyle(
-              fontFamily: 'Geist',
-              fontSize: 13,
-              color: AppColors.ctText2,
-            ),
+            style: AppTextStyles.body.copyWith(color: AppColors.ctText2),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 16),
@@ -670,15 +662,11 @@ class _ExecutionDetailSheetState
         const SizedBox(height: 8),
 
         if (captureFields.isEmpty)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 8),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
             child: Text(
               'Sin campos adicionales',
-              style: TextStyle(
-                fontFamily: 'Geist',
-                fontSize: 13,
-                color: AppColors.ctText3,
-              ),
+              style: AppTextStyles.body.copyWith(color: AppColors.ctText3),
             ),
           )
         else
