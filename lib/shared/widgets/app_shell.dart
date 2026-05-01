@@ -613,7 +613,7 @@ class _Sidebar extends ConsumerWidget {
                           _NavItem(
                             icon: Icons.receipt_long_outlined,
                             label: 'Ejecuciones',
-                            route: '/tareas',
+                            route: '/executions',
                             currentRoute: currentRoute,
                             collapsed: collapsed,
                           ),
