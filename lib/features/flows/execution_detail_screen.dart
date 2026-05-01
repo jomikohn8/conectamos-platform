@@ -230,22 +230,28 @@ class _FieldsBlock extends StatelessWidget {
 
     // Build field_values lookup keyed by field_key
     final rawFvList = exec['field_values'] as List? ?? [];
-    final fvMap = <String, Map<String, dynamic>>{};
+    final fvMap = <String, Map>{};
     for (final item in rawFvList.whereType<Map>()) {
-      final k = item['field_key'] as String? ?? '';
-      if (k.isNotEmpty) fvMap[k] = item.cast<String, dynamic>();
+      final k = item['field_key'];
+      if (k is String && k.isNotEmpty) fvMap[k] = item;
     }
 
-    // Progress
-    final filled = fvMap.values.where(_fvHasValue).length;
+    // Progress: count only fields that exist in snapshot AND have a value
     final total = fields.length;
+    final filled = fields.where((f) {
+      final key = f['key'];
+      if (key is! String) return false;
+      final fv = fvMap[key];
+      return fv != null && _fvHasValue(fv.cast<String, dynamic>());
+    }).length;
 
     // Resolve values and pending list
     final values = <String, dynamic>{};
     final pending = <String>[];
     for (final field in fields) {
       final key = field['key'] as String? ?? '';
-      final fv = fvMap[key];
+      final fvRaw = fvMap[key];
+      final fv = fvRaw?.cast<String, dynamic>();
       if (fv == null || !_fvHasValue(fv)) {
         pending.add(key);
       } else {

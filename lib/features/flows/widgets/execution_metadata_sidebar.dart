@@ -34,21 +34,37 @@ class ExecutionMetadataSidebar extends StatelessWidget {
     final execId = exec['id'] as String? ?? '—';
     final startedAt = exec['created_at'] as String?;
     final completedAt = exec['completed_at'] as String?;
-    // Compute progress from field_values + snapshot fields
+    // Compute progress: match each snapshot field to its field_value by key
     final rawFvList = exec['field_values'] as List? ?? [];
-    int filled = 0;
+    final fvMap = <String, Map>{};
     for (final fv in rawFvList.whereType<Map>()) {
-      if (fv['value_text'] != null || fv['value_numeric'] != null ||
-          fv['value_media_url'] != null || fv['value_jsonb'] != null) { filled++; }
+      final k = fv['field_key'];
+      if (k is String && k.isNotEmpty) fvMap[k] = fv;
     }
-    final total = (flow['fields'] as List?)?.length ?? 0;
+    final snapshotFields = (flow['fields'] as List?)?.whereType<Map>().toList() ?? [];
+    final total = snapshotFields.length;
+    int filled = 0;
+    for (final field in snapshotFields) {
+      final key = field['key'];
+      if (key is! String) continue;
+      final fv = fvMap[key];
+      if (fv != null &&
+          (fv['value_text'] != null ||
+           fv['value_numeric'] != null ||
+           fv['value_media_url'] != null ||
+           fv['value_jsonb'] != null)) {
+        filled++;
+      }
+    }
 
     // Channel (now a nested Map)
-    final channelMap = (exec['channel'] as Map?)?.cast<String, dynamic>();
+    final channelRaw = exec['channel'];
+    final channelMap = channelRaw is Map ? channelRaw : null;
     final channelType = channelMap?['channel_type'] as String? ?? '';
     final channelDisplayName = channelMap?['display_name'] as String? ?? '—';
 
-    final operator_ = (exec['operator'] as Map?)?.cast<String, dynamic>();
+    final operatorRaw = exec['operator'];
+    final operator_ = operatorRaw is Map ? operatorRaw : null;
     final opName = operator_?['name'] as String? ?? 'Sin operador';
     final opAvatar = operator_?['profile_picture_url'] as String?;
 

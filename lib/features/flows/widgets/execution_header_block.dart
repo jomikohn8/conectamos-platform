@@ -18,21 +18,36 @@ class ExecutionHeaderBlock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final status = exec['status'] as String? ?? 'completed';
-    // Compute progress from field_values + snapshot fields
+    // Compute progress: match each snapshot field to its field_value by key
     final rawFvList = exec['field_values'] as List? ?? [];
-    int filled = 0;
+    final fvMap = <String, Map>{};
     for (final fv in rawFvList.whereType<Map>()) {
-      if (fv['value_text'] != null || fv['value_numeric'] != null ||
-          fv['value_media_url'] != null || fv['value_jsonb'] != null) { filled++; }
+      final k = fv['field_key'];
+      if (k is String && k.isNotEmpty) fvMap[k] = fv;
     }
-    final total = ((flow['fields'] as List?)?.length ?? 0).clamp(1, 9999);
+    final snapshotFields = (flow['fields'] as List?)?.whereType<Map>().toList() ?? [];
+    final total = snapshotFields.length.clamp(1, 9999);
+    int filled = 0;
+    for (final field in snapshotFields) {
+      final key = field['key'];
+      if (key is! String) continue;
+      final fv = fvMap[key];
+      if (fv != null &&
+          (fv['value_text'] != null ||
+           fv['value_numeric'] != null ||
+           fv['value_media_url'] != null ||
+           fv['value_jsonb'] != null)) {
+        filled++;
+      }
+    }
     final triggerSources = flow['trigger_sources'] as List?;
     final flowType = triggerSources?.firstOrNull?.toString() ?? 'conversacional';
     final flowName = flow['name'] as String? ?? '—';
     final execId = (exec['id'] as String? ?? '').isNotEmpty
         ? (exec['id'] as String).substring(0, 8).toUpperCase()
         : '—';
-    final operator_ = (exec['operator'] as Map?)?.cast<String, dynamic>();
+    final operatorRaw = exec['operator'];
+    final operator_ = operatorRaw is Map ? operatorRaw : null;
     final opName = operator_?['name'] as String? ?? 'Sin operador';
     final opAvatar = operator_?['profile_picture_url'] as String?;
     final waitingFor = exec['waiting_for'] as String? ?? exec['waitingFor'] as String?;
