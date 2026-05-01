@@ -64,7 +64,9 @@ class ExecutionMetadataSidebar extends StatelessWidget {
     final channelDisplayName = channelMap?['display_name'] as String? ?? '—';
 
     final operatorRaw = exec['operator'];
-    final operator_ = operatorRaw is Map ? operatorRaw : null;
+    final Map<String, dynamic>? operator_ = operatorRaw is Map
+        ? Map<String, dynamic>.from(operatorRaw)
+        : null;
     final opName = operator_?['name'] as String? ?? 'Sin operador';
     final opAvatar = operator_?['profile_picture_url'] as String?;
 
@@ -96,7 +98,7 @@ class ExecutionMetadataSidebar extends StatelessWidget {
           _SideCard(
             title: 'Detalle de ejecución',
             child: Column(
-              children: [
+              children: _withDividers([
                 _KV(
                   label: 'Execution ID',
                   value: Text(execId,
@@ -140,7 +142,7 @@ class ExecutionMetadataSidebar extends StatelessWidget {
                     ],
                   ),
                 ),
-              ],
+              ]),
             ),
           ),
           const SizedBox(height: 16),
@@ -347,6 +349,16 @@ class ExecutionMetadataSidebar extends StatelessWidget {
 }
 
 // ── Private helpers ───────────────────────────────────────────────────────────
+
+List<Widget> _withDividers(List<Widget> items) {
+  const divider = Divider(color: Color(0xFFE5E7EB), thickness: 1, height: 1);
+  final result = <Widget>[];
+  for (var i = 0; i < items.length; i++) {
+    result.add(items[i]);
+    if (i < items.length - 1) result.add(divider);
+  }
+  return result;
+}
 
 class _SideCard extends StatelessWidget {
   const _SideCard({required this.title, required this.child, this.action, this.titleIcon});

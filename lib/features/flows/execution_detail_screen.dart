@@ -104,7 +104,7 @@ class _ExecutionDetailScreenState
 
     return Scaffold(
       backgroundColor: AppColors.ctBg,
-      body: SelectionContainer.disabled(child: Column(
+      body: SelectionArea(child: Column(
         children: [
           ExecutionHeaderBlock(exec: exec, flow: flow),
           Expanded(
@@ -180,10 +180,29 @@ class _MainContent extends StatelessWidget {
 
 // ── Fields Block ──────────────────────────────────────────────────────────────
 
-class _FieldsBlock extends StatelessWidget {
+class _FieldsBlock extends StatefulWidget {
   const _FieldsBlock({required this.exec, required this.flow});
   final Map<String, dynamic> exec;
   final Map<String, dynamic> flow;
+
+  @override
+  State<_FieldsBlock> createState() => _FieldsBlockState();
+}
+
+class _FieldsBlockState extends State<_FieldsBlock> {
+  final Set<String> _hiddenTypes = {};
+
+  static const List<(String, IconData, String)> _typeOrder = [
+    ('text',     Icons.notes_rounded,          'Texto'),
+    ('number',   Icons.tag_rounded,            'Número'),
+    ('date',     Icons.calendar_month_rounded, 'Fecha'),
+    ('yesno',    Icons.toggle_on_rounded,      'Sí/No'),
+    ('select',   Icons.checklist_rounded,      'Selección'),
+    ('media',    Icons.camera_alt_rounded,     'Foto'),
+    ('location', Icons.location_on_rounded,    'Ubicación'),
+  ];
+
+  static String _normalizeType(String t) => t == 'photo' ? 'media' : t;
 
   static bool _fvHasValue(Map<String, dynamic> fv) =>
       fv['value_text'] != null ||
@@ -193,10 +212,10 @@ class _FieldsBlock extends StatelessWidget {
 
   static dynamic _resolveValue(String type, Map<String, dynamic> fv) {
     return switch (type) {
-      'number'   => fv['value_numeric'],
-      'media'    => _resolveMedia(fv),
-      'location' => _resolveLocation(fv),
-      _          => fv['value_text'],
+      'number'             => fv['value_numeric'],
+      'media' || 'photo'   => _resolveMedia(fv),
+      'location'           => _resolveLocation(fv),
+      _                    => fv['value_text'],
     };
   }
 
@@ -222,21 +241,26 @@ class _FieldsBlock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final rawFields = flow['fields'] as List? ?? [];
+    final rawFields = widget.flow['fields'] as List? ?? [];
     final fields = rawFields
         .whereType<Map>()
         .map((f) => f.cast<String, dynamic>())
         .toList();
 
     // Build field_values lookup keyed by field_key
-    final rawFvList = exec['field_values'] as List? ?? [];
+    final rawFvList = widget.exec['field_values'] as List? ?? [];
     final fvMap = <String, Map>{};
     for (final item in rawFvList.whereType<Map>()) {
       final k = item['field_key'];
       if (k is String && k.isNotEmpty) fvMap[k] = item;
     }
 
-    // Progress: count only fields that exist in snapshot AND have a value
+    // Types present in this flow (normalized)
+    final presentTypes = fields
+        .map((f) => _normalizeType(f['type'] as String? ?? 'text'))
+        .toSet();
+
+    // Progress
     final total = fields.length;
     final filled = fields.where((f) {
       final key = f['key'];
@@ -259,7 +283,13 @@ class _FieldsBlock extends StatelessWidget {
       }
     }
 
-    // Legacy: field_values whose key is not in defined fields
+    // Visible fields after type filter
+    final visibleFields = fields
+        .where((f) =>
+            !_hiddenTypes.contains(_normalizeType(f['type'] as String? ?? 'text')))
+        .toList();
+
+    // Legacy field_values not in snapshot
     final knownKeys = fields.map((f) => f['key'] as String? ?? '').toSet();
     final legacyKeys = fvMap.keys.where((k) => !knownKeys.contains(k)).toList();
     final legacyValues = <String, dynamic>{
@@ -285,27 +315,44 @@ class _FieldsBlock extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // ── Title + subtitle ────────────────────────────────────────────
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Campos capturados',
+                style: AppFonts.onest(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.ctNavy,
+                  letterSpacing: -0.02,
+                )),
+            const SizedBox(height: 2),
+            Text('$filled de $total campos con valor',
+                style: AppFonts.geist(
+                    fontSize: 12, color: const Color(0xFF6B7280))),
+          ],
+        ),
+        const SizedBox(height: 10),
+        // ── Type filter icons ───────────────────────────────────────────
         Row(
           children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Campos capturados',
-                      style: AppFonts.onest(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.ctNavy,
-                        letterSpacing: -0.02,
-                      )),
-                  const SizedBox(height: 2),
-                  Text(
-                      '$filled de $total campos con valor',
-                      style: AppFonts.geist(
-                          fontSize: 12, color: const Color(0xFF6B7280))),
-                ],
+            for (final (type, icon, label) in _typeOrder)
+              Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child: _TypeFilterIcon(
+                  icon: icon,
+                  label: label,
+                  exists: presentTypes.contains(type),
+                  active: !_hiddenTypes.contains(type),
+                  onToggle: () => setState(() {
+                    if (_hiddenTypes.contains(type)) {
+                      _hiddenTypes.remove(type);
+                    } else {
+                      _hiddenTypes.add(type);
+                    }
+                  }),
+                ),
               ),
-            ),
           ],
         ),
         const SizedBox(height: 14),
@@ -314,7 +361,7 @@ class _FieldsBlock extends StatelessWidget {
             final totalWidth = constraints.maxWidth;
             const gap = 14.0;
             return _WrapGrid(
-              fields: fields,
+              fields: visibleFields,
               values: values,
               pending: pending,
               totalWidth: totalWidth,
@@ -327,6 +374,67 @@ class _FieldsBlock extends StatelessWidget {
           _LegacyFieldsCard(slugs: legacyKeys, values: legacyValues),
         ],
       ],
+    );
+  }
+}
+
+// ── Type Filter Icon ───────────────────────────────────────────────────────────
+
+class _TypeFilterIcon extends StatelessWidget {
+  const _TypeFilterIcon({
+    required this.icon,
+    required this.label,
+    required this.exists,
+    required this.active,
+    required this.onToggle,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool exists;
+  final bool active;
+  final VoidCallback onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    final Color bg;
+    final Color border;
+    final Color iconColor;
+
+    if (!exists) {
+      bg = const Color(0xFFF1F3F5);
+      border = const Color(0xFFE5E7EB);
+      iconColor = const Color(0xFFCBD5E1);
+    } else if (active) {
+      bg = const Color(0xFFCCFBF1);
+      border = const Color(0xFF59E0CC);
+      iconColor = const Color(0xFF0F766E);
+    } else {
+      bg = Colors.white;
+      border = const Color(0xFFE5E7EB);
+      iconColor = const Color(0xFF94A3B8);
+    }
+
+    final tile = Tooltip(
+      message: label,
+      child: Container(
+        width: 24,
+        height: 24,
+        decoration: BoxDecoration(
+          color: bg,
+          border: Border.all(color: border),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Icon(icon, size: 13, color: iconColor),
+      ),
+    );
+
+    if (!exists) {
+      return MouseRegion(cursor: SystemMouseCursors.forbidden, child: tile);
+    }
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(onTap: onToggle, child: tile),
     );
   }
 }

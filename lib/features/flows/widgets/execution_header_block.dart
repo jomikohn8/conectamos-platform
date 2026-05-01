@@ -47,7 +47,9 @@ class ExecutionHeaderBlock extends StatelessWidget {
         ? (exec['id'] as String).substring(0, 8).toUpperCase()
         : '—';
     final operatorRaw = exec['operator'];
-    final operator_ = operatorRaw is Map ? operatorRaw : null;
+    final Map<String, dynamic>? operator_ = operatorRaw is Map
+        ? Map<String, dynamic>.from(operatorRaw)
+        : null;
     final opName = operator_?['name'] as String? ?? 'Sin operador';
     final opAvatar = operator_?['profile_picture_url'] as String?;
     final waitingFor = exec['waiting_for'] as String? ?? exec['waitingFor'] as String?;

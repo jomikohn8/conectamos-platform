@@ -14,12 +14,14 @@ class LineageBreadcrumb extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final parent =
-        (exec['parent'] as Map?)?.cast<String, dynamic>();
+    final parentRaw = exec['parent'];
+    final parent = parentRaw is Map
+        ? Map<String, dynamic>.from(parentRaw)
+        : null;
     final rawChildren = exec['children'] as List? ?? [];
     final children = rawChildren
         .whereType<Map>()
-        .map((e) => e.cast<String, dynamic>())
+        .map((e) => Map<String, dynamic>.from(e))
         .toList();
     final flowName = flow['name'] as String? ?? '—';
     final execId = exec['id'] as String? ?? '—';
