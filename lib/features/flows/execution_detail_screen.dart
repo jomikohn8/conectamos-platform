@@ -104,7 +104,7 @@ class _ExecutionDetailScreenState
 
     return Scaffold(
       backgroundColor: AppColors.ctBg,
-      body: Column(
+      body: SelectionContainer.disabled(child: Column(
         children: [
           ExecutionHeaderBlock(exec: exec, flow: flow),
           Expanded(
@@ -153,7 +153,7 @@ class _ExecutionDetailScreenState
             ),
           ),
         ],
-      ),
+      )),
     );
   }
 }

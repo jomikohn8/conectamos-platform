@@ -37,13 +37,7 @@ class ExecutionHeaderBlock extends StatelessWidget {
     final opAvatar = operator_?['profile_picture_url'] as String?;
     final waitingFor = exec['waiting_for'] as String? ?? exec['waitingFor'] as String?;
     final failureReason = exec['failure_reason'] as String? ?? exec['failureReason'] as String?;
-    final flowSlug = flow['slug'] as String? ?? '';
-
-    final eyebrow = switch (flowType) {
-      'api'       => 'Ejecución vía API',
-      'dashboard' => 'Ejecución desde dashboard',
-      _           => 'Ejecución conversacional',
-    };
+    final flowId = flow['id'] as String? ?? '';
 
     return Container(
       padding: const EdgeInsets.fromLTRB(24, 18, 24, 16),
@@ -64,27 +58,13 @@ class ExecutionHeaderBlock extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Wrap(
-                      spacing: 8,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        Text(eyebrow,
-                            style: AppFonts.geist(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.ctTeal,
-                              letterSpacing: 0.08,
-                            ).copyWith(decoration: TextDecoration.none)),
-                        const Text('·', style: TextStyle(fontSize: 10, color: Color(0xFF94A3B8))),
-                        Text(execId,
-                            style: const TextStyle(
-                              fontFamily: 'Geist',
-                              fontSize: 11,
-                              color: Color(0xFF94A3B8),
-                              letterSpacing: -0.005,
-                            )),
-                      ],
-                    ),
+                    Text(execId,
+                        style: const TextStyle(
+                          fontFamily: 'Geist',
+                          fontSize: 11,
+                          color: Color(0xFF94A3B8),
+                          letterSpacing: -0.005,
+                        )),
                     const SizedBox(height: 4),
                     Text(flowName,
                         style: AppFonts.onest(
@@ -127,7 +107,7 @@ class ExecutionHeaderBlock extends StatelessWidget {
                     label: 'Ver definición',
                     icon: Icons.open_in_new_rounded,
                     onTap: () {
-                      if (flowSlug.isNotEmpty) context.go('/flows/$flowSlug');
+                      if (flowId.isNotEmpty) context.go('/flows/$flowId');
                     },
                   ),
                   const SizedBox(width: 6),
@@ -136,10 +116,6 @@ class ExecutionHeaderBlock extends StatelessWidget {
                     icon: Icons.download_rounded,
                     onTap: () {},
                   ),
-                  const SizedBox(width: 6),
-                  Container(width: 1, height: 24, color: AppColors.ctBorder),
-                  const SizedBox(width: 6),
-                  _GhostIconButton(icon: Icons.more_horiz_rounded, onTap: () {}),
                 ],
               ),
             ],
@@ -524,23 +500,3 @@ class _SmallButton extends StatelessWidget {
   }
 }
 
-class _GhostIconButton extends StatelessWidget {
-  const _GhostIconButton({required this.icon, required this.onTap});
-  final IconData icon;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return IconButton(
-      onPressed: onTap,
-      icon: Icon(icon),
-      iconSize: 16,
-      color: AppColors.ctText2,
-      style: IconButton.styleFrom(
-        padding: const EdgeInsets.all(6),
-        minimumSize: Size.zero,
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      ),
-    );
-  }
-}

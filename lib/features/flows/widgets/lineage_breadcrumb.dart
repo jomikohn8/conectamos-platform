@@ -24,9 +24,10 @@ class LineageBreadcrumb extends StatelessWidget {
     final flowName = flow['name'] as String? ?? '—';
     final execId = exec['id'] as String? ?? '—';
 
-    final noLineage = parent == null && children.isEmpty;
+    if (parent == null && children.isEmpty) return const SizedBox.shrink();
 
     return Container(
+      width: double.infinity,
       margin: const EdgeInsets.only(bottom: 22),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
@@ -37,6 +38,7 @@ class LineageBreadcrumb extends StatelessWidget {
       child: Wrap(
         spacing: 10,
         runSpacing: 8,
+        alignment: WrapAlignment.start,
         crossAxisAlignment: WrapCrossAlignment.center,
         children: [
           Text('LINAJE',
@@ -82,12 +84,6 @@ class LineageBreadcrumb extends StatelessWidget {
             if (children.length > 4)
               _MoreChildrenChip(count: children.length - 4),
           ],
-          if (noLineage)
-            Text('· Flujo independiente — sin flujos previos ni posteriores',
-                style: AppFonts.geist(
-                    fontSize: 11,
-                    color: const Color(0xFF94A3B8))
-                  .copyWith(fontStyle: FontStyle.italic)),
         ],
       ),
     );
