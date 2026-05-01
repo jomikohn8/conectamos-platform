@@ -597,6 +597,7 @@ class _Sidebar extends ConsumerWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // ── Operaciones ──────────────────────────────────
                         _NavSection(
                           label: 'Operaciones',
                           collapsed: collapsed,
@@ -608,6 +609,14 @@ class _Sidebar extends ConsumerWidget {
                           currentRoute: currentRoute,
                           collapsed: collapsed,
                         ),
+                        if (hasPermission(ref, 'flows', 'view'))
+                          _NavItem(
+                            icon: Icons.receipt_long_outlined,
+                            label: 'Ejecuciones',
+                            route: '/tareas',
+                            currentRoute: currentRoute,
+                            collapsed: collapsed,
+                          ),
                         _NavItem(
                           icon: Icons.chat_bubble_outline_rounded,
                           label: 'Conversaciones',
@@ -620,7 +629,23 @@ class _Sidebar extends ConsumerWidget {
                             currentRoute: currentRoute,
                             collapsed:    collapsed,
                           ),
+                        if (hasPermission(ref, 'flow_executions', 'execute_dashboard'))
+                          _ExpandableNavItem(
+                            icon: Icons.bar_chart_rounded,
+                            label: 'Dashboards',
+                            currentRoute: currentRoute,
+                            collapsed: collapsed,
+                            children: [
+                              _ExpandableSubItem(
+                                icon: Icons.task_alt_outlined,
+                                label: 'Tareas',
+                                route: '/tareas',
+                                currentRoute: currentRoute,
+                              ),
+                            ],
+                          ),
                         const SizedBox(height: 4),
+                        // ── Workers ──────────────────────────────────────
                         _NavSection(
                           label: 'Workers',
                           collapsed: collapsed,
@@ -632,75 +657,59 @@ class _Sidebar extends ConsumerWidget {
                           currentRoute: currentRoute,
                           collapsed: collapsed,
                         ),
-                        if (hasPermission(ref, 'flow_executions', 'execute_dashboard'))
-                          _NavItem(
-                            icon: Icons.task_alt_outlined,
-                            label: 'Tareas',
-                            route: '/tareas',
-                            currentRoute: currentRoute,
-                            collapsed: collapsed,
-                          ),
                         if (hasPermission(ref, 'flows', 'view'))
                           _NavItem(
                             icon: Icons.account_tree_outlined,
-                            label: 'Flujos de trabajo',
+                            label: 'Creación de flujos',
                             route: '/flows',
                             currentRoute: currentRoute,
                             collapsed: collapsed,
                           ),
                         const SizedBox(height: 4),
-                        if (hasPermission(ref, 'settings', 'view')) ...[
+                        // ── Configuración ─────────────────────────────────
+                        if (hasPermission(ref, 'settings', 'view') ||
+                            hasPermission(ref, 'operators', 'view')) ...[
                           _NavSection(
                             label: 'Configuración',
                             collapsed: collapsed,
                           ),
-                          _NavItem(
-                            icon: Icons.router_rounded,
-                            label: 'Canales',
-                            route: '/channels',
-                            currentRoute: currentRoute,
-                            collapsed: collapsed,
-                          ),
+                          if (hasPermission(ref, 'settings', 'view'))
+                            _NavItem(
+                              icon: Icons.router_rounded,
+                              label: 'Canales',
+                              route: '/channels',
+                              currentRoute: currentRoute,
+                              collapsed: collapsed,
+                            ),
+                          if (hasPermission(ref, 'operators', 'view'))
+                            _NavItem(
+                              icon: Icons.people_outline_rounded,
+                              label: 'Operadores',
+                              route: '/operators',
+                              currentRoute: currentRoute,
+                              collapsed: collapsed,
+                            ),
+                          if (hasPermission(ref, 'settings', 'view')) ...[
+                            _NavItem(
+                              icon: Icons.cable_outlined,
+                              label: 'Conexiones',
+                              route: '/connections',
+                              currentRoute: currentRoute,
+                              collapsed: collapsed,
+                            ),
+                            _NavItem(
+                              icon: Icons.settings_outlined,
+                              label: 'Ajustes',
+                              route: '/settings',
+                              currentRoute: currentRoute,
+                              collapsed: collapsed,
+                            ),
+                          ],
                         ],
-                        if (hasPermission(ref, 'operators', 'view'))
-                          _NavItem(
-                            icon: Icons.people_outline_rounded,
-                            label: 'Operadores',
-                            route: '/operators',
-                            currentRoute: currentRoute,
-                            collapsed: collapsed,
-                          ),
-                        if (hasPermission(ref, 'settings', 'view')) ...[
-                          _NavItem(
-                            icon: Icons.cable_outlined,
-                            label: 'Conexiones',
-                            route: '/connections',
-                            currentRoute: currentRoute,
-                            collapsed: collapsed,
-                          ),
-                          _NavItem(
-                            icon: Icons.settings_outlined,
-                            label: 'Ajustes',
-                            route: '/settings',
-                            currentRoute: currentRoute,
-                            collapsed: collapsed,
-                          ),
-                        ],
-                        const SizedBox(height: 4),
-                        _NavSection(
-                          label: 'Próximamente',
-                          collapsed: collapsed,
-                        ),
-                        _DisabledNavItem(
-                          icon: Icons.bar_chart_rounded,
-                          label: 'Dashboards',
-                          collapsed: collapsed,
-                        ),
-                        _DisabledNavItem(
-                          icon: Icons.group_work_outlined,
-                          label: 'Catálogo',
-                          collapsed: collapsed,
-                        ),
+                        // ── Próximamente (comentado) ──────────────────────
+                        // _NavSection(label: 'Próximamente', collapsed: collapsed),
+                        // _DisabledNavItem(icon: Icons.bar_chart_rounded, label: 'Dashboards', collapsed: collapsed),
+                        // _DisabledNavItem(icon: Icons.group_work_outlined, label: 'Catálogo', collapsed: collapsed),
                       ],
                     ),
                   ),
@@ -949,6 +958,209 @@ class _EscalacionesNavItem extends ConsumerWidget {
       currentRoute: currentRoute,
       collapsed:    collapsed,
       badgeCount:   count > 0 ? count : null,
+    );
+  }
+}
+
+// ── Expandable nav item (parent + sub-items) ──────────────────────────────────
+
+class _ExpandableSubItem {
+  const _ExpandableSubItem({
+    required this.icon,
+    required this.label,
+    required this.route,
+    required this.currentRoute,
+  });
+  final IconData icon;
+  final String label;
+  final String route;
+  final String currentRoute;
+
+  bool get isActive =>
+      currentRoute == route || currentRoute.startsWith('$route/');
+}
+
+class _ExpandableNavItem extends StatefulWidget {
+  const _ExpandableNavItem({
+    required this.icon,
+    required this.label,
+    required this.currentRoute,
+    required this.collapsed,
+    required this.children,
+  });
+  final IconData icon;
+  final String label;
+  final String currentRoute;
+  final bool collapsed;
+  final List<_ExpandableSubItem> children;
+
+  @override
+  State<_ExpandableNavItem> createState() => _ExpandableNavItemState();
+}
+
+class _ExpandableNavItemState extends State<_ExpandableNavItem> {
+  bool _hovered = false;
+
+  bool get _anyChildActive =>
+      widget.children.any((c) => c.isActive);
+
+  late bool _expanded;
+
+  @override
+  void initState() {
+    super.initState();
+    _expanded = _anyChildActive;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.collapsed) {
+      // Collapsed: show only icon with tooltip
+      return Tooltip(
+        message: widget.label,
+        preferBelow: false,
+        waitDuration: const Duration(milliseconds: 300),
+        decoration: BoxDecoration(
+          color: AppColors.ctNavy,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        textStyle: const TextStyle(
+          fontFamily: 'Geist', fontSize: 12, color: Colors.white,
+        ),
+        child: Container(
+          margin: const EdgeInsets.symmetric(vertical: 1, horizontal: 6),
+          width: 44, height: 36,
+          decoration: BoxDecoration(
+            color: _anyChildActive ? AppColors.ctTealLight : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          alignment: Alignment.center,
+          child: Icon(widget.icon, size: 18,
+              color: _anyChildActive ? AppColors.ctTealDark : AppColors.ctText3),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Parent row
+        MouseRegion(
+          onEnter: (_) => setState(() => _hovered = true),
+          onExit:  (_) => setState(() => _hovered = false),
+          cursor: SystemMouseCursors.click,
+          child: GestureDetector(
+            onTap: () => setState(() => _expanded = !_expanded),
+            child: Container(
+              margin: const EdgeInsets.symmetric(vertical: 1, horizontal: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: _anyChildActive
+                    ? AppColors.ctTealLight
+                    : _hovered ? AppColors.ctSurface2 : Colors.transparent,
+                borderRadius: BorderRadius.circular(8),
+                border: _anyChildActive
+                    ? const Border(
+                        left: BorderSide(color: AppColors.ctTeal, width: 2))
+                    : null,
+              ),
+              child: Row(
+                children: [
+                  Icon(widget.icon, size: 16,
+                      color: _anyChildActive
+                          ? AppColors.ctTealDark
+                          : _hovered ? AppColors.ctText2 : AppColors.ctText3),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(widget.label,
+                        style: TextStyle(
+                          fontFamily: 'Geist',
+                          fontSize: 12,
+                          fontWeight: _anyChildActive
+                              ? FontWeight.w600 : FontWeight.w500,
+                          color: _anyChildActive
+                              ? AppColors.ctTealDark
+                              : _hovered ? AppColors.ctText : AppColors.ctText2,
+                        ),
+                        overflow: TextOverflow.ellipsis),
+                  ),
+                  Icon(
+                    _expanded
+                        ? Icons.keyboard_arrow_up_rounded
+                        : Icons.keyboard_arrow_down_rounded,
+                    size: 14,
+                    color: _anyChildActive
+                        ? AppColors.ctTealDark : AppColors.ctText3,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        // Sub-items
+        if (_expanded)
+          ...widget.children.map((sub) => _SubItemTile(sub: sub)),
+      ],
+    );
+  }
+}
+
+class _SubItemTile extends StatefulWidget {
+  const _SubItemTile({required this.sub});
+  final _ExpandableSubItem sub;
+
+  @override
+  State<_SubItemTile> createState() => _SubItemTileState();
+}
+
+class _SubItemTileState extends State<_SubItemTile> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final active = widget.sub.isActive;
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit:  (_) => setState(() => _hovered = false),
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: () => context.go(widget.sub.route),
+        child: Container(
+          margin: const EdgeInsets.only(left: 24, right: 6, top: 1, bottom: 1),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+          decoration: BoxDecoration(
+            color: active
+                ? AppColors.ctTealLight
+                : _hovered ? AppColors.ctSurface2 : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+            border: active
+                ? const Border(
+                    left: BorderSide(color: AppColors.ctTeal, width: 2))
+                : null,
+          ),
+          child: Row(
+            children: [
+              Icon(widget.sub.icon, size: 14,
+                  color: active
+                      ? AppColors.ctTealDark
+                      : _hovered ? AppColors.ctText2 : AppColors.ctText3),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(widget.sub.label,
+                    style: TextStyle(
+                      fontFamily: 'Geist',
+                      fontSize: 11,
+                      fontWeight: active ? FontWeight.w600 : FontWeight.w500,
+                      color: active
+                          ? AppColors.ctTealDark
+                          : _hovered ? AppColors.ctText : AppColors.ctText2,
+                    ),
+                    overflow: TextOverflow.ellipsis),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

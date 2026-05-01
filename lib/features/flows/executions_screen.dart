@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/api/flows_api.dart';
 import '../../core/providers/tenant_provider.dart';
@@ -110,20 +111,6 @@ class _ExecutionsScreenState extends ConsumerState<ExecutionsScreen> {
     }
   }
 
-  void _openExecutionDetail(Map<String, dynamic> execution) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: AppColors.ctSurface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (_) => _ExecutionDetailSheet(
-        execution: execution,
-        onSubmitted: _load,
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -179,7 +166,7 @@ class _ExecutionsScreenState extends ConsumerState<ExecutionsScreen> {
               separatorBuilder: (context2, i) => const SizedBox(height: 8),
               itemBuilder: (context2, i) => _ExecutionCard(
                 execution: _executions[i],
-                onTap: () => _openExecutionDetail(_executions[i]),
+                onTap: () => context.go('/flows/runs/${_executions[i]['id']}'),
               ),
             ),
           ),
