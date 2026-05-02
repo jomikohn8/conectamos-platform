@@ -56,6 +56,19 @@ class ExecutionHeaderBlock extends StatelessWidget {
     final failureReason = exec['failure_reason'] as String? ?? exec['failureReason'] as String?;
     final flowId = flow['id'] as String? ?? '';
 
+    // Channel
+    final channelRaw = exec['channel'];
+    final channelMap = channelRaw is Map
+        ? Map<String, dynamic>.from(channelRaw)
+        : null;
+    final channelType = channelMap?['channel_type'] as String? ??
+        switch (exec['actor_type'] as String?) {
+          'operator'    => 'whatsapp',
+          'tenant_user' => 'dashboard',
+          'system'      => 'api',
+          _             => null,
+        };
+
     return Container(
       padding: const EdgeInsets.fromLTRB(24, 18, 24, 16),
       decoration: const BoxDecoration(
@@ -98,6 +111,7 @@ class ExecutionHeaderBlock extends StatelessWidget {
                       children: [
                         _StatusPill(status: status),
                         _TypeBadge(flowType: flowType),
+                        if (channelType != null) _ChannelBadge(channelType: channelType),
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -487,6 +501,40 @@ class _InitialAvatar extends StatelessWidget {
                 fontSize: size * 0.36,
                 fontWeight: FontWeight.w600,
                 color: AppColors.ctInfoText)),
+      ),
+    );
+  }
+}
+
+class _ChannelBadge extends StatelessWidget {
+  const _ChannelBadge({required this.channelType});
+  final String channelType;
+
+  @override
+  Widget build(BuildContext context) {
+    final (bg, fg, bd, icon, label) = switch (channelType) {
+      'whatsapp'  => (const Color(0xFFE8F8EF), const Color(0xFF1A7A45), const Color(0xFFBBF7D0), Icons.chat_rounded, 'WhatsApp'),
+      'telegram'  => (AppColors.ctInfoBg, AppColors.ctInfoText, const Color(0xFFBFDBFE), Icons.send_rounded, 'Telegram'),
+      'api'       => (AppColors.ctInfoBg, AppColors.ctInfoText, const Color(0xFFBFDBFE), Icons.code_rounded, 'API'),
+      'dashboard' => (AppColors.ctSurface2, const Color(0xFF475569), AppColors.ctBorder, Icons.dashboard_outlined, 'Dashboard'),
+      _           => (AppColors.ctSurface2, AppColors.ctText2, AppColors.ctBorder, Icons.link_rounded, channelType),
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: bg,
+        border: Border.all(color: bd),
+        borderRadius: BorderRadius.circular(99),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 11, color: fg),
+          const SizedBox(width: 4),
+          Text(label,
+              style: AppFonts.geist(
+                  fontSize: 11, fontWeight: FontWeight.w600, color: fg)),
+        ],
       ),
     );
   }

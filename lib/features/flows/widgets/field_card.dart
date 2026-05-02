@@ -94,6 +94,35 @@ class _FieldHeader extends StatelessWidget {
         _          => 'Texto',
       };
 
+  static String _locationStr(dynamic v) {
+    if (v is! Map) return v.toString();
+    final address = v['address'] as String?;
+    if (address != null && address.isNotEmpty) return address;
+    final lat = v['lat'] ?? v['latitude'];
+    final lng = v['lng'] ?? v['longitude'];
+    if (lat != null && lng != null) return '$lat, $lng';
+    return v.toString();
+  }
+
+  static String _displayStr(String type, dynamic value) {
+    if (value == null) return '';
+    return switch (type) {
+      'number'           => value.toString(),
+      'date'             => value.toString(),
+      'yesno'            => switch (value) {
+        true  => 'Sí',
+        false => 'No',
+        _     => value.toString(),
+      },
+      'select'           => value is List ? value.join(', ') : value.toString(),
+      'photo' || 'media' => value is List
+          ? value.join(', ')
+          : value.toString(),
+      'location'         => _locationStr(value),
+      _                  => value.toString(),
+    };
+  }
+
   @override
   Widget build(BuildContext context) {
     final type = field['type'] as String? ?? 'text';
@@ -154,6 +183,30 @@ class _FieldHeader extends StatelessWidget {
             ],
           ),
         ),
+        if (!isPending) ...[
+          const SizedBox(width: 4),
+          SizedBox(
+            width: 24,
+            height: 24,
+            child: IconButton(
+              onPressed: () {
+                final text = _displayStr(type, value);
+                if (text.isEmpty) return;
+                Clipboard.setData(ClipboardData(text: text));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Copiado'),
+                    duration: Duration(milliseconds: 1500),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.copy_rounded,
+                  size: 14, color: AppColors.ctText2),
+              padding: EdgeInsets.zero,
+              tooltip: 'Copiar valor',
+            ),
+          ),
+        ],
       ],
     );
   }

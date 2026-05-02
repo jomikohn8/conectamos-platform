@@ -167,10 +167,18 @@ class _MainContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final rawEvents = exec['events'] as List? ?? [];
+    final events = rawEvents
+        .whereType<Map>()
+        .map((e) => e.cast<String, dynamic>())
+        .toList();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _FieldsBlock(exec: exec, flow: flow),
+        const SizedBox(height: 22),
+        _TimelineBlock(events: events),
         const SizedBox(height: 22),
         _MessagesBlock(exec: exec),
       ],
@@ -559,6 +567,195 @@ class _LegacyFieldsCard extends StatelessWidget {
               )),
         ],
       ),
+    );
+  }
+}
+
+// ── Timeline Block ────────────────────────────────────────────────────────────
+
+class _TimelineBlock extends StatelessWidget {
+  const _TimelineBlock({required this.events});
+  final List<Map<String, dynamic>> events;
+
+  static const _months = [
+    'ene', 'feb', 'mar', 'abr', 'may', 'jun',
+    'jul', 'ago', 'sep', 'oct', 'nov', 'dic',
+  ];
+
+  static String _fmt(String? iso) {
+    if (iso == null) return '—';
+    try {
+      final d = DateTime.parse(iso).toLocal();
+      final hh = d.hour.toString().padLeft(2, '0');
+      final mm = d.minute.toString().padLeft(2, '0');
+      final ss = d.second.toString().padLeft(2, '0');
+      return '${d.day.toString().padLeft(2, '0')} ${_months[d.month - 1]} · $hh:$mm:$ss';
+    } catch (_) {
+      return iso;
+    }
+  }
+
+  static ({Color color, IconData icon, String label}) _cfg(String type) =>
+      switch (type) {
+        'flujo_iniciado'       => (color: AppColors.ctTeal,            icon: Icons.play_circle_outline_rounded,  label: 'Flujo iniciado'),
+        'campo_capturado'      => (color: AppColors.ctOk,              icon: Icons.check_circle_outline_rounded, label: 'Campo capturado'),
+        'campo_rechazado'      => (color: AppColors.ctWarn,            icon: Icons.cancel_outlined,              label: 'Campo rechazado'),
+        'flujo_completado'     => (color: AppColors.ctTeal,            icon: Icons.check_circle_rounded,         label: 'Flujo completado'),
+        'flujo_abandonado'     => (color: AppColors.ctDanger,          icon: Icons.highlight_off_rounded,        label: 'Flujo abandonado'),
+        'supervisor_intervino' => (color: AppColors.ctInfo,            icon: Icons.person_outline_rounded,       label: 'Supervisor intervino'),
+        'worker_escaló'        => (color: AppColors.ctWarn,            icon: Icons.arrow_upward_rounded,         label: 'Worker escaló'),
+        'flujo_pausado'        => (color: const Color(0xFF7B92A7),     icon: Icons.pause_circle_outline_rounded, label: 'Flujo pausado'),
+        'flujo_retomado'       => (color: AppColors.ctTeal,            icon: Icons.play_arrow_rounded,           label: 'Flujo retomado'),
+        _                      => (color: const Color(0xFF7B92A7),     icon: Icons.radio_button_unchecked,       label: type),
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    final sorted = [...events];
+    sorted.sort((a, b) {
+      final ta = a['timestamp'] as String? ?? a['created_at'] as String? ?? '';
+      final tb = b['timestamp'] as String? ?? b['created_at'] as String? ?? '';
+      return ta.compareTo(tb);
+    });
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Cronología',
+            style: AppFonts.onest(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: AppColors.ctNavy,
+              letterSpacing: -0.02,
+            )),
+        const SizedBox(height: 2),
+        Text('Registro de eventos del flujo',
+            style: AppFonts.geist(fontSize: 12, color: AppColors.ctText2)),
+        const SizedBox(height: 14),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border.all(color: AppColors.ctBorder),
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: const [
+              BoxShadow(
+                  color: Color(0x0A0F172A), offset: Offset(0, 1), blurRadius: 2),
+            ],
+          ),
+          child: sorted.isEmpty
+              ? Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 24),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.timeline_rounded,
+                          size: 20, color: AppColors.ctText3),
+                      const SizedBox(width: 8),
+                      Text('Sin eventos registrados',
+                          style: AppFonts.geist(
+                              fontSize: 13, color: AppColors.ctText3)),
+                    ],
+                  ),
+                )
+              : Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                  child: Column(
+                    children: [
+                      for (var i = 0; i < sorted.length; i++)
+                        _EventRow(
+                          event: sorted[i],
+                          isLast: i == sorted.length - 1,
+                        ),
+                    ],
+                  ),
+                ),
+        ),
+      ],
+    );
+  }
+}
+
+class _EventRow extends StatelessWidget {
+  const _EventRow({required this.event, required this.isLast});
+  final Map<String, dynamic> event;
+  final bool isLast;
+
+  @override
+  Widget build(BuildContext context) {
+    final type =
+        event['type'] as String? ?? event['event_type'] as String? ?? '';
+    final ts = event['timestamp'] as String? ?? event['created_at'] as String?;
+    final dataRaw = event['data'];
+    String? dataStr;
+    if (dataRaw is Map && dataRaw.isNotEmpty) {
+      dataStr = dataRaw.entries.map((e) => '${e.key}: ${e.value}').join(' · ');
+    } else if (dataRaw is String && (dataRaw).isNotEmpty) {
+      dataStr = dataRaw;
+    }
+    final cfg = _TimelineBlock._cfg(type);
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // ── Track (icon + connector line) ────────────────────────────────
+        SizedBox(
+          width: 28,
+          child: Column(
+            children: [
+              Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: cfg.color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(cfg.icon, size: 14, color: cfg.color),
+              ),
+              if (!isLast)
+                Container(
+                  width: 1.5,
+                  height: 20,
+                  margin: const EdgeInsets.symmetric(vertical: 2),
+                  color: AppColors.ctBorder,
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 12),
+        // ── Content ──────────────────────────────────────────────────────
+        Expanded(
+          child: Padding(
+            padding: EdgeInsets.only(bottom: isLast ? 0.0 : 16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(cfg.label,
+                          style: AppFonts.geist(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.ctNavy)),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(_TimelineBlock._fmt(ts),
+                        style: AppFonts.geist(
+                            fontSize: 11, color: AppColors.ctText3)),
+                  ],
+                ),
+                if (dataStr != null && dataStr.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(dataStr,
+                      style: AppFonts.geist(
+                          fontSize: 12, color: AppColors.ctText2)),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

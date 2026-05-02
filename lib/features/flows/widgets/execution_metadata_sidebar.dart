@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 
@@ -120,6 +121,7 @@ class ExecutionMetadataSidebar extends StatelessWidget {
               children: _withDividers([
                 _KV(
                   label: 'Execution ID',
+                  copyText: exec['id'] as String?,
                   value: Text(execId,
                       style: const TextStyle(
                           fontFamily: 'Geist',
@@ -127,10 +129,15 @@ class ExecutionMetadataSidebar extends StatelessWidget {
                           color: AppColors.ctNavy,
                           letterSpacing: -0.005)),
                 ),
-                _KV(label: 'Iniciada', value: Text(_fmtDateLong(startedAt),
-                    style: AppFonts.geist(fontSize: 12, color: AppColors.ctNavy))),
+                _KV(
+                  label: 'Iniciada',
+                  copyText: startedAt,
+                  value: Text(_fmtDateLong(startedAt),
+                      style: AppFonts.geist(fontSize: 12, color: AppColors.ctNavy)),
+                ),
                 _KV(
                   label: 'Finalizada',
+                  copyText: completedAt,
                   value: Text(_fmtDateLong(completedAt),
                       style: AppFonts.geist(fontSize: 12, color: AppColors.ctNavy)),
                 ),
@@ -429,9 +436,10 @@ class _SideCard extends StatelessWidget {
 }
 
 class _KV extends StatelessWidget {
-  const _KV({required this.label, required this.value});
+  const _KV({required this.label, required this.value, this.copyText});
   final String label;
   final Widget value;
+  final String? copyText;
 
   @override
   Widget build(BuildContext context) {
@@ -446,6 +454,28 @@ class _KV extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           Expanded(child: value),
+          if (copyText != null && copyText!.isNotEmpty) ...[
+            const SizedBox(width: 4),
+            SizedBox(
+              width: 24,
+              height: 24,
+              child: IconButton(
+                onPressed: () {
+                  Clipboard.setData(ClipboardData(text: copyText!));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Copiado'),
+                      duration: Duration(milliseconds: 1500),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.copy_rounded,
+                    size: 14, color: AppColors.ctText2),
+                padding: EdgeInsets.zero,
+                tooltip: 'Copiar',
+              ),
+            ),
+          ],
         ],
       ),
     );
