@@ -1,5 +1,8 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 
@@ -8,10 +11,12 @@ class ExecutionMetadataSidebar extends StatelessWidget {
     super.key,
     required this.exec,
     required this.flow,
+    required this.events,
   });
 
   final Map<String, dynamic> exec;
   final Map<String, dynamic> flow;
+  final List<Map<String, dynamic>> events;
 
   static const _shortMonths = [
     'ene', 'feb', 'mar', 'abr', 'may', 'jun',
@@ -318,6 +323,14 @@ class ExecutionMetadataSidebar extends StatelessWidget {
 
           const SizedBox(height: 16),
 
+          // ── Cronología ────────────────────────────────────────────────────
+          const SizedBox(height: 16),
+          _SideCard(
+            title: 'Cronología',
+            child: _TimelineSidebar(events: events),
+          ),
+          const SizedBox(height: 16),
+
           // ── Comportamiento ────────────────────────────────────────────────
           _SideCard(
             title: 'Comportamiento',
@@ -505,10 +518,17 @@ class _ChannelLabel extends StatelessWidget {
         icon = Icons.dashboard_outlined;
         color = const Color(0xFF475569);
     }
+    final Widget iconWidget = switch (channelType) {
+      'whatsapp' => SvgPicture.asset('assets/logos/whatsapp.svg',
+          width: 14, height: 14),
+      'telegram' => Image.asset('assets/logos/telegram',
+          width: 14, height: 14),
+      _ => Icon(icon, size: 14, color: color),
+    };
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 14, color: color),
+        iconWidget,
         const SizedBox(width: 6),
         Flexible(
           child: Text(displayName,
@@ -613,6 +633,329 @@ class _Initials extends StatelessWidget {
                 fontSize: size * 0.36,
                 fontWeight: FontWeight.w600,
                 color: AppColors.ctInfoText)),
+      ),
+    );
+  }
+}
+
+// ── Timeline sidebar ──────────────────────────────────────────────────────────
+
+class _EventGroup {
+  _EventGroup({required this.type, required Map<String, dynamic> first})
+      : items = [first];
+  final String type;
+  final List<Map<String, dynamic>> items;
+
+  int get count => items.length;
+  String? get firstAt =>
+      items.first['timestamp'] as String? ?? items.first['created_at'] as String?;
+  String? get lastAt =>
+      items.last['timestamp'] as String? ?? items.last['created_at'] as String?;
+}
+
+class _TimelineSidebar extends StatefulWidget {
+  const _TimelineSidebar({required this.events});
+  final List<Map<String, dynamic>> events;
+
+  static const _months = [
+    'ene', 'feb', 'mar', 'abr', 'may', 'jun',
+    'jul', 'ago', 'sep', 'oct', 'nov', 'dic',
+  ];
+
+  static String _fmtFull(String? iso) {
+    if (iso == null) return '—';
+    try {
+      final d = DateTime.parse(iso).toLocal();
+      final hh = d.hour.toString().padLeft(2, '0');
+      final mm = d.minute.toString().padLeft(2, '0');
+      return '${d.day.toString().padLeft(2, '0')} ${_months[d.month - 1]} · $hh:$mm';
+    } catch (_) {
+      return iso;
+    }
+  }
+
+  static String _fmtTime(String? iso) {
+    if (iso == null) return '—';
+    try {
+      final d = DateTime.parse(iso).toLocal();
+      return '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
+    } catch (_) {
+      return iso;
+    }
+  }
+
+  static ({Color color, String label}) _cfg(String type) => switch (type) {
+    'flujo_iniciado'       => (color: AppColors.ctTeal,            label: 'Flujo iniciado'),
+    'campo_capturado'      => (color: const Color(0xFF10B981),     label: 'Campo capturado'),
+    'campo_rechazado'      => (color: const Color(0xFFF59E0B),     label: 'Campo rechazado'),
+    'flujo_completado'     => (color: AppColors.ctTeal,            label: 'Flujo completado'),
+    'flujo_abandonado'     => (color: const Color(0xFFEF4444),     label: 'Flujo abandonado'),
+    'supervisor_intervino' => (color: const Color(0xFF3B82F6),     label: 'Supervisor intervino'),
+    'worker_escaló'        => (color: const Color(0xFFF59E0B),     label: 'Worker escaló'),
+    'flujo_pausado'        => (color: AppColors.ctText2,           label: 'Flujo pausado'),
+    'flujo_retomado'       => (color: AppColors.ctTeal,            label: 'Flujo retomado'),
+    _                      => (color: AppColors.ctText2,           label: type),
+  };
+
+  static List<String> _dataLines(dynamic raw) {
+    if (raw == null) return [];
+    if (raw is Map) {
+      final m = raw.cast<String, dynamic>();
+      if (m.isEmpty) return [];
+      return m.entries.map((e) => '${e.key}: ${e.value}').toList();
+    }
+    if (raw is String && raw.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(raw);
+        if (decoded is Map) {
+          final m = decoded.cast<String, dynamic>();
+          if (m.isEmpty) return [];
+          return m.entries.map((e) => '${e.key}: ${e.value}').toList();
+        }
+      } catch (_) {}
+      return [raw];
+    }
+    return [];
+  }
+
+  static List<_EventGroup> _buildGroups(List<Map<String, dynamic>> sorted) {
+    final groups = <_EventGroup>[];
+    for (final e in sorted) {
+      final type = e['type'] as String? ?? e['event_type'] as String? ?? '';
+      if (groups.isNotEmpty && groups.last.type == type) {
+        groups.last.items.add(e);
+      } else {
+        groups.add(_EventGroup(type: type, first: e));
+      }
+    }
+    return groups;
+  }
+
+  @override
+  State<_TimelineSidebar> createState() => _TimelineSidebarState();
+}
+
+class _TimelineSidebarState extends State<_TimelineSidebar> {
+  final _expanded = <int>{};
+
+  @override
+  Widget build(BuildContext context) {
+    final sorted = [...widget.events];
+    sorted.sort((a, b) {
+      final ta = a['timestamp'] as String? ?? a['created_at'] as String? ?? '';
+      final tb = b['timestamp'] as String? ?? b['created_at'] as String? ?? '';
+      return ta.compareTo(tb);
+    });
+
+    if (sorted.isEmpty) {
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.timeline_rounded, size: 16, color: AppColors.ctText3),
+          const SizedBox(width: 6),
+          Text('Sin eventos registrados',
+              style: AppFonts.geist(fontSize: 12, color: AppColors.ctText3)),
+        ],
+      );
+    }
+
+    final groups = _TimelineSidebar._buildGroups(sorted);
+
+    return Column(
+      children: [
+        for (var i = 0; i < groups.length; i++)
+          _GroupRow(
+            group: groups[i],
+            isLast: i == groups.length - 1,
+            expanded: _expanded.contains(i),
+            onToggle: () => setState(() {
+              if (_expanded.contains(i)) {
+                _expanded.remove(i);
+              } else {
+                _expanded.add(i);
+              }
+            }),
+          ),
+      ],
+    );
+  }
+}
+
+class _GroupRow extends StatelessWidget {
+  const _GroupRow({
+    required this.group,
+    required this.isLast,
+    required this.expanded,
+    required this.onToggle,
+  });
+  final _EventGroup group;
+  final bool isLast;
+  final bool expanded;
+  final VoidCallback onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    final cfg = _TimelineSidebar._cfg(group.type);
+
+    final bool hasExpandable = group.count > 1 ||
+        _TimelineSidebar._dataLines(group.items.first['data']).isNotEmpty;
+
+    final String timeStr = group.count == 1
+        ? _TimelineSidebar._fmtFull(group.firstAt)
+        : '${_TimelineSidebar._fmtTime(group.firstAt)} → ${_TimelineSidebar._fmtTime(group.lastAt)}';
+
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── Track ─────────────────────────────────────────────────────
+          SizedBox(
+            width: 16,
+            child: Column(
+              children: [
+                const SizedBox(height: 3),
+                Container(
+                  width: 7,
+                  height: 7,
+                  decoration: BoxDecoration(
+                    color: cfg.color,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                if (!isLast)
+                  Expanded(
+                    child: Container(
+                      width: 1.5,
+                      margin: const EdgeInsets.symmetric(vertical: 3),
+                      color: AppColors.ctBorder,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          // ── Content ───────────────────────────────────────────────────
+          Expanded(
+            child: Padding(
+              padding: EdgeInsets.only(bottom: isLast ? 0.0 : 12.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Expanded(
+                        child: Text.rich(
+                          TextSpan(children: [
+                            TextSpan(
+                              text: cfg.label,
+                              style: AppFonts.geist(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.ctNavy),
+                            ),
+                            if (group.count > 1)
+                              TextSpan(
+                                text: ' ×${group.count}',
+                                style: AppFonts.geist(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w500,
+                                    color: AppColors.ctText3),
+                              ),
+                          ]),
+                        ),
+                      ),
+                      if (hasExpandable)
+                        SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: IconButton(
+                            onPressed: onToggle,
+                            icon: Icon(
+                              expanded
+                                  ? Icons.keyboard_arrow_up_rounded
+                                  : Icons.keyboard_arrow_down_rounded,
+                              size: 14,
+                              color: AppColors.ctText3,
+                            ),
+                            padding: EdgeInsets.zero,
+                          ),
+                        ),
+                    ],
+                  ),
+                  Text(timeStr,
+                      style: AppFonts.geist(
+                          fontSize: 11, color: AppColors.ctText3)),
+                  if (expanded) ...[
+                    const SizedBox(height: 4),
+                    if (group.count == 1)
+                      _DataLines(
+                          lines: _TimelineSidebar
+                              ._dataLines(group.items.first['data']))
+                    else
+                      _SubEventList(items: group.items),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DataLines extends StatelessWidget {
+  const _DataLines({required this.lines});
+  final List<String> lines;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: lines
+            .map((l) => Text(l,
+                style: AppFonts.geist(fontSize: 11, color: AppColors.ctText2)))
+            .toList(),
+      ),
+    );
+  }
+}
+
+class _SubEventList extends StatelessWidget {
+  const _SubEventList({required this.items});
+  final List<Map<String, dynamic>> items;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: items.map((e) {
+          final ts = e['timestamp'] as String? ?? e['created_at'] as String?;
+          final lines = _TimelineSidebar._dataLines(e['data']);
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _TimelineSidebar._fmtTime(ts),
+                  style: AppFonts.geist(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.ctText2),
+                ),
+                ...lines.map((l) => Text(l,
+                    style:
+                        AppFonts.geist(fontSize: 11, color: AppColors.ctText2))),
+              ],
+            ),
+          );
+        }).toList(),
       ),
     );
   }
