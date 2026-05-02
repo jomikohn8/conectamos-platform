@@ -183,7 +183,10 @@ class _FieldHeader extends StatelessWidget {
             ],
           ),
         ),
-        if (!isPending) ...[
+        if (!isPending &&
+            type != 'photo' &&
+            type != 'media' &&
+            type != 'location') ...[
           const SizedBox(width: 4),
           SizedBox(
             width: 24,

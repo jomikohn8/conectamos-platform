@@ -595,18 +595,18 @@ class _TimelineBlock extends StatelessWidget {
     }
   }
 
-  static ({Color color, IconData icon, String label}) _cfg(String type) =>
+  static ({Color color, String label}) _cfg(String type) =>
       switch (type) {
-        'flujo_iniciado'       => (color: AppColors.ctTeal,            icon: Icons.play_circle_outline_rounded,  label: 'Flujo iniciado'),
-        'campo_capturado'      => (color: AppColors.ctOk,              icon: Icons.check_circle_outline_rounded, label: 'Campo capturado'),
-        'campo_rechazado'      => (color: AppColors.ctWarn,            icon: Icons.cancel_outlined,              label: 'Campo rechazado'),
-        'flujo_completado'     => (color: AppColors.ctTeal,            icon: Icons.check_circle_rounded,         label: 'Flujo completado'),
-        'flujo_abandonado'     => (color: AppColors.ctDanger,          icon: Icons.highlight_off_rounded,        label: 'Flujo abandonado'),
-        'supervisor_intervino' => (color: AppColors.ctInfo,            icon: Icons.person_outline_rounded,       label: 'Supervisor intervino'),
-        'worker_escaló'        => (color: AppColors.ctWarn,            icon: Icons.arrow_upward_rounded,         label: 'Worker escaló'),
-        'flujo_pausado'        => (color: const Color(0xFF7B92A7),     icon: Icons.pause_circle_outline_rounded, label: 'Flujo pausado'),
-        'flujo_retomado'       => (color: AppColors.ctTeal,            icon: Icons.play_arrow_rounded,           label: 'Flujo retomado'),
-        _                      => (color: const Color(0xFF7B92A7),     icon: Icons.radio_button_unchecked,       label: type),
+        'flujo_iniciado'       => (color: AppColors.ctTeal,            label: 'Flujo iniciado'),
+        'campo_capturado'      => (color: const Color(0xFF10B981),     label: 'Campo capturado'),
+        'campo_rechazado'      => (color: const Color(0xFFF59E0B),     label: 'Campo rechazado'),
+        'flujo_completado'     => (color: AppColors.ctTeal,            label: 'Flujo completado'),
+        'flujo_abandonado'     => (color: const Color(0xFFEF4444),     label: 'Flujo abandonado'),
+        'supervisor_intervino' => (color: const Color(0xFF3B82F6),     label: 'Supervisor intervino'),
+        'worker_escaló'        => (color: const Color(0xFFF59E0B),     label: 'Worker escaló'),
+        'flujo_pausado'        => (color: AppColors.ctText2,           label: 'Flujo pausado'),
+        'flujo_retomado'       => (color: AppColors.ctTeal,            label: 'Flujo retomado'),
+        _                      => (color: AppColors.ctText2,           label: type),
       };
 
   @override
@@ -697,25 +697,25 @@ class _EventRow extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // ── Track (icon + connector line) ────────────────────────────────
+        // ── Track (dot + connector line) ─────────────────────────────────
         SizedBox(
-          width: 28,
+          width: 20,
           child: Column(
             children: [
+              const SizedBox(height: 4),
               Container(
-                width: 28,
-                height: 28,
+                width: 8,
+                height: 8,
                 decoration: BoxDecoration(
-                  color: cfg.color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(8),
+                  color: cfg.color,
+                  shape: BoxShape.circle,
                 ),
-                child: Icon(cfg.icon, size: 14, color: cfg.color),
               ),
               if (!isLast)
                 Container(
                   width: 1.5,
-                  height: 20,
-                  margin: const EdgeInsets.symmetric(vertical: 2),
+                  height: 24,
+                  margin: const EdgeInsets.symmetric(vertical: 3),
                   color: AppColors.ctBorder,
                 ),
             ],
