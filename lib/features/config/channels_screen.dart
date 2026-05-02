@@ -420,12 +420,36 @@ class _CreateChannelStepperState extends State<_CreateChannelStepper> {
     final helper = html.ScriptElement()
       ..text = '''
         window.fbAsyncInit = function() {
-          FB.init({ appId: '4149613485350757', cookie: true, xfbml: false, version: 'v19.0' });
+          FB.init({ 
+            appId: '4149613485350757', 
+            cookie: true, 
+            xfbml: true,          
+            autoLogAppEvents: true, 
+            version: 'v19.0' 
+          });
         };
+
+        // ── Event listener para WA_EMBEDDED_SIGNUP ──
+        window.addEventListener('message', function(event) {
+          if (!event.origin.endsWith('facebook.com')) return;
+          try {
+            var data = JSON.parse(event.data);
+            console.log('WA_EMBEDDED_SIGNUP event:', JSON.stringify(data));
+            if (data.type === 'WA_EMBEDDED_SIGNUP') {
+              // Aquí llegan waba_id, phone_number_id, etc.
+              window._waSignupData = data;
+            }
+          } catch(e) {
+            console.log('message event raw:', event.data);
+          }
+        });
+
         window._fbLaunchSignup = function(onCode, onCancel) {
           if (typeof FB === 'undefined') { onCancel('not_ready'); return; }
           FB.login(function(r) {
+            console.log('FB.login response:', JSON.stringify(r));
             if (r && r.authResponse && r.authResponse.code) {
+              console.log('CODE:', r.authResponse.code);
               onCode(r.authResponse.code);
             } else {
               onCancel('cancelled');
@@ -437,7 +461,7 @@ class _CreateChannelStepperState extends State<_CreateChannelStepper> {
             override_default_response_type: true,
             extras: {
               setup: {},
-              featureType: 'whatsapp_business_app_onboarding', 
+              featureType: 'whatsapp_business_app_onboarding',
               sessionInfoVersion: '3'
             }
           });
