@@ -30,6 +30,7 @@ import '../../core/api/supabase_read_receipts.dart';
 import '../../core/providers/permissions_provider.dart';
 import '../../core/providers/tenant_provider.dart';
 import '../../core/theme/app_theme.dart';
+import 'widgets/media_preview_dialog.dart';
 
 // ── Providers ─────────────────────────────────────────────────────────────────
 
@@ -3189,14 +3190,8 @@ class _ApiMessageBubbleState extends State<_ApiMessageBubble> {
     final thumbnail = GestureDetector(
       onTap: () => showDialog(
         context: context,
-        builder: (_) => Dialog(
-          backgroundColor: Colors.transparent,
-          child: GestureDetector(
-            onTap: () => Navigator.of(context).pop(),
-            child: Image.network(mUrl,
-                errorBuilder: (ctx, e, s) => _fallback('[Imagen]')),
-          ),
-        ),
+        barrierColor: Colors.black87,
+        builder: (_) => MediaPreviewDialog(url: mUrl),
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(8),

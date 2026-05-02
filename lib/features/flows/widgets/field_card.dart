@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart' show LatLng;
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../conversations/widgets/media_preview_dialog.dart';
 
 // ── Public widget ────────────────────────────────────────────────────────────
 
@@ -94,35 +95,6 @@ class _FieldHeader extends StatelessWidget {
         _          => 'Texto',
       };
 
-  static String _locationStr(dynamic v) {
-    if (v is! Map) return v.toString();
-    final address = v['address'] as String?;
-    if (address != null && address.isNotEmpty) return address;
-    final lat = v['lat'] ?? v['latitude'];
-    final lng = v['lng'] ?? v['longitude'];
-    if (lat != null && lng != null) return '$lat, $lng';
-    return v.toString();
-  }
-
-  static String _displayStr(String type, dynamic value) {
-    if (value == null) return '';
-    return switch (type) {
-      'number'           => value.toString(),
-      'date'             => value.toString(),
-      'yesno'            => switch (value) {
-        true  => 'Sí',
-        false => 'No',
-        _     => value.toString(),
-      },
-      'select'           => value is List ? value.join(', ') : value.toString(),
-      'photo' || 'media' => value is List
-          ? value.join(', ')
-          : value.toString(),
-      'location'         => _locationStr(value),
-      _                  => value.toString(),
-    };
-  }
-
   @override
   Widget build(BuildContext context) {
     final type = field['type'] as String? ?? 'text';
@@ -183,33 +155,6 @@ class _FieldHeader extends StatelessWidget {
             ],
           ),
         ),
-        if (!isPending &&
-            type != 'photo' &&
-            type != 'media' &&
-            type != 'location') ...[
-          const SizedBox(width: 4),
-          SizedBox(
-            width: 24,
-            height: 24,
-            child: IconButton(
-              onPressed: () {
-                final text = _displayStr(type, value);
-                if (text.isEmpty) return;
-                Clipboard.setData(ClipboardData(text: text));
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Copiado'),
-                    duration: Duration(milliseconds: 1500),
-                  ),
-                );
-              },
-              icon: const Icon(Icons.copy_rounded,
-                  size: 14, color: AppColors.ctText2),
-              padding: EdgeInsets.zero,
-              tooltip: 'Copiar valor',
-            ),
-          ),
-        ],
       ],
     );
   }
@@ -323,20 +268,49 @@ class _TextValue extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF1F3F5),
-        border: Border.all(color: AppColors.ctBorder),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Text(
-        value?.toString() ?? '—',
-        style: AppFonts.geist(fontSize: 14, color: const Color(0xFF0F172A), height: 1.55),
-        softWrap: true,
-        maxLines: multiline ? null : 4,
-      ),
+    final text = value?.toString() ?? '';
+    return Stack(
+      children: [
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF1F3F5),
+            border: Border.all(color: AppColors.ctBorder),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Text(
+            text.isEmpty ? '—' : text,
+            style: AppFonts.geist(fontSize: 14, color: const Color(0xFF0F172A), height: 1.55),
+            softWrap: true,
+            maxLines: multiline ? null : 4,
+          ),
+        ),
+        if (text.isNotEmpty)
+          Positioned(
+            bottom: 6,
+            right: 6,
+            child: SizedBox(
+              width: 24,
+              height: 24,
+              child: IconButton(
+                onPressed: () {
+                  Clipboard.setData(ClipboardData(text: text));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Copiado'),
+                      duration: Duration(milliseconds: 1500),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.copy_rounded,
+                    size: 13, color: AppColors.ctText3),
+                padding: EdgeInsets.zero,
+                tooltip: 'Copiar valor',
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
@@ -595,64 +569,34 @@ class _SelectValue extends StatelessWidget {
 
 // ── Photo Gallery ─────────────────────────────────────────────────────────────
 
-class _PhotoGallery extends StatefulWidget {
+class _PhotoGallery extends StatelessWidget {
   const _PhotoGallery({required this.photos});
   final List<String> photos;
 
   @override
-  State<_PhotoGallery> createState() => _PhotoGalleryState();
-}
-
-class _PhotoGalleryState extends State<_PhotoGallery> {
-  int? _lightboxIndex;
-
-  void _openLightbox(int idx) => setState(() => _lightboxIndex = idx);
-  void _closeLightbox() => setState(() => _lightboxIndex = null);
-
-  void _prev() {
-    if (_lightboxIndex != null && _lightboxIndex! > 0) {
-      setState(() => _lightboxIndex = _lightboxIndex! - 1);
-    }
-  }
-
-  void _next() {
-    if (_lightboxIndex != null && _lightboxIndex! < widget.photos.length - 1) {
-      setState(() => _lightboxIndex = _lightboxIndex! + 1);
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
-    if (widget.photos.isEmpty) return const _PendingSlot();
+    if (photos.isEmpty) return const _PendingSlot();
 
-    return Stack(
-      children: [
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-            maxCrossAxisExtent: 140,
-            childAspectRatio: 4 / 3,
-            crossAxisSpacing: 8,
-            mainAxisSpacing: 8,
-          ),
-          itemCount: widget.photos.length,
-          itemBuilder: (ctx, i) => _PhotoThumb(
-            src: widget.photos[i],
-            index: i,
-            total: widget.photos.length,
-            onTap: () => _openLightbox(i),
-          ),
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: 140,
+        childAspectRatio: 4 / 3,
+        crossAxisSpacing: 8,
+        mainAxisSpacing: 8,
+      ),
+      itemCount: photos.length,
+      itemBuilder: (ctx, i) => _PhotoThumb(
+        src: photos[i],
+        index: i,
+        total: photos.length,
+        onTap: () => showDialog(
+          context: context,
+          barrierColor: Colors.black87,
+          builder: (_) => MediaPreviewDialog(url: photos[i]),
         ),
-        if (_lightboxIndex != null)
-          _Lightbox(
-            photos: widget.photos,
-            index: _lightboxIndex!,
-            onClose: _closeLightbox,
-            onPrev: _prev,
-            onNext: _next,
-          ),
-      ],
+      ),
     );
   }
 }
@@ -729,116 +673,6 @@ class _PhotoThumb extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _Lightbox extends StatelessWidget {
-  const _Lightbox({
-    required this.photos,
-    required this.index,
-    required this.onClose,
-    required this.onPrev,
-    required this.onNext,
-  });
-  final List<String> photos;
-  final int index;
-  final VoidCallback onClose;
-  final VoidCallback onPrev;
-  final VoidCallback onNext;
-
-  @override
-  Widget build(BuildContext context) {
-    return Positioned.fill(
-      child: Focus(
-        autofocus: true,
-        onKeyEvent: (node, event) {
-          if (event is KeyDownEvent) {
-            if (event.logicalKey == LogicalKeyboardKey.escape) {
-              onClose();
-              return KeyEventResult.handled;
-            }
-            if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
-              onPrev();
-              return KeyEventResult.handled;
-            }
-            if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
-              onNext();
-              return KeyEventResult.handled;
-            }
-          }
-          return KeyEventResult.ignored;
-        },
-        child: GestureDetector(
-          onTap: onClose,
-          child: Container(
-            color: const Color(0xD90B132B),
-            child: Stack(
-              children: [
-                // Main image
-                Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(40),
-                    child: Image.network(
-                      photos[index],
-                      fit: BoxFit.contain,
-                      errorBuilder: (ctx, err, stack) =>
-                          const Icon(Icons.broken_image_rounded,
-                              size: 48, color: Colors.white54),
-                    ),
-                  ),
-                ),
-                // Close button
-                Positioned(
-                  top: 18, right: 18,
-                  child: _LightboxBtn(icon: Icons.close_rounded, onTap: onClose),
-                ),
-                // Prev
-                if (index > 0)
-                  Positioned(
-                    left: 18,
-                    top: 0, bottom: 0,
-                    child: Center(
-                      child: _LightboxBtn(
-                          icon: Icons.chevron_left_rounded, onTap: onPrev),
-                    ),
-                  ),
-                // Next
-                if (index < photos.length - 1)
-                  Positioned(
-                    right: 18,
-                    top: 0, bottom: 0,
-                    child: Center(
-                      child: _LightboxBtn(
-                          icon: Icons.chevron_right_rounded, onTap: onNext),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _LightboxBtn extends StatelessWidget {
-  const _LightboxBtn({required this.icon, required this.onTap});
-  final IconData icon;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 40, height: 40,
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.12),
-          shape: BoxShape.circle,
-        ),
-        child: Icon(icon, color: Colors.white, size: 22),
       ),
     );
   }
