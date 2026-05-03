@@ -1,7 +1,7 @@
 // ignore_for_file: avoid_web_libraries_in_flutter, deprecated_member_use
 import 'dart:html' as html;
-
 import 'package:excel/excel.dart' as xl;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -119,14 +119,23 @@ Future<void> exportExecutionPdf(
   Map<String, dynamic> exec,
   Map<String, dynamic> flow,
 ) async {
-  // Load font
-  final fontData =
-      await rootBundle.load('assets/fonts/Geist-VariableFont_wght.ttf');
-  final geist = pw.Font.ttf(fontData);
+  try {
+  // Load font with fallback
+  pw.Font geistFont;
+  pw.Font geistBold;
+  try {
+    final fontData =
+        await rootBundle.load('assets/fonts/Geist-VariableFont_wght.ttf');
+    geistFont = pw.Font.ttf(fontData);
+    geistBold = pw.Font.ttf(fontData);
+  } catch (_) {
+    geistFont = pw.Font.helvetica();
+    geistBold = pw.Font.helveticaBold();
+  }
 
   final pdf = pw.Document(
     title: 'Reporte de ejecución',
-    theme: pw.ThemeData.withFont(base: geist, bold: geist),
+    theme: pw.ThemeData.withFont(base: geistFont, bold: geistBold),
   );
 
   // ── Data extraction ────────────────────────────────────────────────────────
@@ -215,7 +224,7 @@ Future<void> exportExecutionPdf(
     pw.FontWeight weight = pw.FontWeight.normal,
   }) =>
       pw.TextStyle(
-        font: geist,
+        font: geistFont,
         fontSize: size,
         color: color ?? _text,
         fontWeight: weight,
@@ -290,13 +299,13 @@ Future<void> exportExecutionPdf(
               // Badges row
               pw.Row(
                 children: [
-                  _pdfBadge(_statusLabel(status), _statusColor(status), geist),
+                  _pdfBadge(_statusLabel(status), _statusColor(status), geistFont),
                   pw.SizedBox(width: 6),
                   if (channelType != null) ...[
-                    _pdfBadge(channelType, _steel, geist),
+                    _pdfBadge(channelType, _steel, geistFont),
                     pw.SizedBox(width: 6),
                   ],
-                  _pdfBadge(flowType, _teal, geist),
+                  _pdfBadge(flowType, _teal, geistFont),
                 ],
               ),
             ],
@@ -318,10 +327,10 @@ Future<void> exportExecutionPdf(
             children: [
               pw.TableRow(
                 children: [
-                  _metaCell('Operador', opName, geist, rightBorder: true),
-                  _metaCell('Iniciada', _fmtShort(startedAt), geist, rightBorder: true),
-                  _metaCell('Finalizada', _fmtShort(completedAt), geist, rightBorder: true),
-                  _metaCell('Progreso', '$filled / $total campos', geist),
+                  _metaCell('Operador', opName, geistFont, rightBorder: true),
+                  _metaCell('Iniciada', _fmtShort(startedAt), geistFont, rightBorder: true),
+                  _metaCell('Finalizada', _fmtShort(completedAt), geistFont, rightBorder: true),
+                  _metaCell('Progreso', '$filled / $total campos', geistFont),
                 ],
               ),
             ],
@@ -353,9 +362,9 @@ Future<void> exportExecutionPdf(
                     pw.TableRow(
                       decoration: const pw.BoxDecoration(color: _navy),
                       children: [
-                        _tableHeader('Campo', geist),
-                        _tableHeader('Valor', geist),
-                        _tableHeader('Tipo', geist),
+                        _tableHeader('Campo', geistFont),
+                        _tableHeader('Valor', geistFont),
+                        _tableHeader('Tipo', geistFont),
                       ],
                     ),
                     // Data rows
@@ -365,17 +374,17 @@ Future<void> exportExecutionPdf(
                           color: i.isOdd ? _altRow : PdfColors.white,
                         ),
                         children: [
-                          _tableCell(fvList[i]['field_key']?.toString() ?? '—', geist),
+                          _tableCell(fvList[i]['field_key']?.toString() ?? '—', geistFont),
                           _tableCell(
                             _resolveFieldValue(
                               fvList[i],
                               fieldTypeMap[fvList[i]['field_key']] ?? 'text',
                             ),
-                            geist,
+                            geistFont,
                           ),
                           _tableCell(
                             fieldTypeMap[fvList[i]['field_key']] ?? '—',
-                            geist,
+                            geistFont,
                           ),
                         ],
                       ),
@@ -471,9 +480,9 @@ Future<void> exportExecutionPdf(
                     pw.TableRow(
                       decoration: const pw.BoxDecoration(color: _navy),
                       children: [
-                        _tableHeader('Hora', geist),
-                        _tableHeader('Mensaje', geist),
-                        _tableHeader('De', geist),
+                        _tableHeader('Hora', geistFont),
+                        _tableHeader('Mensaje', geistFont),
+                        _tableHeader('De', geistFont),
                       ],
                     ),
                     for (var i = 0; i < messages.length; i++)
@@ -482,11 +491,11 @@ Future<void> exportExecutionPdf(
                           color: i.isOdd ? _altRow : PdfColors.white,
                         ),
                         children: [
-                          _tableCell(messages[i]['at']?.toString() ?? '—', geist),
-                          _tableCell(messages[i]['text']?.toString() ?? '—', geist),
+                          _tableCell(messages[i]['at']?.toString() ?? '—', geistFont),
+                          _tableCell(messages[i]['text']?.toString() ?? '—', geistFont),
                           _tableCell(
                             messages[i]['from'] == 'worker' ? 'Worker' : 'Usuario',
-                            geist,
+                            geistFont,
                           ),
                         ],
                       ),
@@ -505,6 +514,9 @@ Future<void> exportExecutionPdf(
     onLayout: (_) => pdf.save(),
     name: '${flowName}_${shortId.replaceAll('-', '')}.pdf',
   );
+  } catch (e, st) {
+    debugPrint('[exportExecutionPdf] error: $e\n$st');
+  }
 }
 
 // ── PDF widget helpers ────────────────────────────────────────────────────────
@@ -595,6 +607,7 @@ Future<void> exportExecutionXls(
   Map<String, dynamic> exec,
   Map<String, dynamic> flow,
 ) async {
+  try {
   final execId    = exec['id'] as String? ?? '';
   final flowName  = flow['name'] as String? ?? 'flujo';
   final shortId   = execId.length > 8 ? execId.substring(0, 8).toUpperCase() : execId.toUpperCase();
@@ -735,7 +748,7 @@ Future<void> exportExecutionXls(
       .replaceAll(RegExp(r'[^\w\-_.]'), '');
 
   final blob = html.Blob(
-    [bytes],
+    [Uint8List.fromList(bytes)],
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   );
   final url = html.Url.createObjectUrlFromBlob(blob);
@@ -744,4 +757,7 @@ Future<void> exportExecutionXls(
         ..click())
       .remove();
   html.Url.revokeObjectUrl(url);
+  } catch (e, st) {
+    debugPrint('[exportExecutionXls] error: $e\n$st');
+  }
 }

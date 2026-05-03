@@ -823,10 +823,12 @@ class _MessagesBlock extends ConsumerWidget {
             OutlinedButton.icon(
               onPressed: () {
                 final channelId = (exec['channel'] as Map?)?['id'] as String?;
-                if (channelId != null) {
-                  ref.read(selectedChannelIdProvider.notifier).state = channelId;
-                }
                 context.go('/conversations');
+                if (channelId != null) {
+                  Future.delayed(const Duration(milliseconds: 50), () {
+                    ref.read(selectedChannelIdProvider.notifier).state = channelId;
+                  });
+                }
               },
               icon: const Icon(Icons.arrow_outward_rounded, size: 12),
               label: const Text('Abrir hilo completo'),
