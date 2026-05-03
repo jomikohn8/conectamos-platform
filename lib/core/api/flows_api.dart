@@ -277,4 +277,21 @@ class FlowsApi {
       rethrow;
     }
   }
+
+  static Future<Map<String, dynamic>> getDashboardKpis(String dashboardSlug) async {
+    final response = await ApiClient.instance.get(
+      '/api/v1/dashboard/kpis',
+      queryParameters: {'dashboard_slug': dashboardSlug},
+    );
+    final raw = response.data;
+    final list = raw is List ? raw : [];
+    // Convertir lista a mapa widget_id → kpi data para lookup O(1)
+    final Map<String, dynamic> byWidgetId = {};
+    for (final item in list) {
+      if (item is Map && item['widget_id'] != null) {
+        byWidgetId[item['widget_id'] as String] = Map<String, dynamic>.from(item);
+      }
+    }
+    return byWidgetId;
+  }
 }

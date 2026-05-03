@@ -12,6 +12,11 @@ final dashboardsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) asyn
   return FlowsApi.listDashboardConfigurations();
 });
 
+final dashboardKpisProvider =
+    FutureProvider.family<Map<String, dynamic>, String>((ref, dashboardSlug) async {
+  return FlowsApi.getDashboardKpis(dashboardSlug);
+});
+
 // ── Pantalla ──────────────────────────────────────────────────────────────────
 
 class DashboardScreen extends ConsumerWidget {
@@ -198,12 +203,16 @@ class _EmptyView extends StatelessWidget {
 
 // ── Vista configurada ─────────────────────────────────────────────────────────
 
-class _ConfiguredView extends StatelessWidget {
+class _ConfiguredView extends ConsumerWidget {
   const _ConfiguredView({required this.dashboard});
   final Map<String, dynamic> dashboard;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final slug = dashboard['slug'] as String? ?? '';
+    final asyncKpis = ref.watch(dashboardKpisProvider(slug));
+    final kpis = asyncKpis.valueOrNull ?? {};
+
     final widgets = (dashboard['widgets'] as List<dynamic>? ?? [])
         .cast<Map<String, dynamic>>();
     widgets.sort((a, b) =>
@@ -214,7 +223,6 @@ class _ConfiguredView extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Nombre del dashboard
           Text(
             dashboard['name'] as String? ?? 'Dashboard',
             style: const TextStyle(
@@ -225,11 +233,12 @@ class _ConfiguredView extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 20),
-
-          // Grid de widgets
           ...widgets.map((w) => Padding(
             padding: const EdgeInsets.only(bottom: 16),
-            child: _DashboardWidgetRenderer(widgetConfig: w),
+            child: _DashboardWidgetRenderer(
+              widgetConfig: w,
+              kpiData: kpis[w['id'] as String? ?? ''],
+            ),
           )),
         ],
       ),
@@ -240,8 +249,12 @@ class _ConfiguredView extends StatelessWidget {
 // ── Renderer de widget individual ─────────────────────────────────────────────
 
 class _DashboardWidgetRenderer extends StatelessWidget {
-  const _DashboardWidgetRenderer({required this.widgetConfig});
+  const _DashboardWidgetRenderer({
+    required this.widgetConfig,
+    this.kpiData,
+  });
   final Map<String, dynamic> widgetConfig;
+  final Map<String, dynamic>? kpiData;
 
   @override
   Widget build(BuildContext context) {
@@ -251,7 +264,7 @@ class _DashboardWidgetRenderer extends StatelessWidget {
 
     switch (type) {
       case 'kpi_card':
-        return _KpiCardWidget(title: title, config: config);
+        return _KpiCardWidget(title: title, config: config, kpiData: kpiData);
       case 'execution_table':
         return _ExecutionTableWidget(title: title, config: config);
       case 'operator_status_grid':
@@ -312,12 +325,18 @@ class _DashCard extends StatelessWidget {
 // ── kpi_card ──────────────────────────────────────────────────────────────────
 
 class _KpiCardWidget extends StatelessWidget {
-  const _KpiCardWidget({required this.title, required this.config});
+  const _KpiCardWidget({
+    required this.title,
+    required this.config,
+    this.kpiData,
+  });
   final String title;
   final Map<String, dynamic> config;
+  final Map<String, dynamic>? kpiData;
 
   Color _accentColor() {
-    switch (config['color'] as String? ?? 'default') {
+    final colorKey = kpiData?['color'] as String? ?? config['color'] as String? ?? 'default';
+    switch (colorKey) {
       case 'green': return AppColors.ctOk;
       case 'red':   return AppColors.ctDanger;
       case 'amber': return AppColors.ctWarn;
@@ -327,15 +346,18 @@ class _KpiCardWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final label = config['label'] as String? ?? '';
+    final value = kpiData?['value'];
+    final label = kpiData?['label'] as String? ?? config['label'] as String? ?? '';
+    final displayValue = value != null ? value.toString() : '—';
     final color = _accentColor();
+
     return _DashCard(
       title: title.toUpperCase(),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           Text(
-            '—',
+            displayValue,
             style: TextStyle(
               fontFamily: 'Geist',
               fontSize: 40,
