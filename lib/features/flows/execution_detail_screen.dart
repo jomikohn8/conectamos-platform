@@ -5,6 +5,7 @@ import '../../core/api/flows_api.dart';
 import '../../core/providers/permissions_provider.dart';
 import '../../core/providers/tenant_provider.dart';
 import '../../core/theme/app_theme.dart';
+import '../conversations/conversations_screen.dart' show selectedChannelIdProvider;
 import 'widgets/execution_header_block.dart';
 import 'widgets/execution_metadata_sidebar.dart';
 import 'widgets/field_card.dart';
@@ -774,12 +775,12 @@ class _EventRow extends StatelessWidget {
 
 // ── Messages Block ────────────────────────────────────────────────────────────
 
-class _MessagesBlock extends StatelessWidget {
+class _MessagesBlock extends ConsumerWidget {
   const _MessagesBlock({required this.exec});
   final Map<String, dynamic> exec;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final rawMessages = exec['messages'] as List? ?? [];
     final messages = rawMessages
         .whereType<Map>()
@@ -820,7 +821,13 @@ class _MessagesBlock extends StatelessWidget {
               ),
             ),
             OutlinedButton.icon(
-              onPressed: () {},
+              onPressed: () {
+                final channelId = (exec['channel'] as Map?)?['id'] as String?;
+                if (channelId != null) {
+                  ref.read(selectedChannelIdProvider.notifier).state = channelId;
+                }
+                context.go('/conversations');
+              },
               icon: const Icon(Icons.arrow_outward_rounded, size: 12),
               label: const Text('Abrir hilo completo'),
               style: OutlinedButton.styleFrom(
