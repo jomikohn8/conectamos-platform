@@ -683,13 +683,19 @@ class _Sidebar extends ConsumerWidget {
                             collapsed:       collapsed,
                             navigationShell: navigationShell,
                           ),
-                        if (hasPermission(ref, 'flow_executions', 'execute_dashboard'))
+                        if (hasPermission(ref, 'dashboards', 'view'))
                           _ExpandableNavItem(
                             icon: Icons.bar_chart_rounded,
                             label: 'Dashboards',
                             currentRoute: currentRoute,
                             collapsed: collapsed,
                             children: [
+                              _ExpandableSubItem(
+                                icon: Icons.dashboard_outlined,
+                                label: 'Panel operativo',
+                                route: '/dashboard',
+                                currentRoute: currentRoute,
+                              ),
                               _ExpandableSubItem(
                                 icon: Icons.task_alt_outlined,
                                 label: 'Tareas',
