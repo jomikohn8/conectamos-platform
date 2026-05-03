@@ -294,4 +294,20 @@ class FlowsApi {
     }
     return byWidgetId;
   }
+
+  static Future<Map<String, dynamic>> getDashboardCharts(String dashboardSlug) async {
+    final response = await ApiClient.instance.get(
+      '/api/v1/dashboard/charts',
+      queryParameters: {'dashboard_slug': dashboardSlug},
+    );
+    final raw = response.data;
+    final list = raw is List ? raw : [];
+    final Map<String, dynamic> byWidgetId = {};
+    for (final item in list) {
+      if (item is Map && item['widget_id'] != null) {
+        byWidgetId[item['widget_id'] as String] = Map<String, dynamic>.from(item);
+      }
+    }
+    return byWidgetId;
+  }
 }

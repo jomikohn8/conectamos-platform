@@ -45,6 +45,9 @@ dependencies:
   flutter_map: ^7.0.2
   latlong2: ^0.9.1
 
+  # Charts
+  fl_chart: ^0.69.0
+
   # Export (PDF + XLS)
   pdf: ^3.11.0
   printing: ^5.13.2
