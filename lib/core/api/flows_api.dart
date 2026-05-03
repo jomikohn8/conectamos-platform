@@ -278,10 +278,17 @@ class FlowsApi {
     }
   }
 
-  static Future<Map<String, dynamic>> getDashboardKpis(String dashboardSlug) async {
+  static Future<Map<String, dynamic>> getDashboardKpis(
+    String dashboardSlug, {
+    String? dateRangeStart,
+    String? dateRangeEnd,
+  }) async {
+    final params = <String, dynamic>{'dashboard_slug': dashboardSlug};
+    if (dateRangeStart != null) params['date_range_start'] = dateRangeStart;
+    if (dateRangeEnd != null) params['date_range_end'] = dateRangeEnd;
     final response = await ApiClient.instance.get(
       '/api/v1/dashboard/kpis',
-      queryParameters: {'dashboard_slug': dashboardSlug},
+      queryParameters: params,
     );
     final raw = response.data;
     final list = raw is List ? raw : [];
@@ -313,10 +320,17 @@ class FlowsApi {
         list.whereType<Map>().map((e) => Map<String, dynamic>.from(e)));
   }
 
-  static Future<Map<String, dynamic>> getDashboardCharts(String dashboardSlug) async {
+  static Future<Map<String, dynamic>> getDashboardCharts(
+    String dashboardSlug, {
+    String? dateRangeStart,
+    String? dateRangeEnd,
+  }) async {
+    final params = <String, dynamic>{'dashboard_slug': dashboardSlug};
+    if (dateRangeStart != null) params['date_range_start'] = dateRangeStart;
+    if (dateRangeEnd != null) params['date_range_end'] = dateRangeEnd;
     final response = await ApiClient.instance.get(
       '/api/v1/dashboard/charts',
-      queryParameters: {'dashboard_slug': dashboardSlug},
+      queryParameters: params,
     );
     final raw = response.data;
     final list = raw is List ? raw : [];

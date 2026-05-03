@@ -9,42 +9,41 @@ import '../../core/theme/app_theme.dart';
 
 // ── Providers ─────────────────────────────────────────────────────────────────
 
+/// Key compuesta: slug + rango de fechas opcional (Dart record → == y hashCode automáticos)
+typedef _DashKey = ({String slug, String? start, String? end});
+
 /// Carga la lista de dashboards desde API.
 final dashboardsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
   return FlowsApi.listDashboardConfigurations();
 });
 
-final dashboardKpisProvider =
-    FutureProvider.family<Map<String, dynamic>, String>((ref, dashboardSlug) async {
-  return FlowsApi.getDashboardKpis(dashboardSlug);
-});
-
 /// Rango de fechas seleccionado. null = hoy (sin filtro explícito)
 final dashboardDateRangeProvider = StateProvider<DateTimeRange?>((ref) => null);
 
-/// Charts data por dashboard slug
-final dashboardChartsProvider =
-    FutureProvider.family<Map<String, dynamic>, String>((ref, dashboardSlug) async {
-  return FlowsApi.getDashboardCharts(dashboardSlug);
+final dashboardKpisProvider =
+    FutureProvider.family<Map<String, dynamic>, _DashKey>((ref, key) async {
+  return FlowsApi.getDashboardKpis(
+    key.slug,
+    dateRangeStart: key.start,
+    dateRangeEnd: key.end,
+  );
 });
 
-/// Actividad reciente del dashboard
+final dashboardChartsProvider =
+    FutureProvider.family<Map<String, dynamic>, _DashKey>((ref, key) async {
+  return FlowsApi.getDashboardCharts(
+    key.slug,
+    dateRangeStart: key.start,
+    dateRangeEnd: key.end,
+  );
+});
+
 final dashboardActivityProvider =
-    FutureProvider.family<List<Map<String, dynamic>>, String>(
-        (ref, dashboardSlug) async {
-  final range = ref.watch(dashboardDateRangeProvider);
-  String? start;
-  String? end;
-  if (range != null) {
-    start = range.start.toUtc().toIso8601String();
-    end = range.end.toUtc()
-        .add(const Duration(hours: 23, minutes: 59, seconds: 59))
-        .toIso8601String();
-  }
+    FutureProvider.family<List<Map<String, dynamic>>, _DashKey>((ref, key) async {
   return FlowsApi.getDashboardActivity(
-    dashboardSlug,
-    dateRangeStart: start,
-    dateRangeEnd: end,
+    key.slug,
+    dateRangeStart: key.start,
+    dateRangeEnd: key.end,
   );
 });
 
@@ -399,11 +398,22 @@ class _ConfiguredView extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final slug = dashboard['slug'] as String? ?? '';
-    final asyncKpis = ref.watch(dashboardKpisProvider(slug));
+    final range = ref.watch(dashboardDateRangeProvider);
+    String? start;
+    String? end;
+    if (range != null) {
+      start = range.start.toUtc().toIso8601String();
+      end = range.end.toUtc()
+          .add(const Duration(hours: 23, minutes: 59, seconds: 59))
+          .toIso8601String();
+    }
+    final key = (slug: slug, start: start, end: end);
+
+    final asyncKpis = ref.watch(dashboardKpisProvider(key));
     final kpis = asyncKpis.valueOrNull ?? <String, dynamic>{};
-    final asyncCharts = ref.watch(dashboardChartsProvider(slug));
+    final asyncCharts = ref.watch(dashboardChartsProvider(key));
     final charts = asyncCharts.valueOrNull ?? <String, dynamic>{};
-    final asyncActivity = ref.watch(dashboardActivityProvider(slug));
+    final asyncActivity = ref.watch(dashboardActivityProvider(key));
     final activityData = asyncActivity.valueOrNull ?? <Map<String, dynamic>>[];
 
     final widgets = (dashboard['widgets'] as List<dynamic>? ?? [])
@@ -702,7 +712,12 @@ class _RecentActivityWidget extends StatelessWidget {
           final completedAt = item['completed_at'] as String?;
 
           return GestureDetector(
-            onTap: () => context.go('/tareas'),
+            onTap: () {
+                final executionId = item['execution_id'] as String?;
+                if (executionId != null) {
+                  context.go('/executions/$executionId');
+                }
+              },
             child: Container(
               margin: const EdgeInsets.only(bottom: 10),
               padding: const EdgeInsets.all(12),
