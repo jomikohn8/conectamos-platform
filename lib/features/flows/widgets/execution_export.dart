@@ -1,6 +1,7 @@
 // ignore_for_file: avoid_web_libraries_in_flutter, deprecated_member_use
+import 'dart:convert';
 import 'dart:html' as html;
-import 'package:excel/excel.dart' as xl;
+import 'package:archive/archive.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:pdf/pdf.dart';
@@ -601,6 +602,43 @@ pw.Widget _tableCell(String text, pw.Font font) {
   );
 }
 
+// ── XLSX helpers ─────────────────────────────────────────────────────────────
+
+String _colName(int index) {
+  var name = '';
+  var i = index;
+  do {
+    name = String.fromCharCode(65 + (i % 26)) + name;
+    i = (i ~/ 26) - 1;
+  } while (i >= 0);
+  return name;
+}
+
+String _xmlEscape(String s) => s
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&apos;');
+
+String _sheetXml(List<List<String>> rows) {
+  final sb = StringBuffer()
+    ..write('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>')
+    ..write('<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">')
+    ..write('<sheetData>');
+  for (var r = 0; r < rows.length; r++) {
+    sb.write('<row r="${r + 1}">');
+    for (var c = 0; c < rows[r].length; c++) {
+      final cell = '${_colName(c)}${r + 1}';
+      final val  = _xmlEscape(rows[r][c]);
+      sb.write('<c r="$cell" t="inlineStr"><is><t>$val</t></is></c>');
+    }
+    sb.write('</row>');
+  }
+  sb.write('</sheetData></worksheet>');
+  return sb.toString();
+}
+
 // ── XLS ────────────────────────────────────────────────────────────────────────
 
 Future<void> exportExecutionXls(
@@ -608,156 +646,154 @@ Future<void> exportExecutionXls(
   Map<String, dynamic> flow,
 ) async {
   try {
-  final execId    = exec['id'] as String? ?? '';
-  final flowName  = flow['name'] as String? ?? 'flujo';
-  final shortId   = execId.length > 8 ? execId.substring(0, 8).toUpperCase() : execId.toUpperCase();
+    final execId   = exec['id'] as String? ?? '';
+    final flowName = flow['name'] as String? ?? 'flujo';
+    final shortId  = execId.length > 8
+        ? execId.substring(0, 8).toUpperCase()
+        : execId.toUpperCase();
 
-  final opRaw  = exec['operator'];
-  final opName = (opRaw is Map ? opRaw['name'] : null) as String? ?? '—';
+    final opRaw      = exec['operator'];
+    final opName     = (opRaw is Map ? opRaw['name'] : null) as String? ?? '—';
+    final channelRaw = exec['channel'];
+    final channelName =
+        (channelRaw is Map ? channelRaw['display_name'] ?? channelRaw['channel_type'] : null)
+            as String? ?? '—';
 
-  final channelRaw  = exec['channel'];
-  final channelType = (channelRaw is Map ? channelRaw['channel_type'] : null) as String? ?? '—';
+    // ── Campos rows ────────────────────────────────────────────────────────
+    final snapshotFields = (flow['fields'] as List? ?? [])
+        .whereType<Map>()
+        .map((f) => f.cast<String, dynamic>())
+        .toList();
+    final fieldTypeMap = <String, String>{
+      for (final f in snapshotFields)
+        if (f['key'] is String)
+          f['key'] as String: (f['type'] as String? ?? 'text'),
+    };
+    final rawFvList = exec['field_values'] as List? ?? [];
+    final fvList    = rawFvList
+        .whereType<Map>()
+        .map((e) => e.cast<String, dynamic>())
+        .toList();
 
-  final rawFvList   = exec['field_values'] as List? ?? [];
-  final fvList      = rawFvList.whereType<Map>().map((e) => e.cast<String, dynamic>()).toList();
-
-  final snapshotFields = (flow['fields'] as List? ?? [])
-      .whereType<Map>()
-      .map((f) => f.cast<String, dynamic>())
-      .toList();
-  final fieldTypeMap = <String, String>{
-    for (final f in snapshotFields)
-      if (f['key'] is String) f['key'] as String: (f['type'] as String? ?? 'text'),
-  };
-
-  final rawEvents = exec['events'] as List? ?? [];
-  final events    = rawEvents
-      .whereType<Map>()
-      .map((e) => e.cast<String, dynamic>())
-      .toList()
-    ..sort((a, b) {
-      final ta = a['timestamp'] as String? ?? a['created_at'] as String? ?? '';
-      final tb = b['timestamp'] as String? ?? b['created_at'] as String? ?? '';
-      return ta.compareTo(tb);
-    });
-
-  final excel = xl.Excel.createExcel();
-
-  // Delete auto-created sheet
-  excel.delete('Sheet1');
-
-  // ── Helper: header style ──────────────────────────────────────────────────
-  xl.CellStyle headerStyle() => xl.CellStyle(
-    bold: true,
-    backgroundColorHex: xl.ExcelColor.fromHexString('0B132B'),
-    fontColorHex: xl.ExcelColor.fromHexString('FFFFFF'),
-  );
-
-  // ── Hoja 1: Campos ────────────────────────────────────────────────────────
-  final sheetCampos = excel['Campos'];
-  excel.setDefaultSheet('Campos');
-  final camposHeaders = ['Field Key', 'Valor', 'Tipo', 'Source', 'Captured At'];
-  for (var i = 0; i < camposHeaders.length; i++) {
-    final cell = sheetCampos.cell(
-      xl.CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0),
-    );
-    cell.value = xl.TextCellValue(camposHeaders[i]);
-    cell.cellStyle = headerStyle();
-  }
-  for (var r = 0; r < fvList.length; r++) {
-    final fv   = fvList[r];
-    final key  = fv['field_key']?.toString() ?? '';
-    final type = fieldTypeMap[key] ?? 'text';
-    final values = [
-      key,
-      _resolveFieldValue(fv, type),
-      type,
-      fv['source']?.toString() ?? '—',
-      fv['captured_at']?.toString() ?? fv['created_at']?.toString() ?? '—',
+    final camposRows = <List<String>>[
+      ['Campo', 'Valor', 'Tipo', 'Source', 'Capturado'],
+      for (final fv in fvList)
+        [
+          fv['field_key']?.toString() ?? '',
+          _resolveFieldValue(fv, fieldTypeMap[fv['field_key']] ?? 'text'),
+          fieldTypeMap[fv['field_key']] ?? '',
+          fv['source']?.toString() ?? 'captured',
+          _fmtShort(fv['captured_at'] as String? ?? fv['created_at'] as String?),
+        ],
     ];
-    for (var c = 0; c < values.length; c++) {
-      sheetCampos.cell(
-        xl.CellIndex.indexByColumnRow(columnIndex: c, rowIndex: r + 1),
-      ).value = xl.TextCellValue(values[c]);
-    }
-  }
 
-  // ── Hoja 2: Metadatos ─────────────────────────────────────────────────────
-  final sheetMeta = excel['Metadatos'];
-  final metaHeaders = ['Campo', 'Valor'];
-  for (var i = 0; i < metaHeaders.length; i++) {
-    final cell = sheetMeta.cell(
-      xl.CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0),
+    // ── Metadatos rows ─────────────────────────────────────────────────────
+    final metadatosRows = <List<String>>[
+      ['Campo', 'Valor'],
+      ['Execution ID', execId],
+      ['Flujo', flowName],
+      ['Operador', opName],
+      ['Canal', channelName],
+      ['Status', exec['status']?.toString() ?? '—'],
+      ['Iniciada', _fmtShort(exec['created_at'] as String?)],
+      ['Finalizada', _fmtShort(exec['completed_at'] as String?)],
+    ];
+
+    // ── Cronología rows ────────────────────────────────────────────────────
+    final rawEvents = exec['events'] as List? ?? [];
+    final events    = rawEvents
+        .whereType<Map>()
+        .map((e) => e.cast<String, dynamic>())
+        .toList()
+      ..sort((a, b) {
+        final ta = a['timestamp'] as String? ?? a['created_at'] as String? ?? '';
+        final tb = b['timestamp'] as String? ?? b['created_at'] as String? ?? '';
+        return ta.compareTo(tb);
+      });
+    final hasEvents = events.isNotEmpty;
+
+    final cronologiaRows = <List<String>>[
+      if (hasEvents) ...[
+        ['Tipo', 'Label', 'Timestamp'],
+        for (final e in events)
+          [
+            e['type'] as String? ?? e['event_type'] as String? ?? '',
+            _eventLabel(e['type'] as String? ?? e['event_type'] as String? ?? ''),
+            e['timestamp'] as String? ?? e['created_at'] as String? ?? '—',
+          ],
+      ],
+    ];
+
+    // ── Build ZIP ─────────────────────────────────────────────────────────
+    final archive = Archive();
+
+    void addFile(String name, String content) {
+      final bytes = utf8.encode(content);
+      archive.addFile(ArchiveFile(name, bytes.length, bytes));
+    }
+
+    addFile('[Content_Types].xml', [
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+      '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">',
+      '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>',
+      '<Default Extension="xml" ContentType="application/xml"/>',
+      '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>',
+      '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>',
+      '<Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>',
+      if (hasEvents)
+        '<Override PartName="/xl/worksheets/sheet3.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>',
+      '</Types>',
+    ].join());
+
+    addFile('_rels/.rels', [
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">',
+      '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>',
+      '</Relationships>',
+    ].join());
+
+    addFile('xl/_rels/workbook.xml.rels', [
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">',
+      '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>',
+      '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/>',
+      if (hasEvents)
+        '<Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet3.xml"/>',
+      '</Relationships>',
+    ].join());
+
+    addFile('xl/workbook.xml', [
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+      '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">',
+      '<sheets>',
+      '<sheet name="Campos" sheetId="1" r:id="rId1"/>',
+      '<sheet name="Metadatos" sheetId="2" r:id="rId2"/>',
+      if (hasEvents) '<sheet name="Cronología" sheetId="3" r:id="rId3"/>',
+      '</sheets>',
+      '</workbook>',
+    ].join());
+
+    addFile('xl/worksheets/sheet1.xml', _sheetXml(camposRows));
+    addFile('xl/worksheets/sheet2.xml', _sheetXml(metadatosRows));
+    if (hasEvents) addFile('xl/worksheets/sheet3.xml', _sheetXml(cronologiaRows));
+
+    // ── Download ──────────────────────────────────────────────────────────
+    final zipBytes = ZipEncoder().encode(archive)!;
+
+    final fileName = '${flowName}_$shortId.xlsx'
+        .replaceAll(' ', '_')
+        .replaceAll(RegExp(r'[^\w\-_.]'), '');
+
+    final blob = html.Blob(
+      [Uint8List.fromList(zipBytes)],
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     );
-    cell.value = xl.TextCellValue(metaHeaders[i]);
-    cell.cellStyle = headerStyle();
-  }
-  final metaRows = [
-    ['Execution ID', execId],
-    ['Flujo', flowName],
-    ['Operador', opName],
-    ['Canal', channelType],
-    ['Status', exec['status']?.toString() ?? '—'],
-    ['Iniciada', exec['created_at']?.toString() ?? '—'],
-    ['Finalizada', exec['completed_at']?.toString() ?? '—'],
-  ];
-  for (var r = 0; r < metaRows.length; r++) {
-    for (var c = 0; c < 2; c++) {
-      sheetMeta.cell(
-        xl.CellIndex.indexByColumnRow(columnIndex: c, rowIndex: r + 1),
-      ).value = xl.TextCellValue(metaRows[r][c]);
-    }
-  }
-
-  // ── Hoja 3: Cronología ────────────────────────────────────────────────────
-  if (events.isNotEmpty) {
-    final sheetTimeline = excel['Cronología'];
-    final tlHeaders = ['Tipo', 'Label', 'Timestamp', 'Data'];
-    for (var i = 0; i < tlHeaders.length; i++) {
-      final cell = sheetTimeline.cell(
-        xl.CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0),
-      );
-      cell.value = xl.TextCellValue(tlHeaders[i]);
-      cell.cellStyle = headerStyle();
-    }
-    for (var r = 0; r < events.length; r++) {
-      final e = events[r];
-      final type = e['type'] as String? ?? e['event_type'] as String? ?? '';
-      final ts   = e['timestamp'] as String? ?? e['created_at'] as String? ?? '—';
-      final data = e['data'];
-      String dataStr = '';
-      if (data is Map) {
-        dataStr = data.entries.map((x) => '${x.key}: ${x.value}').join(', ');
-      } else if (data is String) {
-        dataStr = data;
-      }
-      final row = [type, _eventLabel(type), ts, dataStr];
-      for (var c = 0; c < row.length; c++) {
-        sheetTimeline.cell(
-          xl.CellIndex.indexByColumnRow(columnIndex: c, rowIndex: r + 1),
-        ).value = xl.TextCellValue(row[c]);
-      }
-    }
-  }
-
-  // ── Download via dart:html ─────────────────────────────────────────────────
-  final bytes = excel.encode();
-  if (bytes == null) return;
-
-  final fileName = '${flowName}_$shortId.xlsx'
-      .replaceAll(' ', '_')
-      .replaceAll(RegExp(r'[^\w\-_.]'), '');
-
-  final blob = html.Blob(
-    [Uint8List.fromList(bytes)],
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  );
-  final url = html.Url.createObjectUrlFromBlob(blob);
-  (html.AnchorElement(href: url)
-        ..setAttribute('download', fileName)
-        ..click())
-      .remove();
-  html.Url.revokeObjectUrl(url);
+    final url = html.Url.createObjectUrlFromBlob(blob);
+    (html.AnchorElement(href: url)
+          ..setAttribute('download', fileName)
+          ..click())
+        .remove();
+    html.Url.revokeObjectUrl(url);
   } catch (e, st) {
     debugPrint('[exportExecutionXls] error: $e\n$st');
   }
