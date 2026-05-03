@@ -1,11 +1,11 @@
 import 'package:conectamos_platform/core/api/api_client.dart';
+import 'package:dio/dio.dart';
 
 class FlowsApi {
   static Future<List<Map<String, dynamic>>> listFlows({
-    required String tenantId,
     String? triggerSource,
   }) async {
-    final params = <String, dynamic>{'tenant_id': tenantId};
+    final params = <String, dynamic>{};
     if (triggerSource != null) params['trigger_source'] = triggerSource;
     final response = await ApiClient.instance.get(
       '/flows',
@@ -15,13 +15,11 @@ class FlowsApi {
   }
 
   static Future<List<Map<String, dynamic>>> getFlowsByWorker({
-    required String tenantId,
     required String tenantWorkerId,
   }) async {
     final response = await ApiClient.instance.get(
       '/flows',
       queryParameters: {
-        'tenant_id': tenantId,
         'tenant_worker_id': tenantWorkerId,
       },
     );
@@ -32,18 +30,15 @@ class FlowsApi {
   }
 
   static Future<Map<String, dynamic>> getFlow({
-    required String tenantId,
     required String flowId,
   }) async {
     final response = await ApiClient.instance.get(
       '/flows/$flowId',
-      queryParameters: {'tenant_id': tenantId},
     );
     return Map<String, dynamic>.from(response.data);
   }
 
   static Future<Map<String, dynamic>> createFlow({
-    required String tenantId,
     required String tenantWorkerId,
     required String name,
     String? description,
@@ -51,7 +46,6 @@ class FlowsApi {
     Map<String, dynamic> behavior = const {},
   }) async {
     final response = await ApiClient.instance.post('/flows', data: {
-      'tenant_id':        tenantId,
       'tenant_worker_id': tenantWorkerId,
       'name':             name,
       'description':      ?description,
@@ -92,11 +86,9 @@ class FlowsApi {
 
   static Future<void> deleteFlow({
     required String flowId,
-    required String tenantId,
   }) async {
     await ApiClient.instance.delete(
       '/flows/$flowId',
-      queryParameters: {'tenant_id': tenantId},
     );
   }
 
@@ -104,12 +96,10 @@ class FlowsApi {
 
   // @deprecated — usar listIntegrationsByTenant
   static Future<List<Map<String, dynamic>>> listIntegrations({
-    required String tenantId,
     required String flowId,
   }) async {
     final response = await ApiClient.instance.get(
       '/flows/$flowId/integrations',
-      queryParameters: {'tenant_id': tenantId},
     );
     final raw = response.data;
     final list = raw is List
@@ -122,7 +112,6 @@ class FlowsApi {
   // @deprecated — usar createIntegrationForTenant
   static Future<Map<String, dynamic>> createIntegration({
     required String flowId,
-    required String tenantId,
     required String name,
     required String integrationType,
     String? endpointUrl,
@@ -131,7 +120,6 @@ class FlowsApi {
   }) async {
     final response = await ApiClient.instance.post(
       '/flows/$flowId/integrations',
-      queryParameters: {'tenant_id': tenantId},
       data: {
         'name':                name,
         'integration_type':    integrationType,
@@ -146,12 +134,10 @@ class FlowsApi {
   static Future<Map<String, dynamic>> patchIntegration({
     required String flowId,
     required String integrationId,
-    required String tenantId,
     required String endpointUrl,
   }) async {
     final response = await ApiClient.instance.patch(
       '/flows/$flowId/integrations/$integrationId',
-      queryParameters: {'tenant_id': tenantId},
       data: {'endpoint_url': endpointUrl},
     );
     return Map<String, dynamic>.from(response.data);
@@ -161,22 +147,19 @@ class FlowsApi {
   static Future<void> deleteIntegration({
     required String flowId,
     required String integrationId,
-    required String tenantId,
   }) async {
     await ApiClient.instance.delete(
       '/flows/$flowId/integrations/$integrationId',
-      queryParameters: {'tenant_id': tenantId},
     );
   }
 
   // ── Tenant-level integrations ────────────────────────────────────────────────
 
   static Future<List<Map<String, dynamic>>> listIntegrationsByTenant({
-    required String tenantId,
     String? tenantWorkerId,
     String? integrationType,
   }) async {
-    final params = <String, dynamic>{'tenant_id': tenantId};
+    final params = <String, dynamic>{};
     if (tenantWorkerId != null) params['tenant_worker_id'] = tenantWorkerId;
     if (integrationType != null) params['integration_type'] = integrationType;
     final response = await ApiClient.instance.get(
@@ -194,7 +177,6 @@ class FlowsApi {
   }
 
   static Future<Map<String, dynamic>> createIntegrationForTenant({
-    required String tenantId,
     required String name,
     required String integrationType,
     required String tenantWorkerId,
@@ -203,7 +185,6 @@ class FlowsApi {
   }) async {
     final response = await ApiClient.instance.post(
       '/integrations',
-      queryParameters: {'tenant_id': tenantId},
       data: {
         'name': name,
         'integration_type': integrationType,
@@ -216,23 +197,19 @@ class FlowsApi {
   }
 
   static Future<void> deleteIntegrationById({
-    required String tenantId,
     required String integrationId,
   }) async {
     await ApiClient.instance.delete(
       '/integrations/$integrationId',
-      queryParameters: {'tenant_id': tenantId},
     );
   }
 
   // ── Dashboard (executions) ──────────────────────────────────────────────────
 
   static Future<List<Map<String, dynamic>>> listPendingExecutions({
-    required String tenantId,
     String? flowSlug,
   }) async {
     final params = <String, dynamic>{
-      'tenant_id': tenantId,
       'status': 'pending_dashboard',
     };
     if (flowSlug != null) params['flow_slug'] = flowSlug;
@@ -247,13 +224,11 @@ class FlowsApi {
   }
 
   static Future<Map<String, dynamic>?> getActiveFlow({
-    required String tenantId,
     required String operatorId,
   }) async {
     final response = await ApiClient.instance.get(
       '/flows/active',
       queryParameters: {
-        'tenant_id': tenantId,
         'operator_id': operatorId,
       },
     );
@@ -262,12 +237,10 @@ class FlowsApi {
   }
 
   static Future<Map<String, dynamic>> getExecution({
-    required String tenantId,
     required String executionId,
   }) async {
     final response = await ApiClient.instance.get(
       '/api/v1/dashboard/executions/$executionId',
-      queryParameters: {'tenant_id': tenantId},
     );
     final data = Map<String, dynamic>.from(response.data);
     return data;
@@ -275,12 +248,33 @@ class FlowsApi {
 
   static Future<void> submitExecution({
     required String executionId,
-    required String tenantId,
     required Map<String, String> fields,
   }) async {
     await ApiClient.instance.post(
       '/api/v1/dashboard/executions/$executionId/submit',
-      data: {'tenant_id': tenantId, 'fields': fields},
+      data: {'fields': fields},
     );
+  }
+
+  static Future<List<Map<String, dynamic>>> listDashboardConfigurations() async {
+    final response = await ApiClient.instance.get(
+      '/api/v1/dashboard/configurations',
+    );
+    final raw = response.data;
+    final list = raw is List ? raw : <dynamic>[];
+    return List<Map<String, dynamic>>.from(
+        list.whereType<Map>().map((e) => Map<String, dynamic>.from(e)));
+  }
+
+  static Future<Map<String, dynamic>?> getDashboardConfiguration(String slug) async {
+    try {
+      final response = await ApiClient.instance.get(
+        '/api/v1/dashboard/configurations/$slug',
+      );
+      return Map<String, dynamic>.from(response.data as Map);
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404) return null;
+      rethrow;
+    }
   }
 }

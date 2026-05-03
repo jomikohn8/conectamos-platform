@@ -95,7 +95,7 @@ class _WorkflowsScreenState extends ConsumerState<WorkflowsScreen> {
     try {
       final tenantId = ref.read(activeTenantIdProvider);
       final results = await Future.wait([
-        FlowsApi.listFlows(tenantId: tenantId),
+        FlowsApi.listFlows(),
         AiWorkersApi.listWorkers(tenantId: tenantId),
       ]);
       if (!mounted) return;
@@ -164,7 +164,6 @@ class _WorkflowsScreenState extends ConsumerState<WorkflowsScreen> {
         flow: flow,
         workers: _workers,
         onSaved: _fetchAll,
-        tenantId: ref.read(activeTenantIdProvider),
       ),
     );
   }
@@ -657,13 +656,11 @@ class _FlowFormDialog extends StatefulWidget {
   const _FlowFormDialog({
     required this.workers,
     required this.onSaved,
-    required this.tenantId,
     this.flow,
   });
   final Map<String, dynamic>? flow;
   final List<Map<String, dynamic>> workers;
   final Future<void> Function() onSaved;
-  final String tenantId;
 
   @override
   State<_FlowFormDialog> createState() => _FlowFormDialogState();
@@ -726,7 +723,6 @@ class _FlowFormDialogState extends State<_FlowFormDialog> {
       } else {
         if (_selectedWorkerId == null) return;
         await FlowsApi.createFlow(
-          tenantId: widget.tenantId,
           tenantWorkerId: _selectedWorkerId!,
           name: name,
           description: desc.isNotEmpty ? desc : null,

@@ -2944,7 +2944,6 @@ class _ActiveFlowPillState extends State<_ActiveFlowPill> {
     if (!mounted) return;
     try {
       final flow = await FlowsApi.getActiveFlow(
-        tenantId: widget.tenantId,
         operatorId: widget.operatorId,
       );
       if (!mounted) return;

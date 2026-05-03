@@ -41,15 +41,12 @@ class _FlowIntegrationsScreenState
 
   Future<void> _load() async {
     if (!mounted) return;
-    final tenantId = ref.read(activeTenantIdProvider);
-    if (tenantId.isEmpty) return;
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
       final list = await FlowsApi.listIntegrations(
-        tenantId: tenantId,
         flowId: widget.flowId,
       );
       if (!mounted) return;
@@ -70,11 +67,9 @@ class _FlowIntegrationsScreenState
     if (_deleting) return;
     setState(() => _deleting = true);
     try {
-      final tenantId = ref.read(activeTenantIdProvider);
       await FlowsApi.deleteIntegration(
         flowId: widget.flowId,
         integrationId: integrationId,
-        tenantId: tenantId,
       );
       if (!mounted) return;
       await _load();
@@ -95,11 +90,9 @@ class _FlowIntegrationsScreenState
       builder: (_) => _EditEndpointDialog(
         currentUrl: currentUrl,
         onSave: (newUrl) async {
-          final tenantId = ref.read(activeTenantIdProvider);
           final updated = await FlowsApi.patchIntegration(
             flowId: widget.flowId,
             integrationId: integrationId,
-            tenantId: tenantId,
             endpointUrl: newUrl,
           );
           if (!mounted) return;
@@ -119,12 +112,10 @@ class _FlowIntegrationsScreenState
   }
 
   void _openCreateDialog() {
-    final tenantId = ref.read(activeTenantIdProvider);
     showDialog(
       context: context,
       builder: (_) => _CreateIntegrationDialog(
         flowId: widget.flowId,
-        tenantId: tenantId,
         onCreated: (integration) async {
           await _showSecretDialog(integration);
           await _load();
@@ -506,12 +497,10 @@ class _IntegrationCard extends StatelessWidget {
 class _CreateIntegrationDialog extends StatefulWidget {
   const _CreateIntegrationDialog({
     required this.flowId,
-    required this.tenantId,
     required this.onCreated,
   });
 
   final String flowId;
-  final String tenantId;
   final Future<void> Function(Map<String, dynamic> integration) onCreated;
 
   @override
@@ -558,7 +547,6 @@ class _CreateIntegrationDialogState extends State<_CreateIntegrationDialog> {
     try {
       final integration = await FlowsApi.createIntegration(
         flowId: widget.flowId,
-        tenantId: widget.tenantId,
         name: _nameCtrl.text.trim(),
         integrationType: _type,
         endpointUrl: _urlCtrl.text.trim().isEmpty ? null : _urlCtrl.text.trim(),

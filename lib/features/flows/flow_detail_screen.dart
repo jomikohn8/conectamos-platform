@@ -166,9 +166,7 @@ class _FlowDetailScreenState extends ConsumerState<FlowDetailScreen>
       _error = null;
     });
     try {
-      final tenantId = ref.read(activeTenantIdProvider);
       final flow = await FlowsApi.getFlow(
-        tenantId: tenantId,
         flowId: widget.flowId,
       );
       if (!mounted) return;
@@ -382,8 +380,7 @@ class _FlowDetailScreenState extends ConsumerState<FlowDetailScreen>
     );
     if (confirmed != true || !mounted) return;
     try {
-      final tenantId = ref.read(activeTenantIdProvider);
-      await FlowsApi.deleteFlow(flowId: widget.flowId, tenantId: tenantId);
+      await FlowsApi.deleteFlow(flowId: widget.flowId);
       if (!mounted) return;
       context.go('/flows');
     } catch (e) {
@@ -1125,7 +1122,6 @@ class _FieldDialogState extends State<_FieldDialog> {
     setState(() => _loadingFlows = true);
     try {
       final flows = await FlowsApi.getFlowsByWorker(
-        tenantId: widget.tenantId,
         tenantWorkerId: widget.tenantWorkerId,
       );
       if (!mounted) return;
@@ -2535,7 +2531,6 @@ class _ActionDialogState extends State<_ActionDialog> {
     setState(() => _loadingFlows = true);
     try {
       final flows = await FlowsApi.getFlowsByWorker(
-        tenantId: widget.tenantId,
         tenantWorkerId: widget.tenantWorkerId,
       );
       final filtered = flows

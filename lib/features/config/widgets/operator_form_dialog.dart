@@ -270,9 +270,7 @@ class _OperatorFormDialogState extends ConsumerState<OperatorFormDialog> {
 
   Future<void> _loadFlows() async {
     try {
-      final tenantId = ref.read(activeTenantIdProvider);
       final flows = await FlowsApi.listFlows(
-        tenantId: tenantId.isNotEmpty ? tenantId : 'default',
         triggerSource: 'conversational',
       );
       if (mounted) {

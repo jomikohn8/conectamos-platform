@@ -94,7 +94,7 @@ class _ExecutionsScreenState extends ConsumerState<ExecutionsScreen> {
       _error = null;
     });
     try {
-      final data = await FlowsApi.listPendingExecutions(tenantId: tenantId);
+      final data = await FlowsApi.listPendingExecutions();
       if (!mounted) return;
       setState(() {
         _executions = data;
@@ -413,10 +413,8 @@ class _ExecutionDetailSheetState
 
   Future<void> _loadDetail() async {
     try {
-      final tenantId = ref.read(activeTenantIdProvider);
       final executionId = widget.execution['id'] as String;
       final detail = await FlowsApi.getExecution(
-        tenantId: tenantId,
         executionId: executionId,
       );
       if (!mounted) return;
@@ -494,16 +492,12 @@ class _ExecutionDetailSheetState
     setState(() => _submitting = true);
     try {
       final executionId = widget.execution['id'] as String;
-      final tenantId = (widget.execution['tenant_id'] as String?) ??
-          ref.read(activeTenantIdProvider) ??
-          '';
       final fields = Map<String, String>.fromEntries(
         _controllers.entries
             .map((e) => MapEntry(e.key, e.value.text.trim())),
       );
       await FlowsApi.submitExecution(
         executionId: executionId,
-        tenantId: tenantId,
         fields: fields,
       );
       if (!mounted) return;

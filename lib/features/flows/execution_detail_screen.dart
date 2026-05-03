@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/api/flows_api.dart';
 import '../../core/providers/permissions_provider.dart';
-import '../../core/providers/tenant_provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../conversations/conversations_screen.dart' show selectedChannelIdProvider;
 import 'widgets/execution_header_block.dart';
@@ -40,9 +39,8 @@ class _ExecutionDetailScreenState
       _error = null;
     });
     try {
-      final tenantId = ref.read(activeTenantIdProvider);
       final raw = await FlowsApi.getExecution(
-          tenantId: tenantId, executionId: widget.executionId);
+          executionId: widget.executionId);
       final snapshot =
           (raw['flow_definition_snapshot'] as Map?)?.cast<String, dynamic>() ??
               {};

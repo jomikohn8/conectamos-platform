@@ -2006,8 +2006,7 @@ class _IntegrationsManagementSheetState
       _error = null;
     });
     try {
-      final tenantId = ref.read(activeTenantIdProvider);
-      final all = await FlowsApi.listIntegrationsByTenant(tenantId: tenantId);
+      final all = await FlowsApi.listIntegrationsByTenant();
       if (!mounted) return;
       final filtered = all.where((i) {
         final t = (i['integration_type'] as String? ?? '').toLowerCase();
@@ -2031,8 +2030,7 @@ class _IntegrationsManagementSheetState
     if (_deleting) return;
     setState(() => _deleting = true);
     try {
-      final tenantId = ref.read(activeTenantIdProvider);
-      await FlowsApi.deleteIntegrationById(tenantId: tenantId, integrationId: id);
+      await FlowsApi.deleteIntegrationById(integrationId: id);
       if (!mounted) return;
       await _load();
     } catch (e) {
@@ -2088,11 +2086,9 @@ class _IntegrationsManagementSheetState
   }
 
   void _openCreate() {
-    final tenantId = ref.read(activeTenantIdProvider);
     showDialog(
       context: context,
       builder: (_) => _CreateTenantIntegrationDialog(
-        tenantId: tenantId,
         defaultType: widget.typeFilter == 'inbound' ? 'api' : 'webhook',
         onCreated: (integration) async {
           await _showSecretDialog(integration);
@@ -2424,11 +2420,9 @@ class _IntegrationsManagementSheetState
 
 class _CreateTenantIntegrationDialog extends ConsumerStatefulWidget {
   const _CreateTenantIntegrationDialog({
-    required this.tenantId,
     required this.defaultType,
     required this.onCreated,
   });
-  final String tenantId;
   final String defaultType;
   final Future<void> Function(Map<String, dynamic>) onCreated;
 
@@ -2474,8 +2468,9 @@ class _CreateTenantIntegrationDialogState
 
   Future<void> _loadWorkers() async {
     try {
+      final tenantId = ref.read(activeTenantIdProvider);
       final list =
-          await AiWorkersApi.listWorkers(tenantId: widget.tenantId);
+          await AiWorkersApi.listWorkers(tenantId: tenantId);
       if (!mounted) return;
       setState(() {
         _workers = list;
@@ -2496,7 +2491,6 @@ class _CreateTenantIntegrationDialogState
     });
     try {
       final result = await FlowsApi.createIntegrationForTenant(
-        tenantId: widget.tenantId,
         name: _nameCtrl.text.trim(),
         integrationType: _type,
         tenantWorkerId: _workerId!,

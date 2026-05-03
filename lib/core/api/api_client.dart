@@ -1,3 +1,5 @@
+import 'dart:html' as html;
+
 import 'package:dio/dio.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -19,6 +21,10 @@ class ApiClient {
             Supabase.instance.client.auth.currentSession?.accessToken;
         if (token != null) {
           options.headers['Authorization'] = 'Bearer $token';
+        }
+        final tenantId = html.window.localStorage['conectamos_active_tenant_id'];
+        if (tenantId != null && tenantId.isNotEmpty) {
+          options.headers['X-Tenant-ID'] = tenantId;
         }
         handler.next(options);
       },
