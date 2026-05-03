@@ -127,12 +127,7 @@ class _ExecutionsScreenState extends ConsumerState<ExecutionsScreen> {
             children: [
               const Text(
                 'Tareas pendientes',
-                style: TextStyle(
-                  fontFamily: 'Onest',
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.ctText,
-                ),
+                style: AppTextStyles.pageTitle,
               ),
               const Spacer(),
               IconButton(

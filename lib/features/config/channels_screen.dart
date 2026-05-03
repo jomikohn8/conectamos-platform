@@ -210,7 +210,7 @@ class _ActionBar extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text('Canales', style: TextStyle(fontFamily: 'Geist', fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.ctText)),
+                Text('Canales', style: AppTextStyles.pageTitle),
                 SizedBox(height: 1),
                 Text('Conecta números de WhatsApp con AI Workers y operadores', style: TextStyle(fontFamily: 'Geist', fontSize: 11, color: AppColors.ctText2)),
               ],

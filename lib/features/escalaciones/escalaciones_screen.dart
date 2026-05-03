@@ -170,12 +170,7 @@ class _EscalacionesScreenState extends ConsumerState<EscalacionesScreen>
         children: [
           const Text(
             'Escalaciones',
-            style: TextStyle(
-              fontFamily: 'Onest',
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: AppColors.ctText,
-            ),
+            style: AppTextStyles.pageTitle,
           ),
           const Spacer(),
           if (tenantUsers.isNotEmpty) ...[

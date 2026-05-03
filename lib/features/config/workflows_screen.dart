@@ -265,12 +265,7 @@ class _ActionBar extends StatelessWidget {
               children: [
                 Text(
                   'Flujos de trabajo',
-                  style: TextStyle(
-                    fontFamily: 'Geist',
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.ctText,
-                  ),
+                  style: AppTextStyles.pageTitle,
                 ),
                 SizedBox(height: 1),
                 Text(

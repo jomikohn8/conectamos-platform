@@ -115,12 +115,7 @@ class _ActionBar extends StatelessWidget {
         alignment: Alignment.centerLeft,
         child: Text(
           'Conversaciones',
-          style: TextStyle(
-            fontFamily: 'Geist',
-            fontSize: 15,
-            fontWeight: FontWeight.w700,
-            color: AppColors.ctText,
-          ),
+          style: AppTextStyles.pageTitle,
         ),
       ),
     );
