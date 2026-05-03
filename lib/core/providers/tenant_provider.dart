@@ -82,6 +82,10 @@ class TenantNotifier extends StateNotifier<TenantState> {
         }
       }
 
+      // Persist active tenant so ApiClient interceptor can read it
+      if (active != null) {
+        html.window.localStorage[_kStorageKey] = active.id;
+      }
       state = state.withAll(tenants, active);
     } catch (_) {
       // silencioso — no bloquear la UI si falla la carga de tenants
