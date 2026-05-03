@@ -1,5 +1,4 @@
 // ignore_for_file: deprecated_member_use
-// ignore: unused_import
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -19,13 +18,33 @@ final dashboardKpisProvider =
   return FlowsApi.getDashboardKpis(dashboardSlug);
 });
 
-/// Fecha seleccionada para filtros (today / yesterday / 7days)
-final dashboardDateFilterProvider = StateProvider<String>((ref) => 'today');
+/// Rango de fechas seleccionado. null = hoy (sin filtro explícito)
+final dashboardDateRangeProvider = StateProvider<DateTimeRange?>((ref) => null);
 
 /// Charts data por dashboard slug
 final dashboardChartsProvider =
     FutureProvider.family<Map<String, dynamic>, String>((ref, dashboardSlug) async {
   return FlowsApi.getDashboardCharts(dashboardSlug);
+});
+
+/// Actividad reciente del dashboard
+final dashboardActivityProvider =
+    FutureProvider.family<List<Map<String, dynamic>>, String>(
+        (ref, dashboardSlug) async {
+  final range = ref.watch(dashboardDateRangeProvider);
+  String? start;
+  String? end;
+  if (range != null) {
+    start = range.start.toUtc().toIso8601String();
+    end = range.end.toUtc()
+        .add(const Duration(hours: 23, minutes: 59, seconds: 59))
+        .toIso8601String();
+  }
+  return FlowsApi.getDashboardActivity(
+    dashboardSlug,
+    dateRangeStart: start,
+    dateRangeEnd: end,
+  );
 });
 
 // ── Pantalla ──────────────────────────────────────────────────────────────────
@@ -51,17 +70,7 @@ class _ActionBar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final filter = ref.watch(dashboardDateFilterProvider);
-    final subtitle = filter == 'yesterday'
-        ? 'Datos de ayer'
-        : filter == '7days'
-            ? 'Últimos 7 días'
-            : 'Panel operativo · actualiza cada 45s';
-    final filterLabel = filter == 'yesterday'
-        ? 'Ayer'
-        : filter == '7days'
-            ? '7 días'
-            : 'Hoy';
+    final range = ref.watch(dashboardDateRangeProvider);
 
     return Container(
       height: 48,
@@ -73,12 +82,12 @@ class _ActionBar extends ConsumerWidget {
       padding: const EdgeInsets.symmetric(horizontal: 22),
       child: Row(
         children: [
-          Expanded(
+          const Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Text(
+                Text(
                   'Dashboard',
                   style: TextStyle(
                     fontFamily: 'Geist',
@@ -87,49 +96,107 @@ class _ActionBar extends ConsumerWidget {
                     color: AppColors.ctText,
                   ),
                 ),
-                const SizedBox(height: 1),
-                Text(subtitle, style: AppTextStyles.pageSubtitle),
+                SizedBox(height: 1),
+                Text(
+                  'Panel operativo · actualiza cada 45s',
+                  style: AppTextStyles.pageSubtitle,
+                ),
               ],
             ),
           ),
-          PopupMenuButton<String>(
-            initialValue: filter,
-            onSelected: (value) =>
-                ref.read(dashboardDateFilterProvider.notifier).state = value,
-            itemBuilder: (_) => const [
-              PopupMenuItem(value: 'today',     child: Text('Hoy')),
-              PopupMenuItem(value: 'yesterday', child: Text('Ayer')),
-              PopupMenuItem(value: '7days',     child: Text('7 días')),
-            ],
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppColors.ctBorder2),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    filterLabel,
-                    style: const TextStyle(
-                      fontFamily: 'Geist',
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      color: AppColors.ctText2,
+          _DateRangeButton(
+            range: range,
+            onTap: () async {
+              final picked = await showDateRangePicker(
+                context: context,
+                firstDate: DateTime(2025),
+                lastDate: DateTime.now(),
+                initialDateRange: ref.read(dashboardDateRangeProvider),
+                locale: const Locale('es', 'MX'),
+                builder: (context, child) => Theme(
+                  data: Theme.of(context).copyWith(
+                    colorScheme: ColorScheme.dark(
+                      primary: AppColors.ctTeal,
+                      onPrimary: Colors.white,
+                      surface: AppColors.ctSurface,
+                      onSurface: AppColors.ctText,
                     ),
                   ),
-                  const SizedBox(width: 4),
-                  const Icon(
-                    Icons.keyboard_arrow_down_rounded,
-                    size: 14,
-                    color: AppColors.ctText2,
-                  ),
-                ],
-              ),
-            ),
+                  child: child!,
+                ),
+              );
+              if (picked != null) {
+                ref.read(dashboardDateRangeProvider.notifier).state = picked;
+              }
+            },
+            onClear: () =>
+                ref.read(dashboardDateRangeProvider.notifier).state = null,
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── Date range button ─────────────────────────────────────────────────────────
+
+class _DateRangeButton extends StatelessWidget {
+  const _DateRangeButton({
+    required this.range,
+    required this.onTap,
+    required this.onClear,
+  });
+  final DateTimeRange? range;
+  final VoidCallback onTap;
+  final VoidCallback onClear;
+
+  String get _label {
+    if (range == null) return 'Hoy';
+    String pad(int n) => n.toString().padLeft(2, '0');
+    final s = range!.start;
+    final e = range!.end;
+    return '${pad(s.day)}/${pad(s.month)} – ${pad(e.day)}/${pad(e.month)}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: AppColors.ctBorder2),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.calendar_today_rounded,
+                size: 12, color: AppColors.ctText2),
+            const SizedBox(width: 6),
+            Text(
+              _label,
+              style: const TextStyle(
+                fontFamily: 'Geist',
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: AppColors.ctText2,
+              ),
+            ),
+            if (range != null) ...[
+              const SizedBox(width: 6),
+              GestureDetector(
+                onTap: onClear,
+                child: const Icon(Icons.close_rounded,
+                    size: 12, color: AppColors.ctText2),
+              ),
+            ] else ...[
+              const SizedBox(width: 4),
+              const Icon(Icons.keyboard_arrow_down_rounded,
+                  size: 14, color: AppColors.ctText2),
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -262,6 +329,7 @@ class _ConfiguredView extends ConsumerWidget {
     List<Map<String, dynamic>> sortedWidgets,
     Map<String, dynamic> kpis,
     Map<String, dynamic> charts,
+    List<Map<String, dynamic>> activityData,
     double maxWidth,
   ) {
     final result = <Widget>[];
@@ -273,6 +341,7 @@ class _ConfiguredView extends ConsumerWidget {
         widgetConfig: w,
         kpiData: kpis[id] as Map<String, dynamic>?,
         chartData: charts[id] as Map<String, dynamic>?,
+        activityData: activityData,
       );
     }
 
@@ -337,6 +406,8 @@ class _ConfiguredView extends ConsumerWidget {
     final kpis = asyncKpis.valueOrNull ?? <String, dynamic>{};
     final asyncCharts = ref.watch(dashboardChartsProvider(slug));
     final charts = asyncCharts.valueOrNull ?? <String, dynamic>{};
+    final asyncActivity = ref.watch(dashboardActivityProvider(slug));
+    final activityData = asyncActivity.valueOrNull ?? <Map<String, dynamic>>[];
 
     final widgets = (dashboard['widgets'] as List<dynamic>? ?? [])
         .cast<Map<String, dynamic>>();
@@ -345,7 +416,8 @@ class _ConfiguredView extends ConsumerWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final rows = _buildRows(widgets, kpis, charts, constraints.maxWidth);
+        final rows =
+            _buildRows(widgets, kpis, charts, activityData, constraints.maxWidth);
         return SingleChildScrollView(
           padding: const EdgeInsets.all(22),
           child: Column(
@@ -377,10 +449,12 @@ class _DashboardWidgetRenderer extends StatelessWidget {
     required this.widgetConfig,
     this.kpiData,
     this.chartData,
+    this.activityData,
   });
   final Map<String, dynamic> widgetConfig;
   final Map<String, dynamic>? kpiData;
   final Map<String, dynamic>? chartData;
+  final List<Map<String, dynamic>>? activityData;
 
   @override
   Widget build(BuildContext context) {
@@ -398,11 +472,13 @@ class _DashboardWidgetRenderer extends StatelessWidget {
       case 'flow_action_button':
         return _FlowActionButton(title: title, config: config);
       case 'recent_activity_feed':
-        return _RecentActivityWidget(title: title, config: config);
+        return _RecentActivityWidget(
+            title: title, config: config, activityData: activityData);
       case 'bar_chart':
         return _BarChartWidget(title: title, config: config, chartData: chartData);
       case 'operator_ranking':
-        return _OperatorRankingWidget(title: title, config: config, chartData: chartData);
+        return _OperatorRankingWidget(
+            title: title, config: config, chartData: chartData);
       default:
         return const SizedBox.shrink();
     }
@@ -465,19 +541,25 @@ class _KpiCardWidget extends StatelessWidget {
   final Map<String, dynamic>? kpiData;
 
   Color _accentColor() {
-    final colorKey = kpiData?['color'] as String? ?? config['color'] as String? ?? 'default';
+    final colorKey =
+        kpiData?['color'] as String? ?? config['color'] as String? ?? 'default';
     switch (colorKey) {
-      case 'green': return AppColors.ctOk;
-      case 'red':   return AppColors.ctDanger;
-      case 'amber': return AppColors.ctWarn;
-      default:      return AppColors.ctTeal;
+      case 'green':
+        return AppColors.ctOk;
+      case 'red':
+        return AppColors.ctDanger;
+      case 'amber':
+        return AppColors.ctWarn;
+      default:
+        return AppColors.ctTeal;
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final value = kpiData?['value'];
-    final label = kpiData?['label'] as String? ?? config['label'] as String? ?? '';
+    final label =
+        kpiData?['label'] as String? ?? config['label'] as String? ?? '';
     final displayValue = value != null ? value.toString() : '—';
     final color = _accentColor();
 
@@ -581,22 +663,140 @@ class _FlowActionButton extends StatelessWidget {
 // ── recent_activity_feed ──────────────────────────────────────────────────────
 
 class _RecentActivityWidget extends StatelessWidget {
-  const _RecentActivityWidget({required this.title, required this.config});
+  const _RecentActivityWidget({
+    required this.title,
+    required this.config,
+    this.activityData,
+  });
   final String title;
   final Map<String, dynamic> config;
+  final List<Map<String, dynamic>>? activityData;
+
+  String _formatTime(String? isoString) {
+    if (isoString == null) return '—';
+    try {
+      final dt = DateTime.parse(isoString).toLocal();
+      final h = dt.hour.toString().padLeft(2, '0');
+      final m = dt.minute.toString().padLeft(2, '0');
+      return '$h:$m';
+    } catch (_) {
+      return '—';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final items = activityData ?? [];
+
+    if (items.isEmpty) {
+      return _DashCard(
+        title: title.toUpperCase(),
+        child: const _ComingSoonChip(),
+      );
+    }
+
     return _DashCard(
       title: title.toUpperCase(),
-      child: const _ComingSoonChip(),
+      child: Column(
+        children: items.map((item) {
+          final isDelivery = item['is_delivery'] as bool? ?? true;
+          final operatorName = item['operator_name'] as String? ?? '—';
+          final orderNumber = item['order_number'] as String? ?? '—';
+          final completedAt = item['completed_at'] as String?;
+
+          return GestureDetector(
+            onTap: () {
+              // Navegar al detalle — próximo sprint
+            },
+            child: Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.ctSurface2,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: isDelivery
+                      ? AppColors.ctOk.withOpacity(0.3)
+                      : AppColors.ctDanger.withOpacity(0.3),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: isDelivery ? AppColors.ctOk : AppColors.ctDanger,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          operatorName,
+                          style: const TextStyle(
+                            fontFamily: 'Geist',
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.ctText,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Orden #$orderNumber',
+                          style: const TextStyle(
+                            fontFamily: 'Geist',
+                            fontSize: 11,
+                            color: AppColors.ctText2,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        isDelivery ? 'Entregado' : 'Fallido',
+                        style: TextStyle(
+                          fontFamily: 'Geist',
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: isDelivery ? AppColors.ctOk : AppColors.ctDanger,
+                        ),
+                      ),
+                      Text(
+                        _formatTime(completedAt),
+                        style: const TextStyle(
+                          fontFamily: 'Geist',
+                          fontSize: 11,
+                          color: AppColors.ctText2,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(width: 4),
+                  const Icon(
+                    Icons.chevron_right_rounded,
+                    size: 16,
+                    color: AppColors.ctText2,
+                  ),
+                ],
+              ),
+            ),
+          );
+        }).toList(),
+      ),
     );
   }
 }
 
-// ── bar_chart ─────────────────────────────────────────────────────────────────
+// ── bar_chart (pie chart) ─────────────────────────────────────────────────────
 
-class _BarChartWidget extends StatelessWidget {
+class _BarChartWidget extends StatefulWidget {
   const _BarChartWidget({
     required this.title,
     required this.config,
@@ -607,78 +807,142 @@ class _BarChartWidget extends StatelessWidget {
   final Map<String, dynamic>? chartData;
 
   @override
+  State<_BarChartWidget> createState() => _BarChartWidgetState();
+}
+
+class _BarChartWidgetState extends State<_BarChartWidget> {
+  int _touchedIndex = -1;
+
+  static const _colors = [
+    Color(0xFFEF4444),
+    Color(0xFFF59E0B),
+    Color(0xFF3B82F6),
+    Color(0xFF8B5CF6),
+    Color(0xFF10B981),
+    Color(0xFFF97316),
+    Color(0xFF06B6D4),
+    Color(0xFFEC4899),
+  ];
+
+  @override
   Widget build(BuildContext context) {
-    final subtitle = config['subtitle'] as String?;
-    final data = (chartData?['data'] as List<dynamic>? ?? [])
+    final subtitle = widget.config['subtitle'] as String?;
+    final data = (widget.chartData?['data'] as List<dynamic>? ?? [])
         .cast<Map<String, dynamic>>();
 
     if (data.isEmpty) {
       return _DashCard(
-        title: title.toUpperCase(),
+        title: widget.title.toUpperCase(),
         subtitle: subtitle,
         child: const _ComingSoonChip(),
       );
     }
 
-    final maxVal = data
-        .map((e) => (e['value'] as num).toDouble())
-        .reduce((a, b) => a > b ? a : b);
+    final total = data.fold<double>(
+        0, (s, e) => s + (e['value'] as num).toDouble());
+
+    final sections = data.asMap().entries.map((entry) {
+      final i = entry.key;
+      final item = entry.value;
+      final value = (item['value'] as num).toDouble();
+      final isTouched = i == _touchedIndex;
+      return PieChartSectionData(
+        value: value,
+        color: _colors[i % _colors.length],
+        radius: isTouched ? 60 : 50,
+        title: '',
+        showTitle: false,
+      );
+    }).toList();
 
     return _DashCard(
-      title: title.toUpperCase(),
+      title: widget.title.toUpperCase(),
       subtitle: subtitle,
-      child: Column(
-        children: data.map((item) {
-          final label = item['label'] as String? ?? '';
-          final value = (item['value'] as num).toDouble();
-          final pct = maxVal > 0 ? value / maxVal : 0.0;
-
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          SizedBox(
+            height: 160,
+            width: 160,
+            child: PieChart(
+              PieChartData(
+                sections: sections,
+                centerSpaceRadius: 40,
+                sectionsSpace: 2,
+                pieTouchData: PieTouchData(
+                  touchCallback: (event, response) {
+                    setState(() {
+                      if (!event.isInterestedForInteractions ||
+                          response == null ||
+                          response.touchedSection == null) {
+                        _touchedIndex = -1;
+                        return;
+                      }
+                      _touchedIndex =
+                          response.touchedSection!.touchedSectionIndex;
+                    });
+                  },
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 20),
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        label,
-                        style: const TextStyle(
-                          fontFamily: 'Geist',
-                          fontSize: 12,
-                          color: AppColors.ctText,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: data.asMap().entries.map((entry) {
+                final i = entry.key;
+                final item = entry.value;
+                final label = item['label'] as String? ?? '';
+                final value = (item['value'] as num).toDouble();
+                final pct = total > 0 ? (value / total * 100).round() : 0;
+                final isSelected = i == _touchedIndex;
+
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 10,
+                        height: 10,
+                        decoration: BoxDecoration(
+                          color: _colors[i % _colors.length],
+                          shape: BoxShape.circle,
                         ),
-                        overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      value.toInt().toString(),
-                      style: const TextStyle(
-                        fontFamily: 'Geist',
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.ctText,
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          label,
+                          style: TextStyle(
+                            fontFamily: 'Geist',
+                            fontSize: isSelected ? 12 : 11,
+                            fontWeight: isSelected
+                                ? FontWeight.w600
+                                : FontWeight.w400,
+                            color: AppColors.ctText,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(
-                    value: pct,
-                    minHeight: 6,
-                    backgroundColor: AppColors.ctSurface2,
-                    valueColor:
-                        const AlwaysStoppedAnimation<Color>(AppColors.ctDanger),
+                      const SizedBox(width: 4),
+                      Text(
+                        '$pct%',
+                        style: TextStyle(
+                          fontFamily: 'Geist',
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: _colors[i % _colors.length],
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-              ],
+                );
+              }).toList(),
             ),
-          );
-        }).toList(),
+          ),
+        ],
       ),
     );
   }

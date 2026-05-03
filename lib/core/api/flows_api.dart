@@ -295,6 +295,24 @@ class FlowsApi {
     return byWidgetId;
   }
 
+  static Future<List<Map<String, dynamic>>> getDashboardActivity(
+    String dashboardSlug, {
+    String? dateRangeStart,
+    String? dateRangeEnd,
+  }) async {
+    final params = <String, dynamic>{'dashboard_slug': dashboardSlug};
+    if (dateRangeStart != null) params['date_range_start'] = dateRangeStart;
+    if (dateRangeEnd != null) params['date_range_end'] = dateRangeEnd;
+    final response = await ApiClient.instance.get(
+      '/api/v1/dashboard/activity',
+      queryParameters: params,
+    );
+    final raw = response.data;
+    final list = raw is List ? raw : <dynamic>[];
+    return List<Map<String, dynamic>>.from(
+        list.whereType<Map>().map((e) => Map<String, dynamic>.from(e)));
+  }
+
   static Future<Map<String, dynamic>> getDashboardCharts(String dashboardSlug) async {
     final response = await ApiClient.instance.get(
       '/api/v1/dashboard/charts',
