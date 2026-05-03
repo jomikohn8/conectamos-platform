@@ -120,6 +120,15 @@ class _ActionBar extends ConsumerWidget {
             onClear: () =>
                 ref.read(dashboardDateRangeProvider.notifier).state = null,
           ),
+          const SizedBox(width: 8),
+          _RefreshButton(
+            onTap: () {
+              ref.invalidate(dashboardKpisProvider);
+              ref.invalidate(dashboardChartsProvider);
+              ref.invalidate(dashboardActivityProvider);
+              ref.invalidate(dashboardsProvider);
+            },
+          ),
         ],
       ),
     );
@@ -1094,6 +1103,63 @@ class _ComingSoonChip extends StatelessWidget {
           fontFamily: 'Geist',
           fontSize: 12,
           color: AppColors.ctText2,
+        ),
+      ),
+    );
+  }
+}
+
+// ── Refresh button ────────────────────────────────────────────────────────────
+
+class _RefreshButton extends ConsumerStatefulWidget {
+  const _RefreshButton({required this.onTap});
+  final VoidCallback onTap;
+
+  @override
+  ConsumerState<_RefreshButton> createState() => _RefreshButtonState();
+}
+
+class _RefreshButtonState extends ConsumerState<_RefreshButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  void _handleTap() {
+    _ctrl.forward(from: 0);
+    widget.onTap();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: _handleTap,
+      child: Container(
+        padding: const EdgeInsets.all(7),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: AppColors.ctBorder2),
+        ),
+        child: RotationTransition(
+          turns: CurvedAnimation(parent: _ctrl, curve: Curves.easeOut),
+          child: const Icon(
+            Icons.refresh_rounded,
+            size: 14,
+            color: AppColors.ctText2,
+          ),
         ),
       ),
     );
