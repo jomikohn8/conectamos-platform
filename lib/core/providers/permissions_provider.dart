@@ -20,6 +20,7 @@ const _kAllPermissions = {
   'reports.view',
   'settings.view', 'settings.manage',
   'users.view', 'users.manage',
+  'dashboards.view', 'dashboards.manage',
 };
 
 // ── Rol del usuario autenticado en el tenant activo ───────────────────────────
@@ -169,6 +170,8 @@ const kPermLabels = <String, String>{
   'settings.manage':      'Gestionar configuración',
   'users.view':           'Ver usuarios',
   'users.manage':         'Gestionar usuarios',
+  'dashboards.view':      'Ver dashboards',
+  'dashboards.manage':    'Gestionar dashboards',
 };
 
 // ── Prerequisitos ─────────────────────────────────────────────────────────────
