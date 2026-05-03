@@ -70,9 +70,10 @@ class _ExecutionDetailScreenState
     }
 
     if (_loading) {
-      return const Scaffold(
+      return Scaffold(
         backgroundColor: AppColors.ctBg,
-        body: Center(
+        appBar: _buildAppBar(context),
+        body: const Center(
           child: CircularProgressIndicator(color: AppColors.ctTeal),
         ),
       );
@@ -81,6 +82,7 @@ class _ExecutionDetailScreenState
     if (_error != null) {
       return Scaffold(
         backgroundColor: AppColors.ctBg,
+        appBar: _buildAppBar(context),
         body: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -104,6 +106,7 @@ class _ExecutionDetailScreenState
 
     return Scaffold(
       backgroundColor: AppColors.ctBg,
+      appBar: _buildAppBar(context),
       body: SelectionArea(child: Column(
         children: [
           ExecutionHeaderBlock(exec: exec, flow: flow),
@@ -159,6 +162,18 @@ final content = _MainContent(exec: exec, flow: flow);
           ),
         ],
       )),
+    );
+  }
+
+  PreferredSizeWidget _buildAppBar(BuildContext context) {
+    return AppBar(
+      backgroundColor: AppColors.ctBg,
+      elevation: 0,
+      scrolledUnderElevation: 0,
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back_rounded, color: AppColors.ctText),
+        onPressed: () => context.go('/executions'),
+      ),
     );
   }
 }
