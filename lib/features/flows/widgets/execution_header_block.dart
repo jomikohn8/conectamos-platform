@@ -1,7 +1,9 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
+import 'execution_export.dart';
 
 // ── Public widget ────────────────────────────────────────────────────────────
 
@@ -142,11 +144,7 @@ class ExecutionHeaderBlock extends StatelessWidget {
                     },
                   ),
                   const SizedBox(width: 6),
-                  _SmallButton(
-                    label: 'Exportar',
-                    icon: Icons.download_rounded,
-                    onTap: () {},
-                  ),
+                  _ExportMenuButton(exec: exec, flow: flow),
                 ],
               ),
             ],
@@ -519,6 +517,13 @@ class _ChannelBadge extends StatelessWidget {
       'dashboard' => (AppColors.ctSurface2, const Color(0xFF475569), AppColors.ctBorder, Icons.dashboard_outlined, 'Dashboard'),
       _           => (AppColors.ctSurface2, AppColors.ctText2, AppColors.ctBorder, Icons.link_rounded, channelType),
     };
+    final Widget iconWidget = switch (channelType) {
+      'whatsapp' => SvgPicture.asset('assets/logos/whatsapp.svg',
+          width: 11, height: 11),
+      'telegram' => Image.asset('assets/logos/telegram',
+          width: 11, height: 11),
+      _ => Icon(icon, size: 11, color: fg),
+    };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
@@ -529,7 +534,7 @@ class _ChannelBadge extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 11, color: fg),
+          iconWidget,
           const SizedBox(width: 4),
           Text(label,
               style: AppFonts.geist(
@@ -560,6 +565,74 @@ class _SmallButton extends StatelessWidget {
         textStyle:
             AppFonts.geist(fontSize: 12, fontWeight: FontWeight.w600),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+    );
+  }
+}
+
+class _ExportMenuButton extends StatelessWidget {
+  const _ExportMenuButton({required this.exec, required this.flow});
+  final Map<String, dynamic> exec;
+  final Map<String, dynamic> flow;
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<String>(
+      offset: const Offset(0, 36),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      color: AppColors.ctSurface,
+      elevation: 4,
+      onSelected: (value) {
+        if (value == 'pdf') {
+          exportExecutionPdf(exec, flow);
+        } else if (value == 'xls') {
+          exportExecutionXls(exec, flow);
+        }
+      },
+      itemBuilder: (_) => [
+        PopupMenuItem<String>(
+          value: 'pdf',
+          height: 40,
+          child: Row(
+            children: [
+              const Icon(Icons.picture_as_pdf_rounded,
+                  size: 16, color: Color(0xFFEF4444)),
+              const SizedBox(width: 10),
+              Text('Exportar PDF',
+                  style: AppFonts.geist(
+                      fontSize: 13, color: AppColors.ctText)),
+            ],
+          ),
+        ),
+        PopupMenuItem<String>(
+          value: 'xls',
+          height: 40,
+          child: Row(
+            children: [
+              const Icon(Icons.table_chart_rounded,
+                  size: 16, color: Color(0xFF107C41)),
+              const SizedBox(width: 10),
+              Text('Exportar XLS',
+                  style: AppFonts.geist(
+                      fontSize: 13, color: AppColors.ctText)),
+            ],
+          ),
+        ),
+      ],
+      child: OutlinedButton.icon(
+        onPressed: null,
+        icon: const Icon(Icons.download_rounded, size: 13),
+        label: const Text('Exportar'),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.ctText2,
+          side: const BorderSide(color: AppColors.ctBorder),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          minimumSize: Size.zero,
+          textStyle:
+              AppFonts.geist(fontSize: 12, fontWeight: FontWeight.w600),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
       ),
     );
   }

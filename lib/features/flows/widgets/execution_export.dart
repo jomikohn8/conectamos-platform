@@ -1,0 +1,747 @@
+// ignore_for_file: avoid_web_libraries_in_flutter, deprecated_member_use
+import 'dart:html' as html;
+
+import 'package:excel/excel.dart' as xl;
+import 'package:flutter/services.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
+
+// ── Color constants ────────────────────────────────────────────────────────────
+
+const _navy    = PdfColor(0.043, 0.075, 0.169);   // #0B132B
+const _teal    = PdfColor(0.349, 0.878, 0.800);   // #59E0CC
+const _white   = PdfColors.white;
+const _text    = PdfColor(0.067, 0.094, 0.153);   // #111827
+const _text2   = PdfColor(0.420, 0.447, 0.502);   // #6B7280
+const _border  = PdfColor(0.898, 0.910, 0.922);   // #E5E7EB
+const _altRow  = PdfColor(0.945, 0.945, 0.945);   // #F1F1F1
+const _ok      = PdfColor(0.063, 0.725, 0.506);   // #10B981
+const _warn    = PdfColor(0.965, 0.620, 0.043);   // #F59E0B
+const _danger  = PdfColor(0.937, 0.267, 0.267);   // #EF4444
+const _info    = PdfColor(0.231, 0.510, 0.965);   // #3B82F6
+const _steel   = PdfColor(0.482, 0.573, 0.655);   // #7B92A7
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+const _months = [
+  'ene', 'feb', 'mar', 'abr', 'may', 'jun',
+  'jul', 'ago', 'sep', 'oct', 'nov', 'dic',
+];
+
+String _fmtShort(String? iso) {
+  if (iso == null || iso.isEmpty) return '—';
+  try {
+    final d = DateTime.parse(iso).toLocal();
+    final hh = d.hour.toString().padLeft(2, '0');
+    final mm = d.minute.toString().padLeft(2, '0');
+    return '${d.day.toString().padLeft(2, '0')} ${_months[d.month - 1]} · $hh:$mm';
+  } catch (_) {
+    return iso;
+  }
+}
+
+PdfColor _eventColor(String type) => switch (type) {
+  'flujo_iniciado'       => _teal,
+  'flujo_completado'     => _teal,
+  'flujo_retomado'       => _teal,
+  'campo_capturado'      => _ok,
+  'campo_rechazado'      => _warn,
+  'worker_escaló'        => _warn,
+  'flujo_abandonado'     => _danger,
+  'supervisor_intervino' => _info,
+  _                      => _steel,
+};
+
+String _eventLabel(String type) => switch (type) {
+  'flujo_iniciado'       => 'Flujo iniciado',
+  'flujo_completado'     => 'Flujo completado',
+  'flujo_retomado'       => 'Flujo retomado',
+  'campo_capturado'      => 'Campo capturado',
+  'campo_rechazado'      => 'Campo rechazado',
+  'worker_escaló'        => 'Worker escaló',
+  'flujo_abandonado'     => 'Flujo abandonado',
+  'supervisor_intervino' => 'Supervisor intervino',
+  'flujo_pausado'        => 'Flujo pausado',
+  _                      => type,
+};
+
+String _statusLabel(String s) => switch (s) {
+  'completed'  => 'Completado',
+  'in_progress'|| 'active' => 'En curso',
+  'paused'     => 'Pausado',
+  'abandoned'  => 'Abandonado',
+  'escalated'  => 'Escalado',
+  'failed'     => 'Fallido',
+  _            => s,
+};
+
+// Groups consecutive events of the same type (mirrors _TimelineSidebar logic).
+List<({String type, List<Map<String, dynamic>> items})> _groupEvents(
+    List<Map<String, dynamic>> sorted) {
+  final groups = <({String type, List<Map<String, dynamic>> items})>[];
+  for (final e in sorted) {
+    final type = e['type'] as String? ?? e['event_type'] as String? ?? '';
+    if (groups.isNotEmpty && groups.last.type == type) {
+      groups.last.items.add(e);
+    } else {
+      groups.add((type: type, items: [e]));
+    }
+  }
+  return groups;
+}
+
+String _resolveFieldValue(Map<String, dynamic> fv, String type) {
+  switch (type) {
+    case 'number':
+      return fv['value_numeric']?.toString() ?? '—';
+    case 'media':
+    case 'photo':
+      final jsonb = fv['value_jsonb'];
+      if (jsonb is Map) return jsonb['url']?.toString() ?? '—';
+      return fv['value_media_url']?.toString() ?? '—';
+    case 'location':
+      final jsonb = fv['value_jsonb'];
+      if (jsonb is Map) {
+        final lat = jsonb['lat'] ?? jsonb['latitude'];
+        final lng = jsonb['lng'] ?? jsonb['longitude'];
+        if (lat != null && lng != null) return '$lat, $lng';
+      }
+      return fv['value_text']?.toString() ?? '—';
+    default:
+      return fv['value_text']?.toString() ?? '—';
+  }
+}
+
+// ── PDF ────────────────────────────────────────────────────────────────────────
+
+Future<void> exportExecutionPdf(
+  Map<String, dynamic> exec,
+  Map<String, dynamic> flow,
+) async {
+  // Load font
+  final fontData =
+      await rootBundle.load('assets/fonts/Geist-VariableFont_wght.ttf');
+  final geist = pw.Font.ttf(fontData);
+
+  final pdf = pw.Document(
+    title: 'Reporte de ejecución',
+    theme: pw.ThemeData.withFont(base: geist, bold: geist),
+  );
+
+  // ── Data extraction ────────────────────────────────────────────────────────
+  final execId     = exec['id'] as String? ?? '';
+  final flowName   = flow['name'] as String? ?? '—';
+  final status     = exec['status'] as String? ?? 'completed';
+  final startedAt  = exec['created_at'] as String?;
+  final completedAt = exec['completed_at'] as String?;
+
+  // Operator
+  final opRaw = exec['operator'];
+  final opName = (opRaw is Map ? opRaw['name'] : null) as String? ?? 'Sin operador';
+
+  // Channel
+  final channelRaw = exec['channel'];
+  final channelType = (channelRaw is Map ? channelRaw['channel_type'] : null)
+      as String?
+      ?? switch (exec['actor_type'] as String?) {
+        'operator'    => 'whatsapp',
+        'tenant_user' => 'dashboard',
+        'system'      => 'api',
+        _             => null,
+      };
+
+  // Trigger / type
+  final triggerSources = flow['trigger_sources'] as List?;
+  final flowType = triggerSources?.firstOrNull?.toString() ?? 'conversacional';
+
+  // Field values
+  final rawFvList = exec['field_values'] as List? ?? [];
+  final fvList = rawFvList
+      .whereType<Map>()
+      .map((e) => e.cast<String, dynamic>())
+      .toList();
+
+  // Snapshot fields map by key for type lookup
+  final snapshotFields = (flow['fields'] as List? ?? [])
+      .whereType<Map>()
+      .map((f) => f.cast<String, dynamic>())
+      .toList();
+  final fieldTypeMap = <String, String>{
+    for (final f in snapshotFields)
+      if (f['key'] is String) f['key'] as String: (f['type'] as String? ?? 'text'),
+  };
+
+  // Progress
+  final total = snapshotFields.length;
+  final filled = fvList.where((fv) =>
+      fv['value_text'] != null ||
+      fv['value_numeric'] != null ||
+      fv['value_media_url'] != null ||
+      fv['value_jsonb'] != null).length;
+
+  // Events
+  final rawEvents = exec['events'] as List? ?? [];
+  final events = rawEvents
+      .whereType<Map>()
+      .map((e) => e.cast<String, dynamic>())
+      .toList()
+    ..sort((a, b) {
+      final ta = a['timestamp'] as String? ?? a['created_at'] as String? ?? '';
+      final tb = b['timestamp'] as String? ?? b['created_at'] as String? ?? '';
+      return ta.compareTo(tb);
+    });
+  final eventGroups = _groupEvents(events);
+
+  // Messages
+  final rawMessages = exec['messages'] as List? ?? [];
+  final messages = rawMessages
+      .whereType<Map>()
+      .map((m) => m.cast<String, dynamic>())
+      .toList();
+
+  // Date for report subtitle
+  final now = DateTime.now();
+  final reportDate =
+      '${now.day.toString().padLeft(2, '0')} ${_months[now.month - 1]} ${now.year}';
+
+  // Short exec ID for footer
+  final shortId = execId.length > 18 ? execId.substring(0, 18) : execId;
+
+  // ── pw.TextStyle helpers ───────────────────────────────────────────────────
+  pw.TextStyle ts({
+    double size = 10,
+    PdfColor? color,
+    pw.FontWeight weight = pw.FontWeight.normal,
+  }) =>
+      pw.TextStyle(
+        font: geist,
+        fontSize: size,
+        color: color ?? _text,
+        fontWeight: weight,
+      );
+
+  // ── PDF pages ──────────────────────────────────────────────────────────────
+  pdf.addPage(
+    pw.MultiPage(
+      pageFormat: PdfPageFormat.a4,
+      margin: pw.EdgeInsets.zero,
+      footer: (ctx) => pw.Container(
+        padding: const pw.EdgeInsets.symmetric(horizontal: 28, vertical: 10),
+        decoration: const pw.BoxDecoration(
+          border: pw.Border(top: pw.BorderSide(color: _border)),
+        ),
+        child: pw.Row(
+          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+          children: [
+            pw.Text(
+              'Generado por ConectamOS · conectamos.ai',
+              style: ts(size: 8, color: _text2),
+            ),
+            pw.Text(
+              shortId,
+              style: ts(size: 8, color: _text2),
+            ),
+          ],
+        ),
+      ),
+      build: (ctx) => [
+        // ── HEADER block ────────────────────────────────────────────────────
+        pw.Container(
+          color: _navy,
+          padding: const pw.EdgeInsets.fromLTRB(28, 22, 28, 22),
+          child: pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              // Brand + subtitle
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: pw.CrossAxisAlignment.center,
+                children: [
+                  pw.RichText(
+                    text: pw.TextSpan(
+                      children: [
+                        pw.TextSpan(
+                          text: 'Conectam',
+                          style: ts(size: 16, color: _white, weight: pw.FontWeight.bold),
+                        ),
+                        pw.TextSpan(
+                          text: 'OS',
+                          style: ts(size: 16, color: _teal, weight: pw.FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                  ),
+                  pw.Text(
+                    'Reporte de ejecución · $reportDate',
+                    style: ts(size: 9, color: PdfColor(1, 1, 1, 0.6)),
+                  ),
+                ],
+              ),
+              pw.SizedBox(height: 12),
+              pw.Divider(color: PdfColor(1, 1, 1, 0.12), thickness: 0.5),
+              pw.SizedBox(height: 12),
+              // Flow name
+              pw.Text(
+                flowName,
+                style: ts(size: 20, color: _white, weight: pw.FontWeight.bold),
+              ),
+              pw.SizedBox(height: 8),
+              // Badges row
+              pw.Row(
+                children: [
+                  _pdfBadge(_statusLabel(status), _statusColor(status), geist),
+                  pw.SizedBox(width: 6),
+                  if (channelType != null) ...[
+                    _pdfBadge(channelType, _steel, geist),
+                    pw.SizedBox(width: 6),
+                  ],
+                  _pdfBadge(flowType, _teal, geist),
+                ],
+              ),
+            ],
+          ),
+        ),
+
+        // ── METADATA row ────────────────────────────────────────────────────
+        pw.Container(
+          decoration: const pw.BoxDecoration(
+            border: pw.Border(bottom: pw.BorderSide(color: _border)),
+          ),
+          child: pw.Table(
+            columnWidths: {
+              0: const pw.FlexColumnWidth(),
+              1: const pw.FlexColumnWidth(),
+              2: const pw.FlexColumnWidth(),
+              3: const pw.FlexColumnWidth(),
+            },
+            children: [
+              pw.TableRow(
+                children: [
+                  _metaCell('Operador', opName, geist, rightBorder: true),
+                  _metaCell('Iniciada', _fmtShort(startedAt), geist, rightBorder: true),
+                  _metaCell('Finalizada', _fmtShort(completedAt), geist, rightBorder: true),
+                  _metaCell('Progreso', '$filled / $total campos', geist),
+                ],
+              ),
+            ],
+          ),
+        ),
+        pw.SizedBox(height: 20),
+
+        // ── CAMPOS section ──────────────────────────────────────────────────
+        if (fvList.isNotEmpty) ...[
+          pw.Padding(
+            padding: const pw.EdgeInsets.symmetric(horizontal: 28),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text(
+                  'CAMPOS CAPTURADOS',
+                  style: ts(size: 9, color: _text2, weight: pw.FontWeight.bold),
+                ),
+                pw.SizedBox(height: 8),
+                pw.Table(
+                  columnWidths: {
+                    0: const pw.FlexColumnWidth(2),
+                    1: const pw.FlexColumnWidth(3),
+                    2: const pw.FlexColumnWidth(1.2),
+                  },
+                  border: pw.TableBorder.all(color: _border, width: 0.5),
+                  children: [
+                    // Header
+                    pw.TableRow(
+                      decoration: const pw.BoxDecoration(color: _navy),
+                      children: [
+                        _tableHeader('Campo', geist),
+                        _tableHeader('Valor', geist),
+                        _tableHeader('Tipo', geist),
+                      ],
+                    ),
+                    // Data rows
+                    for (var i = 0; i < fvList.length; i++)
+                      pw.TableRow(
+                        decoration: pw.BoxDecoration(
+                          color: i.isOdd ? _altRow : PdfColors.white,
+                        ),
+                        children: [
+                          _tableCell(fvList[i]['field_key']?.toString() ?? '—', geist),
+                          _tableCell(
+                            _resolveFieldValue(
+                              fvList[i],
+                              fieldTypeMap[fvList[i]['field_key']] ?? 'text',
+                            ),
+                            geist,
+                          ),
+                          _tableCell(
+                            fieldTypeMap[fvList[i]['field_key']] ?? '—',
+                            geist,
+                          ),
+                        ],
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          pw.SizedBox(height: 24),
+        ],
+
+        // ── CRONOLOGÍA section ───────────────────────────────────────────────
+        if (eventGroups.isNotEmpty) ...[
+          pw.Padding(
+            padding: const pw.EdgeInsets.symmetric(horizontal: 28),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text(
+                  'CRONOLOGÍA',
+                  style: ts(size: 9, color: _text2, weight: pw.FontWeight.bold),
+                ),
+                pw.SizedBox(height: 8),
+                pw.Container(
+                  decoration: pw.BoxDecoration(
+                    border: pw.Border.all(color: _border, width: 0.5),
+                    borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
+                  ),
+                  padding: const pw.EdgeInsets.all(12),
+                  child: pw.Column(
+                    children: [
+                      for (final g in eventGroups) ...[
+                        pw.Row(
+                          crossAxisAlignment: pw.CrossAxisAlignment.start,
+                          children: [
+                            pw.Container(
+                              width: 7,
+                              height: 7,
+                              margin: const pw.EdgeInsets.only(top: 2, right: 8),
+                              decoration: pw.BoxDecoration(
+                                color: _eventColor(g.type),
+                                shape: pw.BoxShape.circle,
+                              ),
+                            ),
+                            pw.Expanded(
+                              child: pw.Text(
+                                g.items.length > 1
+                                    ? '${_eventLabel(g.type)} ×${g.items.length}'
+                                    : _eventLabel(g.type),
+                                style: ts(size: 10, weight: pw.FontWeight.bold),
+                              ),
+                            ),
+                            pw.Text(
+                              _fmtShort(
+                                g.items.first['timestamp'] as String? ??
+                                g.items.first['created_at'] as String?,
+                              ),
+                              style: ts(size: 9, color: _text2),
+                            ),
+                          ],
+                        ),
+                        if (g != eventGroups.last) pw.SizedBox(height: 8),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          pw.SizedBox(height: 24),
+        ],
+
+        // ── CONVERSACIÓN section ─────────────────────────────────────────────
+        if (messages.isNotEmpty) ...[
+          pw.Padding(
+            padding: const pw.EdgeInsets.symmetric(horizontal: 28),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text(
+                  'CONVERSACIÓN',
+                  style: ts(size: 9, color: _text2, weight: pw.FontWeight.bold),
+                ),
+                pw.SizedBox(height: 8),
+                pw.Table(
+                  columnWidths: {
+                    0: const pw.FixedColumnWidth(70),
+                    1: const pw.FlexColumnWidth(),
+                    2: const pw.FixedColumnWidth(55),
+                  },
+                  border: pw.TableBorder.all(color: _border, width: 0.5),
+                  children: [
+                    pw.TableRow(
+                      decoration: const pw.BoxDecoration(color: _navy),
+                      children: [
+                        _tableHeader('Hora', geist),
+                        _tableHeader('Mensaje', geist),
+                        _tableHeader('De', geist),
+                      ],
+                    ),
+                    for (var i = 0; i < messages.length; i++)
+                      pw.TableRow(
+                        decoration: pw.BoxDecoration(
+                          color: i.isOdd ? _altRow : PdfColors.white,
+                        ),
+                        children: [
+                          _tableCell(messages[i]['at']?.toString() ?? '—', geist),
+                          _tableCell(messages[i]['text']?.toString() ?? '—', geist),
+                          _tableCell(
+                            messages[i]['from'] == 'worker' ? 'Worker' : 'Usuario',
+                            geist,
+                          ),
+                        ],
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          pw.SizedBox(height: 24),
+        ],
+      ],
+    ),
+  );
+
+  await Printing.layoutPdf(
+    onLayout: (_) => pdf.save(),
+    name: '${flowName}_${shortId.replaceAll('-', '')}.pdf',
+  );
+}
+
+// ── PDF widget helpers ────────────────────────────────────────────────────────
+
+PdfColor _statusColor(String s) => switch (s) {
+  'completed'                   => _ok,
+  'in_progress' || 'active'    => _info,
+  'paused'                      => _warn,
+  'failed' || 'escalated'      => _danger,
+  _                             => _steel,
+};
+
+pw.Widget _pdfBadge(String label, PdfColor color, pw.Font font) {
+  return pw.Container(
+    padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+    decoration: pw.BoxDecoration(
+      color: PdfColor(color.red, color.green, color.blue, 0.2),
+      border: pw.Border.all(color: color, width: 0.5),
+      borderRadius: const pw.BorderRadius.all(pw.Radius.circular(99)),
+    ),
+    child: pw.Text(
+      label,
+      style: pw.TextStyle(font: font, fontSize: 9, color: color),
+    ),
+  );
+}
+
+pw.Widget _metaCell(
+  String label,
+  String value,
+  pw.Font font, {
+  bool rightBorder = false,
+}) {
+  return pw.Container(
+    padding: const pw.EdgeInsets.all(14),
+    decoration: pw.BoxDecoration(
+      border: rightBorder
+          ? const pw.Border(right: pw.BorderSide(color: _border))
+          : null,
+    ),
+    child: pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.Text(
+          label.toUpperCase(),
+          style: pw.TextStyle(
+            font: font, fontSize: 8, color: _text2,
+            fontWeight: pw.FontWeight.bold, letterSpacing: 0.4,
+          ),
+        ),
+        pw.SizedBox(height: 3),
+        pw.Text(
+          value,
+          style: pw.TextStyle(font: font, fontSize: 11, color: _text, fontWeight: pw.FontWeight.bold),
+        ),
+      ],
+    ),
+  );
+}
+
+pw.Widget _tableHeader(String text, pw.Font font) {
+  return pw.Container(
+    padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+    child: pw.Text(
+      text.toUpperCase(),
+      style: pw.TextStyle(
+        font: font, fontSize: 8, color: _white, fontWeight: pw.FontWeight.bold,
+      ),
+    ),
+  );
+}
+
+pw.Widget _tableCell(String text, pw.Font font) {
+  return pw.Container(
+    padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+    child: pw.Text(
+      text,
+      style: pw.TextStyle(font: font, fontSize: 10, color: _text),
+      maxLines: 3,
+      overflow: pw.TextOverflow.clip,
+    ),
+  );
+}
+
+// ── XLS ────────────────────────────────────────────────────────────────────────
+
+Future<void> exportExecutionXls(
+  Map<String, dynamic> exec,
+  Map<String, dynamic> flow,
+) async {
+  final execId    = exec['id'] as String? ?? '';
+  final flowName  = flow['name'] as String? ?? 'flujo';
+  final shortId   = execId.length > 8 ? execId.substring(0, 8).toUpperCase() : execId.toUpperCase();
+
+  final opRaw  = exec['operator'];
+  final opName = (opRaw is Map ? opRaw['name'] : null) as String? ?? '—';
+
+  final channelRaw  = exec['channel'];
+  final channelType = (channelRaw is Map ? channelRaw['channel_type'] : null) as String? ?? '—';
+
+  final rawFvList   = exec['field_values'] as List? ?? [];
+  final fvList      = rawFvList.whereType<Map>().map((e) => e.cast<String, dynamic>()).toList();
+
+  final snapshotFields = (flow['fields'] as List? ?? [])
+      .whereType<Map>()
+      .map((f) => f.cast<String, dynamic>())
+      .toList();
+  final fieldTypeMap = <String, String>{
+    for (final f in snapshotFields)
+      if (f['key'] is String) f['key'] as String: (f['type'] as String? ?? 'text'),
+  };
+
+  final rawEvents = exec['events'] as List? ?? [];
+  final events    = rawEvents
+      .whereType<Map>()
+      .map((e) => e.cast<String, dynamic>())
+      .toList()
+    ..sort((a, b) {
+      final ta = a['timestamp'] as String? ?? a['created_at'] as String? ?? '';
+      final tb = b['timestamp'] as String? ?? b['created_at'] as String? ?? '';
+      return ta.compareTo(tb);
+    });
+
+  final excel = xl.Excel.createExcel();
+
+  // Delete auto-created sheet
+  excel.delete('Sheet1');
+
+  // ── Helper: header style ──────────────────────────────────────────────────
+  xl.CellStyle headerStyle() => xl.CellStyle(
+    bold: true,
+    backgroundColorHex: xl.ExcelColor.fromHexString('0B132B'),
+    fontColorHex: xl.ExcelColor.fromHexString('FFFFFF'),
+  );
+
+  // ── Hoja 1: Campos ────────────────────────────────────────────────────────
+  final sheetCampos = excel['Campos'];
+  final camposHeaders = ['Field Key', 'Valor', 'Tipo', 'Source', 'Captured At'];
+  for (var i = 0; i < camposHeaders.length; i++) {
+    final cell = sheetCampos.cell(
+      xl.CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0),
+    );
+    cell.value = xl.TextCellValue(camposHeaders[i]);
+    cell.cellStyle = headerStyle();
+  }
+  for (var r = 0; r < fvList.length; r++) {
+    final fv   = fvList[r];
+    final key  = fv['field_key']?.toString() ?? '';
+    final type = fieldTypeMap[key] ?? 'text';
+    final values = [
+      key,
+      _resolveFieldValue(fv, type),
+      type,
+      fv['source']?.toString() ?? '—',
+      fv['captured_at']?.toString() ?? fv['created_at']?.toString() ?? '—',
+    ];
+    for (var c = 0; c < values.length; c++) {
+      sheetCampos.cell(
+        xl.CellIndex.indexByColumnRow(columnIndex: c, rowIndex: r + 1),
+      ).value = xl.TextCellValue(values[c]);
+    }
+  }
+
+  // ── Hoja 2: Metadatos ─────────────────────────────────────────────────────
+  final sheetMeta = excel['Metadatos'];
+  final metaHeaders = ['Campo', 'Valor'];
+  for (var i = 0; i < metaHeaders.length; i++) {
+    final cell = sheetMeta.cell(
+      xl.CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0),
+    );
+    cell.value = xl.TextCellValue(metaHeaders[i]);
+    cell.cellStyle = headerStyle();
+  }
+  final metaRows = [
+    ['Execution ID', execId],
+    ['Flujo', flowName],
+    ['Operador', opName],
+    ['Canal', channelType],
+    ['Status', exec['status']?.toString() ?? '—'],
+    ['Iniciada', exec['created_at']?.toString() ?? '—'],
+    ['Finalizada', exec['completed_at']?.toString() ?? '—'],
+  ];
+  for (var r = 0; r < metaRows.length; r++) {
+    for (var c = 0; c < 2; c++) {
+      sheetMeta.cell(
+        xl.CellIndex.indexByColumnRow(columnIndex: c, rowIndex: r + 1),
+      ).value = xl.TextCellValue(metaRows[r][c]);
+    }
+  }
+
+  // ── Hoja 3: Cronología ────────────────────────────────────────────────────
+  if (events.isNotEmpty) {
+    final sheetTimeline = excel['Cronología'];
+    final tlHeaders = ['Tipo', 'Label', 'Timestamp', 'Data'];
+    for (var i = 0; i < tlHeaders.length; i++) {
+      final cell = sheetTimeline.cell(
+        xl.CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0),
+      );
+      cell.value = xl.TextCellValue(tlHeaders[i]);
+      cell.cellStyle = headerStyle();
+    }
+    for (var r = 0; r < events.length; r++) {
+      final e = events[r];
+      final type = e['type'] as String? ?? e['event_type'] as String? ?? '';
+      final ts   = e['timestamp'] as String? ?? e['created_at'] as String? ?? '—';
+      final data = e['data'];
+      String dataStr = '';
+      if (data is Map) {
+        dataStr = data.entries.map((x) => '${x.key}: ${x.value}').join(', ');
+      } else if (data is String) {
+        dataStr = data;
+      }
+      final row = [type, _eventLabel(type), ts, dataStr];
+      for (var c = 0; c < row.length; c++) {
+        sheetTimeline.cell(
+          xl.CellIndex.indexByColumnRow(columnIndex: c, rowIndex: r + 1),
+        ).value = xl.TextCellValue(row[c]);
+      }
+    }
+  }
+
+  // ── Download via dart:html ─────────────────────────────────────────────────
+  final bytes = excel.encode();
+  if (bytes == null) return;
+
+  final fileName = '${flowName}_$shortId.xlsx'
+      .replaceAll(' ', '_')
+      .replaceAll(RegExp(r'[^\w\-_.]'), '');
+
+  final blob = html.Blob(
+    [bytes],
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  );
+  final url = html.Url.createObjectUrlFromBlob(blob);
+  (html.AnchorElement(href: url)
+        ..setAttribute('download', fileName)
+        ..click())
+      .remove();
+  html.Url.revokeObjectUrl(url);
+}
