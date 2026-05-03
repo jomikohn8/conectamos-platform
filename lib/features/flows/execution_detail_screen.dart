@@ -121,9 +121,14 @@ class _ExecutionDetailScreenState
                         LayoutBuilder(
                           builder: (ctx, constraints) {
                             final wide = constraints.maxWidth >= 900;
-                            final content = _MainContent(exec: exec, flow: flow);
-                            final sidebar =
-                                ExecutionMetadataSidebar(exec: exec, flow: flow);
+                            final rawEvents = exec['events'] as List? ?? [];
+                            final events = rawEvents
+                                .whereType<Map>()
+                                .map((e) => e.cast<String, dynamic>())
+                                .toList();
+final content = _MainContent(exec: exec, flow: flow);
+                            final sidebar = ExecutionMetadataSidebar(
+                                exec: exec, flow: flow, events: events);
 
                             if (wide) {
                               return Row(
@@ -167,18 +172,10 @@ class _MainContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final rawEvents = exec['events'] as List? ?? [];
-    final events = rawEvents
-        .whereType<Map>()
-        .map((e) => e.cast<String, dynamic>())
-        .toList();
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _FieldsBlock(exec: exec, flow: flow),
-        const SizedBox(height: 22),
-        _TimelineBlock(events: events),
         const SizedBox(height: 22),
         _MessagesBlock(exec: exec),
       ],

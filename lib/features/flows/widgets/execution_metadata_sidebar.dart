@@ -740,7 +740,7 @@ class _TimelineSidebarState extends State<_TimelineSidebar> {
 
   @override
   Widget build(BuildContext context) {
-    final sorted = [...widget.events];
+final sorted = [...widget.events];
     sorted.sort((a, b) {
       final ta = a['timestamp'] as String? ?? a['created_at'] as String? ?? '';
       final tb = b['timestamp'] as String? ?? b['created_at'] as String? ?? '';

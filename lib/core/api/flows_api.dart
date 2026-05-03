@@ -270,29 +270,6 @@ class FlowsApi {
       queryParameters: {'tenant_id': tenantId},
     );
     final data = Map<String, dynamic>.from(response.data);
-
-    // Events are served from a sub-resource (same pattern as SessionsApi).
-    // Fetch separately and merge if not already present in the main response.
-    final inlineEvents = data['events'];
-    final hasInlineEvents = inlineEvents is List && inlineEvents.isNotEmpty;
-    if (!hasInlineEvents) {
-      try {
-        final eventsResp = await ApiClient.instance.get(
-          '/api/v1/dashboard/executions/$executionId/events',
-          queryParameters: {'tenant_id': tenantId},
-        );
-        final raw = eventsResp.data;
-        if (raw is List) {
-          data['events'] = raw;
-        } else if (raw is Map) {
-          final nested = raw['events'] ?? raw['items'] ?? raw['data'];
-          if (nested is List) data['events'] = nested;
-        }
-      } catch (_) {
-        // Events endpoint is optional; ignore failures.
-      }
-    }
-
     return data;
   }
 
