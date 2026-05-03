@@ -2,6 +2,7 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/api/flows_api.dart';
 import '../../core/theme/app_theme.dart';
@@ -112,18 +113,6 @@ class _ActionBar extends ConsumerWidget {
                 firstDate: DateTime(2025),
                 lastDate: DateTime.now(),
                 initialDateRange: ref.read(dashboardDateRangeProvider),
-                locale: const Locale('es', 'MX'),
-                builder: (context, child) => Theme(
-                  data: Theme.of(context).copyWith(
-                    colorScheme: ColorScheme.dark(
-                      primary: AppColors.ctTeal,
-                      onPrimary: Colors.white,
-                      surface: AppColors.ctSurface,
-                      onSurface: AppColors.ctText,
-                    ),
-                  ),
-                  child: child!,
-                ),
               );
               if (picked != null) {
                 ref.read(dashboardDateRangeProvider.notifier).state = picked;
@@ -381,13 +370,21 @@ class _ConfiguredView extends ConsumerWidget {
       buffer.clear();
     }
 
+    String? activeHint; // 'kpi_row' | 'chart_row' | null
+
     for (final w in sortedWidgets) {
       final config = (w['config'] as Map<String, dynamic>?) ?? {};
       final hint = config['layout_hint'] as String?;
-      if (hint == 'kpi_row') {
+      if (hint == 'kpi_row' || hint == 'chart_row') {
+        if (hint != activeHint && buffer.isNotEmpty) {
+          // Different group type — flush before starting new buffer
+          flushBuffer();
+        }
+        activeHint = hint;
         buffer.add(w);
       } else {
         flushBuffer();
+        activeHint = null;
         result.add(Padding(
           padding: const EdgeInsets.only(bottom: 16),
           child: rendererFor(w),
@@ -705,9 +702,7 @@ class _RecentActivityWidget extends StatelessWidget {
           final completedAt = item['completed_at'] as String?;
 
           return GestureDetector(
-            onTap: () {
-              // Navegar al detalle — próximo sprint
-            },
+            onTap: () => context.go('/tareas'),
             child: Container(
               margin: const EdgeInsets.only(bottom: 10),
               padding: const EdgeInsets.all(12),
