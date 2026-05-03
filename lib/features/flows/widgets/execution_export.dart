@@ -655,6 +655,7 @@ Future<void> exportExecutionXls(
 
   // ── Hoja 1: Campos ────────────────────────────────────────────────────────
   final sheetCampos = excel['Campos'];
+  excel.setDefaultSheet('Campos');
   final camposHeaders = ['Field Key', 'Valor', 'Tipo', 'Source', 'Captured At'];
   for (var i = 0; i < camposHeaders.length; i++) {
     final cell = sheetCampos.cell(
