@@ -304,10 +304,27 @@ class _FieldsBlockState extends State<_FieldsBlock> {
       }
     }
 
-    // Visible fields after type filter
-    final visibleFields = fields
+    // Visible fields after type filter, sorted by type priority (stable)
+    const typePriority = <String, int>{
+      'text': 0, 'number': 1, 'date': 2,
+      'boolean': 3, 'yesno': 3,
+      'select': 4, 'photo': 5, 'media': 5, 'location': 6,
+    };
+    final visibleFields = (fields
         .where((f) =>
             !_hiddenTypes.contains(_normalizeType(f['type'] as String? ?? 'text')))
+        .toList()
+        .asMap()
+        .entries
+        .toList()
+      ..sort((a, b) {
+        final ta = _normalizeType(a.value['type'] as String? ?? 'text');
+        final tb = _normalizeType(b.value['type'] as String? ?? 'text');
+        final pa = typePriority[ta] ?? 99;
+        final pb = typePriority[tb] ?? 99;
+        return pa != pb ? pa.compareTo(pb) : a.key.compareTo(b.key);
+      }))
+        .map((e) => e.value)
         .toList();
 
     // Legacy field_values not in snapshot
