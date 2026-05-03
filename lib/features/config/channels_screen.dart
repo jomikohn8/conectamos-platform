@@ -78,10 +78,9 @@ class _ChannelsScreenState extends ConsumerState<ChannelsScreen> {
     if (!mounted) return;
     setState(() { _loading = true; _error = null; });
     try {
-      final tenantId = ref.read(activeTenantIdProvider);
       final results = await Future.wait([
-        ChannelsApi.listChannels(tenantId: tenantId),
-        AiWorkersApi.listWorkers(tenantId: tenantId),
+        ChannelsApi.listChannels(),
+        AiWorkersApi.listWorkers(),
       ]);
       if (!mounted) return;
       setState(() {
@@ -100,9 +99,9 @@ class _ChannelsScreenState extends ConsumerState<ChannelsScreen> {
     final isActive = channel['is_active'] as bool? ?? false;
     try {
       if (isActive) {
-        await ChannelsApi.updateChannel(channelId: id, isActive: false, tenantId: ref.read(activeTenantIdProvider));
+        await ChannelsApi.updateChannel(channelId: id, isActive: false);
       } else {
-        await ChannelsApi.activateChannel(channelId: id, tenantId: ref.read(activeTenantIdProvider));
+        await ChannelsApi.activateChannel(channelId: id);
       }
       ref.read(channelStateVersionProvider.notifier).state++;
       await _fetchAll();
@@ -559,7 +558,6 @@ class _CreateChannelStepperState extends State<_CreateChannelStepper> {
       final Map<String, dynamic> result;
       if (_channelType == 'telegram') {
         result = await ChannelsApi.createChannel(
-          tenantId:       widget.tenantId,
           tenantWorkerId: _workerId!,
           displayName:    _nameCtrl.text.trim(),
           color:          _color,
@@ -568,7 +566,6 @@ class _CreateChannelStepperState extends State<_CreateChannelStepper> {
         );
       } else {
         result = await ChannelsApi.createChannel(
-          tenantId:       widget.tenantId,
           tenantWorkerId: _workerId!,
           displayName:    _nameCtrl.text.trim(),
           color:          _color,
@@ -620,10 +617,7 @@ class _CreateChannelStepperState extends State<_CreateChannelStepper> {
     if (_embeddedSignupInProgress) return;
     _embeddedSignupInProgress = true;
     try {
-      final result = await ChannelsApi.embeddedSignup(
-        code:     code,
-        tenantId: widget.tenantId,
-      );
+      final result = await ChannelsApi.embeddedSignup(code: code);
       if (!mounted) return;
       setState(() => _creating = false);
       final newId = result['id'] as String? ?? result['channel_id'] as String? ?? '';

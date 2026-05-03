@@ -226,7 +226,7 @@ class _ConversationsBodyState extends ConsumerState<_ConversationsBody> {
     setState(() => _loadingChannels = true);
     final tenantId = ref.read(activeTenantIdProvider);
     try {
-      final all = await ChannelsApi.listChannels(tenantId: tenantId);
+      final all = await ChannelsApi.listChannels();
       final active = all
           .where((c) => c['is_active'] as bool? ?? false)
           .toList()
@@ -258,7 +258,6 @@ class _ConversationsBodyState extends ConsumerState<_ConversationsBody> {
       final results = await Future.wait(
         otherChannels.map((ch) => ConversationsApi.listConversations(
           channelId: ch['id'] as String,
-          tenantId: tenantId.isNotEmpty ? tenantId : 'default',
         )),
       );
       if (!mounted) return;
@@ -864,7 +863,6 @@ class _ConvoListState extends ConsumerState<_ConvoList> {
     try {
       final tenantId = ref.read(activeTenantIdProvider);
       final convs = await ConversationsApi.listConversations(
-        tenantId: tenantId.isNotEmpty ? tenantId : 'default',
         channelId: channelId,
       );
       if (mounted) {
@@ -1114,7 +1112,6 @@ class _ConvoListState extends ConsumerState<_ConvoList> {
                         ConversationsApi.markChatRead(
                           chatId: chatId,
                           channelId: channelId,
-                          tenantId: ref.read(activeTenantIdProvider),
                         );
                       }
                       // read-receipts dispatched in _ChatPanelState._sendReadReceipts
@@ -1536,7 +1533,6 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
   Future<void> _sendReaction(
       Map<String, dynamic> msg, String emoji) async {
     final chatId = ref.read(selectedChatIdProvider) ?? '';
-    final tenantId = ref.read(activeTenantIdProvider);
     final channelId = msg['channel_id'] as String? ?? '';
     if (channelId.isEmpty) {
       debugPrint('[_sendReaction] SKIP — no channel_id');
@@ -1580,7 +1576,6 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
         }
         await MessagesApi.sendTelegramReaction(
           channelId: channelId,
-          tenantId: tenantId,
           toChatId: toChatId,
           messageId: tgMessageId is int
               ? tgMessageId
@@ -1598,7 +1593,6 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
           messageId: waId,
           emoji: emoji,
           toPhone: chatId,
-          tenantId: tenantId,
           channelId: channelId,
         );
       }
@@ -1693,7 +1687,6 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
   Future<void> _sendMedia(Uint8List bytes, String filename, String? caption) async {
     final chatId = ref.read(selectedChatIdProvider) ?? '';
     if (chatId.isEmpty) return;
-    final tenantId = ref.read(activeTenantIdProvider);
     final channelId = _activeChannelId() ?? '';
     if (channelId.isEmpty) {
       debugPrint('[_sendMedia] SKIP — no channelId');
@@ -1714,7 +1707,6 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
         to: chatId,
         fileBytes: bytes,
         filename: filename,
-        tenantId: tenantId,
         channelId: channelId,
         caption: caption,
         sentByUserId: userId,
@@ -1772,7 +1764,6 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
   Future<void> _sendLocationRequest() async {
     final chatId = ref.read(selectedChatIdProvider) ?? '';
     if (chatId.isEmpty) return;
-    final tenantId = ref.read(activeTenantIdProvider);
     final channelId = _activeChannelId() ?? '';
     if (channelId.isEmpty) {
       debugPrint('[_sendLocationRequest] SKIP — no channelId');
@@ -1782,7 +1773,6 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
     try {
       await MessagesApi.sendLocationRequest(
         to: chatId,
-        tenantId: tenantId,
         channelId: channelId,
         sentByUserId: userId,
       );
@@ -2087,11 +2077,7 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
     if (chatId == null) return;
     setState(() => _isSupervisorMode = true);
     try {
-      final tenantId = ref.read(activeTenantIdProvider);
-      final sessionId = await SessionsApi.findActiveSessionId(
-        chatId: chatId,
-        tenantId: tenantId,
-      );
+      final sessionId = await SessionsApi.findActiveSessionId(chatId: chatId);
       if (sessionId != null) {
         await SessionsApi.patchStatus(sessionId: sessionId, status: 'supervisor');
       }
@@ -2105,11 +2091,7 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
     if (chatId == null) return;
     setState(() => _isSupervisorMode = false);
     try {
-      final tenantId = ref.read(activeTenantIdProvider);
-      final sessionId = await SessionsApi.findActiveSessionId(
-        chatId: chatId,
-        tenantId: tenantId,
-      );
+      final sessionId = await SessionsApi.findActiveSessionId(chatId: chatId);
       if (sessionId != null) {
         await SessionsApi.patchStatus(sessionId: sessionId, status: 'worker');
       }
@@ -2141,7 +2123,6 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
       try {
         await MessagesApi.sendLocation(
           to: chatId,
-          tenantId: tenantId,
           channelId: channelId,
           googleMapsUrl: text,
           sentByUserId: Supabase.instance.client.auth.currentUser?.id,
@@ -2195,7 +2176,6 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
       await MessagesApi.sendWhatsAppMessage(
           to: chatId,
           text: text,
-          tenantId: tenantId,
           channelId: channelId,
           sentByUserId: Supabase.instance.client.auth.currentUser?.id,
           replyToMessageId: replyId);
@@ -5855,11 +5835,10 @@ class _NewMessageDialogState extends ConsumerState<_NewMessageDialog> {
   Future<void> _loadAll() async {
     setState(() { _loadingAll = true; _loadError = null; });
     try {
-      final tenantId = ref.read(activeTenantIdProvider);
       final results = await Future.wait([
-        OperatorsApi.listOperators(tenantId: tenantId),
-        ApiClient.instance.get('/iam/users', queryParameters: {'tenant_id': tenantId}),
-        ApiClient.instance.get('/templates', queryParameters: {'tenant_id': tenantId}),
+        OperatorsApi.listOperators(),
+        ApiClient.instance.get('/iam/users'),
+        ApiClient.instance.get('/templates'),
       ]);
       final ops = results[0] as List<Map<String, dynamic>>;
       final iamRaw = results[1] as dynamic;
@@ -5934,7 +5913,6 @@ class _NewMessageDialogState extends ConsumerState<_NewMessageDialog> {
     if (_selected == null) return;
     final phone = _selected!['phone'] as String? ?? '';
     final name = _selected!['name'] as String? ?? phone;
-    final tenantId = ref.read(activeTenantIdProvider);
     final userId = Supabase.instance.client.auth.currentUser?.id;
 
     setState(() { _sending = true; _sendError = null; });
@@ -5948,7 +5926,6 @@ class _NewMessageDialogState extends ConsumerState<_NewMessageDialog> {
           '/messages/send',
           data: {
             'to': phone,
-            'tenant_id': tenantId,
             'template_name': tpl['name'] ?? tpl['template_name'] ?? '',
             'template_language': tpl['language'] ?? tpl['lang'] ?? 'es',
             'template_variables': _resolveVars(tpl),
@@ -5975,7 +5952,6 @@ class _NewMessageDialogState extends ConsumerState<_NewMessageDialog> {
         await MessagesApi.sendWhatsAppMessage(
           to: phone,
           text: text,
-          tenantId: tenantId,
           channelId: channelId,
           sentByUserId: userId,
         );

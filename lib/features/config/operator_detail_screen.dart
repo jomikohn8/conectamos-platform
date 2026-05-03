@@ -540,7 +540,6 @@ class _DatosTabState extends ConsumerState<_DatosTab> {
     try {
       final available = await OperatorsApi.getAvailableChannelTypes(
         operatorId: operatorId,
-        tenantId:   tenantId,
       );
       if (!mounted) return;
       setState(() {

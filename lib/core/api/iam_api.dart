@@ -1,13 +1,8 @@
 import 'package:conectamos_platform/core/api/api_client.dart';
 
 class IamApi {
-  static Future<List<Map<String, dynamic>>> getUsers({
-    required String tenantId,
-  }) async {
-    final res = await ApiClient.instance.get(
-      '/iam/users',
-      queryParameters: {'tenant_id': tenantId},
-    );
+  static Future<List<Map<String, dynamic>>> getUsers() async {
+    final res = await ApiClient.instance.get('/iam/users');
     final data = res.data;
     final List raw = data is List
         ? data
@@ -15,13 +10,8 @@ class IamApi {
     return raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
   }
 
-  static Future<List<Map<String, dynamic>>> getRoles({
-    required String tenantId,
-  }) async {
-    final res = await ApiClient.instance.get(
-      '/iam/roles',
-      queryParameters: {'tenant_id': tenantId},
-    );
+  static Future<List<Map<String, dynamic>>> getRoles() async {
+    final res = await ApiClient.instance.get('/iam/roles');
     final data = res.data;
     final List raw = data is List
         ? data
@@ -43,14 +33,8 @@ class IamApi {
     );
   }
 
-  static Future<void> resendInvite(
-    String id, {
-    required String tenantId,
-  }) async {
-    await ApiClient.instance.post(
-      '/iam/users/$id/resend-invite',
-      data: {'tenant_id': tenantId},
-    );
+  static Future<void> resendInvite(String id) async {
+    await ApiClient.instance.post('/iam/users/$id/resend-invite');
   }
 
   static Future<void> inviteUser(Map<String, dynamic> data) async {

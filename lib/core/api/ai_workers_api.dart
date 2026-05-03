@@ -2,35 +2,23 @@ import 'package:conectamos_platform/core/api/api_client.dart';
 
 class AiWorkersApi {
   /// Workers contratados por el tenant.
-  static Future<List<Map<String, dynamic>>> listWorkers({
-    required String tenantId,
-  }) async {
-    final response = await ApiClient.instance.get(
-      '/workers',
-      queryParameters: {'tenant_id': tenantId},
-    );
+  static Future<List<Map<String, dynamic>>> listWorkers() async {
+    final response = await ApiClient.instance.get('/workers');
     return List<Map<String, dynamic>>.from(response.data);
   }
 
   /// Catálogo de workers visibles para el tenant.
-  static Future<List<Map<String, dynamic>>> listCatalog({
-    required String tenantId,
-  }) async {
-    final response = await ApiClient.instance.get(
-      '/catalog/workers',
-      queryParameters: {'tenant_id': tenantId},
-    );
+  static Future<List<Map<String, dynamic>>> listCatalog() async {
+    final response = await ApiClient.instance.get('/catalog/workers');
     return List<Map<String, dynamic>>.from(response.data);
   }
 
   /// Contratar un worker del catálogo para el tenant.
   static Future<Map<String, dynamic>> contractWorker({
-    required String tenantId,
     required String catalogWorkerId,
     String? displayName,
   }) async {
     final response = await ApiClient.instance.post('/workers/contract', data: {
-      'tenant_id':         tenantId,
       'catalog_worker_id': catalogWorkerId,
       'display_name':      ?displayName,
     });

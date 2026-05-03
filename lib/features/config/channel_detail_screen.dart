@@ -93,9 +93,9 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen>
       final tenantId = ref.read(activeTenantIdProvider);
       _tenantId = tenantId;
       final results = await Future.wait([
-        ChannelsApi.getChannel(channelId: widget.channelId, tenantId: tenantId),
-        AiWorkersApi.listWorkers(tenantId: tenantId),
-        OperatorsApi.listOperators(tenantId: tenantId),
+        ChannelsApi.getChannel(channelId: widget.channelId),
+        AiWorkersApi.listWorkers(),
+        OperatorsApi.listOperators(),
       ]);
       if (!mounted) return;
       final channel = results[0] as Map<String, dynamic>;
@@ -128,15 +128,11 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen>
         final updated = await ChannelsApi.updateChannel(
           channelId: widget.channelId,
           isActive: false,
-          tenantId: _tenantId,
         );
         if (!mounted) return;
         setState(() { _channel = updated; _toggling = false; });
       } else {
-        await ChannelsApi.activateChannel(
-          channelId: widget.channelId,
-          tenantId: _tenantId,
-        );
+        await ChannelsApi.activateChannel(channelId: widget.channelId);
         if (!mounted) return;
         await _load();
       }
@@ -415,7 +411,6 @@ class _InfoTabState extends State<_InfoTab> {
         displayName: name,
         color: _selectedColor,
         tenantWorkerId: _selectedWorkerId,
-        tenantId: widget.channel['tenant_id'] as String?,
       );
       widget.onUpdated(updated);
       widget.onSuccess('Cambios guardados');
@@ -607,7 +602,6 @@ class _CredentialsTabState extends State<_CredentialsTab> {
     try {
       final updated = await ChannelsApi.updateChannel(
         channelId: widget.channel['id'] as String,
-        tenantId: widget.tenantId,
         phoneNumberId: phone,
         wabaId: waba,
         waToken: token,
@@ -615,7 +609,6 @@ class _CredentialsTabState extends State<_CredentialsTab> {
       widget.onUpdated(updated);
       TemplatesApi.syncTemplates(
         channelId: widget.channel['id'] as String,
-        tenantId: widget.tenantId,
       ).catchError((_) {});
       widget.onSuccess('Credenciales guardadas');
     } catch (e) {
@@ -888,8 +881,7 @@ class _TemplatesTabState extends State<_TemplatesTab> {
   Future<void> _fetchTemplates() async {
     setState(() => _loading = true);
     try {
-      final list = await TemplatesApi.listTemplates(
-          channelId: widget.channelId, tenantId: widget.tenantId);
+      final list = await TemplatesApi.listTemplates(channelId: widget.channelId);
       if (mounted) setState(() { _templates = list; _loading = false; });
     } catch (e) {
       if (mounted) setState(() { _templates = []; _loading = false; });
@@ -899,8 +891,7 @@ class _TemplatesTabState extends State<_TemplatesTab> {
   Future<void> _sync() async {
     setState(() => _syncing = true);
     try {
-      await TemplatesApi.syncTemplates(
-          channelId: widget.channelId, tenantId: widget.tenantId);
+      await TemplatesApi.syncTemplates(channelId: widget.channelId);
       widget.onSuccess('Plantillas sincronizadas');
       await _fetchTemplates();
     } catch (e) {
@@ -1106,8 +1097,7 @@ class _WelcomeTabState extends State<_WelcomeTab> {
   Future<void> _loadApproved() async {
     try {
       final all = await TemplatesApi.listTemplates(
-          channelId: widget.channel['id'] as String,
-          tenantId: widget.tenantId);
+          channelId: widget.channel['id'] as String);
       final approved = all
           .where((t) =>
               (t['status'] as String? ?? '').toUpperCase() == 'APPROVED')

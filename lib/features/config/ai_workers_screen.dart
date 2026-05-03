@@ -67,10 +67,9 @@ class _AiWorkersScreenState extends ConsumerState<AiWorkersScreen> {
     if (!mounted) return;
     setState(() { _loading = true; _error = null; });
     try {
-      final tenantId = ref.read(activeTenantIdProvider);
       final results = await Future.wait([
-        AiWorkersApi.listWorkers(tenantId: tenantId),
-        AiWorkersApi.listCatalog(tenantId: tenantId),
+        AiWorkersApi.listWorkers(),
+        AiWorkersApi.listCatalog(),
       ]);
       if (!mounted) return;
       setState(() {
@@ -717,7 +716,6 @@ class _CatalogDialogState extends State<_CatalogDialog> {
     final messenger = ScaffoldMessenger.of(context);
     try {
       await AiWorkersApi.contractWorker(
-        tenantId: widget.tenantId,
         catalogWorkerId: catalogId,
       );
       if (!mounted) return;

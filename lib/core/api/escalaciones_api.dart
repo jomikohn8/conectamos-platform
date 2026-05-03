@@ -8,11 +8,10 @@ class EscalacionesApi {
   // ── REST ──────────────────────────────────────────────────────────────────
 
   static Future<List<Map<String, dynamic>>> getEscalaciones({
-    required String tenantId,
     String? status,
     String? assignedTo,
   }) async {
-    final params = <String, dynamic>{'tenant_id': tenantId};
+    final params = <String, dynamic>{};
     if (status != null && status.isNotEmpty) params['status'] = status;
     if (assignedTo != null && assignedTo.isNotEmpty) {
       params['assigned_to'] = assignedTo;

@@ -117,7 +117,6 @@ class _OperatorFieldFormDialogState extends State<OperatorFieldFormDialog> {
         );
       } else {
         await OperatorFieldsApi.createOperatorField(
-          tenantId: widget.tenantId,
           label: label,
           fieldType: _selectedType,
           isRequired: _isRequired,

@@ -71,7 +71,7 @@ class MessagesApi {
     try {
       await ApiClient.instance.post(
         '/messages/read',
-        data: {'message_id': waMessageId, 'tenant_id': tenantId, 'channel_id': channelId},
+        data: {'message_id': waMessageId, 'channel_id': channelId},
       );
       debugPrint('[MessagesApi.markRead] OK — $waMessageId');
     } catch (e) {
@@ -86,7 +86,7 @@ class MessagesApi {
     try {
       await ApiClient.instance.post(
         '/messages/typing',
-        data: {'message_id': waMessageId, 'tenant_id': tenantId, 'channel_id': channelId},
+        data: {'message_id': waMessageId, 'channel_id': channelId},
       );
     } catch (_) {}
   }
@@ -96,18 +96,16 @@ class MessagesApi {
   static Future<void> sendWhatsAppMessage({
     required String to,
     required String text,
-    required String tenantId,
     required String channelId,
     String? sentByUserId,
     String? replyToMessageId,
   }) async {
-    if (to.isEmpty || tenantId.isEmpty || channelId.isEmpty) return;
+    if (to.isEmpty || channelId.isEmpty) return;
     await ApiClient.instance.post(
       '/messages/send',
       data: {
         'to':                   to,
         'message':              text,
-        'tenant_id':            tenantId,
         'channel_id':           channelId,
         'sent_by_user_id':     ?sentByUserId,
         'reply_to_message_id': ?replyToMessageId,
@@ -120,7 +118,6 @@ class MessagesApi {
     required String messageId,
     required String emoji,
     required String toPhone,
-    required String tenantId,
     required String channelId,
   }) async {
     await ApiClient.instance.post(
@@ -129,7 +126,6 @@ class MessagesApi {
         'message_id': messageId,
         'emoji':      emoji,
         'to_phone':   toPhone,
-        'tenant_id':  tenantId,
         'channel_id': channelId,
       },
     );
@@ -138,7 +134,6 @@ class MessagesApi {
   /// Envía una reacción emoji sobre un mensaje de Telegram.
   static Future<void> sendTelegramReaction({
     required String channelId,
-    required String tenantId,
     required int toChatId,
     required int messageId,
     required String emoji,
@@ -148,7 +143,6 @@ class MessagesApi {
       '/messages/send/reaction/telegram',
       data: {
         'channel_id':   channelId,
-        'tenant_id':    tenantId,
         'to_chat_id':   toChatId,
         'message_id':   messageId,
         'emoji':        emoji,
@@ -162,7 +156,6 @@ class MessagesApi {
     required String to,
     required Uint8List fileBytes,
     required String filename,
-    required String tenantId,
     required String channelId,
     String? caption,
     String? sentByUserId,
@@ -170,7 +163,6 @@ class MessagesApi {
   }) async {
     final formData = FormData.fromMap({
       'to': to,
-      'tenant_id': tenantId,
       'channel_id': channelId,
       'file': MultipartFile.fromBytes(
         fileBytes,
@@ -187,7 +179,6 @@ class MessagesApi {
   /// Envía una ubicación de Google Maps parseando la URL.
   static Future<void> sendLocation({
     required String to,
-    required String tenantId,
     required String channelId,
     required String googleMapsUrl,
     String? sentByUserId,
@@ -196,7 +187,6 @@ class MessagesApi {
       '/messages/send/location',
       data: {
         'to':              to,
-        'tenant_id':       tenantId,
         'channel_id':      channelId,
         'google_maps_url': googleMapsUrl,
         'sent_by_user_id': ?sentByUserId,
@@ -207,7 +197,6 @@ class MessagesApi {
   /// Envía una solicitud de ubicación interactiva.
   static Future<void> sendLocationRequest({
     required String to,
-    required String tenantId,
     required String channelId,
     String? sentByUserId,
   }) async {
@@ -215,7 +204,6 @@ class MessagesApi {
       '/messages/send/location-request',
       data: {
         'to':              to,
-        'tenant_id':       tenantId,
         'channel_id':      channelId,
         'sent_by_user_id': ?sentByUserId,
       },

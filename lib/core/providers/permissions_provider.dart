@@ -31,10 +31,7 @@ final userRoleProvider = FutureProvider.autoDispose<String?>((ref) async {
   // BUG 1: esperar a que activeTenantIdProvider tenga valor antes de llamar al backend
   final tenantId = ref.watch(activeTenantIdProvider);
   if (tenantId.isEmpty) return null;
-  final res = await ApiClient.instance.get(
-    '/iam/users',
-    queryParameters: {'tenant_id': tenantId},
-  );
+  final res = await ApiClient.instance.get('/iam/users');
   final data = res.data;
   final List raw = data is List
       ? data
@@ -71,13 +68,8 @@ final userPermissionsProvider = FutureProvider.autoDispose<Set<String>>((ref) as
   if (role == null) return {};
   if (role.toLowerCase() == 'admin') return _kAllPermissions;
 
-  final tenantId = ref.watch(activeTenantIdProvider);
-
   // Buscar role_id por nombre
-  final rolesRes = await ApiClient.instance.get(
-    '/iam/roles',
-    queryParameters: {'tenant_id': tenantId},
-  );
+  final rolesRes = await ApiClient.instance.get('/iam/roles');
   final rolesData = rolesRes.data;
   final List rawRoles = rolesData is List
       ? rolesData
@@ -140,11 +132,7 @@ final roleListProvider = FutureProvider.autoDispose<List<Role>>((ref) async {
       Role(id: 'viewer-mock',     name: 'viewer'),
     ];
   }
-  final tenantId = ref.watch(activeTenantIdProvider);
-  final res = await ApiClient.instance.get(
-    '/iam/roles',
-    queryParameters: {'tenant_id': tenantId},
-  );
+  final res = await ApiClient.instance.get('/iam/roles');
   final data = res.data;
   final List raw = data is List
       ? data

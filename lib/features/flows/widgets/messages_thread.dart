@@ -162,13 +162,54 @@ class _MessageBubble extends StatelessWidget {
                         runSpacing: 4,
                         children: attachments.map<Widget>((a) {
                           if (a is String && a.startsWith('http')) {
-                            return ClipRRect(
-                              borderRadius: BorderRadius.circular(4),
-                              child: Image.network(a,
-                                  width: 90, height: 68, fit: BoxFit.cover,
-                                  errorBuilder: (ctx, err, stack) => Container(
-                                      width: 90, height: 68,
-                                      color: AppColors.ctSurface2)),
+                            return MouseRegion(
+                              cursor: SystemMouseCursors.click,
+                              child: GestureDetector(
+                                onTap: () => showDialog(
+                                  context: context,
+                                  builder: (_) => Dialog.fullscreen(
+                                    backgroundColor: const Color(0xD90B132B),
+                                    child: Stack(
+                                      children: [
+                                        Center(
+                                          child: Image.network(
+                                            a,
+                                            fit: BoxFit.contain,
+                                            errorBuilder: (ctx2, err, stack) =>
+                                                const Icon(Icons.broken_image_rounded,
+                                                    size: 48, color: Colors.white54),
+                                          ),
+                                        ),
+                                        Positioned(
+                                          top: 18,
+                                          right: 18,
+                                          child: GestureDetector(
+                                            onTap: () => Navigator.of(context).pop(),
+                                            child: Container(
+                                              width: 36,
+                                              height: 36,
+                                              decoration: BoxDecoration(
+                                                color: Colors.white.withValues(alpha: 0.15),
+                                                shape: BoxShape.circle,
+                                              ),
+                                              child: const Icon(Icons.close_rounded,
+                                                  color: Colors.white, size: 20),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(4),
+                                  child: Image.network(a,
+                                      width: 90, height: 68, fit: BoxFit.cover,
+                                      errorBuilder: (ctx, err, stack) => Container(
+                                          width: 90, height: 68,
+                                          color: AppColors.ctSurface2)),
+                                ),
+                              ),
                             );
                           }
                           return Container(

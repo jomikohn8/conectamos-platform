@@ -78,7 +78,6 @@ class _EscalacionesScreenState extends ConsumerState<EscalacionesScreen>
     });
     try {
       final data = await EscalacionesApi.getEscalaciones(
-        tenantId:   tenantId,
         status:     status,
         assignedTo: _assignedToFilter,
       );

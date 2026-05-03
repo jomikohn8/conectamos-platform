@@ -243,7 +243,6 @@ class _TemplateCreateDialogState extends State<TemplateCreateDialog> {
       final footerText = _footerCtrl.text.trim();
 
       await TemplatesApi.createTemplate(
-        tenantId:         widget.tenantId,
         name:             name,
         category:         _category,
         language:         _language,

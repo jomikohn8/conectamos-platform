@@ -92,14 +92,10 @@ class _OperatorFieldsBodyState extends ConsumerState<OperatorFieldsBody> {
     if (!mounted) return;
     setState(() { _loading = true; _error = null; });
     try {
-      final tenantId = ref.read(activeTenantIdProvider);
-      final effectiveId = tenantId.isNotEmpty ? tenantId : 'default';
-
       // Fetch all fields including inactive ones
       final res = await ApiClient.instance.get(
         '/operator-fields',
         queryParameters: {
-          'tenant_id': effectiveId,
           'include_inactive': true,
         },
       );

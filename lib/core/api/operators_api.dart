@@ -1,13 +1,8 @@
 import 'package:conectamos_platform/core/api/api_client.dart';
 
 class OperatorsApi {
-  static Future<List<Map<String, dynamic>>> listOperators({
-    String tenantId = 'default',
-  }) async {
-    final response = await ApiClient.instance.get(
-      '/operators',
-      queryParameters: {'tenant_id': tenantId},
-    );
+  static Future<List<Map<String, dynamic>>> listOperators() async {
+    final response = await ApiClient.instance.get('/operators');
     return List<Map<String, dynamic>>.from(response.data);
   }
 
@@ -20,7 +15,6 @@ class OperatorsApi {
     required String displayName,
     required String phone,
     required List<String> flows,
-    String tenantId = 'default',
     String? telegramChatId,
     String? email,
     String? nationality,
@@ -44,7 +38,6 @@ class OperatorsApi {
         'display_name': displayName,
         'phone': phone,
         'flows': flows,
-        'tenant_id': tenantId,
         if (email != null && email.isNotEmpty) 'email': email,
         if (nationality != null && nationality.isNotEmpty)
           'nationality': nationality,
@@ -114,11 +107,9 @@ class OperatorsApi {
   /// Returns the channel types the operator actually has via assigned flows.
   static Future<List<String>> getAvailableChannelTypes({
     required String operatorId,
-    required String tenantId,
   }) async {
     final response = await ApiClient.instance.get(
       '/operators/$operatorId/available-channel-types',
-      queryParameters: {'tenant_id': tenantId},
     );
     final data = response.data;
     final List raw = data is Map
@@ -150,13 +141,11 @@ class OperatorsApi {
   static Future<void> assignFlow({
     required String operatorId,
     required String flowDefinitionId,
-    required String tenantId,
   }) async {
     await ApiClient.instance.post(
       '/operators/$operatorId/flows',
       data: {
         'flow_definition_id': flowDefinitionId,
-        'tenant_id': tenantId,
       },
     );
   }

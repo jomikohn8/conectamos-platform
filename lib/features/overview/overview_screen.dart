@@ -772,7 +772,7 @@ class _OperatorGridState extends State<_OperatorGrid> {
     });
 
     try {
-      final raw = await OperatorsApi.listOperators(tenantId: widget.tenantId);
+      final raw = await OperatorsApi.listOperators();
       setState(() {
         _operators = raw.map(_operatorFromApi).toList();
         _loading = false;

@@ -93,10 +93,9 @@ class _WorkflowsScreenState extends ConsumerState<WorkflowsScreen> {
     if (!mounted) return;
     setState(() { _loading = true; _error = null; });
     try {
-      final tenantId = ref.read(activeTenantIdProvider);
       final results = await Future.wait([
         FlowsApi.listFlows(),
-        AiWorkersApi.listWorkers(tenantId: tenantId),
+        AiWorkersApi.listWorkers(),
       ]);
       if (!mounted) return;
       setState(() {

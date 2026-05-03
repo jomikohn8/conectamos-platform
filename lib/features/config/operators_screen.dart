@@ -91,10 +91,7 @@ class _OperatorsScreenState extends ConsumerState<OperatorsScreen> {
   Future<void> _fetchOperators() async {
     setState(() => _loading = true);
     try {
-      final tenantId = ref.read(activeTenantIdProvider);
-      final ops = await OperatorsApi.listOperators(
-        tenantId: tenantId.isNotEmpty ? tenantId : 'default',
-      );
+      final ops = await OperatorsApi.listOperators();
       if (mounted) {
         setState(() {
           _operators = ops;

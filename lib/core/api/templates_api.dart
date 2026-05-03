@@ -5,11 +5,10 @@ class TemplatesApi {
   /// Lista plantillas por canal y tenant.
   static Future<List<Map<String, dynamic>>> listTemplates({
     required String channelId,
-    required String tenantId,
   }) async {
     final response = await ApiClient.instance.get(
       '/templates',
-      queryParameters: {'channel_id': channelId, 'tenant_id': tenantId},
+      queryParameters: {'channel_id': channelId},
     );
     final data = response.data;
     final List raw = data is List
@@ -21,23 +20,21 @@ class TemplatesApi {
   /// Sincroniza plantillas desde Meta para un canal y tenant.
   static Future<void> syncTemplates({
     required String channelId,
-    required String tenantId,
   }) async {
     await ApiClient.instance.post(
       '/templates/sync',
-      queryParameters: {'channel_id': channelId, 'tenant_id': tenantId},
+      queryParameters: {'channel_id': channelId},
     );
   }
 
   /// Obtiene la plantilla de bienvenida del sistema.
   static Future<Map<String, dynamic>?> getDefault({
     required String channelId,
-    required String tenantId,
   }) async {
     try {
       final response = await ApiClient.instance.get(
         '/templates/default',
-        queryParameters: {'channel_id': channelId, 'tenant_id': tenantId},
+        queryParameters: {'channel_id': channelId},
       );
       return Map<String, dynamic>.from(response.data as Map);
     } catch (_) {
@@ -47,7 +44,6 @@ class TemplatesApi {
 
   /// Crea una nueva plantilla y la envía a Meta para aprobación.
   static Future<void> createTemplate({
-    required String tenantId,
     required String name,
     required String category,
     required String language,
@@ -65,7 +61,6 @@ class TemplatesApi {
     await ApiClient.instance.post(
       '/templates',
       data: {
-        'tenant_id':  tenantId,
         'name':       name,
         'category':   category,
         'language':   language,

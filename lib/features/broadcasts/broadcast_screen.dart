@@ -69,10 +69,7 @@ final _bcastOperatorsProvider =
     FutureProvider.autoDispose.family<List<Map<String, dynamic>>, String>(
   (ref, tenantId) async {
     if (tenantId.isEmpty) return [];
-    final res = await ApiClient.instance.get(
-      '/operators',
-      queryParameters: {'tenant_id': tenantId},
-    );
+    final res = await ApiClient.instance.get('/operators');
     final data = res.data;
     final List raw = data is List ? data : [];
     return raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
@@ -85,7 +82,7 @@ final _bcastTemplatesProvider =
     if (tenantId.isEmpty) return [];
     final res = await ApiClient.instance.get(
       '/templates',
-      queryParameters: {'tenant_id': tenantId, 'status': 'APPROVED'},
+      queryParameters: {'status': 'APPROVED'},
     );
     final data = res.data;
     final List raw =
@@ -117,10 +114,7 @@ final _bcastHistoryProvider =
   (ref, tenantId) async {
     if (tenantId.isEmpty) return [];
     try {
-      final res = await ApiClient.instance.get(
-        '/broadcasts',
-        queryParameters: {'tenant_id': tenantId},
-      );
+      final res = await ApiClient.instance.get('/broadcasts');
       final data = res.data;
       final List raw = data is List ? data : (data['items'] ?? []) as List;
       return raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
@@ -279,7 +273,6 @@ class _BroadcastScreenState extends ConsumerState<BroadcastScreen> {
     try {
       final userId =
           Supabase.instance.client.auth.currentUser?.id ?? '';
-      final tenantId = ref.read(activeTenantIdProvider);
 
       Map<String, dynamic>? selectedTemplate;
       if (_useTemplate && _selectedTemplateId != null) {
@@ -314,7 +307,6 @@ class _BroadcastScreenState extends ConsumerState<BroadcastScreen> {
       }
 
       final body = <String, dynamic>{
-        'tenant_id':          tenantId,
         'sent_by_user_id':    userId,
         'channel_id':         _channelId,
         'message_text':       _useTemplate ? null : resolvedText,
@@ -375,7 +367,7 @@ class _BroadcastScreenState extends ConsumerState<BroadcastScreen> {
         _resultType   = type;
         _resultErrors = errors;
       });
-      ref.invalidate(_bcastHistoryProvider(tenantId));
+      ref.invalidate(_bcastHistoryProvider(ref.read(activeTenantIdProvider)));
     } on DioException catch (e) {
       if (!mounted) return;
       final raw = e.response?.data is Map

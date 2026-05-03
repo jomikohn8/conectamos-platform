@@ -645,7 +645,7 @@ final _usersListProvider =
     FutureProvider.autoDispose.family<List<Map<String, dynamic>>, String>(
   (ref, tenantId) async {
     if (tenantId.isEmpty) return [];
-    return IamApi.getUsers(tenantId: tenantId);
+    return IamApi.getUsers();
   },
 );
 
@@ -653,7 +653,7 @@ final _rolesMapProvider =
     FutureProvider.autoDispose.family<Map<String, String>, String>(
   (ref, tenantId) async {
     if (tenantId.isEmpty) return {};
-    final roles = await IamApi.getRoles(tenantId: tenantId);
+    final roles = await IamApi.getRoles();
     final map = <String, String>{};
     for (final e in roles) {
       final id   = e['id']?.toString() ?? '';
@@ -923,7 +923,7 @@ class _UserRowState extends ConsumerState<_UserRow> {
     if (_id.isEmpty) return;
     setState(() => _acting = true);
     try {
-      await IamApi.resendInvite(_id, tenantId: widget.tenantId);
+      await IamApi.resendInvite(_id);
       if (mounted) setState(() => _acting = false);
     } catch (_) {
       if (mounted) setState(() => _acting = false);
@@ -1444,7 +1444,7 @@ class _ChangeRoleDialogState extends ConsumerState<_ChangeRoleDialog> {
 
   Future<void> _loadRoles() async {
     try {
-      final roles = await IamApi.getRoles(tenantId: widget.tenantId);
+      final roles = await IamApi.getRoles();
       if (!mounted) return;
       setState(() {
         _roles        = roles;
@@ -1615,7 +1615,7 @@ class _InviteUserDialogState extends ConsumerState<_InviteUserDialog> {
 
   Future<void> _loadRoles() async {
     try {
-      final roles = await IamApi.getRoles(tenantId: widget.tenantId);
+      final roles = await IamApi.getRoles();
       if (!mounted) return;
       setState(() {
         _availableRoles = roles;
@@ -1649,7 +1649,6 @@ class _InviteUserDialogState extends ConsumerState<_InviteUserDialog> {
         'telefono':  _telefonoCtrl.text.trim(),
         'email':     email,
         'role_id':   _roleId,
-        'tenant_id': widget.tenantId,
       });
       if (!mounted) return;
       widget.onInvited();
@@ -1837,7 +1836,7 @@ class _ManageChannelsDialogState extends State<_ManageChannelsDialog> {
   Future<void> _load() async {
     try {
       final results = await Future.wait([
-        ChannelsApi.listChannels(tenantId: widget.tenantId),
+        ChannelsApi.listChannels(),
         IamApi.getUserChannels(tenantUserId: widget.tenantUserId),
       ]);
       if (!mounted) return;

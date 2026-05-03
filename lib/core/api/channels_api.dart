@@ -2,29 +2,19 @@ import 'package:dio/dio.dart';
 import 'package:conectamos_platform/core/api/api_client.dart';
 
 class ChannelsApi {
-  static Future<List<Map<String, dynamic>>> listChannels({
-    required String tenantId,
-  }) async {
-    final response = await ApiClient.instance.get(
-      '/channels',
-      queryParameters: {'tenant_id': tenantId},
-    );
+  static Future<List<Map<String, dynamic>>> listChannels() async {
+    final response = await ApiClient.instance.get('/channels');
     return List<Map<String, dynamic>>.from(response.data);
   }
 
   static Future<Map<String, dynamic>> getChannel({
     required String channelId,
-    required String tenantId,
   }) async {
-    final response = await ApiClient.instance.get(
-      '/channels/$channelId',
-      queryParameters: {'tenant_id': tenantId},
-    );
+    final response = await ApiClient.instance.get('/channels/$channelId');
     return Map<String, dynamic>.from(response.data);
   }
 
   static Future<Map<String, dynamic>> createChannel({
-    required String tenantId,
     required String tenantWorkerId,
     required String displayName,
     required String color,
@@ -46,7 +36,6 @@ class ChannelsApi {
     }
 
     final response = await ApiClient.instance.post('/channels', data: {
-      'tenant_id':        tenantId,
       'tenant_worker_id': tenantWorkerId,
       'display_name':     displayName,
       'color':            color,
@@ -58,7 +47,6 @@ class ChannelsApi {
 
   static Future<Map<String, dynamic>> updateChannel({
     required String channelId,
-    String? tenantId,
     String? displayName,
     String? color,
     bool? isActive,
@@ -83,12 +71,8 @@ class ChannelsApi {
       effectiveConfig = base;
     }
 
-    final qp = <String, dynamic>{};
-    if (tenantId != null && tenantId.isNotEmpty) qp['tenant_id'] = tenantId;
-
     final response = await ApiClient.instance.patch(
       '/channels/$channelId',
-      queryParameters: qp.isEmpty ? null : qp,
       data: {
         'display_name':     ?displayName,
         'color':            ?color,
@@ -166,12 +150,8 @@ class ChannelsApi {
 
   static Future<void> activateChannel({
     required String channelId,
-    required String tenantId,
   }) async {
-    await ApiClient.instance.post(
-      '/channels/$channelId/activate',
-      queryParameters: {'tenant_id': tenantId},
-    );
+    await ApiClient.instance.post('/channels/$channelId/activate');
   }
 
   static Future<Map<String, dynamic>> syncTemplates({
@@ -210,13 +190,11 @@ class ChannelsApi {
 
   static Future<Map<String, dynamic>> embeddedSignup({
     required String code,
-    required String tenantId,
   }) async {
     final response = await ApiClient.instance.post(
       '/channels/embedded-signup',
       data: {
-        'code':      code,
-        'tenant_id': tenantId,
+        'code': code,
       },
     );
     return Map<String, dynamic>.from(response.data);

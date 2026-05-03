@@ -1,13 +1,8 @@
 import 'package:conectamos_platform/core/api/api_client.dart';
 
 class OperatorFieldsApi {
-  static Future<List<Map<String, dynamic>>> getOperatorFields({
-    required String tenantId,
-  }) async {
-    final res = await ApiClient.instance.get(
-      '/operator-fields',
-      queryParameters: {'tenant_id': tenantId},
-    );
+  static Future<List<Map<String, dynamic>>> getOperatorFields() async {
+    final res = await ApiClient.instance.get('/operator-fields');
     final data = res.data;
     final List raw = data is List
         ? data
@@ -16,7 +11,6 @@ class OperatorFieldsApi {
   }
 
   static Future<Map<String, dynamic>> createOperatorField({
-    required String tenantId,
     required String label,
     required String fieldType,
     bool isRequired = false,
@@ -26,7 +20,6 @@ class OperatorFieldsApi {
     final res = await ApiClient.instance.post(
       '/operator-fields',
       data: {
-        'tenant_id': tenantId,
         'label': label,
         'field_type': fieldType,
         'required': isRequired,

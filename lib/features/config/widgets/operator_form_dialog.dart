@@ -11,7 +11,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/api/flows_api.dart';
 import '../../../core/api/operator_fields_api.dart';
 import '../../../core/api/operators_api.dart';
-import '../../../core/providers/tenant_provider.dart';
 import '../../../core/theme/colors.dart';
 import '../../../core/utils/identity_config.dart';
 import '../../../core/utils/phone_normalizer.dart';
@@ -311,10 +310,7 @@ class _OperatorFormDialogState extends ConsumerState<OperatorFormDialog> {
     if (!mounted) return;
     setState(() => _customFieldsLoading = true);
     try {
-      final tenantId = ref.read(activeTenantIdProvider);
-      final defs = await OperatorFieldsApi.getOperatorFields(
-        tenantId: tenantId.isNotEmpty ? tenantId : 'default',
-      );
+      final defs = await OperatorFieldsApi.getOperatorFields();
       if (!mounted) return;
 
       // Build initial values from initialCustomFields list
@@ -969,12 +965,10 @@ class _OperatorFormDialogState extends ConsumerState<OperatorFormDialog> {
               customFieldValues.isNotEmpty ? customFieldValues : null,
         );
       } else {
-        final tenantId = ref.read(activeTenantIdProvider);
         await OperatorsApi.createOperator(
           displayName: name,
           phone: phone,
           flows: flows,
-          tenantId: tenantId.isNotEmpty ? tenantId : 'default',
           telegramChatId: tgId.isNotEmpty ? tgId : null,
           email: email.isNotEmpty ? email : null,
           nationality:

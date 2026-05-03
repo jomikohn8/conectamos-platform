@@ -9,7 +9,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../core/api/flows_api.dart';
 import '../../core/api/ai_workers_api.dart';
-import '../../core/providers/tenant_provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/widgets/app_shell.dart';
 
@@ -2468,9 +2467,7 @@ class _CreateTenantIntegrationDialogState
 
   Future<void> _loadWorkers() async {
     try {
-      final tenantId = ref.read(activeTenantIdProvider);
-      final list =
-          await AiWorkersApi.listWorkers(tenantId: tenantId);
+      final list = await AiWorkersApi.listWorkers();
       if (!mounted) return;
       setState(() {
         _workers = list;
