@@ -17,6 +17,8 @@ class ExecutionsApi {
     String? dateFrom,
     String? dateTo,
     String? search,
+    String? fieldKey,
+    List<String>? fieldValues,
     String sortCol = 'created_at',
     String sortDir = 'desc',
     int page = 1,
@@ -37,6 +39,8 @@ class ExecutionsApi {
     if (dateFrom != null) params['date_from'] = dateFrom;
     if (dateTo != null) params['date_to'] = dateTo;
     if (search != null && search.isNotEmpty) params['search'] = search;
+    if (fieldKey != null) params['field_key'] = fieldKey;
+    if (fieldValues != null && fieldValues.isNotEmpty) params['field_values'] = fieldValues;
 
     final resp = await ApiClient.instance.get(
       '/api/v1/dashboard/executions',
@@ -84,5 +88,15 @@ class ExecutionsApi {
   /// Elimina una vista guardada.
   static Future<void> deleteView({required String viewId}) async {
     await ApiClient.instance.delete('/api/v1/dashboard/views/$viewId');
+  }
+
+  /// Campos buscables por clave de campo (para filtro avanzado).
+  static Future<Map<String, dynamic>> getSearchableFields({
+    required String tenantId,
+  }) async {
+    final resp = await ApiClient.instance.get(
+      '/api/v1/dashboard/executions/searchable-fields',
+    );
+    return resp.data as Map<String, dynamic>;
   }
 }

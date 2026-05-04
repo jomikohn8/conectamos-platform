@@ -117,6 +117,12 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
   final TextEditingController _searchCtrl = TextEditingController();
   Timer? _searchDebounce;
 
+  // ── Advanced field search ────────────────────────────────────────────────────
+  Map<String, dynamic>      _searchableFields    = {};
+  Map<String, List<String>> _activeFieldSearches = {};
+  bool                      _showFieldDropdown   = false;
+  String?                   _pendingField;
+
   // ────────────────────────────────────────────────────────────────────────────
 
   @override
@@ -140,6 +146,7 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
       if (tenantId.isNotEmpty) {
         _load();
         _loadViews();
+        _loadSearchableFields();
         _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
           if (mounted) _load();
         });
@@ -162,7 +169,8 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
     if (tenantId.isEmpty) return;
     setState(() { _loading = true; _error = null; });
     try {
-      debugPrint('[Search] query="$_searchText"');
+      debugPrint('[Search] query="$_searchText" fields=$_activeFieldSearches');
+      final fieldEntry = _activeFieldSearches.entries.firstOrNull;
       final data = await ExecutionsApi.listExecutions(
         tenantId:    tenantId,
         status:      _filterStatus.isNotEmpty ? _filterStatus : null,
@@ -172,6 +180,8 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
         channelType: _filterChannelType,
         dateRange:   _filterDateRange,
         search:      _searchText.isNotEmpty ? _searchText : null,
+        fieldKey:    fieldEntry?.key,
+        fieldValues: fieldEntry?.value,
         sortCol:     _sortCol,
         sortDir:     _sortDir,
         page:        _page,
@@ -200,6 +210,15 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
     } catch (_) {}
   }
 
+  Future<void> _loadSearchableFields() async {
+    final tenantId = ref.read(activeTenantIdProvider);
+    if (tenantId.isEmpty) return;
+    try {
+      final fields = await ExecutionsApi.getSearchableFields(tenantId: tenantId);
+      if (mounted) setState(() => _searchableFields = fields);
+    } catch (_) {}
+  }
+
   // ── Filter helpers ────────────────────────────────────────────────────────
 
   int _activeFiltersCount() {
@@ -211,7 +230,10 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
     return count;
   }
 
-  bool _hasActiveFilters() => _activeFiltersCount() > 0 || _searchText.isNotEmpty;
+  bool _hasActiveFilters() =>
+      _activeFiltersCount() > 0 ||
+      _searchText.isNotEmpty ||
+      _activeFieldSearches.isNotEmpty;
 
   void _markDirty() {
     if (_activeViewId != null && !_viewsDirty) {
@@ -221,23 +243,26 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
 
   void _clearFilters() {
     setState(() {
-      _filterStatus      = [];
-      _filterWorkerId    = null;
-      _filterOperatorIds = [];
-      _filterFlowId      = null;
-      _filterChannelType = null;
-      _filterDateRange   = null;
-      _searchText        = '';
+      _filterStatus        = [];
+      _filterWorkerId      = null;
+      _filterOperatorIds   = [];
+      _filterFlowId        = null;
+      _filterChannelType   = null;
+      _filterDateRange     = null;
+      _searchText          = '';
       _searchCtrl.clear();
-      _activeViewId      = null;
-      _viewsDirty        = false;
-      _page              = 1;
+      _activeFieldSearches = {};
+      _activeViewId        = null;
+      _viewsDirty          = false;
+      _page                = 1;
     });
     _load();
   }
 
   void _applyView(Map<String, dynamic> view) {
     final filters = view['filters'] as Map<String, dynamic>? ?? {};
+    final savedFieldSearches =
+        filters['field_searches'] as Map<String, dynamic>? ?? {};
     setState(() {
       _filterStatus      = List<String>.from(filters['status']       ?? []);
       _filterWorkerId    = filters['worker_id']   as String?;
@@ -247,6 +272,10 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
       _filterDateRange   = filters['date_range']   as String?;
       _searchText        = filters['search']       as String? ?? '';
       if (_searchText.isNotEmpty) _searchCtrl.text = _searchText;
+      _activeFieldSearches = {
+        for (final e in savedFieldSearches.entries)
+          e.key: List<String>.from(e.value as List? ?? []),
+      };
       _activeViewId = view['id'] as String?;
       _viewsDirty   = false;
       _page         = 1;
@@ -255,13 +284,14 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
   }
 
   Map<String, dynamic> _currentFiltersMap() => {
-    if (_filterStatus.isNotEmpty)      'status':       _filterStatus,
+    if (_filterStatus.isNotEmpty)           'status':         _filterStatus,
     'worker_id':    ?_filterWorkerId,
-    if (_filterOperatorIds.isNotEmpty) 'operator_ids': _filterOperatorIds,
+    if (_filterOperatorIds.isNotEmpty)      'operator_ids':   _filterOperatorIds,
     'flow_id':      ?_filterFlowId,
     'channel_type': ?_filterChannelType,
     'date_range':   ?_filterDateRange,
-    if (_searchText.isNotEmpty)        'search':       _searchText,
+    if (_searchText.isNotEmpty)             'search':         _searchText,
+    if (_activeFieldSearches.isNotEmpty)    'field_searches': _activeFieldSearches,
   };
 
   String _statusLabel(String s) => switch (s) {
@@ -308,6 +338,23 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
     'elapsed'  => 'elapsed_seconds',
     _          => colId,
   };
+
+  String _fieldLabel(String key) {
+    // Flat structure: {fields: [...]}
+    final flat = _searchableFields['fields'] as List? ?? [];
+    for (final f in flat) {
+      if (f is Map && f['key'] == key) return f['label'] as String? ?? key;
+    }
+    // Grouped by flow: {flows: [{fields: [...]}]}
+    final flows = _searchableFields['flows'] as List? ?? [];
+    for (final flow in flows) {
+      if (flow is! Map) continue;
+      for (final f in (flow['fields'] as List? ?? [])) {
+        if (f is Map && f['key'] == key) return f['label'] as String? ?? key;
+      }
+    }
+    return key;
+  }
 
   // ── build ─────────────────────────────────────────────────────────────────
 
@@ -382,6 +429,52 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
               if (_total > _limit) _buildPaginationFooter(totalPages),
             ],
           ),
+          // Dismiss layer for field dropdown / value input
+          if (_showFieldDropdown || _pendingField != null)
+            GestureDetector(
+              onTap: () => setState(() {
+                _showFieldDropdown = false;
+                _pendingField = null;
+              }),
+              behavior: HitTestBehavior.opaque,
+              child: const SizedBox.expand(),
+            ),
+          // Field search dropdown
+          if (_showFieldDropdown)
+            Positioned(
+              top: 96,
+              left: 20,
+              right: 300,
+              child: _buildFieldDropdown(),
+            ),
+          // Value input panel
+          if (_pendingField != null)
+            Positioned(
+              top: 96,
+              left: 20,
+              width: 380,
+              child: _ValueInput(
+                fieldKey:   _pendingField!,
+                fieldLabel: _fieldLabel(_pendingField!),
+                initialValues: _activeFieldSearches[_pendingField!] ?? [],
+                onSubmit: (values) {
+                  setState(() {
+                    if (values.isNotEmpty) {
+                      _activeFieldSearches = Map.from(_activeFieldSearches)
+                        ..[_pendingField!] = values;
+                    } else {
+                      _activeFieldSearches = Map.from(_activeFieldSearches)
+                        ..remove(_pendingField);
+                    }
+                    _pendingField = null;
+                    _page = 1;
+                  });
+                  _markDirty();
+                  _load();
+                },
+                onCancel: () => setState(() => _pendingField = null),
+              ),
+            ),
           // Dismiss layer for column picker
           if (_showColumnPicker)
             GestureDetector(
@@ -392,7 +485,7 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
           // Column picker card
           if (_showColumnPicker)
             Positioned(
-              top: 58,
+              top: 96,
               right: 24,
               child: _buildColumnPickerCard(),
             ),
@@ -404,7 +497,6 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
   // ── Topbar ────────────────────────────────────────────────────────────────
 
   Widget _buildTopbar() {
-    final visCount = _columns.where((c) => c.visible).length;
     return Container(
       padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
       child: Row(
@@ -437,57 +529,29 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
             ),
           ],
           const Spacer(),
-          // Right side: [Act.] [Refresh] | [Por fecha] [N col.]
-          Flexible(
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (_lastFetch != null)
-                    Text(
-                      'Act. ${_elapsedSince(_lastFetch!)}',
-                      style: AppFonts.geist(
-                          fontSize: 11, color: AppColors.ctText3),
-                    ),
-                  const SizedBox(width: 4),
-                  SizedBox(
-                    width: 32,
-                    height: 32,
-                    child: IconButton(
-                      padding: EdgeInsets.zero,
-                      icon: _loading
-                          ? const SizedBox(
-                              width: 14,
-                              height: 14,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: AppColors.ctTeal,
-                              ),
-                            )
-                          : const Icon(Icons.refresh_rounded,
-                              size: 16, color: AppColors.ctText3),
-                      onPressed: _loading ? null : _load,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  _TopbarChip(
-                    icon: Icons.calendar_today_outlined,
-                    label: _grouping == 'date' ? 'Por fecha' : 'Sin agrupar',
-                    active: _grouping == 'date',
-                    onTap: () => setState(
-                        () => _grouping = _grouping == 'date' ? 'none' : 'date'),
-                  ),
-                  const SizedBox(width: 8),
-                  _TopbarChip(
-                    icon: Icons.view_column_outlined,
-                    label: '$visCount col.',
-                    active: _showColumnPicker,
-                    onTap: () =>
-                        setState(() => _showColumnPicker = !_showColumnPicker),
-                  ),
-                ],
-              ),
+          if (_lastFetch != null)
+            Text(
+              'Act. ${_elapsedSince(_lastFetch!)}',
+              style: AppFonts.geist(fontSize: 11, color: AppColors.ctText3),
+            ),
+          const SizedBox(width: 4),
+          SizedBox(
+            width: 32,
+            height: 32,
+            child: IconButton(
+              padding: EdgeInsets.zero,
+              icon: _loading
+                  ? const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: AppColors.ctTeal,
+                      ),
+                    )
+                  : const Icon(Icons.refresh_rounded,
+                      size: 16, color: AppColors.ctText3),
+              onPressed: _loading ? null : _load,
             ),
           ),
         ],
@@ -498,80 +562,272 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
   // ── Search row ────────────────────────────────────────────────────────────
 
   Widget _buildSearchRow() {
+    final visCount = _columns.where((c) => c.visible).length;
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
       child: Row(
         children: [
-          Expanded(
-            child: SizedBox(
-              height: 36,
-              child: TextField(
-                controller: _searchCtrl,
-                style: AppFonts.geist(fontSize: 13, color: AppColors.ctText),
-                decoration: InputDecoration(
-                  hintText: 'Buscar por operador, flujo...',
-                  hintStyle: AppFonts.geist(
-                      fontSize: 13, color: AppColors.ctText3),
-                  prefixIcon: const Icon(Icons.search_rounded,
-                      size: 16, color: AppColors.ctText3),
-                  contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 0),
-                  filled: true,
-                  fillColor: AppColors.ctSurface,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: AppColors.ctBorder),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: AppColors.ctBorder),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: AppColors.ctTeal),
-                  ),
-                ),
-                onChanged: (v) {
-                  _searchDebounce?.cancel();
-                  _searchDebounce =
-                      Timer(const Duration(milliseconds: 400), () {
-                    if (!mounted) return;
-                    setState(() { _searchText = v; _page = 1; });
-                    _markDirty();
-                    _load();
-                  });
-                },
-              ),
-            ),
+          Expanded(child: _buildSearchBar()),
+          const SizedBox(width: 8),
+          _TopbarChip(
+            icon: Icons.calendar_today_outlined,
+            label: _grouping == 'date' ? 'Por fecha' : 'Sin agrupar',
+            active: _grouping == 'date',
+            onTap: () =>
+                setState(() => _grouping = _grouping == 'date' ? 'none' : 'date'),
           ),
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(width: 8),
-              _TopbarChip(
-                icon: Icons.filter_list_rounded,
-                label: _activeFiltersCount() > 0
-                    ? 'Filtros (${_activeFiltersCount()})'
-                    : 'Filtros',
-                active: _showFilterSidebar || _hasActiveFilters(),
-                onTap: () =>
-                    setState(() => _showFilterSidebar = !_showFilterSidebar),
-              ),
-              const SizedBox(width: 8),
-              _ViewsMenu(
-                views:        _savedViews,
-                activeViewId: _activeViewId,
-                isDirty:      _viewsDirty,
-                onSelect:     _applyView,
-                onSave:       _showSaveViewDialog,
-                onDelete:     _deleteView,
-              ),
-            ],
+          const SizedBox(width: 8),
+          _TopbarChip(
+            icon: Icons.view_column_outlined,
+            label: '$visCount col.',
+            active: _showColumnPicker,
+            onTap: () =>
+                setState(() => _showColumnPicker = !_showColumnPicker),
+          ),
+          const SizedBox(width: 8),
+          _TopbarChip(
+            icon: Icons.filter_list_rounded,
+            label: _activeFiltersCount() > 0
+                ? 'Filtros (${_activeFiltersCount()})'
+                : 'Filtros',
+            active: _showFilterSidebar || _hasActiveFilters(),
+            onTap: () =>
+                setState(() => _showFilterSidebar = !_showFilterSidebar),
+          ),
+          const SizedBox(width: 8),
+          _ViewsMenu(
+            views:        _savedViews,
+            activeViewId: _activeViewId,
+            isDirty:      _viewsDirty,
+            onSelect:     _applyView,
+            onSave:       _showSaveViewDialog,
+            onDelete:     _deleteView,
           ),
         ],
       ),
     );
   }
+
+  Widget _buildSearchBar() {
+    return Container(
+      height: 36,
+      decoration: BoxDecoration(
+        color: AppColors.ctSurface,
+        border: Border.all(
+          color: _showFieldDropdown || _pendingField != null
+              ? AppColors.ctTeal
+              : AppColors.ctBorder,
+        ),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          const SizedBox(width: 10),
+          const Icon(Icons.search_rounded, size: 16, color: AppColors.ctText3),
+          const SizedBox(width: 6),
+          // Active field search tags
+          for (final entry in _activeFieldSearches.entries) ...[
+            _FieldSearchTag(
+              fieldKey: entry.key,
+              values:   entry.value,
+              label:    _fieldLabel(entry.key),
+              onRemove: () {
+                setState(() {
+                  _activeFieldSearches = Map.from(_activeFieldSearches)
+                    ..remove(entry.key);
+                  _page = 1;
+                });
+                _markDirty();
+                _load();
+              },
+            ),
+            const SizedBox(width: 4),
+          ],
+          // Plain text search input
+          Expanded(
+            child: TextField(
+              controller: _searchCtrl,
+              style: AppFonts.geist(fontSize: 13, color: AppColors.ctText),
+              decoration: InputDecoration(
+                hintText: _activeFieldSearches.isEmpty
+                    ? 'Buscar por operador, flujo...'
+                    : '',
+                hintStyle:
+                    AppFonts.geist(fontSize: 13, color: AppColors.ctText3),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+                border: InputBorder.none,
+                isDense: true,
+              ),
+              onChanged: (v) {
+                _searchDebounce?.cancel();
+                _searchDebounce =
+                    Timer(const Duration(milliseconds: 400), () {
+                  if (!mounted) return;
+                  setState(() { _searchText = v; _page = 1; });
+                  _markDirty();
+                  _load();
+                });
+              },
+            ),
+          ),
+          // "+" button to open field search dropdown
+          if (_searchableFields.isNotEmpty)
+            GestureDetector(
+              onTap: () =>
+                  setState(() => _showFieldDropdown = !_showFieldDropdown),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Icon(
+                  Icons.add_rounded,
+                  size: 15,
+                  color: _showFieldDropdown
+                      ? AppColors.ctTeal
+                      : AppColors.ctText3,
+                ),
+              ),
+            )
+          else
+            const SizedBox(width: 6),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFieldDropdown() {
+    return Material(
+      elevation: 4,
+      borderRadius: BorderRadius.circular(10),
+      shadowColor: Colors.black12,
+      child: Container(
+        constraints: const BoxConstraints(maxHeight: 320),
+        decoration: BoxDecoration(
+          color: AppColors.ctSurface,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: AppColors.ctBorder),
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: _buildFieldSections(),
+          ),
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _buildFieldSections() {
+    final flows = _searchableFields['flows'] as List? ?? [];
+    final flat  = _searchableFields['fields'] as List? ?? [];
+
+    if (flows.isNotEmpty) {
+      final result = <Widget>[];
+      for (final flow in flows) {
+        if (flow is! Map) continue;
+        final flowName = flow['flow_name'] as String? ?? 'Flujo';
+        final fields   = flow['fields']    as List? ?? [];
+        if (fields.isEmpty) continue;
+        result.add(Padding(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
+          child: Text(
+            flowName.toUpperCase(),
+            style: AppFonts.geist(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: AppColors.ctText3,
+            ),
+          ),
+        ));
+        for (final f in fields) {
+          if (f is! Map) continue;
+          result.add(_buildFieldItem(
+            f['key']   as String? ?? '',
+            f['label'] as String? ?? (f['key'] as String? ?? ''),
+            f['type']  as String? ?? 'text',
+          ));
+        }
+      }
+      if (result.isEmpty) {
+        result.add(_noFieldsPlaceholder());
+      }
+      return result;
+    }
+
+    if (flat.isNotEmpty) {
+      return [
+        for (final f in flat)
+          if (f is Map)
+            _buildFieldItem(
+              f['key']   as String? ?? '',
+              f['label'] as String? ?? (f['key'] as String? ?? ''),
+              f['type']  as String? ?? 'text',
+            ),
+      ];
+    }
+
+    return [_noFieldsPlaceholder()];
+  }
+
+  Widget _noFieldsPlaceholder() => Padding(
+        padding: const EdgeInsets.all(16),
+        child: Text(
+          'No hay campos disponibles',
+          style: AppFonts.geist(fontSize: 13, color: AppColors.ctText3),
+        ),
+      );
+
+  Widget _buildFieldItem(String key, String label, String type) {
+    final active = _activeFieldSearches.containsKey(key);
+    return InkWell(
+      onTap: () {
+        setState(() {
+          _showFieldDropdown = false;
+          _pendingField      = key;
+        });
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+        child: Row(
+          children: [
+            Icon(_fieldIcon(type), size: 13, color: AppColors.ctText3),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                label,
+                style: AppFonts.geist(fontSize: 13, color: AppColors.ctText),
+              ),
+            ),
+            if (active)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                decoration: BoxDecoration(
+                  color: AppColors.ctTealLight,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  '${_activeFieldSearches[key]!.length}',
+                  style: AppFonts.geist(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.ctTealDark,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  IconData _fieldIcon(String type) => switch (type) {
+        'number' || 'int' || 'float' => Icons.tag_rounded,
+        'email'                      => Icons.email_outlined,
+        'phone'                      => Icons.phone_outlined,
+        'date'                       => Icons.calendar_today_outlined,
+        'select' || 'list'           => Icons.list_rounded,
+        _                            => Icons.text_fields_rounded,
+      };
 
   // ── Chips bar ─────────────────────────────────────────────────────────────
 
@@ -1237,6 +1493,261 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
                 ),
               ),
             )),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── _FieldSearchTag ───────────────────────────────────────────────────────────
+
+class _FieldSearchTag extends StatelessWidget {
+  const _FieldSearchTag({
+    required this.fieldKey,
+    required this.values,
+    required this.label,
+    required this.onRemove,
+  });
+
+  final String       fieldKey;
+  final List<String> values;
+  final String       label;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final displayValues = values.length <= 2
+        ? values.join(', ')
+        : '${values.take(2).join(', ')} +${values.length - 2}';
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(6, 2, 4, 2),
+      decoration: BoxDecoration(
+        color: AppColors.ctTealLight,
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: AppColors.ctTeal),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            '$label: $displayValues',
+            style: AppFonts.geist(
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+              color: AppColors.ctTealDark,
+            ),
+          ),
+          const SizedBox(width: 3),
+          GestureDetector(
+            onTap: onRemove,
+            child: const Icon(Icons.close_rounded,
+                size: 11, color: AppColors.ctTealDark),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── _ValueInput ───────────────────────────────────────────────────────────────
+
+class _ValueInput extends StatefulWidget {
+  const _ValueInput({
+    required this.fieldKey,
+    required this.fieldLabel,
+    required this.onSubmit,
+    required this.onCancel,
+    this.initialValues = const [],
+  });
+
+  final String             fieldKey;
+  final String             fieldLabel;
+  final List<String>       initialValues;
+  final void Function(List<String>) onSubmit;
+  final VoidCallback       onCancel;
+
+  @override
+  State<_ValueInput> createState() => _ValueInputState();
+}
+
+class _ValueInputState extends State<_ValueInput> {
+  final _ctrl  = TextEditingController();
+  final _focus = FocusNode();
+  late List<String> _values;
+
+  @override
+  void initState() {
+    super.initState();
+    _values = List.from(widget.initialValues);
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => _focus.requestFocus());
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    _focus.dispose();
+    super.dispose();
+  }
+
+  void _addValues(String raw) {
+    final parts = raw
+        .split(RegExp(r'[\n\t,]+'))
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
+    if (parts.isEmpty) return;
+    setState(() {
+      for (final v in parts) {
+        if (!_values.contains(v)) _values.add(v);
+      }
+      _ctrl.clear();
+    });
+  }
+
+  void _removeValue(String v) => setState(() => _values.remove(v));
+
+  void _submit() {
+    if (_ctrl.text.trim().isNotEmpty) _addValues(_ctrl.text);
+    widget.onSubmit(_values);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      elevation: 4,
+      borderRadius: BorderRadius.circular(10),
+      shadowColor: Colors.black12,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: AppColors.ctSurface,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: AppColors.ctBorder),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header
+            Row(
+              children: [
+                Text(
+                  'Filtrar por ${widget.fieldLabel}',
+                  style: AppFonts.geist(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.ctText2,
+                  ),
+                ),
+                const Spacer(),
+                GestureDetector(
+                  onTap: widget.onCancel,
+                  child: const Icon(Icons.close_rounded,
+                      size: 14, color: AppColors.ctText3),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            // Active value chips
+            if (_values.isNotEmpty) ...[
+              Wrap(
+                spacing: 4,
+                runSpacing: 4,
+                children: [
+                  for (final v in _values)
+                    _FilterChip(
+                      label: v,
+                      onRemove: () => _removeValue(v),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 8),
+            ],
+            // Text input
+            TextField(
+              controller: _ctrl,
+              focusNode: _focus,
+              style:
+                  AppFonts.geist(fontSize: 13, color: AppColors.ctText),
+              decoration: InputDecoration(
+                hintText: 'Escribe o pega valores (Enter para añadir)',
+                hintStyle:
+                    AppFonts.geist(fontSize: 12, color: AppColors.ctText3),
+                contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 10, vertical: 8),
+                filled: true,
+                fillColor: AppColors.ctSurface2,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(6),
+                  borderSide: const BorderSide(color: AppColors.ctBorder),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(6),
+                  borderSide: const BorderSide(color: AppColors.ctBorder),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(6),
+                  borderSide: const BorderSide(color: AppColors.ctTeal),
+                ),
+                isDense: true,
+              ),
+              onChanged: (v) {
+                // Detect paste from Excel (tabs or newlines)
+                if (v.contains('\n') || v.contains('\t')) _addValues(v);
+              },
+              onSubmitted: (v) {
+                if (v.trim().isNotEmpty) _addValues(v);
+                if (_values.isNotEmpty) _submit();
+              },
+            ),
+            const SizedBox(height: 10),
+            // Action buttons
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: widget.onCancel,
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 6),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: Text(
+                    'Cancelar',
+                    style: AppFonts.geist(
+                        fontSize: 12, color: AppColors.ctText2),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                ElevatedButton(
+                  onPressed: _values.isEmpty && _ctrl.text.trim().isEmpty
+                      ? null
+                      : _submit,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.ctTeal,
+                    disabledBackgroundColor: AppColors.ctBorder,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 6),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(6)),
+                  ),
+                  child: Text(
+                    'Aplicar',
+                    style: AppFonts.geist(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
       ),
