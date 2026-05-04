@@ -484,29 +484,28 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
         ?? exec['id'] as String?
         ?? '';
 
-    final flowDef   = exec['flow_definition'] as Map<String, dynamic>?
-        ?? exec['flow'] as Map<String, dynamic>?;
-    final operator_ = exec['operator'] as Map<String, dynamic>?;
-    final worker_   = exec['worker'] as Map<String, dynamic>?;
-    final status    = exec['status'] as String? ?? 'unknown';
-    final channelType = exec['channel_type'] as String?
-        ?? exec['channel'] as String?;
-    final createdStr  = exec['created_at'] as String?;
-    final elapsedSec  = exec['elapsed_seconds'] as int?;
+    // New API: flow_name is a flat string.
+    // Fallback to nested flow_definition/flow for backward compat.
+    final flowName = exec['flow_name'] as String?
+        ?? (exec['flow_definition'] as Map<String, dynamic>?)?['name'] as String?
+        ?? (exec['flow'] as Map<String, dynamic>?)?['name'] as String?;
 
-    final fieldsCaptured = (exec['fields_captured'] as Map?)
-        ?.map((k, v) => MapEntry(k.toString(), v)) ?? <String, dynamic>{};
-    final fieldsExpected = flowDef != null
-        ? List<Map<String, dynamic>>.from(
-            (flowDef['fields_expected'] as List? ?? [])
-                .map((f) => Map<String, dynamic>.from(f as Map)))
-        : <Map<String, dynamic>>[];
-    final captured = fieldsExpected
-        .where((f) {
-          final v = fieldsCaptured[f['key']];
-          return v != null && v.toString().isNotEmpty;
-        })
-        .length;
+    final operator_ = exec['operator'] as Map<String, dynamic>?;
+    final worker_   = exec['worker']   as Map<String, dynamic>?;
+    final status    = exec['status']   as String? ?? 'unknown';
+
+    // New API: channel is a nested object { id, channel_type }.
+    final channelObj  = exec['channel'] as Map<String, dynamic>?;
+    final channelType = channelObj?['channel_type'] as String?
+        ?? exec['channel_type'] as String?;
+
+    final createdStr = exec['created_at'] as String?;
+    final elapsedSec = exec['elapsed_seconds'] as int?;
+
+    // New API: fields_progress: { total: N, filled: M }.
+    final progressMap = exec['fields_progress'] as Map<String, dynamic>?;
+    final total    = (progressMap?['total']  as num?)?.toInt() ?? 0;
+    final captured = (progressMap?['filled'] as num?)?.toInt() ?? 0;
 
     DateTime? createdDt;
     if (createdStr != null) {
@@ -531,16 +530,16 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
                 child: Align(
                   alignment: Alignment.centerLeft,
                   child: _cellContent(
-                    colId:     col.id,
-                    flowDef:   flowDef,
-                    operator_: operator_,
-                    worker_:   worker_,
-                    status:    status,
+                    colId:       col.id,
+                    flowName:    flowName,
+                    operator_:   operator_,
+                    worker_:     worker_,
+                    status:      status,
                     channelType: channelType,
-                    createdDt: createdDt,
-                    elapsedSec: elapsedSec,
-                    captured:   captured,
-                    total:      fieldsExpected.length,
+                    createdDt:   createdDt,
+                    elapsedSec:  elapsedSec,
+                    captured:    captured,
+                    total:       total,
                   ),
                 ),
               );
@@ -563,7 +562,7 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
 
   Widget _cellContent({
     required String colId,
-    required Map<String, dynamic>? flowDef,
+    required String? flowName,
     required Map<String, dynamic>? operator_,
     required Map<String, dynamic>? worker_,
     required String status,
@@ -575,16 +574,15 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
   }) {
     switch (colId) {
       case 'flow':
-        final name = flowDef?['name'] as String? ?? '—';
         return Text(
-          name,
+          flowName ?? '—',
           overflow: TextOverflow.ellipsis,
           style: AppFonts.geist(
             fontSize: 13,
             fontWeight: FontWeight.w500,
-            color: flowDef != null ? AppColors.ctText : AppColors.ctText3,
+            color: flowName != null ? AppColors.ctText : AppColors.ctText3,
           ).copyWith(
-            fontStyle: flowDef == null ? FontStyle.italic : FontStyle.normal,
+            fontStyle: flowName == null ? FontStyle.italic : FontStyle.normal,
           ),
         );
       case 'worker':
