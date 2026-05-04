@@ -1601,6 +1601,8 @@ class _ValueInput extends StatefulWidget {
 }
 
 class _ValueInputState extends State<_ValueInput> {
+  static const int _maxValues = 200;
+
   final _ctrl  = TextEditingController();
   final _focus = FocusNode();
   late List<String> _values;
@@ -1658,10 +1660,26 @@ class _ValueInputState extends State<_ValueInput> {
     if (parts.isEmpty) return;
     setState(() {
       for (final v in parts) {
+        if (_values.length >= _maxValues) break;
         if (!_values.contains(v)) _values.add(v);
       }
       _ctrl.clear();
     });
+    if (_values.length >= _maxValues) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Máximo $_maxValues valores por búsqueda',
+              style: AppFonts.geist(fontSize: 13, color: Colors.white),
+            ),
+            backgroundColor: AppColors.ctNavy,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      });
+    }
   }
 
   void _removeValue(String v) => setState(() => _values.remove(v));
@@ -1707,7 +1725,20 @@ class _ValueInputState extends State<_ValueInput> {
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            Row(
+              children: [
+                Text(
+                  '${_values.length} / $_maxValues valores',
+                  style: AppFonts.geist(
+                    fontSize: 11,
+                    color: _values.length >= _maxValues
+                        ? AppColors.ctDanger
+                        : AppColors.ctText3,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
             // Active value chips
             if (_values.isNotEmpty) ...[
               Wrap(
