@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:flutter_svg/flutter_svg.dart';
+
 import '../../core/api/executions_api.dart';
 import '../../core/providers/tenant_provider.dart';
 import '../../core/theme/app_theme.dart';
@@ -32,7 +34,7 @@ double _colWidth(String id) => switch (id) {
   'status'   => 110,
   'operator' => 130,
   'channel'  => 90,
-  'created'  => 110,
+  'created'  => 140,
   'elapsed'  => 90,
   'progress' => 90,
   _          => 100,
@@ -43,13 +45,6 @@ String _fmtElapsed(int? seconds) {
   if (seconds < 60) return '${seconds}s';
   if (seconds < 3600) return '${seconds ~/ 60}m ${seconds % 60}s';
   return '${seconds ~/ 3600}h ${(seconds % 3600) ~/ 60}m';
-}
-
-String _fmtTime(DateTime dt) {
-  final local = dt.toLocal();
-  final h = local.hour.toString().padLeft(2, '0');
-  final m = local.minute.toString().padLeft(2, '0');
-  return '$h:$m';
 }
 
 String _dateGroupLabel(DateTime dt) {
@@ -516,8 +511,9 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
 
     return InkWell(
       onTap: () => context.go('/executions/$id'),
-      child: Container(
-        height: 44,
+      child: ClipRect(
+        child: Container(
+        height: 48,
         decoration: const BoxDecoration(
           border: Border(bottom: BorderSide(color: AppColors.ctBorder)),
         ),
@@ -556,6 +552,7 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
             ),
           ],
         ),
+      ),
       ),
     );
   }
@@ -606,9 +603,51 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
       case 'channel':
         return _ChannelBadge(channelType: channelType);
       case 'created':
-        return Text(
-          createdDt != null ? _fmtTime(createdDt) : '—',
-          style: AppFonts.geist(fontSize: 12, color: AppColors.ctText2),
+        if (createdDt == null) {
+          return Text('—',
+              style: AppFonts.geist(fontSize: 12, color: AppColors.ctText2));
+        }
+        final now   = DateTime.now();
+        final local = createdDt.toLocal();
+        final todayStart     = DateTime(now.year, now.month, now.day);
+        final yesterdayStart = todayStart.subtract(const Duration(days: 1));
+        String datePart;
+        if (!local.isBefore(todayStart)) {
+          datePart = 'Hoy';
+        } else if (!local.isBefore(yesterdayStart)) {
+          datePart = 'Ayer';
+        } else {
+          const meses = ['ene','feb','mar','abr','may','jun',
+                         'jul','ago','sep','oct','nov','dic'];
+          datePart = '${local.day} ${meses[local.month - 1]}';
+        }
+        final hh   = local.hour.toString().padLeft(2, '0');
+        final mm   = local.minute.toString().padLeft(2, '0');
+        final line1 = '$datePart, $hh:$mm';
+        final diff  = now.difference(local);
+        final String line2;
+        if (diff.inMinutes < 1) {
+          line2 = 'ahora';
+        } else if (diff.inMinutes < 60) {
+          line2 = 'hace ${diff.inMinutes}m';
+        } else if (diff.inHours < 24) {
+          line2 = 'hace ${diff.inHours}h';
+        } else {
+          line2 = 'hace ${diff.inDays}d';
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(line1,
+                style: AppFonts.geist(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.ctText,
+                )),
+            Text(line2,
+                style: AppFonts.geist(fontSize: 11, color: AppColors.ctText2)),
+          ],
         );
       case 'elapsed':
         return Text(
@@ -818,25 +857,63 @@ class _ChannelBadge extends StatelessWidget {
           style: AppFonts.geist(fontSize: 12, color: AppColors.ctText3));
     }
     final lc = channelType!.toLowerCase();
-    final (color, label) = switch (lc) {
-      'whatsapp' || 'wa' => (AppColors.ctWa, 'WA'),
-      'telegram' || 'tg' => (AppColors.ctTg, 'TG'),
-      _                  => (AppColors.ctText3, channelType!),
-    };
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
-      ),
-      child: Text(
-        label,
-        style: AppFonts.geist(
-          fontSize: 10,
-          fontWeight: FontWeight.w700,
-          color: color,
+
+    final (bg, bd, fg, label) = switch (lc) {
+      'whatsapp' || 'wa' => (
+          const Color(0xFFE8F8EF),
+          const Color(0xFFBBF7D0),
+          const Color(0xFF1A7A45),
+          'WhatsApp',
         ),
+      'telegram' || 'tg' => (
+          AppColors.ctInfoBg,
+          const Color(0xFFBFDBFE),
+          AppColors.ctInfoText,
+          'Telegram',
+        ),
+      _ => (
+          AppColors.ctSurface2,
+          AppColors.ctBorder,
+          AppColors.ctText2,
+          channelType!,
+        ),
+    };
+
+    final Widget logo = switch (lc) {
+      'whatsapp' || 'wa' => SvgPicture.asset(
+          'assets/logos/whatsapp.svg',
+          width: 11,
+          height: 11,
+        ),
+      'telegram' || 'tg' => Image.asset(
+          'assets/logos/telegram',
+          width: 11,
+          height: 11,
+        ),
+      _ => Icon(Icons.link_rounded, size: 11, color: fg),
+    };
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(99),
+        border: Border.all(color: bd),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          logo,
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: AppFonts.geist(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: fg,
+            ),
+          ),
+        ],
       ),
     );
   }
