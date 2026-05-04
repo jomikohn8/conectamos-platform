@@ -210,9 +210,12 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
 
   Future<void> _loadViews() async {
     final tenantId = ref.read(activeTenantIdProvider);
+    debugPrint('[Views] loading for tenant: '
+        '${ref.read(activeTenantIdProvider)}');
     if (tenantId.isEmpty) return;
     try {
       final views = await ExecutionsApi.listViews(tenantId: tenantId);
+      debugPrint('[Views] response: ${views.toString().substring(0, views.toString().length.clamp(0, 200))}');
       if (mounted) setState(() => _savedViews = views);
     } catch (_) {}
   }
@@ -222,6 +225,8 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
     if (tenantId.isEmpty) return;
     try {
       final resp = await ApiClient.instance.get('/tenant-workers');
+      debugPrint('[Workers] resp.data type: ${resp.data.runtimeType}');
+      debugPrint('[Workers] resp.data: ${resp.data.toString().substring(0, resp.data.toString().length.clamp(0, 300))}');
       final list = resp.data is List
           ? resp.data as List
           : ((resp.data['workers'] ?? resp.data['items'] ?? []) as List);
