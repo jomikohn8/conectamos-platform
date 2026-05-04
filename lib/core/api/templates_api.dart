@@ -50,7 +50,7 @@ class TemplatesApi {
     required String bodyText,
     required List<Map<String, dynamic>> variables,
     bool isWelcome = false,
-    String? channelId,
+    required String channelId,
     // Optional template components
     String? headerType,        // 'TEXT' | 'IMAGE' | 'VIDEO' | 'DOCUMENT'
     String? headerText,        // only when headerType == 'TEXT'
@@ -67,7 +67,7 @@ class TemplatesApi {
         'body_text':  bodyText,
         'variables':  variables,
         'is_welcome': isWelcome,
-        'channel_id': ?channelId,
+        'channel_id': channelId,
         'header_type': ?headerType,
         if (headerType == 'TEXT' && (headerText?.isNotEmpty ?? false))
           'header_text': headerText,

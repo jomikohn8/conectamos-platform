@@ -34,12 +34,13 @@ class _TemplateCreateDialogState extends State<TemplateCreateDialog> {
   final Map<int, TextEditingController> _varExampleCtrls = {};
 
   String      _category   = 'MARKETING';
-  String      _language   = 'es';
+  String      _language   = 'es_MX';
   _HeaderType _headerType = _HeaderType.none;
   bool        _submitting = false;
   String?     _nameError;
   String?     _varError;
   int         _varCount   = 0;
+  final List<TextEditingController> _buttonCtrls = [];
 
   static const _categories = [
     (value: 'MARKETING',      label: 'Marketing'),
@@ -48,10 +49,16 @@ class _TemplateCreateDialogState extends State<TemplateCreateDialog> {
   ];
 
   static const _languages = [
-    (value: 'es',    label: 'Español (es)'),
-    (value: 'en',    label: 'Inglés (en)'),
+    (value: 'es_MX', label: 'Español México (es_MX)'),
+    (value: 'es_ES', label: 'Español España (es_ES)'),
+    (value: 'es_AR', label: 'Español Argentina (es_AR)'),
     (value: 'en_US', label: 'Inglés US (en_US)'),
+    (value: 'en_GB', label: 'Inglés UK (en_GB)'),
     (value: 'pt_BR', label: 'Portugués BR (pt_BR)'),
+    (value: 'pt_PT', label: 'Portugués PT (pt_PT)'),
+    (value: 'fr',    label: 'Francés (fr)'),
+    (value: 'de',    label: 'Alemán (de)'),
+    (value: 'it',    label: 'Italiano (it)'),
   ];
 
   static final _nameRe = RegExp(r'^[a-z0-9_]*$');
@@ -99,6 +106,9 @@ class _TemplateCreateDialogState extends State<TemplateCreateDialog> {
     _footerCtrl.dispose();
     _bodyFocus.dispose();
     for (final c in _varExampleCtrls.values) {
+      c.dispose();
+    }
+    for (final c in _buttonCtrls) {
       c.dispose();
     }
     super.dispose();
@@ -240,7 +250,27 @@ class _TemplateCreateDialogState extends State<TemplateCreateDialog> {
               _headerType != _HeaderType.text)
           ? _headerUrlCtrl.text.trim()
           : null;
+
+      if (_headerType != _HeaderType.none &&
+          _headerType != _HeaderType.text &&
+          (headerUrl == null || headerUrl.isEmpty)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('La URL de ejemplo del encabezado es requerida por Meta.'),
+            backgroundColor: AppColors.ctDanger,
+          ),
+        );
+        setState(() => _submitting = false);
+        return;
+      }
+
       final footerText = _footerCtrl.text.trim();
+
+      final buttons = _buttonCtrls
+          .map((c) => c.text.trim())
+          .where((t) => t.isNotEmpty)
+          .map((t) => {'type': 'QUICK_REPLY', 'text': t})
+          .toList();
 
       await TemplatesApi.createTemplate(
         name:             name,
@@ -253,6 +283,7 @@ class _TemplateCreateDialogState extends State<TemplateCreateDialog> {
         headerText:       headerText,
         headerExampleUrl: headerUrl,
         footerText:       footerText.isEmpty ? null : footerText,
+        buttons:          buttons.isEmpty ? null : buttons,
       );
       if (mounted) Navigator.of(context).pop(true);
     } catch (e) {
@@ -556,6 +587,74 @@ class _TemplateCreateDialogState extends State<TemplateCreateDialog> {
             ),
             style: const TextStyle(fontFamily: 'Geist', fontSize: 13),
           ),
+
+          // 6 ── Botones QUICK_REPLY (opcional, máx 3)
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              _sectionLabel('Botones · Opcional'),
+              const Spacer(),
+              if (_buttonCtrls.length < 3)
+                TextButton.icon(
+                  onPressed: () {
+                    setState(() {
+                      _buttonCtrls.add(TextEditingController());
+                    });
+                  },
+                  icon: const Icon(Icons.add_circle_outline_rounded, size: 15),
+                  label: const Text('Agregar botón',
+                      style: TextStyle(fontFamily: 'Geist', fontSize: 12)),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.ctTeal,
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          for (int i = 0; i < _buttonCtrls.length; i++) ...[
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _buttonCtrls[i],
+                    maxLength: 25,
+                    decoration: InputDecoration(
+                      hintText: 'Texto del botón ${i + 1}',
+                      hintStyle: const TextStyle(
+                          fontFamily: 'Geist',
+                          fontSize: 13,
+                          color: AppColors.ctText3),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8)),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 10),
+                      isDense: true,
+                      counterText: '',
+                    ),
+                    style: const TextStyle(fontFamily: 'Geist', fontSize: 13),
+                    onChanged: (_) => setState(() {}),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  onPressed: () {
+                    setState(() {
+                      _buttonCtrls.removeAt(i).dispose();
+                    });
+                  },
+                  icon: const Icon(Icons.remove_circle_outline_rounded,
+                      size: 18, color: AppColors.ctDanger),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+          ],
         ],
       ),
     );
@@ -682,6 +781,30 @@ class _TemplateCreateDialogState extends State<TemplateCreateDialog> {
                             ),
                           ),
                         ),
+                      // Buttons preview
+                      if (_buttonCtrls.any((c) => c.text.trim().isNotEmpty)) ...[
+                        const Divider(height: 1, color: AppColors.ctBorder),
+                        for (final ctrl in _buttonCtrls
+                            .where((c) => c.text.trim().isNotEmpty))
+                          InkWell(
+                            onTap: null,
+                            child: Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 8),
+                              child: Center(
+                                child: Text(
+                                  ctrl.text.trim(),
+                                  style: const TextStyle(
+                                    fontFamily: 'Geist',
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF0093FF),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
                       // Timestamp row
                       Padding(
                         padding: const EdgeInsets.fromLTRB(12, 6, 12, 8),
