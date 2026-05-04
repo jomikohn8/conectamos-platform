@@ -212,6 +212,7 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
 
   Future<void> _loadSearchableFields() async {
     final tenantId = ref.read(activeTenantIdProvider);
+    debugPrint('[SearchableFields] tenantId="$tenantId"');
     if (tenantId.isEmpty) return;
     try {
       final fields = await ExecutionsApi.getSearchableFields(tenantId: tenantId);
@@ -721,55 +722,61 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
   }
 
   List<Widget> _buildFieldSections() {
-    final flows = _searchableFields['flows'] as List? ?? [];
-    final flat  = _searchableFields['fields'] as List? ?? [];
+    final flat = (_searchableFields['fields'] as List? ?? [])
+        .whereType<Map>()
+        .toList();
 
-    if (flows.isNotEmpty) {
-      final result = <Widget>[];
-      for (final flow in flows) {
-        if (flow is! Map) continue;
-        final flowName = flow['flow_name'] as String? ?? 'Flujo';
-        final fields   = flow['fields']    as List? ?? [];
-        if (fields.isEmpty) continue;
-        result.add(Padding(
-          padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
-          child: Text(
-            flowName.toUpperCase(),
-            style: AppFonts.geist(
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-              color: AppColors.ctText3,
-            ),
-          ),
+    if (flat.isEmpty) return [_noFieldsPlaceholder()];
+
+    final result = <Widget>[];
+
+    // Campos generales primero
+    final generals = flat.where((f) => f['type'] == 'general').toList();
+    if (generals.isNotEmpty) {
+      result.add(Padding(
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
+        child: Text('CAMPOS GENERALES', style: AppFonts.geist(
+          fontSize: 10, fontWeight: FontWeight.w700,
+          color: AppColors.ctText3,
+        )),
+      ));
+      for (final f in generals) {
+        result.add(_buildFieldItem(
+          f['key']   as String? ?? '',
+          f['label'] as String? ?? (f['key'] as String? ?? ''),
+          f['type']  as String? ?? 'text',
+          null,
         ));
-        for (final f in fields) {
-          if (f is! Map) continue;
-          result.add(_buildFieldItem(
-            f['key']   as String? ?? '',
-            f['label'] as String? ?? (f['key'] as String? ?? ''),
-            f['type']  as String? ?? 'text',
-          ));
-        }
       }
-      if (result.isEmpty) {
-        result.add(_noFieldsPlaceholder());
-      }
-      return result;
     }
 
-    if (flat.isNotEmpty) {
-      return [
-        for (final f in flat)
-          if (f is Map)
-            _buildFieldItem(
-              f['key']   as String? ?? '',
-              f['label'] as String? ?? (f['key'] as String? ?? ''),
-              f['type']  as String? ?? 'text',
-            ),
-      ];
+    // Agrupar metadata por flow_name
+    final metadata = flat.where((f) => f['type'] == 'metadata').toList();
+    final Map<String, List<Map>> byFlow = {};
+    for (final f in metadata) {
+      final flowName = f['flow_name'] as String? ?? 'Sin flow';
+      byFlow.putIfAbsent(flowName, () => []).add(f as Map<String, dynamic>);
     }
 
-    return [_noFieldsPlaceholder()];
+    for (final entry in byFlow.entries) {
+      result.add(Padding(
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
+        child: Text('METADATA — ${entry.key}', style: AppFonts.geist(
+          fontSize: 10, fontWeight: FontWeight.w700,
+          color: AppColors.ctText3,
+        )),
+      ));
+      for (final f in entry.value) {
+        result.add(_buildFieldItem(
+          f['key']   as String? ?? '',
+          f['label'] as String? ?? (f['key'] as String? ?? ''),
+          f['type']  as String? ?? 'text',
+          entry.key,
+        ));
+      }
+    }
+
+    return result.isEmpty ? [_noFieldsPlaceholder()] : result;
   }
 
   Widget _noFieldsPlaceholder() => Padding(
@@ -780,7 +787,8 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
         ),
       );
 
-  Widget _buildFieldItem(String key, String label, String type) {
+  Widget _buildFieldItem(
+      String key, String label, String type, String? flowName) {
     final active = _activeFieldSearches.containsKey(key);
     return InkWell(
       onTap: () {
@@ -801,7 +809,22 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
                 style: AppFonts.geist(fontSize: 13, color: AppColors.ctText),
               ),
             ),
-            if (active)
+            if (flowName != null) ...[
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                decoration: BoxDecoration(
+                  color: AppColors.ctSurface2,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  flowName,
+                  style: AppFonts.geist(fontSize: 10, color: AppColors.ctText2),
+                ),
+              ),
+            ],
+            if (active) ...[
+              const SizedBox(width: 4),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                 decoration: BoxDecoration(
@@ -817,6 +840,7 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
                   ),
                 ),
               ),
+            ],
           ],
         ),
       ),
