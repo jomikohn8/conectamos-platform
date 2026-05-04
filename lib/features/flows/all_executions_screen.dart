@@ -215,8 +215,14 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
     if (tenantId.isEmpty) return;
     try {
       final fields = await ExecutionsApi.getSearchableFields(tenantId: tenantId);
-      if (mounted) setState(() => _searchableFields = fields);
-    } catch (_) {}
+      if (mounted) {
+        setState(() => _searchableFields = fields);
+        debugPrint('[SearchableFields] loaded: '
+            '${(_searchableFields["fields"] as List?)?.length ?? 0} fields');
+      }
+    } catch (e) {
+      debugPrint('[SearchableFields] error: $e');
+    }
   }
 
   // ── Filter helpers ────────────────────────────────────────────────────────
@@ -672,23 +678,20 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
             ),
           ),
           // "+" button to open field search dropdown
-          if (_searchableFields.isNotEmpty)
-            GestureDetector(
-              onTap: () =>
-                  setState(() => _showFieldDropdown = !_showFieldDropdown),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: Icon(
-                  Icons.add_rounded,
-                  size: 15,
-                  color: _showFieldDropdown
-                      ? AppColors.ctTeal
-                      : AppColors.ctText3,
-                ),
+          GestureDetector(
+            onTap: () =>
+                setState(() => _showFieldDropdown = !_showFieldDropdown),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Icon(
+                Icons.tune_rounded,
+                size: 15,
+                color: _showFieldDropdown || _activeFieldSearches.isNotEmpty
+                    ? AppColors.ctTeal
+                    : AppColors.ctText3,
               ),
-            )
-          else
-            const SizedBox(width: 6),
+            ),
+          ),
         ],
       ),
     );
