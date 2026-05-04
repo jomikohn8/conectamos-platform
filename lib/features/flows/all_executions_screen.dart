@@ -77,21 +77,47 @@ class AllExecutionsScreen extends ConsumerStatefulWidget {
 }
 
 class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
-  bool   _loading = true;
+  // ── Async state ──────────────────────────────────────────────────────────────
+  bool    _loading = true;
   String? _error;
   List<Map<String, dynamic>> _executions = [];
-  int    _total  = 0;
-  int    _page   = 1;
+  int     _total = 0;
+  int     _page  = 1;
   static const int _limit = 25;
 
+  // ── Sort / grouping ──────────────────────────────────────────────────────────
   String _sortCol = 'created_at';
   String _sortDir = 'desc';
   String _grouping = 'date'; // 'date' | 'none'
 
+  // ── Columns ──────────────────────────────────────────────────────────────────
   late List<_ColDef> _columns;
   bool _showColumnPicker = false;
-  Timer? _refreshTimer;
+
+  // ── Timer ────────────────────────────────────────────────────────────────────
+  Timer?    _refreshTimer;
   DateTime? _lastFetch;
+
+  // ── Filters ──────────────────────────────────────────────────────────────────
+  List<String> _filterStatus      = [];
+  String?      _filterWorkerId;
+  List<String> _filterOperatorIds = [];
+  String?      _filterFlowId;
+  String?      _filterChannelType;
+  String?      _filterDateRange;
+  String       _searchText        = '';
+  bool         _showFilterSidebar = false;
+
+  // ── Views ────────────────────────────────────────────────────────────────────
+  List<Map<String, dynamic>> _savedViews = [];
+  String? _activeViewId;
+  bool    _viewsDirty = false;
+
+  // ── Search debounce ──────────────────────────────────────────────────────────
+  final TextEditingController _searchCtrl = TextEditingController();
+  Timer? _searchDebounce;
+
+  // ────────────────────────────────────────────────────────────────────────────
 
   @override
   void initState() {
@@ -108,11 +134,12 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
     ];
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      ref.read(topbarTitleProvider.notifier).state = 'Ejecuciones';
+      ref.read(topbarTitleProvider.notifier).state    = 'Ejecuciones';
       ref.read(topbarSubtitleProvider.notifier).state = null;
       final tenantId = ref.read(activeTenantIdProvider);
       if (tenantId.isNotEmpty) {
         _load();
+        _loadViews();
         _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
           if (mounted) _load();
         });
@@ -123,20 +150,32 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
   @override
   void dispose() {
     _refreshTimer?.cancel();
+    _searchDebounce?.cancel();
+    _searchCtrl.dispose();
     super.dispose();
   }
+
+  // ── Data loading ──────────────────────────────────────────────────────────
 
   Future<void> _load() async {
     final tenantId = ref.read(activeTenantIdProvider);
     if (tenantId.isEmpty) return;
     setState(() { _loading = true; _error = null; });
     try {
+      debugPrint('[Search] query="$_searchText"');
       final data = await ExecutionsApi.listExecutions(
-        tenantId: tenantId,
-        sortCol:  _sortCol,
-        sortDir:  _sortDir,
-        page:     _page,
-        limit:    _limit,
+        tenantId:    tenantId,
+        status:      _filterStatus.isNotEmpty ? _filterStatus : null,
+        workerId:    _filterWorkerId,
+        operatorIds: _filterOperatorIds.isNotEmpty ? _filterOperatorIds : null,
+        flowId:      _filterFlowId,
+        channelType: _filterChannelType,
+        dateRange:   _filterDateRange,
+        search:      _searchText.isNotEmpty ? _searchText : null,
+        sortCol:     _sortCol,
+        sortDir:     _sortDir,
+        page:        _page,
+        limit:       _limit,
       );
       final raw = data['items'] ?? data['executions'] ?? data['data'] ?? [];
       setState(() {
@@ -151,6 +190,102 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
       setState(() { _error = e.toString(); _loading = false; });
     }
   }
+
+  Future<void> _loadViews() async {
+    final tenantId = ref.read(activeTenantIdProvider);
+    if (tenantId.isEmpty) return;
+    try {
+      final views = await ExecutionsApi.listViews(tenantId: tenantId);
+      if (mounted) setState(() => _savedViews = views);
+    } catch (_) {}
+  }
+
+  // ── Filter helpers ────────────────────────────────────────────────────────
+
+  int _activeFiltersCount() {
+    var count = _filterStatus.length + _filterOperatorIds.length;
+    if (_filterWorkerId != null)    count++;
+    if (_filterFlowId != null)      count++;
+    if (_filterChannelType != null) count++;
+    if (_filterDateRange != null)   count++;
+    return count;
+  }
+
+  bool _hasActiveFilters() => _activeFiltersCount() > 0 || _searchText.isNotEmpty;
+
+  void _markDirty() {
+    if (_activeViewId != null && !_viewsDirty) {
+      setState(() => _viewsDirty = true);
+    }
+  }
+
+  void _clearFilters() {
+    setState(() {
+      _filterStatus      = [];
+      _filterWorkerId    = null;
+      _filterOperatorIds = [];
+      _filterFlowId      = null;
+      _filterChannelType = null;
+      _filterDateRange   = null;
+      _searchText        = '';
+      _searchCtrl.clear();
+      _activeViewId      = null;
+      _viewsDirty        = false;
+      _page              = 1;
+    });
+    _load();
+  }
+
+  void _applyView(Map<String, dynamic> view) {
+    final filters = view['filters'] as Map<String, dynamic>? ?? {};
+    setState(() {
+      _filterStatus      = List<String>.from(filters['status']       ?? []);
+      _filterWorkerId    = filters['worker_id']   as String?;
+      _filterOperatorIds = List<String>.from(filters['operator_ids'] ?? []);
+      _filterFlowId      = filters['flow_id']      as String?;
+      _filterChannelType = filters['channel_type'] as String?;
+      _filterDateRange   = filters['date_range']   as String?;
+      _searchText        = filters['search']       as String? ?? '';
+      if (_searchText.isNotEmpty) _searchCtrl.text = _searchText;
+      _activeViewId = view['id'] as String?;
+      _viewsDirty   = false;
+      _page         = 1;
+    });
+    _load();
+  }
+
+  Map<String, dynamic> _currentFiltersMap() => {
+    if (_filterStatus.isNotEmpty)      'status':       _filterStatus,
+    'worker_id':    ?_filterWorkerId,
+    if (_filterOperatorIds.isNotEmpty) 'operator_ids': _filterOperatorIds,
+    'flow_id':      ?_filterFlowId,
+    'channel_type': ?_filterChannelType,
+    'date_range':   ?_filterDateRange,
+    if (_searchText.isNotEmpty)        'search':       _searchText,
+  };
+
+  String _statusLabel(String s) => switch (s) {
+    'active' || 'in_progress'               => 'Activa',
+    'completed'                             => 'Completada',
+    'pending'                               => 'Pendiente',
+    'pending_dashboard' || 'pending_review' => 'En revisión',
+    'paused'                                => 'Pausada',
+    'abandoned'                             => 'Abandonada',
+    'cancelled'                             => 'Cancelada',
+    'failed' || 'error'                     => 'Error',
+    _                                       => s,
+  };
+
+  String _dateRangeLabel(String r) => switch (r) {
+    'today'        => 'Hoy',
+    'yesterday'    => 'Ayer',
+    'last_7_days'  => 'Últimos 7 días',
+    'last_30_days' => 'Últimos 30 días',
+    'this_month'   => 'Este mes',
+    _              => r,
+  };
+
+  // ── Sort ──────────────────────────────────────────────────────────────────
 
   void _onSort(String apiCol) {
     setState(() {
@@ -192,24 +327,59 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _buildTopbar(),
+              _buildSearchRow(),
+              if (_activeFiltersCount() > 0) _buildChipsBar(),
               const SizedBox(height: 12),
               Expanded(
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: SizedBox(
-                    width: (MediaQuery.of(context).size.width - 220)
-                        .clamp(900.0, double.infinity),
-                    child: Column(
-                      children: [
-                        _buildTableHeader(),
-                        Expanded(child: _buildBody()),
-                      ],
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (_showFilterSidebar)
+                      _FilterSidebar(
+                        filterStatus:      _filterStatus,
+                        filterChannelType: _filterChannelType,
+                        filterDateRange:   _filterDateRange,
+                        onStatusToggle: (s) {
+                          setState(() {
+                            _filterStatus = _filterStatus.contains(s)
+                                ? _filterStatus.where((x) => x != s).toList()
+                                : [..._filterStatus, s];
+                            _page = 1;
+                          });
+                          _markDirty();
+                          _load();
+                        },
+                        onChannelTypeSelect: (c) {
+                          setState(() { _filterChannelType = c; _page = 1; });
+                          _markDirty();
+                          _load();
+                        },
+                        onDateRangeSelect: (d) {
+                          setState(() { _filterDateRange = d; _page = 1; });
+                          _markDirty();
+                          _load();
+                        },
+                      ),
+                    Expanded(
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: SizedBox(
+                          width: (MediaQuery.of(context).size.width -
+                                  (_showFilterSidebar ? 484 : 220))
+                              .clamp(900.0, double.infinity),
+                          child: Column(
+                            children: [
+                              _buildTableHeader(),
+                              Expanded(child: _buildBody()),
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
               ),
-              if (_total > _limit)
-                _buildPaginationFooter(totalPages),
+              if (_total > _limit) _buildPaginationFooter(totalPages),
             ],
           ),
           // Dismiss layer for column picker
@@ -267,53 +437,325 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
             ),
           ],
           const Spacer(),
-          // Grouping toggle
-          _TopbarChip(
-            icon: Icons.calendar_today_outlined,
-            label: _grouping == 'date' ? 'Por fecha' : 'Sin agrupar',
-            active: _grouping == 'date',
-            onTap: () => setState(
-                () => _grouping = _grouping == 'date' ? 'none' : 'date'),
-          ),
-          const SizedBox(width: 8),
-          // Column picker toggle
-          _TopbarChip(
-            icon: Icons.view_column_outlined,
-            label: '$visCount col.',
-            active: _showColumnPicker,
-            onTap: () =>
-                setState(() => _showColumnPicker = !_showColumnPicker),
-          ),
-          const SizedBox(width: 12),
-          // Last-fetch label
-          if (_lastFetch != null)
-            Text(
-              'Act. ${_elapsedSince(_lastFetch!)}',
-              style: AppFonts.geist(fontSize: 11, color: AppColors.ctText3),
-            ),
-          const SizedBox(width: 4),
-          SizedBox(
-            width: 32,
-            height: 32,
-            child: IconButton(
-              padding: EdgeInsets.zero,
-              icon: _loading
-                  ? const SizedBox(
-                      width: 14,
-                      height: 14,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: AppColors.ctTeal,
-                      ),
-                    )
-                  : const Icon(Icons.refresh_rounded,
-                      size: 16, color: AppColors.ctText3),
-              onPressed: _loading ? null : _load,
+          // Right side: [Act.] [Refresh] | [Por fecha] [N col.]
+          Flexible(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (_lastFetch != null)
+                    Text(
+                      'Act. ${_elapsedSince(_lastFetch!)}',
+                      style: AppFonts.geist(
+                          fontSize: 11, color: AppColors.ctText3),
+                    ),
+                  const SizedBox(width: 4),
+                  SizedBox(
+                    width: 32,
+                    height: 32,
+                    child: IconButton(
+                      padding: EdgeInsets.zero,
+                      icon: _loading
+                          ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: AppColors.ctTeal,
+                              ),
+                            )
+                          : const Icon(Icons.refresh_rounded,
+                              size: 16, color: AppColors.ctText3),
+                      onPressed: _loading ? null : _load,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  _TopbarChip(
+                    icon: Icons.calendar_today_outlined,
+                    label: _grouping == 'date' ? 'Por fecha' : 'Sin agrupar',
+                    active: _grouping == 'date',
+                    onTap: () => setState(
+                        () => _grouping = _grouping == 'date' ? 'none' : 'date'),
+                  ),
+                  const SizedBox(width: 8),
+                  _TopbarChip(
+                    icon: Icons.view_column_outlined,
+                    label: '$visCount col.',
+                    active: _showColumnPicker,
+                    onTap: () =>
+                        setState(() => _showColumnPicker = !_showColumnPicker),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
       ),
     );
+  }
+
+  // ── Search row ────────────────────────────────────────────────────────────
+
+  Widget _buildSearchRow() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+      child: Row(
+        children: [
+          Expanded(
+            child: SizedBox(
+              height: 36,
+              child: TextField(
+                controller: _searchCtrl,
+                style: AppFonts.geist(fontSize: 13, color: AppColors.ctText),
+                decoration: InputDecoration(
+                  hintText: 'Buscar por operador, flujo...',
+                  hintStyle: AppFonts.geist(
+                      fontSize: 13, color: AppColors.ctText3),
+                  prefixIcon: const Icon(Icons.search_rounded,
+                      size: 16, color: AppColors.ctText3),
+                  contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 0),
+                  filled: true,
+                  fillColor: AppColors.ctSurface,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: AppColors.ctBorder),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: AppColors.ctBorder),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: AppColors.ctTeal),
+                  ),
+                ),
+                onChanged: (v) {
+                  _searchDebounce?.cancel();
+                  _searchDebounce =
+                      Timer(const Duration(milliseconds: 400), () {
+                    if (!mounted) return;
+                    setState(() { _searchText = v; _page = 1; });
+                    _markDirty();
+                    _load();
+                  });
+                },
+              ),
+            ),
+          ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(width: 8),
+              _TopbarChip(
+                icon: Icons.filter_list_rounded,
+                label: _activeFiltersCount() > 0
+                    ? 'Filtros (${_activeFiltersCount()})'
+                    : 'Filtros',
+                active: _showFilterSidebar || _hasActiveFilters(),
+                onTap: () =>
+                    setState(() => _showFilterSidebar = !_showFilterSidebar),
+              ),
+              const SizedBox(width: 8),
+              _ViewsMenu(
+                views:        _savedViews,
+                activeViewId: _activeViewId,
+                isDirty:      _viewsDirty,
+                onSelect:     _applyView,
+                onSave:       _showSaveViewDialog,
+                onDelete:     _deleteView,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Chips bar ─────────────────────────────────────────────────────────────
+
+  Widget _buildChipsBar() {
+    final chips = <Widget>[];
+
+    for (final s in _filterStatus) {
+      chips.add(_FilterChip(
+        label: _statusLabel(s),
+        onRemove: () {
+          setState(() {
+            _filterStatus = _filterStatus.where((x) => x != s).toList();
+            _page = 1;
+          });
+          _markDirty();
+          _load();
+        },
+      ));
+    }
+    if (_filterChannelType != null) {
+      chips.add(_FilterChip(
+        label: _filterChannelType!,
+        onRemove: () {
+          setState(() { _filterChannelType = null; _page = 1; });
+          _markDirty();
+          _load();
+        },
+      ));
+    }
+    if (_filterDateRange != null) {
+      chips.add(_FilterChip(
+        label: _dateRangeLabel(_filterDateRange!),
+        onRemove: () {
+          setState(() { _filterDateRange = null; _page = 1; });
+          _markDirty();
+          _load();
+        },
+      ));
+    }
+    if (_filterWorkerId != null) {
+      chips.add(_FilterChip(
+        label: 'Worker: $_filterWorkerId',
+        onRemove: () {
+          setState(() { _filterWorkerId = null; _page = 1; });
+          _markDirty();
+          _load();
+        },
+      ));
+    }
+    for (final opId in _filterOperatorIds) {
+      chips.add(_FilterChip(
+        label: 'Op: $opId',
+        onRemove: () {
+          setState(() {
+            _filterOperatorIds =
+                _filterOperatorIds.where((x) => x != opId).toList();
+            _page = 1;
+          });
+          _markDirty();
+          _load();
+        },
+      ));
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 6, 20, 0),
+      child: Wrap(
+        spacing: 6,
+        runSpacing: 4,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          ...chips,
+          TextButton(
+            onPressed: _clearFilters,
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: Text(
+              'Limpiar todo',
+              style: AppFonts.geist(fontSize: 11, color: AppColors.ctText2),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Save / delete views ───────────────────────────────────────────────────
+
+  Future<void> _showSaveViewDialog() async {
+    final ctrl = TextEditingController();
+    final name = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.ctSurface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: Text(
+          'Guardar vista',
+          style: AppFonts.onest(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: AppColors.ctText,
+          ),
+        ),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          style: AppFonts.geist(fontSize: 13, color: AppColors.ctText),
+          decoration: InputDecoration(
+            labelText: 'Nombre de la vista',
+            labelStyle: AppFonts.geist(fontSize: 13, color: AppColors.ctText2),
+            border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8)),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: AppColors.ctTeal),
+            ),
+          ),
+          onSubmitted: (_) => Navigator.of(ctx).pop(ctrl.text.trim()),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text('Cancelar',
+                style: AppFonts.geist(fontSize: 13, color: AppColors.ctText2)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(ctrl.text.trim()),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.ctTeal,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
+            ),
+            child: Text('Guardar',
+                style: AppFonts.geist(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                )),
+          ),
+        ],
+      ),
+    );
+    if (name == null || name.isEmpty || !mounted) return;
+    final tenantId = ref.read(activeTenantIdProvider);
+    try {
+      final view = await ExecutionsApi.createView(
+        tenantId: tenantId,
+        name:     name,
+        filters:  _currentFiltersMap(),
+      );
+      if (!mounted) return;
+      setState(() {
+        _savedViews   = [..._savedViews, view];
+        _activeViewId = view['id'] as String?;
+        _viewsDirty   = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al guardar vista: $e')),
+      );
+    }
+  }
+
+  Future<void> _deleteView(String viewId) async {
+    try {
+      await ExecutionsApi.deleteView(viewId: viewId);
+      if (!mounted) return;
+      setState(() {
+        _savedViews = _savedViews.where((v) => v['id'] != viewId).toList();
+        if (_activeViewId == viewId) {
+          _activeViewId = null;
+          _viewsDirty   = false;
+        }
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al eliminar vista: $e')),
+      );
+    }
   }
 
   // ── Table header ──────────────────────────────────────────────────────────
@@ -327,16 +769,16 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
         color: AppColors.ctSurface2,
         border: Border.all(color: AppColors.ctBorder),
         borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(8),
+          topLeft:  Radius.circular(8),
           topRight: Radius.circular(8),
         ),
       ),
       child: Row(
         children: [
           ...visible.map((col) {
-            final apiField  = _apiCol(col.id);
-            final isSorted  = _sortCol == apiField;
-            final isFlow    = col.id == 'flow';
+            final apiField = _apiCol(col.id);
+            final isSorted = _sortCol == apiField;
+            final isFlow   = col.id == 'flow';
             final cell = InkWell(
               onTap: () => _onSort(apiField),
               child: SizedBox(
@@ -378,7 +820,6 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
                 ? Expanded(child: cell)
                 : SizedBox(width: _colWidth(col.id), child: cell);
           }),
-          // Chevron placeholder
           const SizedBox(width: 32),
         ],
       ),
@@ -452,7 +893,7 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
   List<dynamic> _groupedItems() {
     if (_grouping == 'none') return _executions;
 
-    final result   = <dynamic>[];
+    final result = <dynamic>[];
     String? lastLbl;
     for (final exec in _executions) {
       final raw = exec['created_at'] as String?;
@@ -492,8 +933,6 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
         ?? exec['id'] as String?
         ?? '';
 
-    // New API: flow_name is a flat string.
-    // Fallback to nested flow_definition/flow for backward compat.
     final flowName = exec['flow_name'] as String?
         ?? (exec['flow_definition'] as Map<String, dynamic>?)?['name'] as String?
         ?? (exec['flow'] as Map<String, dynamic>?)?['name'] as String?;
@@ -502,15 +941,13 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
     final worker_   = exec['worker']   as Map<String, dynamic>?;
     final status    = exec['status']   as String? ?? 'unknown';
 
-    // New API: channel is a nested object { id, channel_type }.
     final channelObj  = exec['channel'] as Map<String, dynamic>?;
     final channelType = channelObj?['channel_type'] as String?
         ?? exec['channel_type'] as String?;
 
-    final createdStr = exec['created_at'] as String?;
+    final createdStr = exec['created_at']      as String?;
     final elapsedSec = exec['elapsed_seconds'] as int?;
 
-    // New API: fields_progress: { total: N, filled: M }.
     final progressMap = exec['fields_progress'] as Map<String, dynamic>?;
     final total    = (progressMap?['total']  as num?)?.toInt() ?? 0;
     final captured = (progressMap?['filled'] as num?)?.toInt() ?? 0;
@@ -533,7 +970,7 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
           children: [
             ...visible.map((col) {
               final isFlow = col.id == 'flow';
-              final cell   = Padding(
+              final cell = Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 child: Align(
                   alignment: Alignment.centerLeft,
@@ -618,8 +1055,8 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
           return Text('—',
               style: AppFonts.geist(fontSize: 12, color: AppColors.ctText2));
         }
-        final now   = DateTime.now();
-        final local = createdDt.toLocal();
+        final now            = DateTime.now();
+        final local          = createdDt.toLocal();
         final todayStart     = DateTime(now.year, now.month, now.day);
         final yesterdayStart = todayStart.subtract(const Duration(days: 1));
         String datePart;
@@ -632,8 +1069,8 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
                          'jul','ago','sep','oct','nov','dic'];
           datePart = '${local.day} ${meses[local.month - 1]}';
         }
-        final hh   = local.hour.toString().padLeft(2, '0');
-        final mm   = local.minute.toString().padLeft(2, '0');
+        final hh    = local.hour.toString().padLeft(2, '0');
+        final mm    = local.minute.toString().padLeft(2, '0');
         final line1 = '$datePart, $hh:$mm';
         final diff  = now.difference(local);
         final String line2;
@@ -648,7 +1085,7 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
         }
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisAlignment:  MainAxisAlignment.center,
           children: [
             Text(line1,
                 style: AppFonts.geist(
@@ -657,7 +1094,8 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
                   color: AppColors.ctText,
                 )),
             Text(line2,
-                style: AppFonts.geist(fontSize: 11, color: AppColors.ctText2)),
+                style: AppFonts.geist(
+                    fontSize: 11, color: AppColors.ctText2)),
           ],
         );
       case 'elapsed':
@@ -878,13 +1316,11 @@ class _ChannelBadge extends StatelessWidget {
     final Widget logo = switch (lc) {
       'whatsapp' || 'wa' => SvgPicture.asset(
           'assets/logos/whatsapp.svg',
-          width: 11,
-          height: 11,
+          width: 11, height: 11,
         ),
       'telegram' || 'tg' => Image.asset(
           'assets/logos/telegram',
-          width: 11,
-          height: 11,
+          width: 11, height: 11,
         ),
       _ => const Icon(Icons.link_rounded, size: 11, color: AppColors.ctText2),
     };
@@ -905,6 +1341,7 @@ class _ChannelBadge extends StatelessWidget {
 
 class _TopbarChip extends StatefulWidget {
   const _TopbarChip({
+    super.key,
     required this.icon,
     required this.label,
     required this.onTap,
@@ -933,7 +1370,7 @@ class _TopbarChipState extends State<_TopbarChip> {
         onTap: widget.onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 100),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
             color: widget.active
                 ? AppColors.ctTealLight
@@ -968,6 +1405,412 @@ class _TopbarChipState extends State<_TopbarChip> {
           ),
         ),
       ),
+    );
+  }
+}
+
+// ── _FilterChip ───────────────────────────────────────────────────────────────
+
+class _FilterChip extends StatelessWidget {
+  const _FilterChip({required this.label, required this.onRemove});
+
+  final String label;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(8, 3, 4, 3),
+      decoration: BoxDecoration(
+        color: AppColors.ctTealLight,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.ctTeal),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: AppFonts.geist(
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+              color: AppColors.ctTealDark,
+            ),
+          ),
+          const SizedBox(width: 4),
+          GestureDetector(
+            onTap: onRemove,
+            child: const Icon(Icons.close_rounded,
+                size: 12, color: AppColors.ctTealDark),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── _FilterSidebar ────────────────────────────────────────────────────────────
+
+class _FilterSidebar extends StatelessWidget {
+  const _FilterSidebar({
+    required this.filterStatus,
+    required this.filterChannelType,
+    required this.filterDateRange,
+    required this.onStatusToggle,
+    required this.onChannelTypeSelect,
+    required this.onDateRangeSelect,
+  });
+
+  final List<String>       filterStatus;
+  final String?            filterChannelType;
+  final String?            filterDateRange;
+  final void Function(String) onStatusToggle;
+  final void Function(String?) onChannelTypeSelect;
+  final void Function(String?) onDateRangeSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final statuses = [
+      ('active',           'Activa'),
+      ('completed',        'Completada'),
+      ('pending',          'Pendiente'),
+      ('pending_dashboard','En revisión'),
+      ('paused',           'Pausada'),
+      ('abandoned',        'Abandonada'),
+      ('failed',           'Error'),
+    ];
+    final dateRanges = [
+      ('today',        'Hoy'),
+      ('yesterday',    'Ayer'),
+      ('last_7_days',  'Últimos 7 días'),
+      ('last_30_days', 'Últimos 30 días'),
+      ('this_month',   'Este mes'),
+    ];
+    final channels = [
+      ('whatsapp', 'WhatsApp'),
+      ('telegram', 'Telegram'),
+    ];
+
+    return Container(
+      width: 264,
+      decoration: const BoxDecoration(
+        color: AppColors.ctSurface,
+        border: Border(right: BorderSide(color: AppColors.ctBorder)),
+      ),
+      child: ListView(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        children: [
+          _SidebarSection(
+            title: 'Estado',
+            children: [
+              for (final (value, label) in statuses)
+                _SidebarCheckRow(
+                  label:    label,
+                  selected: filterStatus.contains(value),
+                  onTap:    () => onStatusToggle(value),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          _SidebarSection(
+            title: 'Fecha',
+            children: [
+              for (final (value, label) in dateRanges)
+                _SidebarRadioRow(
+                  label:    label,
+                  selected: filterDateRange == value,
+                  onTap:    () =>
+                      onDateRangeSelect(filterDateRange == value ? null : value),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          _SidebarSection(
+            title: 'Canal',
+            children: [
+              for (final (value, label) in channels)
+                _SidebarRadioRow(
+                  label:    label,
+                  selected: filterChannelType == value,
+                  onTap:    () => onChannelTypeSelect(
+                      filterChannelType == value ? null : value),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── _SidebarSection ───────────────────────────────────────────────────────────
+
+class _SidebarSection extends StatelessWidget {
+  const _SidebarSection({required this.title, required this.children});
+
+  final String        title;
+  final List<Widget>  children;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
+          child: Text(
+            title.toUpperCase(),
+            style: AppFonts.geist(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: AppColors.ctText3,
+            ),
+          ),
+        ),
+        ...children,
+      ],
+    );
+  }
+}
+
+// ── _SidebarCheckRow ──────────────────────────────────────────────────────────
+
+class _SidebarCheckRow extends StatelessWidget {
+  const _SidebarCheckRow({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String       label;
+  final bool         selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
+        child: Row(
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 100),
+              width: 14,
+              height: 14,
+              decoration: BoxDecoration(
+                color: selected ? AppColors.ctTeal : AppColors.ctSurface,
+                borderRadius: BorderRadius.circular(3),
+                border: Border.all(
+                  color: selected ? AppColors.ctTeal : AppColors.ctBorder2,
+                ),
+              ),
+              child: selected
+                  ? const Icon(Icons.check_rounded,
+                      size: 10, color: AppColors.ctNavy)
+                  : null,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: AppFonts.geist(
+                fontSize: 13,
+                color: selected ? AppColors.ctText : AppColors.ctText2,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── _SidebarRadioRow ──────────────────────────────────────────────────────────
+
+class _SidebarRadioRow extends StatelessWidget {
+  const _SidebarRadioRow({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String       label;
+  final bool         selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
+        child: Row(
+          children: [
+            Container(
+              width: 14,
+              height: 14,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: selected ? AppColors.ctTeal : AppColors.ctBorder2,
+                  width: selected ? 4.5 : 1.5,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: AppFonts.geist(
+                fontSize: 13,
+                color: selected ? AppColors.ctText : AppColors.ctText2,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── _ViewsMenu ────────────────────────────────────────────────────────────────
+
+class _ViewsMenu extends StatefulWidget {
+  const _ViewsMenu({
+    required this.views,
+    required this.activeViewId,
+    required this.isDirty,
+    required this.onSelect,
+    required this.onSave,
+    required this.onDelete,
+  });
+
+  final List<Map<String, dynamic>> views;
+  final String?                    activeViewId;
+  final bool                       isDirty;
+  final void Function(Map<String, dynamic>) onSelect;
+  final VoidCallback               onSave;
+  final void Function(String)      onDelete;
+
+  @override
+  State<_ViewsMenu> createState() => _ViewsMenuState();
+}
+
+class _ViewsMenuState extends State<_ViewsMenu> {
+  final _key = GlobalKey();
+
+  String _label() {
+    if (widget.activeViewId == null) return 'Vistas';
+    final v = widget.views.firstWhere(
+        (v) => v['id'] == widget.activeViewId, orElse: () => {});
+    final name = v['name'] as String? ?? 'Vista';
+    return widget.isDirty ? '$name ●' : name;
+  }
+
+  void _openMenu() {
+    final box = _key.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null) return;
+    final offset     = box.localToGlobal(Offset.zero);
+    final size       = box.size;
+    final screenSize = MediaQuery.of(context).size;
+
+    final items = <PopupMenuEntry<String>>[
+      ...widget.views.map((v) {
+        final id       = v['id'] as String;
+        final name     = v['name'] as String? ?? id;
+        final isActive = widget.activeViewId == id;
+        return PopupMenuItem<String>(
+          value:   'select_$id',
+          padding: EdgeInsets.zero,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Row(
+              children: [
+                Icon(
+                  isActive
+                      ? Icons.check_circle_rounded
+                      : Icons.circle_outlined,
+                  size:  14,
+                  color: isActive ? AppColors.ctTeal : AppColors.ctText3,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(name,
+                      style: AppFonts.geist(
+                          fontSize: 13, color: AppColors.ctText)),
+                ),
+                GestureDetector(
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    widget.onDelete(id);
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.all(2),
+                    child: Icon(Icons.close_rounded,
+                        size: 12, color: AppColors.ctText3),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }),
+      if (widget.views.isNotEmpty) const PopupMenuDivider(height: 1),
+      PopupMenuItem<String>(
+        value:   'save',
+        padding: EdgeInsets.zero,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(
+            children: [
+              const Icon(Icons.bookmark_add_outlined,
+                  size: 14, color: AppColors.ctText2),
+              const SizedBox(width: 8),
+              Text('Guardar vista actual',
+                  style:
+                      AppFonts.geist(fontSize: 13, color: AppColors.ctText)),
+            ],
+          ),
+        ),
+      ),
+    ];
+
+    showMenu<String>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        offset.dx,
+        offset.dy + size.height + 4,
+        screenSize.width - offset.dx - size.width,
+        0,
+      ),
+      items:       items,
+      color:       AppColors.ctSurface,
+      elevation:   4,
+      constraints: const BoxConstraints(minWidth: 200, maxWidth: 280),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+        side: const BorderSide(color: AppColors.ctBorder),
+      ),
+    ).then((value) {
+      if (value == null || !mounted) return;
+      if (value == 'save') {
+        widget.onSave();
+      } else if (value.startsWith('select_')) {
+        final id = value.substring(7);
+        final v  = widget.views.firstWhere(
+            (v) => v['id'] == id, orElse: () => {});
+        if (v.isNotEmpty) widget.onSelect(v);
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _TopbarChip(
+      key:    _key,
+      icon:   Icons.bookmarks_outlined,
+      label:  _label(),
+      active: widget.activeViewId != null,
+      onTap:  _openMenu,
     );
   }
 }
