@@ -193,8 +193,21 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
             children: [
               _buildTopbar(),
               const SizedBox(height: 12),
-              _buildTableHeader(),
-              Expanded(child: _buildBody()),
+              Expanded(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: SizedBox(
+                    width: (MediaQuery.of(context).size.width - 220)
+                        .clamp(900.0, double.infinity),
+                    child: Column(
+                      children: [
+                        _buildTableHeader(),
+                        Expanded(child: _buildBody()),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
               if (_total > _limit)
                 _buildPaginationFooter(totalPages),
             ],
@@ -511,8 +524,7 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
 
     return InkWell(
       onTap: () => context.go('/executions/$id'),
-      child: ClipRect(
-        child: Container(
+      child: Container(
         height: 48,
         decoration: const BoxDecoration(
           border: Border(bottom: BorderSide(color: AppColors.ctBorder)),
@@ -552,7 +564,6 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
             ),
           ],
         ),
-      ),
       ),
     );
   }
