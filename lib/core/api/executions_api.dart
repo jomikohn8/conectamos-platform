@@ -55,8 +55,7 @@ class ExecutionsApi {
     required String tenantId,
   }) async {
     final resp = await ApiClient.instance.get(
-      '/dashboard/views',
-      queryParameters: {'tenant_id': tenantId},
+      '/api/v1/dashboard/views',
     );
     final data = resp.data;
     final list = data is List
@@ -73,11 +72,10 @@ class ExecutionsApi {
     required Map<String, dynamic> filters,
   }) async {
     final resp = await ApiClient.instance.post(
-      '/dashboard/views',
+      '/api/v1/dashboard/views',
       data: {
-        'tenant_id': tenantId,
-        'name':      name,
-        'filters':   filters,
+        'name':    name,
+        'filters': filters,
       },
     );
     return Map<String, dynamic>.from(resp.data as Map);
@@ -85,6 +83,6 @@ class ExecutionsApi {
 
   /// Elimina una vista guardada.
   static Future<void> deleteView({required String viewId}) async {
-    await ApiClient.instance.delete('/dashboard/views/$viewId');
+    await ApiClient.instance.delete('/api/v1/dashboard/views/$viewId');
   }
 }
