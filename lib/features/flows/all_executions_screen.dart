@@ -9,6 +9,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../core/api/api_client.dart';
 import '../../core/api/executions_api.dart';
+import '../../core/api/operators_api.dart';
 import '../../core/providers/tenant_provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/widgets/app_shell.dart';
@@ -114,6 +115,9 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
   List<Map<String, dynamic>> _availableWorkers = [];
   bool                       _showWorkerPicker = false;
 
+  // ── Operators ─────────────────────────────────────────────────────────────────
+  List<Map<String, dynamic>> _availableOperators = [];
+
   // ── Views ────────────────────────────────────────────────────────────────────
   List<Map<String, dynamic>> _savedViews = [];
   String? _activeViewId;
@@ -153,6 +157,7 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
         _load();
         _loadViews();
         _loadWorkers();
+        _loadOperators();
         _loadSearchableFields();
         _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
           if (mounted) _load();
@@ -261,6 +266,21 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
       if (wasEmpty && mounted) _load();
     } catch (e) {
       debugPrint('[Workers] error: $e');
+    }
+  }
+
+  Future<void> _loadOperators() async {
+    final tenantId = ref.read(activeTenantIdProvider);
+    if (tenantId.isEmpty) return;
+    try {
+      final list = await OperatorsApi.listOperators();
+      if (mounted) {
+        setState(() {
+          _availableOperators = list;
+        });
+      }
+    } catch (e) {
+      debugPrint('[Operators] error: $e');
     }
   }
 
@@ -426,6 +446,7 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
         _load();
         _loadViews();
         _loadWorkers();
+        _loadOperators();
         _loadSearchableFields();
       }
     });
@@ -449,9 +470,11 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
                   children: [
                     if (_showFilterSidebar)
                       _FilterSidebar(
-                        filterStatus:      _filterStatus,
-                        filterChannelType: _filterChannelType,
-                        filterDateRange:   _filterDateRange,
+                        filterStatus:       _filterStatus,
+                        filterChannelType:  _filterChannelType,
+                        filterDateRange:    _filterDateRange,
+                        filterOperatorIds:  _filterOperatorIds,
+                        availableOperators: _availableOperators,
                         onStatusToggle: (s) {
                           setState(() {
                             _filterStatus = _filterStatus.contains(s)
@@ -469,6 +492,16 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
                         },
                         onDateRangeSelect: (d) {
                           setState(() { _filterDateRange = d; _page = 1; });
+                          _markDirty();
+                          _load();
+                        },
+                        onOperatorToggle: (id) {
+                          setState(() {
+                            _filterOperatorIds = _filterOperatorIds.contains(id)
+                                ? _filterOperatorIds.where((x) => x != id).toList()
+                                : [..._filterOperatorIds, id];
+                            _page = 1;
+                          });
                           _markDirty();
                           _load();
                         },
@@ -2387,17 +2420,23 @@ class _FilterSidebar extends StatelessWidget {
     required this.filterStatus,
     required this.filterChannelType,
     required this.filterDateRange,
+    required this.filterOperatorIds,
+    required this.availableOperators,
     required this.onStatusToggle,
     required this.onChannelTypeSelect,
     required this.onDateRangeSelect,
+    required this.onOperatorToggle,
   });
 
-  final List<String>       filterStatus;
-  final String?            filterChannelType;
-  final String?            filterDateRange;
-  final void Function(String) onStatusToggle;
-  final void Function(String?) onChannelTypeSelect;
-  final void Function(String?) onDateRangeSelect;
+  final List<String>                 filterStatus;
+  final String?                      filterChannelType;
+  final String?                      filterDateRange;
+  final List<String>                 filterOperatorIds;
+  final List<Map<String, dynamic>>   availableOperators;
+  final void Function(String)        onStatusToggle;
+  final void Function(String?)       onChannelTypeSelect;
+  final void Function(String?)       onDateRangeSelect;
+  final void Function(String)        onOperatorToggle;
 
   @override
   Widget build(BuildContext context) {
@@ -2468,6 +2507,22 @@ class _FilterSidebar extends StatelessWidget {
                 ),
             ],
           ),
+          if (availableOperators.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            _SidebarSection(
+              title: 'Operadores',
+              children: [
+                for (final op in availableOperators)
+                  _SidebarCheckRow(
+                    label: op['display_name'] as String? ??
+                        op['name'] as String? ??
+                        op['id'] as String? ?? '—',
+                    selected: filterOperatorIds.contains(op['id'] as String? ?? ''),
+                    onTap: () => onOperatorToggle(op['id'] as String? ?? ''),
+                  ),
+              ],
+            ),
+          ],
         ],
       ),
     );
