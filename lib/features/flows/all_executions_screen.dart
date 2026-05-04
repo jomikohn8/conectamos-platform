@@ -858,25 +858,10 @@ class _ChannelBadge extends StatelessWidget {
     }
     final lc = channelType!.toLowerCase();
 
-    final (bg, bd, fg, label) = switch (lc) {
-      'whatsapp' || 'wa' => (
-          const Color(0xFFE8F8EF),
-          const Color(0xFFBBF7D0),
-          const Color(0xFF1A7A45),
-          'WhatsApp',
-        ),
-      'telegram' || 'tg' => (
-          AppColors.ctInfoBg,
-          const Color(0xFFBFDBFE),
-          AppColors.ctInfoText,
-          'Telegram',
-        ),
-      _ => (
-          AppColors.ctSurface2,
-          AppColors.ctBorder,
-          AppColors.ctText2,
-          channelType!,
-        ),
+    final (bg, bd) = switch (lc) {
+      'whatsapp' || 'wa' => (const Color(0xFFE8F8EF), const Color(0xFFBBF7D0)),
+      'telegram' || 'tg' => (AppColors.ctInfoBg,      const Color(0xFFBFDBFE)),
+      _                  => (AppColors.ctSurface2,     AppColors.ctBorder),
     };
 
     final Widget logo = switch (lc) {
@@ -890,7 +875,7 @@ class _ChannelBadge extends StatelessWidget {
           width: 11,
           height: 11,
         ),
-      _ => Icon(Icons.link_rounded, size: 11, color: fg),
+      _ => const Icon(Icons.link_rounded, size: 11, color: AppColors.ctText2),
     };
 
     return Container(
@@ -900,21 +885,7 @@ class _ChannelBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(99),
         border: Border.all(color: bd),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          logo,
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: AppFonts.geist(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: fg,
-            ),
-          ),
-        ],
-      ),
+      child: logo,
     );
   }
 }
