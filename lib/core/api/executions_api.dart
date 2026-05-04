@@ -49,4 +49,42 @@ class ExecutionsApi {
     }
     return Map<String, dynamic>.from(data as Map);
   }
+
+  /// Lista vistas guardadas del tenant.
+  static Future<List<Map<String, dynamic>>> listViews({
+    required String tenantId,
+  }) async {
+    final resp = await ApiClient.instance.get(
+      '/dashboard/views',
+      queryParameters: {'tenant_id': tenantId},
+    );
+    final data = resp.data;
+    final list = data is List
+        ? data
+        : (data is Map ? (data['items'] ?? data['views'] ?? []) : []);
+    return List<Map<String, dynamic>>.from(
+        (list as List).whereType<Map>().map((e) => Map<String, dynamic>.from(e)));
+  }
+
+  /// Crea una vista guardada con los filtros actuales.
+  static Future<Map<String, dynamic>> createView({
+    required String tenantId,
+    required String name,
+    required Map<String, dynamic> filters,
+  }) async {
+    final resp = await ApiClient.instance.post(
+      '/dashboard/views',
+      data: {
+        'tenant_id': tenantId,
+        'name':      name,
+        'filters':   filters,
+      },
+    );
+    return Map<String, dynamic>.from(resp.data as Map);
+  }
+
+  /// Elimina una vista guardada.
+  static Future<void> deleteView({required String viewId}) async {
+    await ApiClient.instance.delete('/dashboard/views/$viewId');
+  }
 }
