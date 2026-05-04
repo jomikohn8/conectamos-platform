@@ -216,15 +216,26 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
     try {
       final views = await ExecutionsApi.listViews(tenantId: tenantId);
       debugPrint('[Views] response: ${views.toString().substring(0, views.toString().length.clamp(0, 200))}');
-      if (mounted) setState(() => _savedViews = views);
-    } catch (_) {}
+      if (mounted) {
+        setState(() {
+          _savedViews = views
+              .whereType<Map>()
+              .map((e) => Map<String, dynamic>.from(e))
+              .toList();
+          debugPrint('[Views] setState: ${_savedViews.length} views');
+        });
+      }
+    } catch (e) {
+      debugPrint('[Views] error: $e');
+    }
   }
 
   Future<void> _loadWorkers() async {
     final tenantId = ref.read(activeTenantIdProvider);
     if (tenantId.isEmpty) return;
+    final wasEmpty = _filterWorkerIds.isEmpty;
     try {
-      final resp = await ApiClient.instance.get('/tenant-workers');
+      final resp = await ApiClient.instance.get('/workers');
       debugPrint('[Workers] resp.data type: ${resp.data.runtimeType}');
       debugPrint('[Workers] resp.data: ${resp.data.toString().substring(0, resp.data.toString().length.clamp(0, 300))}');
       final list = resp.data is List
@@ -232,10 +243,22 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
           : ((resp.data['workers'] ?? resp.data['items'] ?? []) as List);
       if (!mounted) return;
       setState(() {
-        _availableWorkers = List<Map<String, dynamic>>.from(
-            list.whereType<Map>().map((e) => Map<String, dynamic>.from(e)));
+        _availableWorkers = list
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .where((w) => w['is_active'] == true)
+            .toList();
+        // Seleccionar todos por default si no había filtro activo
+        if (wasEmpty) {
+          _filterWorkerIds = _availableWorkers
+              .map((w) => w['id'] as String? ?? '')
+              .where((id) => id.isNotEmpty)
+              .toList();
+        }
       });
       debugPrint('[Workers] loaded: ${_availableWorkers.length}');
+      // Recargar solo si era la primera carga (seleccionamos workers por default)
+      if (wasEmpty && mounted) _load();
     } catch (e) {
       debugPrint('[Workers] error: $e');
     }
@@ -643,6 +666,7 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
               orElse: () => {'id': wid, 'display_name': wid},
             );
             final name = worker['display_name'] as String?
+                ?? worker['catalog_name'] as String?
                 ?? worker['name'] as String?
                 ?? wid;
             return Container(
@@ -813,6 +837,7 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
                     final w        = _availableWorkers[i];
                     final id       = w['id'] as String? ?? '';
                     final name     = w['display_name'] as String?
+                        ?? w['catalog_name'] as String?
                         ?? w['name'] as String?
                         ?? id;
                     final selected = _filterWorkerIds.contains(id);
