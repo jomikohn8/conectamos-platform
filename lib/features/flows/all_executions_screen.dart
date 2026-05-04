@@ -398,7 +398,13 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
   @override
   Widget build(BuildContext context) {
     ref.listen<String>(activeTenantIdProvider, (_, next) {
-      if (next.isNotEmpty) { _page = 1; _load(); }
+      if (next.isNotEmpty) {
+        _page = 1;
+        _load();
+        _loadViews();
+        _loadWorkers();
+        _loadSearchableFields();
+      }
     });
 
     final totalPages = _total > 0 ? (_total / _limit).ceil() : 1;
