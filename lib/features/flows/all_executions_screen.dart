@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -1607,21 +1608,50 @@ class _ValueInputState extends State<_ValueInput> {
   @override
   void initState() {
     super.initState();
+    ServicesBinding.instance.keyboard.addHandler(_handleKeyEvent);
     _values = List.from(widget.initialValues);
+    _ctrl.addListener(_onTextChanged);
     WidgetsBinding.instance
         .addPostFrameCallback((_) => _focus.requestFocus());
   }
 
   @override
   void dispose() {
+    ServicesBinding.instance.keyboard.removeHandler(_handleKeyEvent);
+    _ctrl.removeListener(_onTextChanged);
     _ctrl.dispose();
     _focus.dispose();
     super.dispose();
   }
 
+  void _onTextChanged() {
+    final text = _ctrl.text;
+    if (text.contains('\n') || text.contains('\r') || text.contains('\t')) {
+      _addValues(text);
+    }
+  }
+
+  bool _handleKeyEvent(KeyEvent event) {
+    if (event is KeyDownEvent) {
+      final isPaste =
+          (HardwareKeyboard.instance.isControlPressed ||
+              HardwareKeyboard.instance.isMetaPressed) &&
+          event.logicalKey == LogicalKeyboardKey.keyV;
+      if (isPaste) {
+        Future.delayed(const Duration(milliseconds: 50), () async {
+          final data = await Clipboard.getData('text/plain');
+          if (data?.text != null && mounted) {
+            _addValues(data!.text!);
+          }
+        });
+      }
+    }
+    return false; // no consumir el evento
+  }
+
   void _addValues(String raw) {
     final parts = raw
-        .split(RegExp(r'[\n\t,]+'))
+        .split(RegExp(r'[\n\r\t,]+'))
         .map((s) => s.trim())
         .where((s) => s.isNotEmpty)
         .toList();
@@ -1722,8 +1752,12 @@ class _ValueInputState extends State<_ValueInput> {
                 isDense: true,
               ),
               onChanged: (v) {
-                // Detect paste from Excel (tabs or newlines)
-                if (v.contains('\n') || v.contains('\t')) _addValues(v);
+                // _onTextChanged via listener maneja el paste
+                // onChanged solo para detección manual de separadores
+                if (v.endsWith('\n') || v.endsWith('\t') ||
+                    v.endsWith(',')) {
+                  _addValues(v);
+                }
               },
               onSubmitted: (v) {
                 if (v.trim().isNotEmpty) _addValues(v);
