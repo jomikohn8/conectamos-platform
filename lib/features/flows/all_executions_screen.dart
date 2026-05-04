@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../core/api/api_client.dart';
 import '../../core/api/executions_api.dart';
 import '../../core/providers/tenant_provider.dart';
 import '../../core/theme/app_theme.dart';
@@ -101,13 +102,17 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
 
   // ── Filters ──────────────────────────────────────────────────────────────────
   List<String> _filterStatus      = [];
-  String?      _filterWorkerId;
+  List<String> _filterWorkerIds   = [];
   List<String> _filterOperatorIds = [];
   String?      _filterFlowId;
   String?      _filterChannelType;
   String?      _filterDateRange;
   String       _searchText        = '';
   bool         _showFilterSidebar = false;
+
+  // ── Workers ──────────────────────────────────────────────────────────────────
+  List<Map<String, dynamic>> _availableWorkers = [];
+  bool                       _showWorkerPicker = false;
 
   // ── Views ────────────────────────────────────────────────────────────────────
   List<Map<String, dynamic>> _savedViews = [];
@@ -147,6 +152,7 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
       if (tenantId.isNotEmpty) {
         _load();
         _loadViews();
+        _loadWorkers();
         _loadSearchableFields();
         _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
           if (mounted) _load();
@@ -175,7 +181,7 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
       final data = await ExecutionsApi.listExecutions(
         tenantId:    tenantId,
         status:      _filterStatus.isNotEmpty ? _filterStatus : null,
-        workerId:    _filterWorkerId,
+        workerIds:   _filterWorkerIds.isNotEmpty ? _filterWorkerIds : null,
         operatorIds: _filterOperatorIds.isNotEmpty ? _filterOperatorIds : null,
         flowId:      _filterFlowId,
         channelType: _filterChannelType,
@@ -211,6 +217,25 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
     } catch (_) {}
   }
 
+  Future<void> _loadWorkers() async {
+    final tenantId = ref.read(activeTenantIdProvider);
+    if (tenantId.isEmpty) return;
+    try {
+      final resp = await ApiClient.instance.get('/tenant-workers');
+      final list = resp.data is List
+          ? resp.data as List
+          : ((resp.data['workers'] ?? resp.data['items'] ?? []) as List);
+      if (!mounted) return;
+      setState(() {
+        _availableWorkers = List<Map<String, dynamic>>.from(
+            list.whereType<Map>().map((e) => Map<String, dynamic>.from(e)));
+      });
+      debugPrint('[Workers] loaded: ${_availableWorkers.length}');
+    } catch (e) {
+      debugPrint('[Workers] error: $e');
+    }
+  }
+
   Future<void> _loadSearchableFields() async {
     final tenantId = ref.read(activeTenantIdProvider);
     debugPrint('[SearchableFields] tenantId="$tenantId"');
@@ -231,7 +256,6 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
 
   int _activeFiltersCount() {
     var count = _filterStatus.length + _filterOperatorIds.length;
-    if (_filterWorkerId != null)    count++;
     if (_filterFlowId != null)      count++;
     if (_filterChannelType != null) count++;
     if (_filterDateRange != null)   count++;
@@ -252,7 +276,7 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
   void _clearFilters() {
     setState(() {
       _filterStatus        = [];
-      _filterWorkerId      = null;
+      _filterWorkerIds     = [];
       _filterOperatorIds   = [];
       _filterFlowId        = null;
       _filterChannelType   = null;
@@ -273,7 +297,7 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
         filters['field_searches'] as Map<String, dynamic>? ?? {};
     setState(() {
       _filterStatus      = List<String>.from(filters['status']       ?? []);
-      _filterWorkerId    = filters['worker_id']   as String?;
+      _filterWorkerIds   = List<String>.from(filters['worker_ids']   ?? []);
       _filterOperatorIds = List<String>.from(filters['operator_ids'] ?? []);
       _filterFlowId      = filters['flow_id']      as String?;
       _filterChannelType = filters['channel_type'] as String?;
@@ -293,7 +317,7 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
 
   Map<String, dynamic> _currentFiltersMap() => {
     if (_filterStatus.isNotEmpty)           'status':         _filterStatus,
-    'worker_id':    ?_filterWorkerId,
+    if (_filterWorkerIds.isNotEmpty)        'worker_ids':     _filterWorkerIds,
     if (_filterOperatorIds.isNotEmpty)      'operator_ids':   _filterOperatorIds,
     'flow_id':      ?_filterFlowId,
     'channel_type': ?_filterChannelType,
@@ -437,6 +461,20 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
               if (_total > _limit) _buildPaginationFooter(totalPages),
             ],
           ),
+          // Dismiss layer for worker picker
+          if (_showWorkerPicker)
+            GestureDetector(
+              onTap: () => setState(() => _showWorkerPicker = false),
+              behavior: HitTestBehavior.opaque,
+              child: const SizedBox.expand(),
+            ),
+          // Worker picker card
+          if (_showWorkerPicker)
+            Positioned(
+              top: 58,
+              left: 24,
+              child: _buildWorkerPickerCard(),
+            ),
           // Dismiss layer for field dropdown / value input
           if (_showFieldDropdown || _pendingField != null)
             GestureDetector(
@@ -536,6 +574,8 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
               ),
             ),
           ],
+          const SizedBox(width: 16),
+          _buildWorkerSelector(),
           const Spacer(),
           if (_lastFetch != null)
             Text(
@@ -563,6 +603,268 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  // ── Worker selector ───────────────────────────────────────────────────────
+
+  Color _workerColor(String workerId) {
+    const colors = [
+      Color(0xFF6366F1),
+      Color(0xFF8B5CF6),
+      Color(0xFF0891B2),
+      Color(0xFF059669),
+      Color(0xFFD97706),
+    ];
+    return colors[workerId.hashCode.abs() % colors.length];
+  }
+
+  Widget _buildWorkerSelector() {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Pills de workers seleccionados
+        for (final wid in _filterWorkerIds) ...[
+          Builder(builder: (ctx) {
+            final worker = _availableWorkers.firstWhere(
+              (w) => w['id'] == wid,
+              orElse: () => {'id': wid, 'display_name': wid},
+            );
+            final name = worker['display_name'] as String?
+                ?? worker['name'] as String?
+                ?? wid;
+            return Container(
+              margin: const EdgeInsets.only(right: 6),
+              padding: const EdgeInsets.fromLTRB(10, 4, 6, 4),
+              decoration: BoxDecoration(
+                color: AppColors.ctNavy,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 16,
+                    height: 16,
+                    decoration: BoxDecoration(
+                      color: _workerColor(wid),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Center(
+                      child: Text(
+                        name.isNotEmpty ? name[0].toUpperCase() : '?',
+                        style: AppFonts.geist(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 5),
+                  Text(
+                    name,
+                    style: AppFonts.geist(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _filterWorkerIds =
+                            List.from(_filterWorkerIds)..remove(wid);
+                        _page = 1;
+                      });
+                      _markDirty();
+                      _load();
+                    },
+                    child: const Icon(Icons.close_rounded,
+                        size: 12, color: Colors.white70),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
+        // Botón "+" para abrir picker
+        GestureDetector(
+          onTap: () =>
+              setState(() => _showWorkerPicker = !_showWorkerPicker),
+          child: Container(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: _filterWorkerIds.isEmpty
+                  ? AppColors.ctSurface2
+                  : AppColors.ctNavy.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: _filterWorkerIds.isEmpty
+                    ? AppColors.ctBorder
+                    : AppColors.ctNavy.withValues(alpha: 0.3),
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.add_rounded,
+                  size: 13,
+                  color: _filterWorkerIds.isEmpty
+                      ? AppColors.ctText2
+                      : AppColors.ctNavy,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  _filterWorkerIds.isEmpty ? 'Worker' : 'Agregar',
+                  style: AppFonts.geist(
+                    fontSize: 12,
+                    color: _filterWorkerIds.isEmpty
+                        ? AppColors.ctText2
+                        : AppColors.ctNavy,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildWorkerPickerCard() {
+    return Material(
+      elevation: 8,
+      borderRadius: BorderRadius.circular(10),
+      shadowColor: Colors.black12,
+      child: Container(
+        width: 260,
+        constraints: const BoxConstraints(maxHeight: 300),
+        decoration: BoxDecoration(
+          color: AppColors.ctSurface,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: AppColors.ctBorder),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
+              child: Row(
+                children: [
+                  Text(
+                    'Workers',
+                    style: AppFonts.geist(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.ctText2,
+                    ),
+                  ),
+                  const Spacer(),
+                  if (_filterWorkerIds.isNotEmpty)
+                    GestureDetector(
+                      onTap: () {
+                        setState(() { _filterWorkerIds = []; _page = 1; });
+                        _markDirty();
+                        _load();
+                      },
+                      child: Text(
+                        'Limpiar',
+                        style: AppFonts.geist(
+                            fontSize: 11, color: AppColors.ctTeal),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            // Lista
+            if (_availableWorkers.isEmpty)
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Text(
+                  'No hay workers disponibles',
+                  style: AppFonts.geist(
+                      fontSize: 13, color: AppColors.ctText3),
+                ),
+              )
+            else
+              Flexible(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: _availableWorkers.length,
+                  itemBuilder: (ctx, i) {
+                    final w        = _availableWorkers[i];
+                    final id       = w['id'] as String? ?? '';
+                    final name     = w['display_name'] as String?
+                        ?? w['name'] as String?
+                        ?? id;
+                    final selected = _filterWorkerIds.contains(id);
+                    return InkWell(
+                      onTap: () {
+                        setState(() {
+                          if (selected) {
+                            _filterWorkerIds =
+                                List.from(_filterWorkerIds)..remove(id);
+                          } else {
+                            _filterWorkerIds =
+                                List.from(_filterWorkerIds)..add(id);
+                          }
+                          _page = 1;
+                        });
+                        _markDirty();
+                        _load();
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 9),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 24,
+                              height: 24,
+                              decoration: BoxDecoration(
+                                color: _workerColor(id),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Center(
+                                child: Text(
+                                  name.isNotEmpty
+                                      ? name[0].toUpperCase()
+                                      : '?',
+                                  style: AppFonts.geist(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                name,
+                                style: AppFonts.geist(
+                                    fontSize: 13, color: AppColors.ctText),
+                              ),
+                            ),
+                            if (selected)
+                              const Icon(Icons.check_rounded,
+                                  size: 16, color: AppColors.ctTeal),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -890,16 +1192,6 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
         label: _dateRangeLabel(_filterDateRange!),
         onRemove: () {
           setState(() { _filterDateRange = null; _page = 1; });
-          _markDirty();
-          _load();
-        },
-      ));
-    }
-    if (_filterWorkerId != null) {
-      chips.add(_FilterChip(
-        label: 'Worker: $_filterWorkerId',
-        onRemove: () {
-          setState(() { _filterWorkerId = null; _page = 1; });
           _markDirty();
           _load();
         },

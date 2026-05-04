@@ -9,7 +9,7 @@ class ExecutionsApi {
   static Future<Map<String, dynamic>> listExecutions({
     required String tenantId,
     List<String>? status,
-    String? workerId,
+    List<String>? workerIds,
     List<String>? operatorIds,
     String? flowId,
     String? channelType,
@@ -31,7 +31,7 @@ class ExecutionsApi {
       'limit':    limit,
     };
     if (status != null && status.isNotEmpty) params['status'] = status;
-    if (workerId != null) params['worker_id'] = workerId;
+    if (workerIds != null && workerIds.isNotEmpty) params['worker_id'] = workerIds;
     if (operatorIds != null && operatorIds.isNotEmpty) params['operator_id'] = operatorIds;
     if (flowId != null) params['flow_id'] = flowId;
     if (channelType != null) params['channel_type'] = channelType;
