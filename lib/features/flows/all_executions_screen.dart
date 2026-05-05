@@ -382,19 +382,21 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
     _markDirty();
     _loadFlows();
     _loadOperators();
+    _loadSearchableFields();
     _load();
   }
 
   Future<void> _loadSearchableFields() async {
+    if (_filterWorkerIds.isEmpty) {
+      setState(() => _searchableFields = {});
+      return;
+    }
     final tenantId = ref.read(activeTenantIdProvider);
-    debugPrint('[SearchableFields] tenantId="$tenantId"');
     if (tenantId.isEmpty) return;
     try {
       final fields = await ExecutionsApi.getSearchableFields(tenantId: tenantId);
       if (mounted) {
         setState(() => _searchableFields = fields);
-        debugPrint('[SearchableFields] loaded: '
-            '${(_searchableFields["fields"] as List?)?.length ?? 0} fields');
       }
     } catch (e) {
       debugPrint('[SearchableFields] error: $e');
@@ -653,6 +655,7 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
                           _markDirty();
                           _load();
                         },
+                        hasWorkers: _filterWorkerIds.isNotEmpty,
                       ),
                     Expanded(
                       child: SingleChildScrollView(
@@ -997,6 +1000,7 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
                         _markDirty();
                         _loadFlows();
                         _loadOperators();
+                        _loadSearchableFields();
                         _load();
                       },
                       child: Text(
@@ -2852,6 +2856,7 @@ class _FilterSidebar extends StatelessWidget {
     required this.onDateRangeChange,
     required this.onOperatorToggle,
     required this.onFlowSelect,
+    required this.hasWorkers,
   });
 
   final List<String>                              filterStatus;
@@ -2864,6 +2869,7 @@ class _FilterSidebar extends StatelessWidget {
   final List<Map<String, dynamic>>                availableOperators;
   final String?                                   filterFlowId;
   final List<Map<String, dynamic>>                availableFlows;
+  final bool                                      hasWorkers;
   final void Function(String)                     onStatusToggle;
   final void Function(String?)                    onChannelTypeSelect;
   final void Function(String?)                    onDateRangeSelect;
@@ -2980,20 +2986,22 @@ class _FilterSidebar extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          _SidebarSection(
-            title: 'Canal',
-            children: [
-              for (final (value, label) in channels)
-                _SidebarRadioRow(
-                  label:    label,
-                  selected: filterChannelType == value,
-                  onTap:    () => onChannelTypeSelect(
-                      filterChannelType == value ? null : value),
-                ),
-            ],
-          ),
-          if (availableOperators.isNotEmpty) ...[
+          if (hasWorkers) ...[
+            const SizedBox(height: 8),
+            _SidebarSection(
+              title: 'Canal',
+              children: [
+                for (final (value, label) in channels)
+                  _SidebarRadioRow(
+                    label:    label,
+                    selected: filterChannelType == value,
+                    onTap:    () => onChannelTypeSelect(
+                        filterChannelType == value ? null : value),
+                  ),
+              ],
+            ),
+          ],
+          if (hasWorkers && availableOperators.isNotEmpty) ...[
             const SizedBox(height: 8),
             _SidebarSection(
               title: 'Operadores',
@@ -3009,7 +3017,7 @@ class _FilterSidebar extends StatelessWidget {
               ],
             ),
           ],
-          if (availableFlows.isNotEmpty) ...[
+          if (hasWorkers && availableFlows.isNotEmpty) ...[
             const SizedBox(height: 8),
             _SidebarSection(
               title: 'Flujo',
