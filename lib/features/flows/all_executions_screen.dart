@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:omni_datetime_picker/omni_datetime_picker.dart';
 
 import '../../core/api/api_client.dart';
 import '../../core/api/executions_api.dart';
@@ -53,14 +54,21 @@ String _fmtElapsed(int? seconds) {
 
 String _dateGroupLabel(DateTime dt) {
   final now   = DateTime.now();
-  final today = DateTime(now.year, now.month, now.day);
-  final yest  = today.subtract(const Duration(days: 1));
-  final d     = DateTime(dt.year, dt.month, dt.day);
-  if (d == today) return 'Hoy';
-  if (d == yest)  return 'Ayer';
-  const mo = ['Ene','Feb','Mar','Abr','May','Jun',
-               'Jul','Ago','Sep','Oct','Nov','Dic'];
-  return '${dt.day} ${mo[dt.month - 1]} ${dt.year}';
+  final local = dt.toLocal();
+
+  final todayMidnight = DateTime(now.year, now.month, now.day);
+  final dtMidnight    = DateTime(local.year, local.month, local.day);
+
+  final diff = todayMidnight.difference(dtMidnight).inDays;
+
+  if (diff == 0) return 'Hoy';
+  if (diff == 1) return 'Ayer';
+
+  const meses = [
+    'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
+    'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic',
+  ];
+  return '${local.day} ${meses[local.month - 1]} ${local.year}';
 }
 
 String _elapsedSince(DateTime t) {
@@ -2864,11 +2872,13 @@ class _FilterSidebar extends StatelessWidget {
               // Selector de campo
               Padding(
                 padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
-                child: Row(
+                child: Wrap(
+                  spacing: 4,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     Text('Campo:', style: AppFonts.geist(
                       fontSize: 11, color: AppColors.ctText2)),
-                    const SizedBox(width: 8),
                     for (final (field, label) in [
                       ('created_at',   'Creada'),
                       ('updated_at',   'Actualizada'),
@@ -2877,7 +2887,6 @@ class _FilterSidebar extends StatelessWidget {
                       GestureDetector(
                         onTap: () => onDateFieldSelect(field),
                         child: Container(
-                          margin: const EdgeInsets.only(right: 4),
                           padding: const EdgeInsets.symmetric(
                               horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
@@ -3032,49 +3041,28 @@ class _DateTimePickerRowState extends State<_DateTimePickerRow> {
     return InkWell(
       onTap: () async {
         final ctx = context;
-        final date = await showDatePicker(
+        final initial = widget.value != null
+            ? DateTime.tryParse(widget.value!)?.toLocal() ?? DateTime.now()
+            : DateTime.now();
+
+        // ignore: use_build_context_synchronously
+        final result = await showOmniDateTimePicker(
           context: ctx,
-          initialDate: widget.value != null
-              ? DateTime.tryParse(widget.value!)?.toLocal() ?? DateTime.now()
-              : DateTime.now(),
+          initialDate: initial,
           firstDate: DateTime(2020),
           lastDate: DateTime(2030),
-          builder: (ctx, child) => Theme(
-            data: ThemeData.light().copyWith(
-              colorScheme: const ColorScheme.light(
-                primary: AppColors.ctTeal,
-                onPrimary: AppColors.ctNavy,
-              ),
-            ),
-            child: child!,
+          is24HourMode: true,
+          isShowSeconds: false,
+          type: OmniDateTimePickerType.dateAndTime,
+          borderRadius: const BorderRadius.all(Radius.circular(16)),
+          constraints: const BoxConstraints(
+            maxWidth: 350,
+            maxHeight: 650,
           ),
         );
-        if (date == null || !mounted) return;
 
-        final time = await showTimePicker(
-          context: ctx, // ignore: use_build_context_synchronously
-          initialTime: widget.value != null &&
-                  DateTime.tryParse(widget.value!) != null
-              ? TimeOfDay.fromDateTime(
-                  DateTime.parse(widget.value!).toLocal())
-              : const TimeOfDay(hour: 0, minute: 0),
-          builder: (ctx, child) => Theme(
-            data: ThemeData.light().copyWith(
-              colorScheme: const ColorScheme.light(
-                primary: AppColors.ctTeal,
-                onPrimary: AppColors.ctNavy,
-              ),
-            ),
-            child: child!,
-          ),
-        );
-        if (time == null || !mounted) return;
-
-        final local = DateTime(
-          date.year, date.month, date.day,
-          time.hour, time.minute,
-        );
-        widget.onChanged(local.toUtc().toIso8601String());
+        if (result == null || !mounted) return;
+        widget.onChanged(result.toUtc().toIso8601String());
       },
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
