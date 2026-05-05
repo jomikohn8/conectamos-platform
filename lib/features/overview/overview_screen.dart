@@ -1436,16 +1436,17 @@ class _WorkersFlowsState extends State<_WorkersFlows> {
               ),
             )
           else
-            GridView.count(
-              crossAxisCount: 2,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisSpacing: 10,
-              mainAxisSpacing: 10,
-              childAspectRatio: 1.5,
-              children: _workers
-                  .map((w) => _WorkerCard(worker: w, totalFlows: _totalFlows))
-                  .toList(),
+            LayoutBuilder(
+              builder: (context, constraints) => Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: _workers
+                    .map((w) => SizedBox(
+                          width: (constraints.maxWidth - 10) / 2,
+                          child: _WorkerCard(worker: w, totalFlows: _totalFlows),
+                        ))
+                    .toList(),
+              ),
             ),
         ],
       ),

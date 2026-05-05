@@ -248,10 +248,11 @@ class _OperatorsBodyState extends State<_OperatorsBody> {
       final matchStatus =
           _filterStatus == 'Todos' || st.label == _filterStatus;
 
-      final flows =
-          List<String>.from(op['flows'] as List? ?? []);
+      final flows = (op['flows'] as List? ?? [])
+          .whereType<Map>()
+          .toList();
       final matchFlow = _filterFlow == 'Todos' ||
-          flows.any((f) => _filterFlow.startsWith(f));
+          flows.any((f) => _filterFlow.startsWith(f['name'] as String? ?? ''));
 
       return matchSearch && matchStatus && matchFlow;
     }).toList();
