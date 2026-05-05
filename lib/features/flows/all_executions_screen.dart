@@ -292,15 +292,17 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
     final tenantId = ref.read(activeTenantIdProvider);
     if (tenantId.isEmpty) return;
     try {
-      final resp = await ApiClient.instance.get('/flows/active');
+      final resp = await ApiClient.instance.get('/flows');
       final list = resp.data is List
           ? resp.data as List
-          : ((resp.data['flows'] ?? resp.data['items'] ?? []) as List);
+          : ((resp.data['flows'] ?? resp.data['items'] ??
+             resp.data['flow_definitions'] ?? []) as List);
       if (!mounted) return;
       setState(() {
         _availableFlows = list
             .whereType<Map>()
             .map((e) => Map<String, dynamic>.from(e))
+            .where((f) => f['is_active'] == true)
             .toList();
       });
       debugPrint('[Flows] loaded: ${_availableFlows.length}');
