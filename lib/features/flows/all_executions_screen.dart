@@ -394,7 +394,10 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
     final tenantId = ref.read(activeTenantIdProvider);
     if (tenantId.isEmpty) return;
     try {
-      final fields = await ExecutionsApi.getSearchableFields(tenantId: tenantId);
+      final fields = await ExecutionsApi.getSearchableFields(
+        tenantId: tenantId,
+        workerIds: _filterWorkerIds.isEmpty ? null : _filterWorkerIds,
+      );
       if (mounted) {
         setState(() => _searchableFields = fields);
       }

@@ -136,9 +136,16 @@ class ExecutionsApi {
   /// Campos buscables por clave de campo (para filtro avanzado).
   static Future<Map<String, dynamic>> getSearchableFields({
     required String tenantId,
+    List<String>? workerIds,
   }) async {
+    final params = <String, dynamic>{};
+    if (workerIds != null && workerIds.isNotEmpty) {
+      params['worker_id'] = workerIds;
+    }
+
     final resp = await ApiClient.instance.get(
       '/api/v1/dashboard/executions/searchable-fields',
+      queryParameters: params,
     );
     return resp.data as Map<String, dynamic>;
   }
