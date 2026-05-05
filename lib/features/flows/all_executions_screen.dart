@@ -134,6 +134,7 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
 
   // ── Flows ─────────────────────────────────────────────────────────────────────
   List<Map<String, dynamic>> _availableFlows = [];
+  int _flowsLoadVersion = 0;
 
   // ── Views ────────────────────────────────────────────────────────────────────
   List<Map<String, dynamic>> _savedViews = [];
@@ -197,6 +198,15 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
   Future<void> _load() async {
     final tenantId = ref.read(activeTenantIdProvider);
     if (tenantId.isEmpty) return;
+    // Sin workers seleccionados = sin resultados
+    if (_filterWorkerIds.isEmpty) {
+      setState(() {
+        _executions = [];
+        _total      = 0;
+        _loading    = false;
+      });
+      return;
+    }
     setState(() { _loading = true; _error = null; });
     try {
       debugPrint('[Search] query="$_searchText" fields=$_activeFieldSearches');
@@ -311,8 +321,20 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
   Future<void> _loadFlows() async {
     final tenantId = ref.read(activeTenantIdProvider);
     if (tenantId.isEmpty) return;
+
+    // Snapshot de workers al inicio de esta llamada
+    final workerSnapshot = List<String>.from(_filterWorkerIds);
+    // Versión de esta llamada — descarta respuestas de llamadas anteriores
+    _flowsLoadVersion++;
+    final myVersion = _flowsLoadVersion;
+
     try {
       final resp = await ApiClient.instance.get('/flows');
+
+      // Si se lanzó una llamada más nueva, descartar
+      if (myVersion != _flowsLoadVersion) return;
+      if (!mounted) return;
+
       final list = resp.data is List
           ? resp.data as List
           : ((resp.data['flows'] ?? resp.data['items'] ??
@@ -324,25 +346,23 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
           .where((f) => f['is_active'] == true)
           .toList();
 
-      // Si hay workers seleccionados, filtrar flows de esos workers
-      if (_filterWorkerIds.isNotEmpty) {
+      // Filtrar por workers usando el snapshot (no el estado mutable)
+      if (workerSnapshot.isNotEmpty) {
         flows = flows.where((f) {
           final fwid = f['tenant_worker_id'] as String?;
-          return fwid != null && _filterWorkerIds.contains(fwid);
+          return fwid != null && workerSnapshot.contains(fwid);
         }).toList();
       }
 
-      if (!mounted) return;
       setState(() {
         _availableFlows = flows;
-        // Si el flow seleccionado ya no está disponible, limpiar
         if (_filterFlowId != null &&
             !_availableFlows.any((f) => f['id'] == _filterFlowId)) {
           _filterFlowId = null;
         }
       });
       debugPrint('[Flows] loaded: ${_availableFlows.length} '
-          '(workers filter: ${_filterWorkerIds.length})');
+          '(workers: ${workerSnapshot.length}, v$myVersion)');
     } catch (e) {
       debugPrint('[Flows] error: $e');
     }
