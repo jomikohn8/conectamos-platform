@@ -2926,28 +2926,15 @@ class _FilterSidebar extends StatelessWidget {
                   onTap: () => onDateRangeChange(
                     filterDateRange == value ? null : value, null, null),
                 ),
-              // Rango personalizado
-              _SidebarRadioRow(
-                label: 'Rango personalizado',
-                selected: filterDateRange == 'custom',
-                onTap: () => onDateRangeChange(
-                    'custom', filterDateFrom, filterDateTo),
+              // Rango personalizado — un solo modal con inicio + fin
+              _SidebarRangePickerRow(
+                filterDateFrom:   filterDateFrom,
+                filterDateTo:     filterDateTo,
+                isActive:         filterDateRange == 'custom',
+                onRangeSelected:  (from, to) =>
+                    onDateRangeChange('custom', from, to),
+                onClear: () => onDateRangeChange(null, null, null),
               ),
-              // Date-time pickers (solo visibles cuando custom está activo)
-              if (filterDateRange == 'custom') ...[
-                _DateTimePickerRow(
-                  label: 'Desde',
-                  value: filterDateFrom,
-                  onChanged: (iso) => onDateRangeChange(
-                      'custom', iso, filterDateTo),
-                ),
-                _DateTimePickerRow(
-                  label: 'Hasta',
-                  value: filterDateTo,
-                  onChanged: (iso) => onDateRangeChange(
-                      'custom', filterDateFrom, iso),
-                ),
-              ],
             ],
           ),
           const SizedBox(height: 8),
@@ -3005,31 +2992,31 @@ class _FilterSidebar extends StatelessWidget {
   }
 }
 
-// ── _DateTimePickerRow ────────────────────────────────────────────────────────
+// ── _SidebarRangePickerRow ────────────────────────────────────────────────────
 
-class _DateTimePickerRow extends StatefulWidget {
-  const _DateTimePickerRow({
-    required this.label,
-    required this.value,
-    required this.onChanged,
+class _SidebarRangePickerRow extends StatelessWidget {
+  const _SidebarRangePickerRow({
+    required this.filterDateFrom,
+    required this.filterDateTo,
+    required this.isActive,
+    required this.onRangeSelected,
+    required this.onClear,
   });
 
-  final String                  label;
-  final String?                 value;
-  final void Function(String?)  onChanged;
+  final String?  filterDateFrom;
+  final String?  filterDateTo;
+  final bool     isActive;
+  final void Function(String from, String to) onRangeSelected;
+  final VoidCallback onClear;
 
-  @override
-  State<_DateTimePickerRow> createState() => _DateTimePickerRowState();
-}
-
-class _DateTimePickerRowState extends State<_DateTimePickerRow> {
-  static String _formatDtLocal(String iso) {
+  static String _fmt(String iso) {
     try {
       final dt = DateTime.parse(iso).toLocal();
-      final d =
-          '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
-      final h =
-          '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+      final d = '${dt.day.toString().padLeft(2, '0')}/'
+                '${dt.month.toString().padLeft(2, '0')}/'
+                '${dt.year}';
+      final h = '${dt.hour.toString().padLeft(2, '0')}:'
+                '${dt.minute.toString().padLeft(2, '0')}';
       return '$d $h';
     } catch (_) {
       return iso;
@@ -3038,66 +3025,98 @@ class _DateTimePickerRowState extends State<_DateTimePickerRow> {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: () async {
-        final ctx = context;
-        final initial = widget.value != null
-            ? DateTime.tryParse(widget.value!)?.toLocal() ?? DateTime.now()
-            : DateTime.now();
+    final hasRange = filterDateFrom != null || filterDateTo != null;
 
-        // ignore: use_build_context_synchronously
-        final result = await showOmniDateTimePicker(
-          context: ctx,
-          initialDate: initial,
-          firstDate: DateTime(2020),
-          lastDate: DateTime(2030),
-          is24HourMode: true,
-          isShowSeconds: false,
-          type: OmniDateTimePickerType.dateAndTime,
-          borderRadius: const BorderRadius.all(Radius.circular(16)),
-          constraints: const BoxConstraints(
-            maxWidth: 350,
-            maxHeight: 650,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        InkWell(
+          onTap: () async {
+            final ctx = context;
+            final startInit = filterDateFrom != null
+                ? DateTime.tryParse(filterDateFrom!)?.toLocal()
+                    ?? DateTime.now()
+                : DateTime.now();
+            final endInit = filterDateTo != null
+                ? DateTime.tryParse(filterDateTo!)?.toLocal()
+                    ?? DateTime.now()
+                : DateTime.now();
+
+            // ignore: use_build_context_synchronously
+            final result = await showOmniDateTimeRangePicker(
+              context: ctx,
+              startInitialDate: startInit,
+              startFirstDate: DateTime(2020),
+              startLastDate: DateTime(2030),
+              endInitialDate: endInit,
+              endFirstDate: DateTime(2020),
+              endLastDate: DateTime(2030),
+              is24HourMode: true,
+              isShowSeconds: false,
+              isForceEndDateAfterStartDate: true,
+              borderRadius: const BorderRadius.all(Radius.circular(16)),
+              constraints: const BoxConstraints(
+                maxWidth: 350,
+                maxHeight: 650,
+              ),
+            );
+
+            if (result == null || result.length < 2) return;
+            onRangeSelected(
+              result[0].toUtc().toIso8601String(),
+              result[1].toUtc().toIso8601String(),
+            );
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+            child: Row(children: [
+              Icon(
+                isActive
+                    ? Icons.date_range_rounded
+                    : Icons.date_range_outlined,
+                size: 14,
+                color: isActive ? AppColors.ctTeal : AppColors.ctText2,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Rango personalizado',
+                  style: AppFonts.geist(
+                    fontSize: 12,
+                    fontWeight: isActive
+                        ? FontWeight.w600
+                        : FontWeight.w400,
+                    color: isActive ? AppColors.ctTeal : AppColors.ctText,
+                  ),
+                ),
+              ),
+              if (hasRange)
+                GestureDetector(
+                  onTap: onClear,
+                  child: const Icon(Icons.close_rounded,
+                      size: 13, color: AppColors.ctText3),
+                ),
+            ]),
           ),
-        );
-
-        if (result == null || !mounted) return;
-        widget.onChanged(result.toUtc().toIso8601String());
-      },
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        child: Row(children: [
-          const Icon(Icons.calendar_today_outlined,
-              size: 13, color: AppColors.ctText2),
-          const SizedBox(width: 8),
-          Text(widget.label,
-              style: AppFonts.geist(
-                  fontSize: 12, color: AppColors.ctText2)),
-          const Spacer(),
-          Text(
-            widget.value != null
-                ? _formatDtLocal(widget.value!)
-                : 'Seleccionar',
-            style: AppFonts.geist(
-              fontSize: 12,
-              color: widget.value != null
-                  ? AppColors.ctText
-                  : AppColors.ctText3,
-              fontWeight: widget.value != null
-                  ? FontWeight.w500
-                  : FontWeight.w400,
+        ),
+        if (hasRange)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(34, 0, 12, 6),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (filterDateFrom != null)
+                  Text('Desde: ${_fmt(filterDateFrom!)}',
+                      style: AppFonts.geist(
+                          fontSize: 11, color: AppColors.ctTeal)),
+                if (filterDateTo != null)
+                  Text('Hasta: ${_fmt(filterDateTo!)}',
+                      style: AppFonts.geist(
+                          fontSize: 11, color: AppColors.ctTeal)),
+              ],
             ),
           ),
-          if (widget.value != null) ...[
-            const SizedBox(width: 6),
-            GestureDetector(
-              onTap: () => widget.onChanged(null),
-              child: const Icon(Icons.close_rounded,
-                  size: 12, color: AppColors.ctText3),
-            ),
-          ],
-        ]),
-      ),
+      ],
     );
   }
 }
