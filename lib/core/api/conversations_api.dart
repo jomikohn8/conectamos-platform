@@ -19,6 +19,21 @@ class ConversationsApi {
     return raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
   }
 
+  /// DELETE /wa-messages — hard-delete de mensajes sin operador (solo admin).
+  /// from_phone es el chat_id del contacto no registrado.
+  static Future<void> deleteUnregisteredConversation({
+    required String fromPhone,
+    required String channelId,
+  }) async {
+    await ApiClient.instance.delete(
+      '/wa-messages',
+      queryParameters: {
+        'from_phone': fromPhone,
+        'channel_id': channelId,
+      },
+    );
+  }
+
   /// PATCH /conversations/assign — asigna un operador a un chat no registrado.
   static Future<void> assignConversationOperator({
     required String chatId,

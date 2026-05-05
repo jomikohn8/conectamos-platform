@@ -1372,14 +1372,18 @@ class _ArchivedPanelState extends ConsumerState<_ArchivedPanel> {
     );
     if (confirm2 != true || !mounted) return;
 
-    // TODO: DELETE /wa-messages?from_phone=X&channel_id=Y&tenant_id=Z
-    // Solo admin. Hard delete de wa_messages con operator_id=null
-    // y from_phone=X en ese canal.
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Eliminación pendiente de implementación en backend.'),
-      ),
-    );
+    try {
+      await ConversationsApi.deleteUnregisteredConversation(
+        fromPhone: chatId,
+        channelId: widget.channelId,
+      );
+      if (mounted) widget.onRefresh();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al eliminar: $e')),
+      );
+    }
   }
 
   @override
