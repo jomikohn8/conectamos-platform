@@ -26,8 +26,8 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
   bool _kpisLoading = false;
   bool _kpisError   = false;
   bool _initialized = false;
-
-  Timer? _refreshTimer;
+  DateTime? _lastUpdated;
+  int _reloadKey = 0;
 
   @override
   void initState() {
@@ -39,26 +39,33 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
     });
   }
 
-  @override
-  void dispose() {
-    _refreshTimer?.cancel();
-    super.dispose();
-  }
-
   Future<void> _fetchKpis(String tenantId) async {
     if (tenantId.isEmpty) return;
     setState(() { _kpisLoading = true; _kpisError = false; });
     try {
       final data = await OverviewApi.getKpis(tenantId: tenantId);
-      setState(() { _kpis = data; _kpisLoading = false; _initialized = true; });
+      setState(() {
+        _kpis = data;
+        _kpisLoading = false;
+        _initialized = true;
+        _lastUpdated = DateTime.now();
+      });
     } catch (_) {
       setState(() { _kpisLoading = false; _kpisError = true; _initialized = true; });
     }
   }
 
+  void _reload() {
+    final tenantId = ref.read(activeTenantIdProvider);
+    if (tenantId.isEmpty) return;
+    setState(() { _reloadKey++; });
+    _fetchKpis(tenantId);
+  }
+
   @override
   Widget build(BuildContext context) {
-    final tenantId = ref.watch(activeTenantIdProvider);
+    final tenantId   = ref.watch(activeTenantIdProvider);
+    final tenantName = ref.watch(activeTenantDisplayProvider);
 
     ref.listen<String>(activeTenantIdProvider, (prev, next) {
       if (next.isNotEmpty && !_initialized && !_kpisLoading) {
@@ -72,7 +79,31 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
 
     return Column(
       children: [
-        _ActionBar(),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+          child: Row(
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Vista general', style: AppTextStyles.pageTitle),
+                  Text(
+                    tenantName.isNotEmpty ? tenantName : 'Sistema operativo',
+                    style: AppFonts.geist(fontSize: 12, color: AppColors.ctText2),
+                  ),
+                ],
+              ),
+              const Spacer(),
+              _LastUpdatedLabel(lastUpdated: _lastUpdated),
+              const SizedBox(width: 8),
+              IconButton(
+                icon: const Icon(Icons.refresh_rounded, size: 20, color: AppColors.ctText2),
+                tooltip: 'Actualizar',
+                onPressed: _reload,
+              ),
+            ],
+          ),
+        ),
         Expanded(
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 18),
@@ -83,7 +114,7 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
                 const SizedBox(height: 14),
                 _KpiRow(kpis: _kpis, loading: _kpisLoading, error: _kpisError),
                 const SizedBox(height: 14),
-                _OperatorsSection(tenantId: tenantId),
+                _OperatorsSection(key: ValueKey(_reloadKey), tenantId: tenantId),
                 const SizedBox(height: 14),
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -105,99 +136,46 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
   }
 }
 
-// ── Barra de acciones ─────────────────────────────────────────────────────────
+// ── _LastUpdatedLabel ─────────────────────────────────────────────────────────
 
-class _ActionBar extends ConsumerWidget {
-  const _ActionBar();
+class _LastUpdatedLabel extends StatefulWidget {
+  const _LastUpdatedLabel({required this.lastUpdated});
+  final DateTime? lastUpdated;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final tenantName = ref.watch(activeTenantDisplayProvider);
-    final subtitle = tenantName.isNotEmpty
-        ? 'Hoy · $tenantName · Sistema operativo'
-        : 'Hoy · Sistema operativo';
+  State<_LastUpdatedLabel> createState() => _LastUpdatedLabelState();
+}
 
-    return Container(
-      height: 48,
-      width: double.infinity,
-      decoration: const BoxDecoration(
-        color: AppColors.ctSurface,
-        border: Border(bottom: BorderSide(color: AppColors.ctBorder)),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 22),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  'Vista general',
-                  style: AppFonts.onest(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.ctText,
-                  ),
-                ),
-                const SizedBox(height: 1),
-                Text(subtitle, style: AppTextStyles.topbarSubtitle),
-              ],
-            ),
-          ),
-          const _DateButton(),
-        ],
-      ),
-    );
+class _LastUpdatedLabelState extends State<_LastUpdatedLabel> {
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted) setState(() {});
+    });
   }
-}
-
-class _DateButton extends StatefulWidget {
-  const _DateButton();
 
   @override
-  State<_DateButton> createState() => _DateButtonState();
-}
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
 
-class _DateButtonState extends State<_DateButton> {
-  bool _hovered = false;
+  String get _label {
+    final lu = widget.lastUpdated;
+    if (lu == null) return 'Actualizando...';
+    final diff = DateTime.now().difference(lu);
+    if (diff.inMinutes < 1) return 'Actualizado hace ${diff.inSeconds}s';
+    return 'Actualizado hace ${diff.inMinutes}m';
+  }
 
   @override
   Widget build(BuildContext context) {
-    final now = DateTime.now();
-    final d   = now.day.toString().padLeft(2, '0');
-    final m   = now.month.toString().padLeft(2, '0');
-    final formatted = '$d/$m/${now.year}';
-
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit:  (_) => setState(() => _hovered = false),
-      cursor: SystemMouseCursors.click,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 120),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-        decoration: BoxDecoration(
-          color: _hovered ? AppColors.ctBorder : AppColors.ctSurface2,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: AppColors.ctBorder2),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.calendar_today_outlined, size: 13, color: AppColors.ctText),
-            const SizedBox(width: 6),
-            Text(
-              '$formatted  ▾',
-              style: const TextStyle(
-                fontFamily: 'Geist',
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: AppColors.ctText,
-              ),
-            ),
-          ],
-        ),
-      ),
+    return Text(
+      _label,
+      style: AppFonts.geist(fontSize: 12, color: AppColors.ctText2),
     );
   }
 }
@@ -382,6 +360,13 @@ class KpiCard extends StatelessWidget {
 
 // ── _HeroBand ─────────────────────────────────────────────────────────────────
 
+String _formatHeroDate(DateTime d) {
+  const dias  = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'];
+  const meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+                 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+  return '${dias[d.weekday - 1]}, ${d.day} de ${meses[d.month - 1]} de ${d.year}';
+}
+
 class _HeroBand extends StatelessWidget {
   const _HeroBand({required this.kpis, required this.loading});
 
@@ -419,7 +404,6 @@ class _HeroBand extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: const Color(0xFF0B132B),
-        // TODO: replace with real art when assets/images/hero_bg_alt.png is delivered
         image: const DecorationImage(
           image: AssetImage('assets/images/hero_bg_alt.png'),
           fit: BoxFit.cover,
@@ -466,6 +450,19 @@ class _HeroBand extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
+                          Align(
+                            alignment: Alignment.topRight,
+                            child: Text(
+                              _formatHeroDate(DateTime.now()),
+                              style: AppFonts.geist(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.white.withValues(alpha: 0.6),
+                                letterSpacing: 0.02,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
                           Text(
                             'TU OPERACIÓN · AHORA',
                             style: AppFonts.geist(
@@ -693,7 +690,7 @@ class _MiniMetricChip extends StatelessWidget {
 // ── _OperatorsSection ─────────────────────────────────────────────────────────
 
 class _OperatorsSection extends StatefulWidget {
-  const _OperatorsSection({required this.tenantId});
+  const _OperatorsSection({super.key, required this.tenantId});
   final String tenantId;
 
   @override
