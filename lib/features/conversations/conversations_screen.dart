@@ -47,6 +47,9 @@ final selectedConvOperatorIdProvider = StateProvider<String?>((ref) => null);
 final selectedChannelTypeProvider    = StateProvider<String?>((ref) => null);
 final selectedConvPhotoUrlProvider   = StateProvider<String?>((ref) => null);
 final channelUnreadProvider = StateProvider<Map<String, int>>((ref) => const {});
+// chat_id → 0 override set when user opens a chat; read by _loadAllChannelUnreads
+// to avoid overwriting local-zeroed counts with stale backend values.
+final _chatReadOverrideProvider = StateProvider<Map<String, int>>((ref) => const {});
 
 // ── Pantalla ──────────────────────────────────────────────────────────────────
 
@@ -261,13 +264,30 @@ class _ConversationsBodyState extends ConsumerState<_ConversationsBody> {
         )),
       );
       if (!mounted) return;
+      final chatReadOverride = ref.read(_chatReadOverrideProvider);
       final current = ref.read(channelUnreadProvider);
       final Map<String, int> updated = Map.from(current);
       for (int i = 0; i < otherChannels.length; i++) {
         final channelId = otherChannels[i]['id'] as String;
         final convs = results[i];
+        // Diagnostic: detect chat_id mismatch between backend and session overrides
+        if (chatReadOverride.isNotEmpty) {
+          final backendIds = convs.map((c) => c['chat_id'] as String? ?? '').toSet();
+          final overrideOnly = chatReadOverride.keys.toSet().difference(backendIds);
+          if (overrideOnly.isNotEmpty) {
+            debugPrint('[_loadAllChannelUnreads] MISMATCH — override keys not in backend: $overrideOnly');
+            debugPrint('[_loadAllChannelUnreads] backend chat_ids sample: ${backendIds.take(3).toList()}');
+          }
+        }
         updated[channelId] = convs.fold<int>(
-            0, (sum, c) => sum + ((c['unread_count'] as int?) ?? 0));
+            0, (sum, c) {
+              final chatId = c['chat_id'] as String? ?? '';
+              // Respect session-level read override — user already cleared this chat
+              final count = chatReadOverride.containsKey(chatId)
+                  ? chatReadOverride[chatId]!
+                  : ((c['unread_count'] as int?) ?? 0);
+              return sum + count;
+            });
       }
       debugPrint('[_loadAllChannelUnreads] done — totals: $updated');
       ref.read(channelUnreadProvider.notifier).state = updated;
@@ -1105,6 +1125,11 @@ class _ConvoListState extends ConsumerState<_ConvoList> {
                       setLastRead(chatId, DateTime.now().toUtc(),
                           ref.read(activeTenantIdProvider));
                       setState(() { _unreadOverride[chatId] = 0; });
+                      final chatOverrides = Map<String, int>.from(
+                          ref.read(_chatReadOverrideProvider));
+                      chatOverrides[chatId] = 0;
+                      ref.read(_chatReadOverrideProvider.notifier).state =
+                          chatOverrides;
                       _updateChannelUnread();
                       // Mark all inbound messages as panel-read on the server
                       final channelId = ref.read(selectedChannelIdProvider) ?? '';
