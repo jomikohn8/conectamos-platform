@@ -143,6 +143,10 @@ class _FlowDetailScreenState extends ConsumerState<FlowDetailScreen>
   // Al cerrar tab state
   List<Map<String, dynamic>> _actions = [];
 
+  // Prerequisito
+  String? _prerequisiteFlowSlug;
+  List<Map<String, dynamic>> _workerFlows = [];
+
   @override
   void initState() {
     super.initState();
@@ -199,10 +203,12 @@ class _FlowDetailScreenState extends ConsumerState<FlowDetailScreen>
         _conditions = conditions;
         _actions = actions;
         _sendProactive = (flow['send_proactive'] as bool?) ?? true;
+        _prerequisiteFlowSlug = flow['prerequisite_flow_slug'] as String?;
         _nameCtrl.text = flow['name'] as String? ?? '';
         _descCtrl.text = flow['description'] as String? ?? '';
         _loading = false;
       });
+      _loadWorkerFlows(flow['tenant_worker_id'] as String? ?? '');
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -210,6 +216,22 @@ class _FlowDetailScreenState extends ConsumerState<FlowDetailScreen>
         _loading = false;
       });
     }
+  }
+
+  Future<void> _loadWorkerFlows(String tenantWorkerId) async {
+    if (tenantWorkerId.isEmpty) return;
+    try {
+      final flows = await FlowsApi.getFlowsByWorker(
+        tenantWorkerId: tenantWorkerId,
+      );
+      if (!mounted) return;
+      setState(() {
+        // Exclude the current flow — cannot be its own prerequisite
+        _workerFlows = flows
+            .where((f) => (f['id'] as String?) != widget.flowId)
+            .toList();
+      });
+    } catch (_) {}
   }
 
   Future<void> _save({bool silent = false}) async {
@@ -226,6 +248,8 @@ class _FlowDetailScreenState extends ConsumerState<FlowDetailScreen>
         onComplete: {'actions': _actions},
         triggerSources: _triggerSources,
         sendProactive: _sendProactive,
+        prerequisiteFlowSlug: _prerequisiteFlowSlug,
+        clearPrerequisite: _prerequisiteFlowSlug == null,
       );
       if (!mounted) return;
       final rawFields = updated['fields'];
@@ -460,6 +484,12 @@ class _FlowDetailScreenState extends ConsumerState<FlowDetailScreen>
               });
             },
             onDelete: _confirmDelete,
+            workerFlows: _workerFlows,
+            prerequisiteFlowSlug: _prerequisiteFlowSlug,
+            onPrerequisiteChanged: (slug) {
+              setState(() => _prerequisiteFlowSlug = slug);
+              _save(silent: true);
+            },
           ),
           _CamposTab(
             fields: _fields,
@@ -584,6 +614,9 @@ class _InfoTab extends StatefulWidget {
     required this.triggerSources,
     required this.onTriggerToggle,
     required this.onDelete,
+    required this.workerFlows,
+    required this.prerequisiteFlowSlug,
+    required this.onPrerequisiteChanged,
   });
 
   final Map<String, dynamic> flow;
@@ -593,6 +626,9 @@ class _InfoTab extends StatefulWidget {
   final List<String> triggerSources;
   final void Function(String source) onTriggerToggle;
   final VoidCallback onDelete;
+  final List<Map<String, dynamic>> workerFlows;
+  final String? prerequisiteFlowSlug;
+  final void Function(String?) onPrerequisiteChanged;
 
   @override
   State<_InfoTab> createState() => _InfoTabState();
@@ -774,6 +810,85 @@ class _InfoTabState extends State<_InfoTab> {
             }).toList(),
           ),
           const SizedBox(height: 24),
+
+          // Flow prerequisito
+          if (widget.workerFlows.isNotEmpty) ...[
+            const Text(
+              'Flow prerequisito',
+              style: TextStyle(
+                fontFamily: 'Geist',
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: AppColors.ctText,
+              ),
+            ),
+            const SizedBox(height: 6),
+            DropdownButtonFormField<String?>(
+              initialValue: widget.prerequisiteFlowSlug,
+              decoration: InputDecoration(
+                filled: true,
+                fillColor: widget.canManage
+                    ? AppColors.ctSurface
+                    : AppColors.ctSurface2,
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: AppColors.ctBorder),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: AppColors.ctBorder),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide:
+                      const BorderSide(color: AppColors.ctTeal, width: 1.5),
+                ),
+              ),
+              style: const TextStyle(
+                fontFamily: 'Geist',
+                fontSize: 13,
+                color: AppColors.ctText,
+              ),
+              dropdownColor: AppColors.ctSurface,
+              onChanged: widget.canManage
+                  ? (v) => widget.onPrerequisiteChanged(v)
+                  : null,
+              items: [
+                const DropdownMenuItem<String?>(
+                  value: null,
+                  child: Text(
+                    'Sin prerequisito',
+                    style: TextStyle(
+                      fontFamily: 'Geist',
+                      fontSize: 13,
+                      color: AppColors.ctText3,
+                    ),
+                  ),
+                ),
+                for (final f in widget.workerFlows)
+                  DropdownMenuItem<String?>(
+                    value: f['slug'] as String?,
+                    child: Text(
+                      f['name'] as String? ?? f['slug'] as String? ?? '—',
+                      style: const TextStyle(
+                        fontFamily: 'Geist',
+                        fontSize: 13,
+                        color: AppColors.ctText,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'El flow que debe completarse antes de iniciar este.',
+              style: AppTextStyles.bodySmall,
+            ),
+            const SizedBox(height: 24),
+          ],
 
           if (widget.canManage) ...[
             const Divider(color: AppColors.ctBorder),

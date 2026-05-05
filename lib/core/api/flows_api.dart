@@ -68,20 +68,28 @@ class FlowsApi {
     Map<String, dynamic>? onComplete,
     List<String>? triggerSources,
     bool? sendProactive,
+    String? prerequisiteFlowSlug,
+    bool clearPrerequisite = false,
   }) async {
+    final body = <String, dynamic>{
+      'name':            ?name,
+      'slug':            ?slug,
+      'description':     ?description,
+      'is_active':       ?isActive,
+      'fields':          ?fields,
+      'behavior':        ?behavior,
+      'on_complete':     ?onComplete,
+      'trigger_sources': ?triggerSources,
+      'send_proactive':  ?sendProactive,
+    };
+    if (clearPrerequisite) {
+      body['prerequisite_flow_slug'] = null;
+    } else if (prerequisiteFlowSlug != null) {
+      body['prerequisite_flow_slug'] = prerequisiteFlowSlug;
+    }
     final response = await ApiClient.instance.patch(
       '/flows/$flowId',
-      data: {
-        'name':            ?name,
-        'slug':            ?slug,
-        'description':     ?description,
-        'is_active':       ?isActive,
-        'fields':          ?fields,
-        'behavior':        ?behavior,
-        'on_complete':     ?onComplete,
-        'trigger_sources': ?triggerSources,
-        'send_proactive':  ?sendProactive,
-      },
+      data: body,
     );
     return Map<String, dynamic>.from(response.data);
   }
