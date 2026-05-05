@@ -900,15 +900,7 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
                   ),
                   const SizedBox(width: 4),
                   GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _filterWorkerIds =
-                            List.from(_filterWorkerIds)..remove(wid);
-                        _page = 1;
-                      });
-                      _markDirty();
-                      _load();
-                    },
+                    onTap: () => _toggleWorker(wid),
                     child: const Icon(Icons.close_rounded,
                         size: 12, color: Colors.white70),
                   ),
