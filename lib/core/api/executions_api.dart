@@ -1,3 +1,7 @@
+import 'dart:typed_data';
+
+import 'package:dio/dio.dart';
+
 import 'package:conectamos_platform/core/api/api_client.dart';
 
 class ExecutionsApi {
@@ -88,6 +92,42 @@ class ExecutionsApi {
   /// Elimina una vista guardada.
   static Future<void> deleteView({required String viewId}) async {
     await ApiClient.instance.delete('/api/v1/dashboard/views/$viewId');
+  }
+
+  /// Exporta ejecuciones filtradas como XLSX (bytes).
+  static Future<Uint8List> exportExecutions({
+    required String tenantId,
+    List<String>? status,
+    List<String>? workerIds,
+    List<String>? operatorIds,
+    String? flowId,
+    String? channelType,
+    String? dateRange,
+    String? dateFrom,
+    String? dateTo,
+    String? search,
+    String? fieldKey,
+    List<String>? fieldValues,
+  }) async {
+    final params = <String, dynamic>{};
+    if (status != null && status.isNotEmpty) params['status'] = status;
+    if (workerIds != null && workerIds.isNotEmpty) params['worker_id'] = workerIds;
+    if (operatorIds != null && operatorIds.isNotEmpty) params['operator_id'] = operatorIds;
+    if (flowId != null) params['flow_id'] = flowId;
+    if (channelType != null) params['channel_type'] = channelType;
+    if (dateRange != null) params['date_range'] = dateRange;
+    if (dateFrom != null) params['date_from'] = dateFrom;
+    if (dateTo != null) params['date_to'] = dateTo;
+    if (search != null && search.isNotEmpty) params['search'] = search;
+    if (fieldKey != null) params['field_key'] = fieldKey;
+    if (fieldValues != null && fieldValues.isNotEmpty) params['field_values'] = fieldValues;
+
+    final resp = await ApiClient.instance.get(
+      '/api/v1/dashboard/executions/export',
+      queryParameters: params,
+      options: Options(responseType: ResponseType.bytes),
+    );
+    return Uint8List.fromList(resp.data as List<int>);
   }
 
   /// Campos buscables por clave de campo (para filtro avanzado).

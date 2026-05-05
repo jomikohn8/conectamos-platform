@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:html' as html;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -110,6 +111,8 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
   String?      _filterDateRange;
   String       _searchText        = '';
   bool         _showFilterSidebar = false;
+  bool         _showExportModal   = false;
+  bool         _exporting         = false;
 
   // ── Workers ──────────────────────────────────────────────────────────────────
   List<Map<String, dynamic>> _availableWorkers = [];
@@ -637,6 +640,17 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
               right: 24,
               child: _buildColumnPickerCard(),
             ),
+          // Export modal backdrop
+          if (_showExportModal)
+            GestureDetector(
+              onTap: () => setState(() => _showExportModal = false),
+              behavior: HitTestBehavior.opaque,
+              child: Container(
+                  color: Colors.black.withValues(alpha: 0.3)),
+            ),
+          // Export modal
+          if (_showExportModal)
+            Center(child: _buildExportModal()),
         ],
       ),
     );
@@ -1016,6 +1030,13 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
             onSelect:     _applyView,
             onSave:       _showSaveViewDialog,
             onDelete:     _deleteView,
+          ),
+          const SizedBox(width: 8),
+          _TopbarChip(
+            icon: Icons.download_rounded,
+            label: 'Exportar',
+            active: false,
+            onTap: () => setState(() => _showExportModal = true),
           ),
         ],
       ),
@@ -1851,6 +1872,248 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
   }
 
   // ── Column picker card ────────────────────────────────────────────────────
+
+  // ── Export modal ────────────────────────────────────────────────────────────
+
+  void _downloadBytes(Uint8List bytes, String filename) {
+    final blob = html.Blob([bytes]);
+    final url = html.Url.createObjectUrlFromBlob(blob);
+    final anchor = html.document.createElement('a') as html.AnchorElement
+      ..href = url
+      ..style.display = 'none'
+      ..download = filename;
+    html.document.body!.children.add(anchor);
+    anchor.click();
+    html.document.body!.children.remove(anchor);
+    html.Url.revokeObjectUrl(url);
+  }
+
+  Future<void> _doExport() async {
+    final tenantId = ref.read(activeTenantIdProvider);
+    if (tenantId.isEmpty) return;
+    setState(() => _exporting = true);
+    try {
+      final fieldEntry = _activeFieldSearches.entries.firstOrNull;
+      final bytes = await ExecutionsApi.exportExecutions(
+        tenantId:    tenantId,
+        status:      _filterStatus.isEmpty ? null : _filterStatus,
+        workerIds:   _filterWorkerIds.isEmpty ? null : _filterWorkerIds,
+        operatorIds: _filterOperatorIds.isEmpty ? null : _filterOperatorIds,
+        flowId:      _filterFlowId,
+        channelType: _filterChannelType,
+        dateRange:   _filterDateRange,
+        search:      _searchText.isEmpty ? null : _searchText,
+        fieldKey:    fieldEntry?.key,
+        fieldValues: fieldEntry?.value,
+      );
+      final now = DateTime.now();
+      final filename =
+          'ejecuciones_${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}.xlsx';
+      _downloadBytes(bytes, filename);
+      if (mounted) {
+        setState(() {
+          _exporting = false;
+          _showExportModal = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _exporting = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al exportar: $e'),
+            backgroundColor: AppColors.ctDanger,
+          ),
+        );
+      }
+    }
+  }
+
+  Widget _buildExportFilterSummary() {
+    final parts = <String>[];
+    if (_filterWorkerIds.isNotEmpty) {
+      final names = _filterWorkerIds.map((id) {
+        final w = _availableWorkers.firstWhere(
+          (w) => w['id'] == id,
+          orElse: () => {'display_name': id},
+        );
+        return w['display_name'] as String?
+            ?? w['catalog_name'] as String?
+            ?? id;
+      }).join(', ');
+      parts.add('Workers: $names');
+    }
+    if (_filterStatus.isNotEmpty) {
+      parts.add('Estado: ${_filterStatus.map(_statusLabel).join(', ')}');
+    }
+    if (_filterFlowId != null) {
+      final flow = _availableFlows.firstWhere(
+        (f) => f['id'] == _filterFlowId,
+        orElse: () => {'name': _filterFlowId},
+      );
+      parts.add('Flujo: ${flow['name']}');
+    }
+    if (_filterChannelType != null) {
+      parts.add('Canal: $_filterChannelType');
+    }
+    if (_filterDateRange != null) {
+      parts.add('Fecha: ${_dateRangeLabel(_filterDateRange!)}');
+    }
+    if (_searchText.isNotEmpty) {
+      parts.add('Búsqueda: "$_searchText"');
+    }
+    if (_activeFieldSearches.isNotEmpty) {
+      for (final e in _activeFieldSearches.entries) {
+        parts.add('${_fieldLabel(e.key)}: ${e.value.join(', ')}');
+      }
+    }
+    return Text(
+      parts.isEmpty ? 'Todas las ejecuciones' : parts.join(' · '),
+      style: AppFonts.geist(fontSize: 12, color: AppColors.ctText),
+    );
+  }
+
+  Widget _buildExportModal() {
+    return Material(
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        width: 420,
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: AppColors.ctSurface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.ctBorder),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(children: [
+              Text('Exportar ejecuciones',
+                  style: AppFonts.onest(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.ctText,
+                  )),
+              const Spacer(),
+              GestureDetector(
+                onTap: () => setState(() => _showExportModal = false),
+                child: const Icon(Icons.close_rounded,
+                    size: 18, color: AppColors.ctText2),
+              ),
+            ]),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.ctSurface2,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.ctBorder),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Filtros activos',
+                      style: AppFonts.geist(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.ctText2,
+                      )),
+                  const SizedBox(height: 6),
+                  _buildExportFilterSummary(),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(children: [
+              const Icon(Icons.info_outline_rounded,
+                  size: 14, color: AppColors.ctText3),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'Máximo 2,500 ejecuciones por exportación. '
+                  'Si necesitas más, aplica filtros adicionales.',
+                  style: AppFonts.geist(
+                      fontSize: 11, color: AppColors.ctText3),
+                ),
+              ),
+            ]),
+            const SizedBox(height: 16),
+            Text('Formato',
+                style: AppFonts.geist(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.ctText2,
+                )),
+            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: AppColors.ctTealLight,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.ctTeal),
+              ),
+              child: Row(children: [
+                const Icon(Icons.table_chart_outlined,
+                    size: 16, color: AppColors.ctTeal),
+                const SizedBox(width: 8),
+                Text(
+                  'XLSX — 3 hojas (Ejecuciones + Metadata + Eventos)',
+                  style: AppFonts.geist(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.ctTealDark,
+                  ),
+                ),
+              ]),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: _exporting
+                      ? null
+                      : () => setState(() => _showExportModal = false),
+                  child: Text('Cancelar',
+                      style: AppFonts.geist(
+                          fontSize: 13, color: AppColors.ctText2)),
+                ),
+                const SizedBox(width: 8),
+                ElevatedButton.icon(
+                  onPressed: _exporting ? null : _doExport,
+                  icon: _exporting
+                      ? const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white))
+                      : const Icon(Icons.download_rounded, size: 16),
+                  label: Text(
+                    _exporting ? 'Exportando...' : 'Descargar XLSX',
+                    style: AppFonts.geist(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.ctTeal,
+                    disabledBackgroundColor: AppColors.ctBorder,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 10),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8)),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   Widget _buildColumnPickerCard() {
     return Material(
