@@ -1851,6 +1851,7 @@ class _ComportamientoTabState extends State<_ComportamientoTab> {
     }
   }
 
+  // ignore: unused_element
   void _openConditionDialog(Map<String, dynamic>? condition) {
     showDialog(
       context: context,
@@ -1877,6 +1878,7 @@ class _ComportamientoTabState extends State<_ComportamientoTab> {
     );
   }
 
+  // ignore: unused_element
   void _deleteCondition(Map<String, dynamic> condition) {
     showDialog(
       context: context,
@@ -1927,58 +1929,59 @@ class _ComportamientoTabState extends State<_ComportamientoTab> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              const Text(
-                'Condiciones de branching',
-                style: TextStyle(
-                  fontFamily: 'Onest',
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.ctText,
-                ),
-              ),
-              const Spacer(),
-              if (widget.canManage)
-                TextButton(
-                  onPressed: () => _openConditionDialog(null),
-                  style: TextButton.styleFrom(
-                      foregroundColor: AppColors.ctTeal),
-                  child: const Text(
-                    '+ Agregar condición',
-                    style: TextStyle(
-                      fontFamily: 'Geist',
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          if (_conditions.isEmpty)
-            const SizedBox(
-              height: 200,
-              child: _EmptyState(
-                icon: Icons.alt_route_outlined,
-                message:
-                    'Sin condiciones definidas.\nEste flujo avanza linealmente.',
-              ),
-            )
-          else
-            ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: _conditions.length,
-              separatorBuilder: (context2, i2) => const SizedBox(height: 8),
-              itemBuilder: (_, i) => _ConditionCard(
-                condition: _conditions[i],
-                canManage: widget.canManage,
-                onEdit: () => _openConditionDialog(_conditions[i]),
-                onDelete: () => _deleteCondition(_conditions[i]),
-              ),
-            ),
-          const SizedBox(height: 24),
+          // TODO: behavior.conditions — pendiente conectar al worker
+          // Row(
+          //   children: [
+          //     const Text(
+          //       'Condiciones de branching',
+          //       style: TextStyle(
+          //         fontFamily: 'Onest',
+          //         fontSize: 14,
+          //         fontWeight: FontWeight.bold,
+          //         color: AppColors.ctText,
+          //       ),
+          //     ),
+          //     const Spacer(),
+          //     if (widget.canManage)
+          //       TextButton(
+          //         onPressed: () => _openConditionDialog(null),
+          //         style: TextButton.styleFrom(
+          //             foregroundColor: AppColors.ctTeal),
+          //         child: const Text(
+          //           '+ Agregar condición',
+          //           style: TextStyle(
+          //             fontFamily: 'Geist',
+          //             fontSize: 12,
+          //             fontWeight: FontWeight.w600,
+          //           ),
+          //         ),
+          //       ),
+          //   ],
+          // ),
+          // const SizedBox(height: 16),
+          // if (_conditions.isEmpty)
+          //   const SizedBox(
+          //     height: 200,
+          //     child: _EmptyState(
+          //       icon: Icons.alt_route_outlined,
+          //       message:
+          //           'Sin condiciones definidas.\nEste flujo avanza linealmente.',
+          //     ),
+          //   )
+          // else
+          //   ListView.separated(
+          //     shrinkWrap: true,
+          //     physics: const NeverScrollableScrollPhysics(),
+          //     itemCount: _conditions.length,
+          //     separatorBuilder: (context2, i2) => const SizedBox(height: 8),
+          //     itemBuilder: (_, i) => _ConditionCard(
+          //       condition: _conditions[i],
+          //       canManage: widget.canManage,
+          //       onEdit: () => _openConditionDialog(_conditions[i]),
+          //       onDelete: () => _deleteCondition(_conditions[i]),
+          //     ),
+          //   ),
+          // const SizedBox(height: 24),
           if (widget.triggerSources.contains('conversational')) ...[
             Container(
               padding: const EdgeInsets.all(16),
@@ -2046,6 +2049,7 @@ class _ComportamientoTabState extends State<_ComportamientoTab> {
 
 // ── _ConditionCard ────────────────────────────────────────────────────────────
 
+// ignore: unused_element
 class _ConditionCard extends StatelessWidget {
   const _ConditionCard({
     required this.condition,
