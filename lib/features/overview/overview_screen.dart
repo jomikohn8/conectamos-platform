@@ -24,6 +24,7 @@ class OverviewScreen extends ConsumerStatefulWidget {
 class _OverviewScreenState extends ConsumerState<OverviewScreen> {
   Map<String, dynamic>? _kpis;
   bool _kpisLoading = false;
+  // ignore: unused_field
   bool _kpisError   = false;
   bool _initialized = false;
   DateTime? _lastUpdated;
@@ -111,8 +112,8 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _HeroBand(kpis: _kpis, loading: _kpisLoading),
-                const SizedBox(height: 14),
-                _KpiRow(kpis: _kpis, loading: _kpisLoading, error: _kpisError),
+                // const SizedBox(height: 14),
+                // _KpiRow(kpis: _kpis, loading: _kpisLoading, error: _kpisError),
                 const SizedBox(height: 14),
                 _OperatorsSection(key: ValueKey(_reloadKey), tenantId: tenantId),
                 const SizedBox(height: 14),
@@ -182,6 +183,7 @@ class _LastUpdatedLabelState extends State<_LastUpdatedLabel> {
 
 // ── Fila de KPIs ─────────────────────────────────────────────────────────────
 
+// ignore: unused_element
 class _KpiRow extends StatelessWidget {
   const _KpiRow({
     required this.kpis,
@@ -390,8 +392,8 @@ class _HeroBand extends StatelessWidget {
         ? (operatorsActive / operatorsTotal * 100).round()
         : null;
 
-    final completionPct = completionRate != null
-        ? '${(completionRate * 100).round()}%'
+    final completionPct = kpis?.containsKey('completion_rate') == true
+        ? '${((completionRate ?? 0.0) * 100).round()}%'
         : '—';
 
     final paragraphText =
@@ -729,10 +731,9 @@ class _OperatorsSectionState extends State<_OperatorsSection> {
   }
 
   String _statusOf(Map<String, dynamic> op) {
-    final s = (op['status'] as String? ?? '').toLowerCase();
+    final s = (_safeString(op['computed_status']) ?? _safeString(op['status']) ?? '').toLowerCase();
     return switch (s) {
       'active'   => 'active',
-      'waiting'  => 'waiting',
       'incident' => 'incident',
       _          => 'off',
     };
@@ -740,14 +741,12 @@ class _OperatorsSectionState extends State<_OperatorsSection> {
 
   Color _colorOf(String status) => switch (status) {
     'active'   => const Color(0xFF10B981),
-    'waiting'  => const Color(0xFFFFB700),
     'incident' => const Color(0xFFE24C4B),
-    _          => const Color(0xFF9AA0A3),
+    _          => const Color(0xFF9CA3AF),
   };
 
   String _labelOf(String status) => switch (status) {
     'active'   => 'Activo',
-    'waiting'  => 'En espera',
     'incident' => 'Incidencia',
     _          => 'Sin turno',
   };
@@ -817,9 +816,8 @@ class _OperatorsSectionState extends State<_OperatorsSection> {
     const filterOptions = [
       ('all',      'Todos',      null),
       ('active',   'Activos',    Color(0xFF10B981)),
-      ('waiting',  'En espera',  Color(0xFFFFB700)),
       ('incident', 'Incidencia', Color(0xFFE24C4B)),
-      ('off',      'Sin turno',  Color(0xFF9AA0A3)),
+      ('off',      'Sin turno',  Color(0xFF9CA3AF)),
     ];
 
     return Row(
@@ -919,10 +917,9 @@ class _OperatorsSectionState extends State<_OperatorsSection> {
       );
     }
 
-    const groupOrder = ['active', 'waiting', 'incident', 'off'];
+    const groupOrder = ['active', 'incident', 'off'];
     const groupLabels = {
       'active':   'Activos',
-      'waiting':  'En espera',
       'incident': 'Incidencia',
       'off':      'Sin turno',
     };
@@ -1158,7 +1155,7 @@ class _OpChipState extends State<_OpChip> {
                   Container(width: 1, height: 12, color: AppColors.ctBorder),
                   const SizedBox(width: 7),
                   Text(
-                    '${widget.lastEventMin}m',
+                    _formatElapsed(widget.lastEventMin),
                     style: AppFonts.geist(
                       fontSize: 10,
                       fontWeight: FontWeight.w500,
@@ -1287,7 +1284,7 @@ class _OpCardState extends State<_OpCard> {
                   const SizedBox(width: 16),
                   _MetaItem(
                     label: 'Último evento',
-                    value: lm != null ? '${lm}m' : '—',
+                    value: lm != null ? _formatElapsed(lm) : '—',
                     valueColor: lmColor,
                   ),
                 ],
@@ -1452,6 +1449,13 @@ class _WorkersFlowsState extends State<_WorkersFlows> {
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────
+
+String _formatElapsed(int? minutes) {
+  if (minutes == null) return '';
+  if (minutes < 60)   return '${minutes}m';
+  if (minutes < 1440) return '${(minutes / 60).floor()}h';
+  return '${(minutes / 1440).floor()}d';
+}
 
 /// Safely extracts a String from API fields that are normally TEXT but may
 /// occasionally arrive as a nested Map (e.g. when a join is not fully flattened).
