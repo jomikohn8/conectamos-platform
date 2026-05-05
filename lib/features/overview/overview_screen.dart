@@ -87,7 +87,7 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Vista general', style: AppTextStyles.pageTitle),
+                  Text('Vista general', style: AppFonts.onest(fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.ctText)),
                   Text(
                     tenantName.isNotEmpty ? tenantName : 'Sistema operativo',
                     style: AppFonts.geist(fontSize: 12, color: AppColors.ctText2),
