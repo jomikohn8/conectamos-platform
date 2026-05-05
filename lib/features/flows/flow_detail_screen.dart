@@ -520,6 +520,7 @@ class _FlowDetailScreenState extends ConsumerState<FlowDetailScreen>
             tenantId: ref.read(activeTenantIdProvider),
             tenantWorkerId: _flow?['tenant_worker_id'] as String? ?? '',
             currentFlowSlug: _flow?['slug'] as String? ?? '',
+            flowFields: _fields,
             onChanged: (updated) {
               setState(() => _actions = updated);
               _save(silent: true);
@@ -2443,6 +2444,7 @@ class _AlCerrarTab extends StatefulWidget {
     required this.tenantId,
     required this.tenantWorkerId,
     required this.currentFlowSlug,
+    required this.flowFields,
     required this.onChanged,
   });
 
@@ -2451,6 +2453,7 @@ class _AlCerrarTab extends StatefulWidget {
   final String tenantId;
   final String tenantWorkerId;
   final String currentFlowSlug;
+  final List<Map<String, dynamic>> flowFields;
   final ValueChanged<List<Map<String, dynamic>>> onChanged;
 
   @override
@@ -2482,6 +2485,7 @@ class _AlCerrarTabState extends State<_AlCerrarTab> {
         tenantId: widget.tenantId,
         tenantWorkerId: widget.tenantWorkerId,
         currentFlowSlug: widget.currentFlowSlug,
+        flowFields: widget.flowFields,
         onSaved: (updated) {
           setState(() {
             if (action != null) {
@@ -2744,6 +2748,7 @@ class _ActionDialog extends StatefulWidget {
     required this.tenantId,
     required this.tenantWorkerId,
     required this.currentFlowSlug,
+    this.flowFields = const [],
     this.action,
   });
 
@@ -2751,6 +2756,7 @@ class _ActionDialog extends StatefulWidget {
   final String tenantId;
   final String tenantWorkerId;
   final String currentFlowSlug;
+  final List<Map<String, dynamic>> flowFields;
   final void Function(Map<String, dynamic>) onSaved;
 
   @override
@@ -2773,6 +2779,11 @@ class _ActionDialogState extends State<_ActionDialog> {
   // emit_event
   final _eventNameCtrl = TextEditingController();
 
+  // condition
+  String? _conditionField;
+  String _conditionOp = '==';
+  final _conditionValueCtrl = TextEditingController();
+
   bool get _isEdit => widget.action != null;
 
   @override
@@ -2786,6 +2797,19 @@ class _ActionDialogState extends State<_ActionDialog> {
       _integrationCtrl.text = a['integration_id'] as String? ?? '';
       _includeAncestors = a['include_ancestors'] as bool? ?? false;
       _eventNameCtrl.text = a['event_name'] as String? ?? '';
+      final cond = a['condition'] as String?;
+      if (cond != null && cond.isNotEmpty) {
+        final re = RegExp(
+            r'^fields\.(\w+)\s*(==|!=|>=|<=|>|<)\s*"?([^"]*)"?\s*$');
+        final m = re.firstMatch(cond);
+        if (m != null) {
+          _conditionField = m.group(1);
+          _conditionOp = m.group(2)!;
+          _conditionValueCtrl.text = m.group(3)!;
+        } else {
+          _conditionValueCtrl.text = cond;
+        }
+      }
     }
     _loadFlows();
   }
@@ -2820,7 +2844,19 @@ class _ActionDialogState extends State<_ActionDialog> {
   void dispose() {
     _integrationCtrl.dispose();
     _eventNameCtrl.dispose();
+    _conditionValueCtrl.dispose();
     super.dispose();
+  }
+
+  String? _buildConditionExpression() {
+    final val = _conditionValueCtrl.text.trim();
+    if (_conditionField != null && val.isNotEmpty) {
+      return 'fields.$_conditionField $_conditionOp "$val"';
+    }
+    if (_conditionField == null && val.isNotEmpty) {
+      return val;
+    }
+    return null;
   }
 
   void _submit() {
@@ -2859,6 +2895,12 @@ class _ActionDialogState extends State<_ActionDialog> {
         updated.remove('integration_id');
         updated.remove('include_ancestors');
         break;
+    }
+    final cond = _buildConditionExpression();
+    if (cond != null) {
+      updated['condition'] = cond;
+    } else {
+      updated.remove('condition');
     }
     widget.onSaved(updated);
     Navigator.pop(context);
@@ -3048,6 +3090,191 @@ class _ActionDialogState extends State<_ActionDialog> {
                   placeholder: 'ej. flujo_completado',
                 ),
               ],
+
+              // ── Condición (opcional) ────────────────────────────────────────
+              const SizedBox(height: 20),
+              const Divider(color: AppColors.ctBorder, height: 1),
+              const SizedBox(height: 16),
+              const Text(
+                'Condición (opcional)',
+                style: TextStyle(
+                  fontFamily: 'Geist',
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.ctText,
+                ),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'La acción solo se ejecuta si se cumple la condición.',
+                style: TextStyle(
+                  fontFamily: 'Geist',
+                  fontSize: 12,
+                  color: AppColors.ctText2,
+                ),
+              ),
+              const SizedBox(height: 10),
+
+              // Campo
+              const Text(
+                'Campo',
+                style: TextStyle(
+                  fontFamily: 'Geist',
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.ctText2,
+                ),
+              ),
+              const SizedBox(height: 6),
+              _DropdownContainer(
+                child: DropdownButton<String?>(
+                  value: _conditionField,
+                  isExpanded: true,
+                  underline: const SizedBox.shrink(),
+                  dropdownColor: AppColors.ctSurface,
+                  items: [
+                    const DropdownMenuItem<String?>(
+                      value: null,
+                      child: Text(
+                        'Sin condición',
+                        style: TextStyle(
+                          fontFamily: 'Geist',
+                          fontSize: 13,
+                          color: AppColors.ctText2,
+                        ),
+                      ),
+                    ),
+                    ...widget.flowFields.map((f) {
+                      final key = f['key'] as String? ?? '';
+                      final label = f['label'] as String? ?? key;
+                      return DropdownMenuItem<String?>(
+                        value: key,
+                        child: Text(
+                          label,
+                          style: const TextStyle(
+                            fontFamily: 'Geist',
+                            fontSize: 13,
+                            color: AppColors.ctText,
+                          ),
+                        ),
+                      );
+                    }),
+                  ],
+                  onChanged: (v) => setState(() {
+                    _conditionField = v;
+                    _conditionValueCtrl.clear();
+                  }),
+                ),
+              ),
+
+              if (_conditionField != null) ...[
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    // Operador
+                    SizedBox(
+                      width: 110,
+                      child: _DropdownContainer(
+                        child: DropdownButton<String>(
+                          value: _conditionOp,
+                          isExpanded: true,
+                          underline: const SizedBox.shrink(),
+                          dropdownColor: AppColors.ctSurface,
+                          items: const [
+                            DropdownMenuItem(value: '==', child: Text('== igual', style: TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText))),
+                            DropdownMenuItem(value: '!=', child: Text('!= distinto', style: TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText))),
+                            DropdownMenuItem(value: '>',  child: Text('>  mayor', style: TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText))),
+                            DropdownMenuItem(value: '<',  child: Text('<  menor', style: TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText))),
+                            DropdownMenuItem(value: '>=', child: Text('>= mayor o igual', style: TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText))),
+                            DropdownMenuItem(value: '<=', child: Text('<= menor o igual', style: TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText))),
+                          ],
+                          onChanged: (v) {
+                            if (v != null) setState(() => _conditionOp = v);
+                          },
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    // Valor
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.ctSurface2,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AppColors.ctBorder2),
+                        ),
+                        child: TextField(
+                          controller: _conditionValueCtrl,
+                          style: const TextStyle(
+                              fontFamily: 'Geist',
+                              fontSize: 13,
+                              color: AppColors.ctText),
+                          decoration: const InputDecoration(
+                            hintText: 'ej. Si, Granjas, 5',
+                            hintStyle: TextStyle(
+                                fontFamily: 'Geist',
+                                fontSize: 13,
+                                color: AppColors.ctText3),
+                            border: InputBorder.none,
+                            isDense: true,
+                            contentPadding:
+                                EdgeInsets.symmetric(vertical: 8),
+                          ),
+                          onChanged: (_) => setState(() {}),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ] else ...[
+                const SizedBox(height: 10),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.ctSurface2,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.ctBorder2),
+                  ),
+                  child: TextField(
+                    controller: _conditionValueCtrl,
+                    style: const TextStyle(
+                        fontFamily: 'Geist',
+                        fontSize: 13,
+                        color: AppColors.ctText),
+                    decoration: const InputDecoration(
+                      hintText: 'ej. fields.receta == "Si"',
+                      hintStyle: TextStyle(
+                          fontFamily: 'Geist',
+                          fontSize: 13,
+                          color: AppColors.ctText3),
+                      border: InputBorder.none,
+                      isDense: true,
+                      contentPadding: EdgeInsets.symmetric(vertical: 8),
+                    ),
+                    onChanged: (_) => setState(() {}),
+                  ),
+                ),
+              ],
+
+              // Preview
+              Builder(builder: (_) {
+                final expr = _buildConditionExpression();
+                if (expr == null) return const SizedBox.shrink();
+                return Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    'Expresión: $expr',
+                    style: const TextStyle(
+                      fontFamily: 'Geist',
+                      fontSize: 11,
+                      color: AppColors.ctText3,
+                    ),
+                  ),
+                );
+              }),
 
               const SizedBox(height: 24),
               Row(
