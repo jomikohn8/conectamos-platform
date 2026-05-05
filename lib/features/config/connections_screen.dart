@@ -524,8 +524,8 @@ class _TabsBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: AppColors.ctSurface,
       decoration: const BoxDecoration(
+        color: AppColors.ctSurface,
         border: Border(bottom: BorderSide(color: AppColors.ctBorder)),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 40),
