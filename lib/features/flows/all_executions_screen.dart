@@ -711,15 +711,6 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
 
   // ── Worker selector ───────────────────────────────────────────────────────
 
-  Color _statusAccentColor(String status) => switch (status) {
-    'active' || 'pending_input'                 => AppColors.ctTeal,
-    'completed'                                 => const Color(0xFF107C41),
-    'pending_dashboard' || 'pending_completion' => const Color(0xFFFFB700),
-    'paused'                                    => const Color(0xFFFFB700),
-    'abandoned' || 'failed'                     => AppColors.ctBorder,
-    _                                           => AppColors.ctBorder,
-  };
-
   Color _workerColor(String workerId) {
     const colors = [
       Color(0xFF6366F1),
@@ -1657,11 +1648,6 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
         ),
         child: Row(
           children: [
-            Container(
-              width: 3,
-              height: 48,
-              color: _statusAccentColor(status),
-            ),
             ...visible.map((col) {
               final isFlow = col.id == 'flow';
               final cell = Padding(
