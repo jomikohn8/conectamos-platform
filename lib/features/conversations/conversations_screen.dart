@@ -5249,6 +5249,47 @@ class _FeedMessages extends StatefulWidget {
 }
 
 class _FeedMessagesState extends State<_FeedMessages> {
+  final _scrollCtrl = ScrollController();
+  bool _atBottom = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollCtrl.addListener(_onScroll);
+    if (widget.messages.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _jumpToBottom());
+    }
+  }
+
+  @override
+  void didUpdateWidget(_FeedMessages old) {
+    super.didUpdateWidget(old);
+    if (widget.messageCount > old.messageCount) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        if (old.messageCount == 0 || _atBottom) _jumpToBottom();
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _scrollCtrl.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (!_scrollCtrl.hasClients) return;
+    final pos = _scrollCtrl.position;
+    final nearBottom = pos.pixels >= pos.maxScrollExtent - 150;
+    if (nearBottom != _atBottom) setState(() => _atBottom = nearBottom);
+  }
+
+  void _jumpToBottom() {
+    if (!_scrollCtrl.hasClients) return;
+    _scrollCtrl.jumpTo(_scrollCtrl.position.maxScrollExtent);
+  }
+
   List<({String label, List<Map<String, dynamic>> msgs})> _buildGroups() {
     final groups = <({String label, List<Map<String, dynamic>> msgs})>[];
     DateTime? lastDay;
@@ -5372,6 +5413,7 @@ class _FeedMessagesState extends State<_FeedMessages> {
     return Container(
       color: const Color(0xFFF0F2F5),
       child: ListView.builder(
+        controller: _scrollCtrl,
         padding: const EdgeInsets.symmetric(vertical: 8),
         itemCount: groups.length + (showTruncatedBanner ? 1 : 0),
         itemBuilder: (context, i) {
