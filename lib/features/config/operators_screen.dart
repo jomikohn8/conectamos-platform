@@ -5,6 +5,7 @@ import '../../core/api/operators_api.dart';
 import '../../core/providers/permissions_provider.dart';
 import '../../core/providers/tenant_provider.dart';
 import '../../core/theme/app_theme.dart';
+import '../../shared/widgets/screen_header.dart';
 import 'widgets/operator_form_dialog.dart';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -160,36 +161,12 @@ class _ActionBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 48,
-      width: double.infinity,
-      decoration: const BoxDecoration(
-        color: AppColors.ctSurface,
-        border: Border(bottom: BorderSide(color: AppColors.ctBorder)),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 22),
-      child: Row(
-        children: [
-          const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  'Operadores',
-                  style: AppTextStyles.pageTitle,
-                ),
-                SizedBox(height: 1),
-                Text(
-                  'Gestiona los operadores y sus permisos de acceso',
-                  style: AppTextStyles.bodySmall,
-                ),
-              ],
-            ),
-          ),
-          if (canManage) _PrimaryButton(label: '+ Agregar operador', onTap: onAdd),
-        ],
-      ),
+    return ScreenHeader(
+      title: 'Operadores',
+      subtitle: 'Gestiona los operadores y sus permisos de acceso',
+      actions: [
+        if (canManage) _PrimaryButton(label: '+ Agregar operador', onTap: onAdd),
+      ],
     );
   }
 }

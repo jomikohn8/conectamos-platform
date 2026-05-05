@@ -30,6 +30,7 @@ import '../../core/api/supabase_read_receipts.dart';
 import '../../core/providers/permissions_provider.dart';
 import '../../core/providers/tenant_provider.dart';
 import '../../core/theme/app_theme.dart';
+import '../../shared/widgets/screen_header.dart';
 import 'widgets/media_preview_dialog.dart';
 
 // ── Providers ─────────────────────────────────────────────────────────────────
@@ -58,10 +59,13 @@ class ConversationsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return const Column(
+    return Column(
       children: [
-        _ActionBar(),
-        Expanded(child: _ConversationsBody()),
+        const ScreenHeader(
+          title: 'Conversaciones',
+          subtitle: 'Mensajes activos por canal y operador',
+        ),
+        const Expanded(child: _ConversationsBody()),
       ],
     );
   }
@@ -97,32 +101,6 @@ void _showBroadcastModal(
       );
     },
   );
-}
-
-// ── Action bar ────────────────────────────────────────────────────────────────
-
-class _ActionBar extends StatelessWidget {
-  const _ActionBar();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 48,
-      width: double.infinity,
-      decoration: const BoxDecoration(
-        color: AppColors.ctSurface,
-        border: Border(bottom: BorderSide(color: AppColors.ctBorder)),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 22),
-      child: const Align(
-        alignment: Alignment.centerLeft,
-        child: Text(
-          'Conversaciones',
-          style: AppTextStyles.pageTitle,
-        ),
-      ),
-    );
-  }
 }
 
 class _ActionBarGhostButton extends StatefulWidget {

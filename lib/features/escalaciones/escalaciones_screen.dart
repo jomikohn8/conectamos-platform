@@ -5,6 +5,7 @@ import '../../core/api/escalaciones_api.dart';
 import '../../core/providers/escalaciones_provider.dart';
 import '../../core/providers/tenant_provider.dart';
 import '../../core/theme/app_theme.dart';
+import '../../shared/widgets/screen_header.dart';
 import 'widgets/escalacion_detail_sheet.dart';
 import 'widgets/escalacion_list_tile.dart';
 
@@ -163,37 +164,29 @@ class _EscalacionesScreenState extends ConsumerState<EscalacionesScreen>
   // ── Header ─────────────────────────────────────────────────────────────────
 
   Widget _buildHeader(List<Map<String, dynamic>> tenantUsers) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 20, 12, 0),
-      child: Row(
-        children: [
-          const Text(
-            'Escalaciones',
-            style: AppTextStyles.pageTitle,
+    return ScreenHeader(
+      title: 'Escalaciones',
+      subtitle: 'Casos escalados pendientes de resolución',
+      actions: [
+        if (tenantUsers.isNotEmpty)
+          _AssignedToDropdown(
+            users:    tenantUsers,
+            value:    _assignedToFilter,
+            onChanged: (v) {
+              setState(() => _assignedToFilter = v);
+              _loadTab(_currentStatus);
+            },
           ),
-          const Spacer(),
-          if (tenantUsers.isNotEmpty) ...[
-            _AssignedToDropdown(
-              users:    tenantUsers,
-              value:    _assignedToFilter,
-              onChanged: (v) {
-                setState(() => _assignedToFilter = v);
-                _loadTab(_currentStatus);
-              },
-            ),
-            const SizedBox(width: 4),
-          ],
-          IconButton(
-            icon: const Icon(
-              Icons.refresh_rounded,
-              size: 20,
-              color: AppColors.ctText2,
-            ),
-            tooltip: 'Actualizar',
-            onPressed: () => _loadTab(_currentStatus),
+        IconButton(
+          icon: const Icon(
+            Icons.refresh_rounded,
+            size: 20,
+            color: AppColors.ctText2,
           ),
-        ],
-      ),
+          tooltip: 'Actualizar',
+          onPressed: () => _loadTab(_currentStatus),
+        ),
+      ],
     );
   }
 

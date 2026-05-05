@@ -8,6 +8,7 @@ import '../../core/api/flows_api.dart';
 import '../../core/providers/permissions_provider.dart';
 import '../../core/providers/tenant_provider.dart';
 import '../../core/theme/app_theme.dart';
+import '../../shared/widgets/screen_header.dart';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -246,36 +247,12 @@ class _ActionBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 48,
-      width: double.infinity,
-      decoration: const BoxDecoration(
-        color: AppColors.ctSurface,
-        border: Border(bottom: BorderSide(color: AppColors.ctBorder)),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 22),
-      child: Row(
-        children: [
-          const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  'Flujos de trabajo',
-                  style: AppTextStyles.pageTitle,
-                ),
-                SizedBox(height: 1),
-                Text(
-                  'Configura los flujos de reporte de tus operadores',
-                  style: AppTextStyles.bodySmall,
-                ),
-              ],
-            ),
-          ),
-          if (canManage) _PrimaryButton(label: '+ Nuevo flujo', onTap: onNew),
-        ],
-      ),
+    return ScreenHeader(
+      title: 'Flujos de trabajo',
+      subtitle: 'Automatizaciones configuradas para tus operadores',
+      actions: [
+        if (canManage) _PrimaryButton(label: '+ Nuevo flujo', onTap: onNew),
+      ],
     );
   }
 }

@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/api/flows_api.dart';
 import '../../core/providers/tenant_provider.dart';
 import '../../core/theme/app_theme.dart';
+import '../../shared/widgets/screen_header.dart';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -120,24 +121,17 @@ class _ExecutionsScreenState extends ConsumerState<ExecutionsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Filter bar / header
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
-          child: Row(
-            children: [
-              const Text(
-                'Tareas pendientes',
-                style: AppTextStyles.pageTitle,
-              ),
-              const Spacer(),
-              IconButton(
-                icon: const Icon(Icons.refresh_rounded,
-                    size: 20, color: AppColors.ctText2),
-                tooltip: 'Actualizar',
-                onPressed: _load,
-              ),
-            ],
-          ),
+        ScreenHeader(
+          title: 'Tareas pendientes',
+          subtitle: 'Ejecuciones pendientes de revisión',
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.refresh_rounded,
+                  size: 20, color: AppColors.ctText2),
+              tooltip: 'Actualizar',
+              onPressed: _load,
+            ),
+          ],
         ),
 
         // Body

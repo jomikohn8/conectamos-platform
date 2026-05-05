@@ -11,6 +11,7 @@ import '../../core/api/overview_api.dart';
 import '../../core/providers/tenant_provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/widgets/operator_avatar.dart';
+import '../../shared/widgets/screen_header.dart';
 
 // ── Pantalla ──────────────────────────────────────────────────────────────────
 
@@ -80,30 +81,17 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
 
     return Column(
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
-          child: Row(
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Vista general', style: AppFonts.onest(fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.ctText)),
-                  Text(
-                    tenantName.isNotEmpty ? tenantName : 'Sistema operativo',
-                    style: AppFonts.geist(fontSize: 12, color: AppColors.ctText2),
-                  ),
-                ],
-              ),
-              const Spacer(),
-              _LastUpdatedLabel(lastUpdated: _lastUpdated),
-              const SizedBox(width: 8),
-              IconButton(
-                icon: const Icon(Icons.refresh_rounded, size: 20, color: AppColors.ctText2),
-                tooltip: 'Actualizar',
-                onPressed: _reload,
-              ),
-            ],
-          ),
+        ScreenHeader(
+          title: 'Vista general',
+          subtitle: tenantName.isNotEmpty ? tenantName : 'Sistema operativo',
+          actions: [
+            _LastUpdatedLabel(lastUpdated: _lastUpdated),
+            IconButton(
+              icon: const Icon(Icons.refresh_rounded, size: 20, color: AppColors.ctText2),
+              tooltip: 'Actualizar',
+              onPressed: _reload,
+            ),
+          ],
         ),
         Expanded(
           child: SingleChildScrollView(
