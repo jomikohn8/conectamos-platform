@@ -211,12 +211,74 @@ class _TenantSelector extends ConsumerWidget {
   const _TenantSelector({required this.name});
   final String name;
 
+  void _openMenu(BuildContext context, WidgetRef ref, List tenants) async {
+    final box = context.findRenderObject() as RenderBox;
+    final offset = box.localToGlobal(Offset.zero);
+    final size = box.size;
+
+    final active = ref.read(activeTenantInfoProvider);
+
+    await showMenu<String>(
+      context: context,
+      color: AppColors.ctSurface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+        side: const BorderSide(color: AppColors.ctBorder),
+      ),
+      elevation: 8,
+      position: RelativeRect.fromLTRB(
+        offset.dx,
+        offset.dy + size.height + 4,
+        offset.dx + size.width,
+        0,
+      ),
+      items: [
+        for (final t in tenants)
+          PopupMenuItem<String>(
+            value: t.id,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    t.displayName,
+                    style: TextStyle(
+                      fontFamily: 'Geist',
+                      fontSize: 12,
+                      fontWeight: t.id == active?.id
+                          ? FontWeight.w600
+                          : FontWeight.w400,
+                      color: t.id == active?.id
+                          ? AppColors.ctTeal
+                          : AppColors.ctText,
+                    ),
+                  ),
+                ),
+                if (t.id == active?.id)
+                  const Icon(Icons.check, size: 13, color: AppColors.ctTeal),
+              ],
+            ),
+          ),
+      ],
+    ).then((selectedId) {
+      if (selectedId == null) return;
+      final selected = tenants.firstWhere(
+        (t) => t.id == selectedId,
+        orElse: () => null,
+      );
+      if (selected != null) {
+        ref.read(tenantNotifierProvider.notifier).select(selected);
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     if (name.isEmpty) return const SizedBox.shrink();
-    final tenants    = ref.watch(allTenantsProvider);
+    final tenants     = ref.watch(allTenantsProvider);
     final hasMultiple = tenants.length > 1;
-    return Container(
+
+    final chip = Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
       decoration: BoxDecoration(
         color: AppColors.ctSurface2,
@@ -241,6 +303,16 @@ class _TenantSelector extends ConsumerWidget {
             const Icon(Icons.keyboard_arrow_down, size: 14, color: AppColors.ctText3),
           ],
         ],
+      ),
+    );
+
+    if (!hasMultiple) return chip;
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: () => _openMenu(context, ref, tenants),
+        child: chip,
       ),
     );
   }
