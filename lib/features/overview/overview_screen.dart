@@ -405,7 +405,7 @@ class _HeroBand extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xFF0B132B),
         image: const DecorationImage(
-          image: AssetImage('assets/images/hero_bg_alt.png'),
+          image: AssetImage('assets/images/hero-bg.png'),
           fit: BoxFit.cover,
           alignment: Alignment.bottomCenter,
         ),
