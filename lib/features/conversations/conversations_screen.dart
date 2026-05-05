@@ -4735,6 +4735,7 @@ class _TabFeedState extends ConsumerState<_TabFeed> {
       _filterDirection = '';
       _filterContact = '';
       _filterContactPhone = '';
+      _filterFlow = '';
       _dateRange = null;
       _fromTime = null;
       _toTime = null;
@@ -4813,8 +4814,9 @@ class _TabFeedState extends ConsumerState<_TabFeed> {
       if (!matchInbound && !matchOutbound) return false;
     }
     if (_filterFlow.isNotEmpty) {
-      final flow = msg['flow_number'] as String? ?? '';
-      if (flow != _filterFlow) return false;
+      final num = msg['flow_number'];
+      final flowLabel = num != null ? 'Flujo ${num.toString()}' : '';
+      if (flowLabel != _filterFlow) return false;
     }
     return _matchesDateFilter(msg);
   }
@@ -4868,6 +4870,19 @@ class _TabFeedState extends ConsumerState<_TabFeed> {
     return keys;
   }
 
+  List<String> get _uniqueFlowOptions {
+    final seen = <String>{};
+    final result = <String>[];
+    for (final m in _feedMessages) {
+      final num = m['flow_number'];
+      if (num == null) continue;
+      final label = 'Flujo ${num.toString()}';
+      if (seen.add(label)) result.add(label);
+    }
+    result.sort();
+    return result;
+  }
+
   @override
   Widget build(BuildContext context) {
     // Reinicia el feed cuando cambia el tenant o el canal seleccionado
@@ -4892,6 +4907,7 @@ class _TabFeedState extends ConsumerState<_TabFeed> {
           filterFlow: _filterFlow,
           keyword: _keyword,
           contacts: _uniqueContacts,
+          flows: _uniqueFlowOptions,
           onDateRange: (range, from, to) {
             setState(() {
               _dateRange = range;
@@ -4968,6 +4984,7 @@ class _FeedFilters extends StatefulWidget {
     required this.filterFlow,
     required this.keyword,
     required this.contacts,
+    required this.flows,
     required this.onDateRange,
     required this.onContact,
     required this.onDirection,
@@ -4983,6 +5000,7 @@ class _FeedFilters extends StatefulWidget {
   final String filterFlow;
   final String keyword;
   final List<String> contacts;
+  final List<String> flows;
   final void Function(DateTimeRange?, TimeOfDay?, TimeOfDay?) onDateRange;
   final ValueChanged<String> onContact;
   final ValueChanged<String> onDirection;
@@ -5125,15 +5143,11 @@ class _FeedFiltersState extends State<_FeedFilters> {
           const SizedBox(width: 8),
           _FilterDropdown(
             label: 'Todos los flujos',
-            value: widget.filterFlow.isEmpty
+            value: widget.filterFlow.isEmpty ||
+                    !widget.flows.contains(widget.filterFlow)
                 ? 'Todos los flujos'
                 : widget.filterFlow,
-            options: const [
-              'Todos los flujos',
-              'Flujo 1',
-              'Flujo 2',
-              'Flujo 3',
-            ],
+            options: ['Todos los flujos', ...widget.flows],
             onChanged: widget.onFlow,
           ),
           const SizedBox(width: 8),
