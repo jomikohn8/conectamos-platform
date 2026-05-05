@@ -837,6 +837,8 @@ class _ConvoListState extends ConsumerState<_ConvoList> {
 
   String _search = '';
   List<Map<String, dynamic>> _conversations = [];
+  List<Map<String, dynamic>> _archivedConvs = [];
+  bool _showArchived = false;
   final Map<String, int> _unreadOverride = {};
   bool _loading = false;
   // TODO: consolidar streams — ConvoList y ChatPanel suscriben por separado
@@ -889,10 +891,28 @@ class _ConvoListState extends ConsumerState<_ConvoList> {
         setState(() { _conversations = convs; _loading = false; });
         _updateChannelUnread();
         if (resubscribe) _subscribeToFeed(channelId, tenantId);
+        _loadArchivedConvs();
       }
     } catch (_) {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  Future<void> _loadArchivedConvs() async {
+    final channelId = ref.read(selectedChannelIdProvider);
+    if (channelId == null) return;
+    try {
+      final all = await ConversationsApi.listConversations(
+        channelId: channelId,
+        includeUnregistered: true,
+      );
+      if (mounted) {
+        setState(() {
+          _archivedConvs =
+              all.where((c) => c['operator_id'] == null).toList();
+        });
+      }
+    } catch (_) {}
   }
 
   void _subscribeToFeed(String channelId, String tenantId) {
@@ -1027,7 +1047,12 @@ class _ConvoListState extends ConsumerState<_ConvoList> {
     // Reinicia conversaciones cuando cambia el tenant
     ref.listen<String>(activeTenantIdProvider, (prev, next) {
       if (prev != null && prev != next) {
-        setState(() { _conversations = []; _unreadOverride.clear(); });
+        setState(() {
+          _conversations = [];
+          _archivedConvs = [];
+          _showArchived = false;
+          _unreadOverride.clear();
+        });
         _fetchConversations();
         ref.read(selectedChatIdProvider.notifier).state = null;
         ref.read(selectedChatNameProvider.notifier).state = null;
@@ -1053,15 +1078,31 @@ class _ConvoListState extends ConsumerState<_ConvoList> {
     final filtered = _conversations.where((conv) {
       final chatIdVal = conv['chat_id'] as String?;
       if (chatIdVal == null || chatIdVal.isEmpty) return false;
+      // Exclude unregistered — shown in archived panel below
+      if (conv['operator_id'] == null) return false;
       final name = conv['display_name'] as String? ?? '';
       return name.toLowerCase().contains(_search.toLowerCase());
     }).toList();
+
+    final channelId = ref.read(selectedChannelIdProvider) ?? '';
 
     return SizedBox(
       width: 240,
       child: Column(
         children: [
           _searchBar(),
+          if (_archivedConvs.isNotEmpty)
+            _ArchivedEntryButton(
+              count: _archivedConvs.length,
+              expanded: _showArchived,
+              onTap: () => setState(() => _showArchived = !_showArchived),
+            ),
+          if (_showArchived && _archivedConvs.isNotEmpty)
+            _ArchivedPanel(
+              convs: _archivedConvs,
+              channelId: channelId,
+              onRefresh: _fetchConversations,
+            ),
           if (_loading)
             const Expanded(
               child: Center(child: CircularProgressIndicator()),
@@ -1154,6 +1195,441 @@ class _ConvoListState extends ConsumerState<_ConvoList> {
               ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+// ── Botón entrada a archivadas ────────────────────────────────────────────────
+
+class _ArchivedEntryButton extends StatelessWidget {
+  const _ArchivedEntryButton({
+    required this.count,
+    required this.expanded,
+    required this.onTap,
+  });
+
+  final int count;
+  final bool expanded;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 2, 12, 4),
+        child: Row(
+          children: [
+            Icon(
+              expanded ? Icons.expand_less_rounded : Icons.expand_more_rounded,
+              size: 14,
+              color: AppColors.ctText3,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              '$count archivada${count == 1 ? '' : 's'}',
+              style: const TextStyle(
+                fontFamily: 'Geist',
+                fontSize: 12,
+                color: AppColors.ctText3,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Panel de conversaciones archivadas (inline colapsable) ────────────────────
+
+class _ArchivedPanel extends ConsumerStatefulWidget {
+  const _ArchivedPanel({
+    required this.convs,
+    required this.channelId,
+    required this.onRefresh,
+  });
+
+  final List<Map<String, dynamic>> convs;
+  final String channelId;
+  final VoidCallback onRefresh;
+
+  @override
+  ConsumerState<_ArchivedPanel> createState() => _ArchivedPanelState();
+}
+
+class _ArchivedPanelState extends ConsumerState<_ArchivedPanel> {
+  List<Map<String, dynamic>> _operators = [];
+  bool _loadingOps = false;
+
+  Future<void> _ensureOperators() async {
+    if (_operators.isNotEmpty || _loadingOps) return;
+    setState(() => _loadingOps = true);
+    try {
+      final ops = await OperatorsApi.listOperators();
+      if (mounted) setState(() { _operators = ops; _loadingOps = false; });
+    } catch (_) {
+      if (mounted) setState(() => _loadingOps = false);
+    }
+  }
+
+  Future<void> _assignOperator(Map<String, dynamic> conv) async {
+    await _ensureOperators();
+    if (!mounted) return;
+    final chatId = conv['chat_id'] as String? ?? '';
+    final operatorId = await showDialog<String>(
+      context: context,
+      builder: (_) => _AssignOperatorDialog(operators: _operators),
+    );
+    if (operatorId == null || !mounted) return;
+    try {
+      await ConversationsApi.assignConversationOperator(
+        chatId: chatId,
+        channelId: widget.channelId,
+        operatorId: operatorId,
+      );
+      if (mounted) widget.onRefresh();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al asignar: $e')),
+      );
+    }
+  }
+
+  Future<void> _deleteConversation(Map<String, dynamic> conv) async {
+    final chatId = conv['chat_id'] as String? ?? '';
+    final name   = conv['display_name'] as String? ?? chatId;
+
+    final confirm1 = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.ctSurface,
+        title: const Text(
+          '¿Eliminar conversación?',
+          style: TextStyle(
+            fontFamily: 'Onest', fontSize: 15,
+            fontWeight: FontWeight.w600, color: AppColors.ctText,
+          ),
+        ),
+        content: Text(
+          'Se eliminarán permanentemente todos los mensajes de "$name" '
+          'en este canal. Esta acción no se puede deshacer.',
+          style: const TextStyle(
+            fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText2,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text(
+              'Continuar',
+              style: TextStyle(color: AppColors.ctDanger),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirm1 != true || !mounted) return;
+
+    final confirm2 = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.ctSurface,
+        title: const Text(
+          'Confirmar eliminación definitiva',
+          style: TextStyle(
+            fontFamily: 'Onest', fontSize: 15,
+            fontWeight: FontWeight.w600, color: AppColors.ctText,
+          ),
+        ),
+        content: Text(
+          '¿Seguro que deseas eliminar todos los mensajes de "$name"? '
+          'Esta operación es irreversible.',
+          style: const TextStyle(
+            fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText2,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text(
+              'Eliminar definitivamente',
+              style: TextStyle(color: AppColors.ctDanger),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirm2 != true || !mounted) return;
+
+    // TODO: DELETE /wa-messages?from_phone=X&channel_id=Y&tenant_id=Z
+    // Solo admin. Hard delete de wa_messages con operator_id=null
+    // y from_phone=X en ese canal.
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Eliminación pendiente de implementación en backend.'),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isAdmin =
+        ref.watch(userRoleProvider).valueOrNull?.toLowerCase() == 'admin';
+    return Container(
+      constraints: const BoxConstraints(maxHeight: 280),
+      decoration: const BoxDecoration(
+        color: AppColors.ctSurface2,
+        border: Border.symmetric(
+          horizontal: BorderSide(color: AppColors.ctBorder),
+        ),
+      ),
+      child: ListView.separated(
+        shrinkWrap: true,
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        itemCount: widget.convs.length,
+        separatorBuilder: (context, i) =>
+            const Divider(color: AppColors.ctBorder, height: 1),
+        itemBuilder: (context, i) {
+          final conv    = widget.convs[i];
+          final chatId  = conv['chat_id']      as String? ?? '';
+          final name    = conv['display_name'] as String? ?? chatId;
+          final lastMsg = conv['last_message'] as Map<String, dynamic>?;
+          final body    = lastMsg?['body']      as String?;
+          final at      = lastMsg?['created_at'] as String?;
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(10, 6, 10, 4),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        name,
+                        style: const TextStyle(
+                          fontFamily: 'Geist', fontSize: 12,
+                          fontWeight: FontWeight.w600, color: AppColors.ctText,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    Text(
+                      _formatTime(at),
+                      style: const TextStyle(
+                        fontFamily: 'Geist', fontSize: 10,
+                        color: AppColors.ctText3,
+                      ),
+                    ),
+                  ],
+                ),
+                if (body != null && body.isNotEmpty) ...[
+                  const SizedBox(height: 1),
+                  Text(
+                    body,
+                    style: const TextStyle(
+                      fontFamily: 'Geist', fontSize: 11,
+                      color: AppColors.ctText3,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    _ArchivedAction(
+                      label: 'Asignar',
+                      color: AppColors.ctTeal,
+                      onTap: () => _assignOperator(conv),
+                    ),
+                    if (isAdmin) ...[
+                      const SizedBox(width: 8),
+                      _ArchivedAction(
+                        label: 'Eliminar',
+                        color: AppColors.ctDanger,
+                        onTap: () => _deleteConversation(conv),
+                      ),
+                    ],
+                  ],
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _ArchivedAction extends StatelessWidget {
+  const _ArchivedAction({
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
+
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(4),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontFamily: 'Geist',
+            fontSize: 11,
+            color: color,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Diálogo selector de operador ──────────────────────────────────────────────
+
+class _AssignOperatorDialog extends StatefulWidget {
+  const _AssignOperatorDialog({required this.operators});
+
+  final List<Map<String, dynamic>> operators;
+
+  @override
+  State<_AssignOperatorDialog> createState() => _AssignOperatorDialogState();
+}
+
+class _AssignOperatorDialogState extends State<_AssignOperatorDialog> {
+  String _search = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final filtered = widget.operators.where((op) {
+      final name = (op['display_name'] as String? ?? '').toLowerCase();
+      return name.contains(_search.toLowerCase());
+    }).toList();
+
+    return Dialog(
+      backgroundColor: AppColors.ctSurface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: SizedBox(
+        width: 340,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Text(
+                'Asignar operador',
+                style: AppFonts.onest(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.ctText,
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: TextField(
+                autofocus: true,
+                onChanged: (v) => setState(() => _search = v),
+                style: const TextStyle(
+                  fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText,
+                ),
+                decoration: InputDecoration(
+                  hintText: 'Buscar operador…',
+                  hintStyle: const TextStyle(
+                    fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText3,
+                  ),
+                  prefixIcon: const Icon(
+                    Icons.search_rounded, size: 16, color: AppColors.ctText3,
+                  ),
+                  filled: true,
+                  fillColor: AppColors.ctSurface2,
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: AppColors.ctBorder),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: AppColors.ctBorder),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide:
+                        const BorderSide(color: AppColors.ctTeal, width: 1.5),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 280),
+              child: filtered.isEmpty
+                  ? const Padding(
+                      padding: EdgeInsets.all(24),
+                      child: Text(
+                        'Sin operadores',
+                        style: TextStyle(
+                          fontFamily: 'Geist',
+                          fontSize: 13,
+                          color: AppColors.ctText3,
+                        ),
+                      ),
+                    )
+                  : ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: filtered.length,
+                      itemBuilder: (context, i) {
+                        final op   = filtered[i];
+                        final id   = op['id']            as String? ?? '';
+                        final name = op['display_name'] as String? ?? id;
+                        return ListTile(
+                          dense: true,
+                          title: Text(
+                            name,
+                            style: const TextStyle(
+                              fontFamily: 'Geist',
+                              fontSize: 13,
+                              color: AppColors.ctText,
+                            ),
+                          ),
+                          onTap: () => Navigator.pop(context, id),
+                        );
+                      },
+                    ),
+            ),
+            const Divider(color: AppColors.ctBorder, height: 1),
+            Align(
+              alignment: Alignment.centerRight,
+              child: Padding(
+                padding: const EdgeInsets.all(8),
+                child: TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancelar'),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
