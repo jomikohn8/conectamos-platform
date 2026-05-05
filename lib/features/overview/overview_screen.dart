@@ -85,17 +85,15 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
                 const SizedBox(height: 14),
                 _OperatorsSection(tenantId: tenantId),
                 const SizedBox(height: 14),
-                IntrinsicHeight(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Expanded(flex: 13, child: _WorkersFlows(tenantId: tenantId)),
-                      const SizedBox(width: 14),
-                      Expanded(flex: 10, child: const _DayThread()),
-                      const SizedBox(width: 14),
-                      Expanded(flex: 10, child: _Attention(tenantId: tenantId)),
-                    ],
-                  ),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(flex: 13, child: _WorkersFlows(tenantId: tenantId)),
+                    const SizedBox(width: 14),
+                    Expanded(flex: 10, child: const _DayThread()),
+                    const SizedBox(width: 14),
+                    Expanded(flex: 10, child: _Attention(tenantId: tenantId)),
+                  ],
                 ),
                 const SizedBox(height: 32),
               ],
@@ -1455,6 +1453,17 @@ class _WorkersFlowsState extends State<_WorkersFlows> {
   }
 }
 
+// ── helpers ───────────────────────────────────────────────────────────────────
+
+/// Safely extracts a String from API fields that are normally TEXT but may
+/// occasionally arrive as a nested Map (e.g. when a join is not fully flattened).
+String? _safeString(dynamic value) {
+  if (value == null) return null;
+  if (value is String) return value;
+  if (value is Map) return value['hex'] as String? ?? value['value'] as String?;
+  return value.toString();
+}
+
 // ── _WorkerCard ───────────────────────────────────────────────────────────────
 
 class _WorkerCard extends StatefulWidget {
@@ -1507,9 +1516,9 @@ class _WorkerCardState extends State<_WorkerCard>
   @override
   Widget build(BuildContext context) {
     final w             = widget.worker;
-    final name          = w['catalog_name'] as String? ?? w['display_name'] as String? ?? '—';
-    final type          = w['catalog_worker_type'] as String?;
-    final colorHex      = w['catalog_color'] as String?;
+    final name          = _safeString(w['catalog_name']) ?? _safeString(w['display_name']) ?? '—';
+    final type          = _safeString(w['catalog_worker_type']);
+    final colorHex      = _safeString(w['catalog_color']);
     final flowsRaw      = w['flows'];
     final flows         = flowsRaw is List ? flowsRaw : <dynamic>[];
     final runningNow    = (w['running_now'] as num?)?.toInt() ?? 0;
