@@ -284,7 +284,10 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
       });
       debugPrint('[Workers] loaded: ${_availableWorkers.length}');
       // Recargar solo si era la primera carga (seleccionamos workers por default)
-      if (wasEmpty && mounted) _load();
+      if (wasEmpty && mounted) {
+        _load();
+        _loadFlows();
+      }
     } catch (e) {
       debugPrint('[Workers] error: $e');
     }
@@ -314,15 +317,32 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
           ? resp.data as List
           : ((resp.data['flows'] ?? resp.data['items'] ??
              resp.data['flow_definitions'] ?? []) as List);
+
+      var flows = list
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .where((f) => f['is_active'] == true)
+          .toList();
+
+      // Si hay workers seleccionados, filtrar flows de esos workers
+      if (_filterWorkerIds.isNotEmpty) {
+        flows = flows.where((f) {
+          final fwid = f['tenant_worker_id'] as String?;
+          return fwid != null && _filterWorkerIds.contains(fwid);
+        }).toList();
+      }
+
       if (!mounted) return;
       setState(() {
-        _availableFlows = list
-            .whereType<Map>()
-            .map((e) => Map<String, dynamic>.from(e))
-            .where((f) => f['is_active'] == true)
-            .toList();
+        _availableFlows = flows;
+        // Si el flow seleccionado ya no está disponible, limpiar
+        if (_filterFlowId != null &&
+            !_availableFlows.any((f) => f['id'] == _filterFlowId)) {
+          _filterFlowId = null;
+        }
       });
-      debugPrint('[Flows] loaded: ${_availableFlows.length}');
+      debugPrint('[Flows] loaded: ${_availableFlows.length} '
+          '(workers filter: ${_filterWorkerIds.length})');
     } catch (e) {
       debugPrint('[Flows] error: $e');
     }
@@ -939,8 +959,15 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
                   if (_filterWorkerIds.isNotEmpty)
                     GestureDetector(
                       onTap: () {
-                        setState(() { _filterWorkerIds = []; _page = 1; });
+                        setState(() {
+                          _filterWorkerIds   = [];
+                          _filterFlowId      = null;
+                          _filterOperatorIds = [];
+                          _page = 1;
+                        });
                         _markDirty();
+                        _loadFlows();
+                        _loadOperators();
                         _load();
                       },
                       child: Text(
@@ -987,8 +1014,14 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
                                 List.from(_filterWorkerIds)..add(id);
                           }
                           _page = 1;
+                          // Limpiar filtros dependientes al cambiar workers
+                          _filterFlowId      = null;
+                          _filterOperatorIds = [];
                         });
                         _markDirty();
+                        // Recargar flows y operadores filtrados por nuevos workers
+                        _loadFlows();
+                        _loadOperators();
                         _load();
                       },
                       child: Padding(
