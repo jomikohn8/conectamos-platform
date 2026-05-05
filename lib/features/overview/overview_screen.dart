@@ -415,9 +415,8 @@ class _HeroBand extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
       ),
       child: DecoratedBox(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          gradient: const LinearGradient(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
