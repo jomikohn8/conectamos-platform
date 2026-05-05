@@ -1172,6 +1172,7 @@ class _FieldDialog extends StatefulWidget {
 
 // Data source options for select fields
 const _kDataSources = [
+  ('static', 'Opciones estáticas'),
   ('system:operators', 'Operadores del tenant'),
   ('system:operators_with_flow', 'Operadores con flow asignado'),
 ];
@@ -1188,12 +1189,18 @@ class _FieldDialogState extends State<_FieldDialog> {
   List<Map<String, dynamic>> _availableFlows = [];
   bool _loadingFlows = false;
 
+  // static options state
+  List<String> _staticOptions = [];
+  final _optionCtrl = TextEditingController();
+  final _descCtrl = TextEditingController();
+
   bool get _isEdit => widget.field != null;
 
   String get _fieldKey => _fieldKeyify(_labelCtrl.text.trim());
   bool get _fieldKeyValid => _fieldKey.length >= 2;
 
   String get _resolvedDataSource {
+    if (_dataSourceBase == 'static') return 'static';
     if (_dataSourceBase == 'system:operators_with_flow') {
       if (_dataSourceFlowSlug == null) return _dataSourceBase;
       return 'system:operators_with_flow:$_dataSourceFlowSlug';
@@ -1203,9 +1210,11 @@ class _FieldDialogState extends State<_FieldDialog> {
 
   bool get _selectValid =>
       _type != 'select' ||
-      (_dataSourceBase == 'system:operators' ||
-          (_dataSourceBase == 'system:operators_with_flow' &&
-              _dataSourceFlowSlug != null));
+      (_dataSourceBase == 'static'
+          ? _staticOptions.isNotEmpty
+          : (_dataSourceBase == 'system:operators' ||
+              (_dataSourceBase == 'system:operators_with_flow' &&
+                  _dataSourceFlowSlug != null)));
 
   @override
   void initState() {
@@ -1214,6 +1223,7 @@ class _FieldDialogState extends State<_FieldDialog> {
       _labelCtrl.text = widget.field!['label'] as String? ?? '';
       _type = widget.field!['type'] as String? ?? 'text';
       _required = widget.field!['required'] as bool? ?? false;
+      _descCtrl.text = widget.field!['description'] as String? ?? '';
       final ds = widget.field!['data_source'] as String?;
       if (ds != null) {
         if (ds.startsWith('system:operators_with_flow:')) {
@@ -1225,6 +1235,11 @@ class _FieldDialogState extends State<_FieldDialog> {
       }
       _fillStrategy = widget.field!['fill_strategy'] as String? ??
           'conversational_list';
+      final rawOpts = widget.field!['options'];
+      if (rawOpts is List) {
+        _staticOptions = List<String>.from(rawOpts.map((e) => e.toString()));
+      }
+      if (_staticOptions.isNotEmpty && ds == null) _dataSourceBase = 'static';
     }
     _labelCtrl.addListener(_onLabelChanged);
     if (_type == 'select') _loadFlows();
@@ -1258,7 +1273,18 @@ class _FieldDialogState extends State<_FieldDialog> {
   void dispose() {
     _labelCtrl.removeListener(_onLabelChanged);
     _labelCtrl.dispose();
+    _optionCtrl.dispose();
+    _descCtrl.dispose();
     super.dispose();
+  }
+
+  void _addStaticOption() {
+    final v = _optionCtrl.text.trim();
+    if (v.isEmpty || _staticOptions.contains(v)) return;
+    setState(() {
+      _staticOptions.add(v);
+      _optionCtrl.clear();
+    });
   }
 
   void _submit() {
@@ -1270,12 +1296,26 @@ class _FieldDialogState extends State<_FieldDialog> {
     updated['key'] = _fieldKey;
     updated['type'] = _type;
     updated['required'] = _required;
+    final desc = _descCtrl.text.trim();
+    if (desc.isNotEmpty) {
+      updated['description'] = desc;
+    } else {
+      updated.remove('description');
+    }
     if (_type == 'select') {
-      updated['data_source'] = _resolvedDataSource;
-      updated['fill_strategy'] = _fillStrategy;
+      if (_dataSourceBase == 'static') {
+        updated['options'] = List<String>.from(_staticOptions);
+        updated.remove('data_source');
+        updated.remove('fill_strategy');
+      } else {
+        updated['data_source'] = _resolvedDataSource;
+        updated['fill_strategy'] = _fillStrategy;
+        updated.remove('options');
+      }
     } else {
       updated.remove('data_source');
       updated.remove('fill_strategy');
+      updated.remove('options');
     }
     if (!_isEdit || updated['id'] == null) {
       updated['id'] =
@@ -1295,8 +1335,8 @@ class _FieldDialogState extends State<_FieldDialog> {
         side: const BorderSide(color: AppColors.ctBorder),
       ),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 420),
-        child: Padding(
+        constraints: const BoxConstraints(maxWidth: 460, maxHeight: 720),
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -1326,6 +1366,39 @@ class _FieldDialogState extends State<_FieldDialog> {
                   valid: _fieldKeyValid,
                 ),
               ],
+              const SizedBox(height: 14),
+
+              // Description
+              const Text(
+                'Descripción / alias de detección',
+                style: AppTextStyles.btnSecondary,
+              ),
+              const SizedBox(height: 6),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppColors.ctSurface2,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppColors.ctBorder2),
+                ),
+                child: TextField(
+                  controller: _descCtrl,
+                  maxLines: 3,
+                  style: AppTextStyles.body,
+                  decoration: const InputDecoration(
+                    hintText: 'Opcional',
+                    hintStyle: TextStyle(
+                      fontFamily: 'Geist',
+                      fontSize: 13,
+                      color: AppColors.ctText3,
+                    ),
+                    border: InputBorder.none,
+                    isDense: true,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+              ),
               const SizedBox(height: 14),
 
               // Type
@@ -1485,8 +1558,84 @@ class _FieldDialogState extends State<_FieldDialog> {
                 ],
               ],
 
-              // Fill strategy (select type only)
-              if (_type == 'select') ...[
+              // Static options (select + static source only)
+              if (_type == 'select' && _dataSourceBase == 'static') ...[
+                const SizedBox(height: 14),
+                const Text(
+                  'Opciones',
+                  style: AppTextStyles.btnSecondary,
+                ),
+                const SizedBox(height: 6),
+                if (_staticOptions.isNotEmpty) ...[
+                  ..._staticOptions.asMap().entries.map((e) => Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: AppColors.ctSurface2,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: AppColors.ctBorder2),
+                                ),
+                                child: Text(e.value, style: AppTextStyles.body),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            GestureDetector(
+                              onTap: () =>
+                                  setState(() => _staticOptions.removeAt(e.key)),
+                              child: const Icon(Icons.close,
+                                  size: 16, color: AppColors.ctText2),
+                            ),
+                          ],
+                        ),
+                      )),
+                  const SizedBox(height: 4),
+                ],
+                Row(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.ctSurface2,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AppColors.ctBorder2),
+                        ),
+                        child: TextField(
+                          controller: _optionCtrl,
+                          style: AppTextStyles.body,
+                          decoration: const InputDecoration(
+                            hintText: 'Nueva opción...',
+                            hintStyle: TextStyle(
+                              fontFamily: 'Geist',
+                              fontSize: 13,
+                              color: AppColors.ctText3,
+                            ),
+                            border: InputBorder.none,
+                            isDense: true,
+                            contentPadding:
+                                EdgeInsets.symmetric(vertical: 8),
+                          ),
+                          onSubmitted: (_) => _addStaticOption(),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    _PrimaryButton(
+                      label: 'Agregar',
+                      onTap: _addStaticOption,
+                    ),
+                  ],
+                ),
+              ],
+
+              // Fill strategy (select type only, not for static)
+              if (_type == 'select' && _dataSourceBase != 'static') ...[
                 const SizedBox(height: 14),
                 const Text(
                   'Cuando se ejecuta conversacionalmente',
