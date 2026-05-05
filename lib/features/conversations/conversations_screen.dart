@@ -1137,13 +1137,9 @@ class _ConvoListState extends ConsumerState<_ConvoList> {
                   final createdAt  = lastMsg?['created_at'] as String?;
                   final unread     = _unreadOverride[chatId]
                       ?? (conv['unread_count'] as int? ?? 0);
-                  final chType     = ref.read(selectedChannelTypeProvider);
-                  final isWa       = (chType ?? 'whatsapp') == 'whatsapp';
-                  final lastTime   = DateTime.tryParse(createdAt ?? '');
-                  final windowOpen = !isWa ||
-                      (lastTime != null &&
-                          DateTime.now().toUtc().difference(lastTime) <
-                              const Duration(hours: 24));
+                  // Use backend-provided window_open; fallback true is
+                  // conservative (non-WA channels have no 24h restriction).
+                  final windowOpen = conv['window_open'] as bool? ?? true;
                   return _ApiConvoItem(
                     name: name,
                     photoUrl: photoUrl,
