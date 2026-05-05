@@ -41,6 +41,7 @@ class FlowsApi {
   static Future<Map<String, dynamic>> createFlow({
     required String tenantWorkerId,
     required String name,
+    required String slug,
     String? description,
     List<Map<String, dynamic>> fields = const [],
     Map<String, dynamic> behavior = const {},
@@ -48,6 +49,7 @@ class FlowsApi {
     final response = await ApiClient.instance.post('/flows', data: {
       'tenant_worker_id': tenantWorkerId,
       'name':             name,
+      'slug':             slug,
       'description':      ?description,
       'fields':   fields,
       'behavior': behavior,

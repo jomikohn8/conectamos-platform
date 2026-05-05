@@ -724,6 +724,7 @@ class _FlowFormDialogState extends State<_FlowFormDialog> {
         await FlowsApi.createFlow(
           tenantWorkerId: _selectedWorkerId!,
           name: name,
+          slug: _slug,
           description: desc.isNotEmpty ? desc : null,
         );
       }
