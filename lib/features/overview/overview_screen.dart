@@ -402,6 +402,7 @@ class _HeroBand extends StatelessWidget {
         '${eventsProcessed ?? '—'} eventos procesados.';
 
     return Container(
+      width: double.infinity,
       constraints: const BoxConstraints(minHeight: 200),
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
@@ -459,9 +460,15 @@ class _HeroBand extends StatelessWidget {
                               style: AppFonts.geist(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w500,
-                                color: Colors.white.withValues(alpha: 0.6),
+                                color: Colors.white.withValues(alpha: 0.85),
                                 letterSpacing: 0.02,
-                              ),
+                              ).copyWith(shadows: [
+                                Shadow(
+                                  color: Colors.black.withValues(alpha: 0.4),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 1),
+                                ),
+                              ]),
                             ),
                           ),
                           const SizedBox(height: 10),
