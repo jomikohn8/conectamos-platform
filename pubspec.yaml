@@ -75,6 +75,7 @@ flutter:
     - assets/images/Conectamos-Isotipo.svg
     - assets/images/Conectamos-Logotipo.svg
     - assets/images/login_background.svg
+    - assets/images/hero_bg_alt.png
     - assets/logos/
 
   fonts:

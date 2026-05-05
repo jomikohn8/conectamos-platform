@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' show pi;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -405,6 +406,11 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                _HeroBand(
+                  kpis: _kpis,
+                  loading: _kpisLoading,
+                ),
+                const SizedBox(height: 18),
                 _KpiRow(
                   kpis: _kpis,
                   loading: _kpisLoading,
@@ -603,7 +609,7 @@ class _KpiRow extends StatelessWidget {
                 topBorderColor: AppColors.ctOk,
                 label: 'FLUJOS ACTIVOS',
                 value: _val('flows_active'),
-                subtext: 'Flujos activos en curso',
+                subtext: 'En curso ahora',
                 hasError: error,
               ),
             ),
@@ -613,7 +619,7 @@ class _KpiRow extends StatelessWidget {
                 topBorderColor: AppColors.ctWarn,
                 label: 'FLUJOS COMPLETADOS HOY',
                 value: _val('flows_completed_today'),
-                subtext: 'Completados desde medianoche',
+                subtext: 'Desde medianoche',
                 hasError: error,
               ),
             ),
@@ -623,7 +629,7 @@ class _KpiRow extends StatelessWidget {
                 topBorderColor: AppColors.ctDanger,
                 label: 'WORKERS CONTRATADOS',
                 value: _val('workers_contracted'),
-                subtext: 'Workers activos en tu operación',
+                subtext: 'Activos en tu operación',
                 hasError: error,
               ),
             ),
@@ -1013,6 +1019,328 @@ class _OperatorAvatar extends StatelessWidget {
           fontWeight: FontWeight.w700,
           color: textColor,
         ),
+      ),
+    );
+  }
+}
+
+// ── _HeroBand ─────────────────────────────────────────────────────────────────
+
+class _HeroBand extends StatelessWidget {
+  const _HeroBand({required this.kpis, required this.loading});
+
+  final Map<String, dynamic>? kpis;
+  final bool loading;
+
+  @override
+  Widget build(BuildContext context) {
+    final operatorsActive = (kpis?['operators_active']   as num?)?.toInt();
+    final operatorsTotal  = (kpis?['operators_total']    as num?)?.toInt();
+    final flowsRunning    = (kpis?['flows_running_now']  as num?)?.toInt();
+    final flowsCompleted  = (kpis?['flows_completed_today'] as num?)?.toInt();
+    final eventsProcessed = (kpis?['events_processed_today'] as num?)?.toInt();
+    final completionRate  = (kpis?['completion_rate']    as num?)?.toDouble();
+    final workersCont     = (kpis?['workers_contracted'] as num?)?.toInt();
+    final flowsCatalog    = (kpis?['flows_catalog_count'] as num?)?.toInt();
+
+    final pct = (operatorsActive != null &&
+            operatorsTotal != null &&
+            operatorsTotal > 0)
+        ? (operatorsActive / operatorsTotal * 100).round()
+        : null;
+
+    final completionPct = completionRate != null
+        ? '${(completionRate * 100).round()}%'
+        : '—';
+
+    final paragraphText =
+        '${flowsRunning ?? '—'} flujos en ejecución · '
+        '${flowsCompleted ?? '—'} completados hoy · '
+        '${eventsProcessed ?? '—'} eventos procesados.';
+
+    return Container(
+      constraints: const BoxConstraints(minHeight: 200),
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: const Color(0xFF0B132B),
+        // TODO: replace with real art when assets/images/hero_bg_alt.png is delivered
+        image: const DecorationImage(
+          image: AssetImage('assets/images/hero_bg_alt.png'),
+          fit: BoxFit.cover,
+          alignment: Alignment.bottomCenter,
+        ),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xB80B132B), // rgba(11,19,43,0.72)
+              Color(0x520B132B), // rgba(11,19,43,0.32)
+            ],
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(28),
+          child: loading
+              ? const Center(
+                  child: CircularProgressIndicator(
+                    color: Colors.white,
+                    strokeWidth: 3,
+                  ),
+                )
+              : Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    SizedBox(
+                      width:  220,
+                      height: 220,
+                      child: _BigDonut(
+                        active:  operatorsActive,
+                        total:   operatorsTotal,
+                        loading: loading,
+                      ),
+                    ),
+                    const SizedBox(width: 32),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            'TU OPERACIÓN · AHORA',
+                            style: AppFonts.geist(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.ctTeal,
+                              letterSpacing: 0.08,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            '${pct ?? '—'}% de tu equipo está operando.',
+                            style: AppFonts.onest(
+                              fontSize: 38,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                              letterSpacing: -0.03,
+                              height: 1.1,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            paragraphText,
+                            style: AppFonts.geist(
+                              fontSize: 14,
+                              color: const Color(0xB3FFFFFF),
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          Wrap(
+                            spacing: 10,
+                            runSpacing: 10,
+                            children: [
+                              _MiniMetricChip(
+                                label: 'Workers',
+                                value: workersCont?.toString() ?? '—',
+                              ),
+                              _MiniMetricChip(
+                                label: 'Flujos del catálogo',
+                                value: flowsCatalog?.toString() ?? '—',
+                              ),
+                              _MiniMetricChip(
+                                label: 'Completitud',
+                                value: completionPct,
+                                highlight: true,
+                              ),
+                              _MiniMetricChip(
+                                label: 'Completados hoy',
+                                value: flowsCompleted?.toString() ?? '—',
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── _BigDonut ─────────────────────────────────────────────────────────────────
+
+class _BigDonut extends StatelessWidget {
+  const _BigDonut({
+    required this.active,
+    required this.total,
+    required this.loading,
+  });
+
+  final int?  active;
+  final int?  total;
+  final bool  loading;
+
+  @override
+  Widget build(BuildContext context) {
+    if (loading) {
+      return const Center(
+        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 14),
+      );
+    }
+
+    final progress = (active != null && total != null && total! > 0)
+        ? (active! / total!).clamp(0.0, 1.0)
+        : 0.0;
+
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        CustomPaint(
+          size: const Size(220, 220),
+          painter: _DonutPainter(progress: progress),
+        ),
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              active?.toString() ?? '—',
+              style: AppFonts.onest(
+                fontSize: 42,
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
+                height: 1,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              'de ${total ?? '—'} operadores',
+              style: AppFonts.geist(
+                fontSize: 12,
+                color: const Color(0xB3FFFFFF),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'EN TURNO HOY',
+              style: AppFonts.geist(
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                color: AppColors.ctTeal,
+                letterSpacing: 0.8,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+// ── _DonutPainter ─────────────────────────────────────────────────────────────
+
+class _DonutPainter extends CustomPainter {
+  const _DonutPainter({required this.progress});
+
+  final double progress;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = (size.width - 14) / 2;
+    final rect   = Rect.fromCircle(center: center, radius: radius);
+
+    // Track
+    canvas.drawArc(
+      rect,
+      -pi / 2,
+      2 * pi,
+      false,
+      Paint()
+        ..color      = const Color(0x1AFFFFFF)
+        ..style      = PaintingStyle.stroke
+        ..strokeWidth = 14
+        ..strokeCap  = StrokeCap.round,
+    );
+
+    // Progress arc with gradient
+    if (progress > 0) {
+      canvas.drawArc(
+        rect,
+        -pi / 2,
+        2 * pi * progress,
+        false,
+        Paint()
+          ..shader = const LinearGradient(
+            colors: [Color(0xFF66E2D0), Color(0xFF5BC0BE)],
+          ).createShader(rect)
+          ..style      = PaintingStyle.stroke
+          ..strokeWidth = 14
+          ..strokeCap  = StrokeCap.round,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DonutPainter old) => old.progress != progress;
+}
+
+// ── _MiniMetricChip ───────────────────────────────────────────────────────────
+
+class _MiniMetricChip extends StatelessWidget {
+  const _MiniMetricChip({
+    required this.label,
+    required this.value,
+    this.highlight = false,
+  });
+
+  final String label;
+  final String value;
+  final bool   highlight;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: highlight
+            ? const Color(0x2E59E0CC)
+            : const Color(0x0FFFFFFF),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: highlight
+              ? const Color(0x6659E0CC)
+              : const Color(0x1AFFFFFF),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label.toUpperCase(),
+            style: AppFonts.geist(
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              color: const Color(0x99FFFFFF),
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: AppFonts.onest(
+              fontSize: 22,
+              fontWeight: FontWeight.w700,
+              color: highlight ? AppColors.ctTeal : Colors.white,
+              height: 1,
+            ),
+          ),
+        ],
       ),
     );
   }
