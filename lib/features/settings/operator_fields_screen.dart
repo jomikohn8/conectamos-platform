@@ -361,8 +361,10 @@ class _OperatorFieldsBodyState extends ConsumerState<OperatorFieldsBody> {
   @override
   Widget build(BuildContext context) {
     final canManage = hasPermission(ref, 'settings', 'manage');
-    final tenantId = ref.read(activeTenantIdProvider);
-    final effectiveTenantId = tenantId.isNotEmpty ? tenantId : 'default';
+    final effectiveTenantId = ref.watch(activeTenantIdProvider);
+    if (effectiveTenantId.isEmpty) {
+      return const Center(child: CircularProgressIndicator(color: AppColors.ctTeal));
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
