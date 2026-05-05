@@ -118,6 +118,9 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
   // ── Operators ─────────────────────────────────────────────────────────────────
   List<Map<String, dynamic>> _availableOperators = [];
 
+  // ── Flows ─────────────────────────────────────────────────────────────────────
+  List<Map<String, dynamic>> _availableFlows = [];
+
   // ── Views ────────────────────────────────────────────────────────────────────
   List<Map<String, dynamic>> _savedViews = [];
   String? _activeViewId;
@@ -158,6 +161,7 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
         _loadViews();
         _loadWorkers();
         _loadOperators();
+        _loadFlows();
         _loadSearchableFields();
         _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
           if (mounted) _load();
@@ -281,6 +285,27 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
       }
     } catch (e) {
       debugPrint('[Operators] error: $e');
+    }
+  }
+
+  Future<void> _loadFlows() async {
+    final tenantId = ref.read(activeTenantIdProvider);
+    if (tenantId.isEmpty) return;
+    try {
+      final resp = await ApiClient.instance.get('/flows/active');
+      final list = resp.data is List
+          ? resp.data as List
+          : ((resp.data['flows'] ?? resp.data['items'] ?? []) as List);
+      if (!mounted) return;
+      setState(() {
+        _availableFlows = list
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList();
+      });
+      debugPrint('[Flows] loaded: ${_availableFlows.length}');
+    } catch (e) {
+      debugPrint('[Flows] error: $e');
     }
   }
 
@@ -447,6 +472,7 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
         _loadViews();
         _loadWorkers();
         _loadOperators();
+        _loadFlows();
         _loadSearchableFields();
       }
     });
@@ -502,6 +528,13 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
                                 : [..._filterOperatorIds, id];
                             _page = 1;
                           });
+                          _markDirty();
+                          _load();
+                        },
+                        filterFlowId:   _filterFlowId,
+                        availableFlows: _availableFlows,
+                        onFlowSelect: (id) {
+                          setState(() { _filterFlowId = id; _page = 1; });
                           _markDirty();
                           _load();
                         },
@@ -2422,10 +2455,13 @@ class _FilterSidebar extends StatelessWidget {
     required this.filterDateRange,
     required this.filterOperatorIds,
     required this.availableOperators,
+    required this.filterFlowId,
+    required this.availableFlows,
     required this.onStatusToggle,
     required this.onChannelTypeSelect,
     required this.onDateRangeSelect,
     required this.onOperatorToggle,
+    required this.onFlowSelect,
   });
 
   final List<String>                 filterStatus;
@@ -2433,10 +2469,13 @@ class _FilterSidebar extends StatelessWidget {
   final String?                      filterDateRange;
   final List<String>                 filterOperatorIds;
   final List<Map<String, dynamic>>   availableOperators;
+  final String?                      filterFlowId;
+  final List<Map<String, dynamic>>   availableFlows;
   final void Function(String)        onStatusToggle;
   final void Function(String?)       onChannelTypeSelect;
   final void Function(String?)       onDateRangeSelect;
   final void Function(String)        onOperatorToggle;
+  final void Function(String?)       onFlowSelect;
 
   @override
   Widget build(BuildContext context) {
@@ -2519,6 +2558,26 @@ class _FilterSidebar extends StatelessWidget {
                         op['id'] as String? ?? '—',
                     selected: filterOperatorIds.contains(op['id'] as String? ?? ''),
                     onTap: () => onOperatorToggle(op['id'] as String? ?? ''),
+                  ),
+              ],
+            ),
+          ],
+          if (availableFlows.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            _SidebarSection(
+              title: 'Flujo',
+              children: [
+                _SidebarCheckRow(
+                  label: 'Todos los flujos',
+                  selected: filterFlowId == null,
+                  onTap: () => onFlowSelect(null),
+                ),
+                for (final flow in availableFlows)
+                  _SidebarCheckRow(
+                    label: flow['name'] as String? ?? '—',
+                    selected: filterFlowId == flow['id'],
+                    onTap: () => onFlowSelect(
+                        filterFlowId == flow['id'] ? null : flow['id'] as String?),
                   ),
               ],
             ),
