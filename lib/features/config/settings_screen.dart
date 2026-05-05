@@ -7,6 +7,7 @@ import '../../core/api/iam_api.dart';
 import '../../core/providers/permissions_provider.dart';
 import '../../core/providers/tenant_provider.dart';
 import '../../core/theme/app_theme.dart';
+import '../../shared/widgets/page_header.dart';
 import 'role_permissions_panel.dart';
 import '../settings/operator_fields_screen.dart';
 
@@ -50,7 +51,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     return Column(
       children: [
-        _ActionBar(),
+        const PageHeader(
+          eyebrow: 'Configuración',
+          title: 'Ajustes',
+          description: 'Configuración general del tenant',
+        ),
         Expanded(
           child: Row(
             children: [
@@ -299,42 +304,6 @@ class _PermissionsSection extends ConsumerWidget {
           ],
         );
       },
-    );
-  }
-}
-
-// ── Action bar ────────────────────────────────────────────────────────────────
-
-class _ActionBar extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 48,
-      width: double.infinity,
-      decoration: const BoxDecoration(
-        color: AppColors.ctSurface,
-        border: Border(bottom: BorderSide(color: AppColors.ctBorder)),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 22),
-      child: const Row(
-        children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                'Ajustes',
-                style: AppTextStyles.pageTitle,
-              ),
-              SizedBox(height: 1),
-              Text(
-                'Configuración general del tenant',
-                style: AppTextStyles.bodySmall,
-              ),
-            ],
-          ),
-        ],
-      ),
     );
   }
 }

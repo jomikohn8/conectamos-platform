@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/api/ai_workers_api.dart';
 import '../../core/providers/tenant_provider.dart';
 import '../../core/theme/app_theme.dart';
+import '../../shared/widgets/page_header.dart';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -154,7 +155,14 @@ class _AiWorkersScreenState extends ConsumerState<AiWorkersScreen> {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        _ActionBar(loading: _loading, onAdd: _openCatalog),
+        PageHeader(
+          eyebrow: 'Workers',
+          title: 'Mis AI Workers',
+          description: 'Workers de IA contratados para tu operación',
+          actions: [
+            _PrimaryBtn(label: '+ Contratar worker', onTap: _openCatalog, disabled: _loading),
+          ],
+        ),
         Expanded(
           child: _loading
               ? const Center(
@@ -193,53 +201,6 @@ class _AiWorkersScreenState extends ConsumerState<AiWorkersScreen> {
                     ),
         ),
       ],
-    );
-  }
-}
-
-// ── Action bar ────────────────────────────────────────────────────────────────
-
-class _ActionBar extends StatelessWidget {
-  const _ActionBar({required this.loading, required this.onAdd});
-  final bool loading;
-  final VoidCallback onAdd;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 48,
-      width: double.infinity,
-      decoration: const BoxDecoration(
-        color: AppColors.ctSurface,
-        border: Border(bottom: BorderSide(color: AppColors.ctBorder)),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 22),
-      child: Row(
-        children: [
-          const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  'Mis Workers',
-                  style: AppTextStyles.pageTitle,
-                ),
-                SizedBox(height: 1),
-                Text(
-                  'Workers de IA contratados para tu operación',
-                  style: AppTextStyles.bodySmall,
-                ),
-              ],
-            ),
-          ),
-          _PrimaryBtn(
-            label: '+ Contratar worker',
-            onTap: onAdd,
-            disabled: loading,
-          ),
-        ],
-      ),
     );
   }
 }

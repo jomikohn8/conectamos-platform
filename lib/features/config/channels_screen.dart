@@ -12,6 +12,7 @@ import '../../core/api/channels_api.dart';
 import '../../core/providers/permissions_provider.dart';
 import '../../core/providers/tenant_provider.dart';
 import '../../core/theme/app_theme.dart';
+import '../../shared/widgets/page_header.dart';
 
 /// JS bridge injected by [_CreateChannelStepperState._initFbSdk].
 /// Calls FB.login() and forwards the OAuth code (or cancellation) to Dart.
@@ -154,7 +155,15 @@ class _ChannelsScreenState extends ConsumerState<ChannelsScreen> {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        _ActionBar(loading: _loading, onAdd: _openCreate, canManage: hasPermission(ref, 'settings', 'manage')),
+        PageHeader(
+          eyebrow: 'Canales',
+          title: 'Canales de comunicación',
+          description: 'Conecta números de WhatsApp con AI Workers y operadores',
+          actions: [
+            if (hasPermission(ref, 'settings', 'manage'))
+              _PrimaryBtn(label: '+ Nuevo canal', onTap: _openCreate, disabled: _loading),
+          ],
+        ),
         Expanded(
           child: _loading
               ? const Center(child: CircularProgressIndicator(color: AppColors.ctTeal, strokeWidth: 2))
@@ -180,44 +189,6 @@ class _ChannelsScreenState extends ConsumerState<ChannelsScreen> {
                     ),
         ),
       ],
-    );
-  }
-}
-
-// ── Action bar ────────────────────────────────────────────────────────────────
-
-class _ActionBar extends StatelessWidget {
-  const _ActionBar({required this.loading, required this.onAdd, required this.canManage});
-  final bool loading;
-  final VoidCallback onAdd;
-  final bool canManage;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 48,
-      width: double.infinity,
-      decoration: const BoxDecoration(
-        color: AppColors.ctSurface,
-        border: Border(bottom: BorderSide(color: AppColors.ctBorder)),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 22),
-      child: Row(
-        children: [
-          const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text('Canales', style: AppTextStyles.pageTitle),
-                SizedBox(height: 1),
-                Text('Conecta números de WhatsApp con AI Workers y operadores', style: TextStyle(fontFamily: 'Geist', fontSize: 11, color: AppColors.ctText2)),
-              ],
-            ),
-          ),
-          if (canManage) _PrimaryBtn(label: '+ Nuevo canal', onTap: onAdd, disabled: loading),
-        ],
-      ),
     );
   }
 }
