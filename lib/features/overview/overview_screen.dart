@@ -4,287 +4,13 @@ import 'dart:math' show pi;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-
+import '../../core/api/ai_workers_api.dart';
+import '../../core/api/escalaciones_api.dart';
 import '../../core/api/operators_api.dart';
 import '../../core/api/overview_api.dart';
-import '../../core/config.dart';
 import '../../core/providers/tenant_provider.dart';
 import '../../core/theme/app_theme.dart';
-
-// ── Modelos de datos ──────────────────────────────────────────────────────────
-
-class FlowBadgeData {
-  const FlowBadgeData({
-    required this.label,
-    required this.bg,
-    required this.textColor,
-  });
-  final String label;
-  final Color bg;
-  final Color textColor;
-}
-
-class OperatorData {
-  const OperatorData({
-    required this.name,
-    required this.phone,
-    required this.initials,
-    required this.avatarBg,
-    required this.avatarTextColor,
-    required this.statusLabel,
-    required this.statusBg,
-    required this.statusTextColor,
-    required this.flows,
-    required this.footerText,
-  });
-  final String name;
-  final String phone;
-  final String initials;
-  final Color avatarBg;
-  final Color avatarTextColor;
-  final String statusLabel;
-  final Color statusBg;
-  final Color statusTextColor;
-  final List<FlowBadgeData> flows;
-  final String footerText;
-}
-
-// ── Datos mock (solo para kMockMode) ─────────────────────────────────────────
-
-const _kOperators = [
-  OperatorData(
-    name: 'Roberto Medina',
-    phone: '+52 55 1234 5678',
-    initials: 'RM',
-    avatarBg: AppColors.ctTealLight,
-    avatarTextColor: AppColors.ctTealDark,
-    statusLabel: 'Activo',
-    statusBg: AppColors.ctOkBg,
-    statusTextColor: AppColors.ctOkText,
-    flows: [
-      FlowBadgeData(
-        label: 'Flujo 1: Turno ✓',
-        bg: AppColors.ctInfoBg,
-        textColor: AppColors.ctInfoText,
-      ),
-      FlowBadgeData(
-        label: 'Flujo 2: 3 IDs',
-        bg: AppColors.ctTealLight,
-        textColor: AppColors.ctTealDark,
-      ),
-    ],
-    footerText: 'Último evento: hace 4 min',
-  ),
-  OperatorData(
-    name: 'Jorge López',
-    phone: '+52 55 9876 5432',
-    initials: 'JL',
-    avatarBg: AppColors.ctWarnBg,
-    avatarTextColor: AppColors.ctWarnText,
-    statusLabel: 'En espera',
-    statusBg: AppColors.ctWarnBg,
-    statusTextColor: AppColors.ctWarnText,
-    flows: [
-      FlowBadgeData(
-        label: 'Flujo 1: Turno ✓',
-        bg: AppColors.ctInfoBg,
-        textColor: AppColors.ctInfoText,
-      ),
-      FlowBadgeData(
-        label: 'Flujo 2: 4 IDs',
-        bg: AppColors.ctTealLight,
-        textColor: AppColors.ctTealDark,
-      ),
-    ],
-    footerText: 'Último evento: hace 18 min',
-  ),
-  OperatorData(
-    name: 'Miguel Herrera',
-    phone: '+52 55 5555 1234',
-    initials: 'MH',
-    avatarBg: AppColors.ctRedBg,
-    avatarTextColor: AppColors.ctRedText,
-    statusLabel: 'Incidencia',
-    statusBg: AppColors.ctRedBg,
-    statusTextColor: AppColors.ctRedText,
-    flows: [
-      FlowBadgeData(
-        label: 'Flujo 1: Turno ✓',
-        bg: AppColors.ctInfoBg,
-        textColor: AppColors.ctInfoText,
-      ),
-      FlowBadgeData(
-        label: 'Flujo 3: alerta activa',
-        bg: AppColors.ctRedBg,
-        textColor: AppColors.ctRedText,
-      ),
-    ],
-    footerText: '⚠ Sin actualización · 32 min',
-  ),
-  OperatorData(
-    name: 'Andrés Pérez',
-    phone: '+52 55 6677 8899',
-    initials: 'AP',
-    avatarBg: AppColors.ctTealLight,
-    avatarTextColor: AppColors.ctTealDark,
-    statusLabel: 'Activo',
-    statusBg: AppColors.ctOkBg,
-    statusTextColor: AppColors.ctOkText,
-    flows: [
-      FlowBadgeData(
-        label: 'Flujo 1: Turno ✓',
-        bg: AppColors.ctInfoBg,
-        textColor: AppColors.ctInfoText,
-      ),
-      FlowBadgeData(
-        label: 'Flujo 2: 3 IDs',
-        bg: AppColors.ctTealLight,
-        textColor: AppColors.ctTealDark,
-      ),
-    ],
-    footerText: 'Último evento: hace 11 min',
-  ),
-  OperatorData(
-    name: 'Luis Castro',
-    phone: '+52 55 4433 2211',
-    initials: 'LC',
-    avatarBg: AppColors.ctTealLight,
-    avatarTextColor: AppColors.ctTealDark,
-    statusLabel: 'Activo',
-    statusBg: AppColors.ctOkBg,
-    statusTextColor: AppColors.ctOkText,
-    flows: [
-      FlowBadgeData(
-        label: 'Flujo 1: Turno ✓',
-        bg: AppColors.ctInfoBg,
-        textColor: AppColors.ctInfoText,
-      ),
-      FlowBadgeData(
-        label: 'Flujo 2: 2 IDs',
-        bg: AppColors.ctTealLight,
-        textColor: AppColors.ctTealDark,
-      ),
-    ],
-    footerText: 'Último evento: hace 7 min',
-  ),
-  OperatorData(
-    name: 'Sara Ramos',
-    phone: '+52 55 1122 3344',
-    initials: 'SR',
-    avatarBg: AppColors.ctSurface2,
-    avatarTextColor: AppColors.ctText3,
-    statusLabel: 'Sin inicio',
-    statusBg: AppColors.ctSurface2,
-    statusTextColor: AppColors.ctText2,
-    flows: [
-      FlowBadgeData(
-        label: 'Sin actividad',
-        bg: AppColors.ctSurface2,
-        textColor: AppColors.ctText2,
-      ),
-    ],
-    footerText: 'No ha iniciado turno · Asignado 08:00',
-  ),
-];
-
-// ── Helpers para mapear datos de la API ───────────────────────────────────────
-
-String _initials(String name) {
-  final parts = name.trim().split(RegExp(r'\s+'));
-  if (parts.length >= 2) {
-    return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
-  }
-  return name.substring(0, name.length >= 2 ? 2 : name.length).toUpperCase();
-}
-
-OperatorData _operatorFromApi(Map<String, dynamic> data) {
-  final status = (data['status'] as String? ?? 'inactive').toLowerCase();
-  final name = data['name'] as String? ?? '';
-  final phone = data['phone'] as String? ?? '';
-  final lastEventAt = data['last_event_at'] as String?;
-
-  final Color avatarBg;
-  final Color avatarTextColor;
-  final String statusLabel;
-  final Color statusBg;
-  final Color statusTextColor;
-
-  switch (status) {
-    case 'active':
-      avatarBg = AppColors.ctTealLight;
-      avatarTextColor = AppColors.ctTealDark;
-      statusLabel = 'Activo';
-      statusBg = AppColors.ctOkBg;
-      statusTextColor = AppColors.ctOkText;
-    case 'incident':
-      avatarBg = AppColors.ctRedBg;
-      avatarTextColor = AppColors.ctRedText;
-      statusLabel = 'Incidencia';
-      statusBg = AppColors.ctRedBg;
-      statusTextColor = AppColors.ctRedText;
-    default:
-      avatarBg = AppColors.ctSurface2;
-      avatarTextColor = AppColors.ctText3;
-      statusLabel = 'Inactivo';
-      statusBg = AppColors.ctSurface2;
-      statusTextColor = AppColors.ctText2;
-  }
-
-  final rawFlows = data['flows'];
-  final List<FlowBadgeData> flows;
-  if (rawFlows is List && rawFlows.isNotEmpty) {
-    flows = rawFlows.map((f) {
-      final label = f is Map ? (f['name'] ?? f['label'] ?? f.toString()) : f.toString();
-      return FlowBadgeData(
-        label: label as String,
-        bg: AppColors.ctInfoBg,
-        textColor: AppColors.ctInfoText,
-      );
-    }).toList();
-  } else {
-    flows = const [
-      FlowBadgeData(
-        label: 'Sin actividad',
-        bg: AppColors.ctSurface2,
-        textColor: AppColors.ctText2,
-      ),
-    ];
-  }
-
-  String footerText;
-  if (lastEventAt == null) {
-    footerText = 'Sin actividad';
-  } else {
-    try {
-      final dt = DateTime.parse(lastEventAt).toLocal();
-      final diff = DateTime.now().difference(dt);
-      if (diff.inMinutes < 1) {
-        footerText = 'Último evento: ahora mismo';
-      } else if (diff.inMinutes < 60) {
-        footerText = 'Último evento: hace ${diff.inMinutes} min';
-      } else if (diff.inHours < 24) {
-        footerText = 'Último evento: hace ${diff.inHours} h';
-      } else {
-        footerText = 'Último evento: hace ${diff.inDays} días';
-      }
-    } catch (_) {
-      footerText = 'Sin actividad';
-    }
-  }
-
-  return OperatorData(
-    name: name,
-    phone: phone,
-    initials: _initials(name),
-    avatarBg: avatarBg,
-    avatarTextColor: avatarTextColor,
-    statusLabel: statusLabel,
-    statusBg: statusBg,
-    statusTextColor: statusTextColor,
-    flows: flows,
-    footerText: footerText,
-  );
-}
+import '../../shared/widgets/operator_avatar.dart';
 
 // ── Pantalla ──────────────────────────────────────────────────────────────────
 
@@ -298,36 +24,19 @@ class OverviewScreen extends ConsumerStatefulWidget {
 class _OverviewScreenState extends ConsumerState<OverviewScreen> {
   Map<String, dynamic>? _kpis;
   bool _kpisLoading = false;
-  bool _kpisError = false;
+  bool _kpisError   = false;
   bool _initialized = false;
 
-  // List<dynamic> _executions = [];
-  // bool _executionsLoading = false;
-  // bool _executionsError = false;
   Timer? _refreshTimer;
-  // DateTime? _lastExecutionsFetch;
 
   @override
   void initState() {
     super.initState();
-    // Defer until after first frame so activeTenantIdProvider is populated.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final tenantId = ref.read(activeTenantIdProvider);
       if (tenantId.isNotEmpty) _fetchKpis(tenantId);
-      // If still empty, the ref.listen in build() will trigger the fetch.
     });
-    // WidgetsBinding.instance.addPostFrameCallback((_) {
-    //   if (!mounted) return;
-    //   final tenantId = ref.read(activeTenantIdProvider);
-    //   if (tenantId.isNotEmpty) {
-    //     _fetchExecutions(tenantId);
-    //     _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
-    //       final tid = ref.read(activeTenantIdProvider);
-    //       if (tid.isNotEmpty) _fetchExecutions(tid);
-    //     });
-    //   }
-    // });
   }
 
   @override
@@ -338,61 +47,25 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
 
   Future<void> _fetchKpis(String tenantId) async {
     if (tenantId.isEmpty) return;
-    setState(() {
-      _kpisLoading = true;
-      _kpisError = false;
-    });
+    setState(() { _kpisLoading = true; _kpisError = false; });
     try {
       final data = await OverviewApi.getKpis(tenantId: tenantId);
-      setState(() {
-        _kpis = data;
-        _kpisLoading = false;
-        _initialized = true;
-      });
+      setState(() { _kpis = data; _kpisLoading = false; _initialized = true; });
     } catch (_) {
-      setState(() {
-        _kpisLoading = false;
-        _kpisError = true;
-        _initialized = true;
-      });
+      setState(() { _kpisLoading = false; _kpisError = true; _initialized = true; });
     }
   }
-
-  // Future<void> _fetchExecutions(String tenantId) async {
-  //   if (tenantId.isEmpty) return;
-  //   setState(() { _executionsLoading = true; _executionsError = false; });
-  //   try {
-  //     final data = await OverviewApi.getFlowExecutionsDebug(tenantId: tenantId);
-  //     setState(() {
-  //       _executions = List<dynamic>.from(data['executions'] ?? []);
-  //       _executionsLoading = false;
-  //       _lastExecutionsFetch = DateTime.now();
-  //     });
-  //   } catch (_) {
-  //     setState(() { _executionsLoading = false; _executionsError = true; });
-  //   }
-  // }
 
   @override
   Widget build(BuildContext context) {
     final tenantId = ref.watch(activeTenantIdProvider);
 
-    // Catch the moment tenantId arrives (e.g. slow auth load).
     ref.listen<String>(activeTenantIdProvider, (prev, next) {
       if (next.isNotEmpty && !_initialized && !_kpisLoading) {
         _fetchKpis(next);
       }
-      // if (next.isNotEmpty) {
-      //   _fetchExecutions(next);
-      //   _refreshTimer?.cancel();
-      //   _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
-      //     final tid = ref.read(activeTenantIdProvider);
-      //     if (tid.isNotEmpty) _fetchExecutions(tid);
-      //   });
-      // }
     });
 
-    // While tenant is not yet resolved, show a full-screen spinner.
     if (tenantId.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -406,40 +79,25 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _HeroBand(
-                  kpis: _kpis,
-                  loading: _kpisLoading,
-                ),
-                const SizedBox(height: 18),
-                _KpiRow(
-                  kpis: _kpis,
-                  loading: _kpisLoading,
-                  error: _kpisError,
-                ),
-                // const SizedBox(height: 18),
-                // _ExecutionsSection(
-                //   executions: _executions,
-                //   loading: _executionsLoading,
-                //   error: _executionsError,
-                //   onRefresh: () {
-                //     final tid = ref.read(activeTenantIdProvider);
-                //     if (tid.isNotEmpty) _fetchExecutions(tid);
-                //   },
-                //   lastFetch: _lastExecutionsFetch,
-                // ),
-                const SizedBox(height: 18),
-                const Text(
-                  'OPERADORES EN TURNO',
-                  style: TextStyle(
-                    fontFamily: 'Geist',
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.ctText3,
-                    letterSpacing: 1.2,
+                _HeroBand(kpis: _kpis, loading: _kpisLoading),
+                const SizedBox(height: 14),
+                _KpiRow(kpis: _kpis, loading: _kpisLoading, error: _kpisError),
+                const SizedBox(height: 14),
+                _OperatorsSection(tenantId: tenantId),
+                const SizedBox(height: 14),
+                IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(flex: 13, child: _WorkersFlows(tenantId: tenantId)),
+                      const SizedBox(width: 14),
+                      Expanded(flex: 10, child: const _DayThread()),
+                      const SizedBox(width: 14),
+                      Expanded(flex: 10, child: _Attention(tenantId: tenantId)),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 12),
-                _OperatorGrid(tenantId: tenantId),
+                const SizedBox(height: 32),
               ],
             ),
           ),
@@ -485,10 +143,7 @@ class _ActionBar extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(height: 1),
-                Text(
-                  subtitle,
-                  style: AppTextStyles.topbarSubtitle,
-                ),
+                Text(subtitle, style: AppTextStyles.topbarSubtitle),
               ],
             ),
           ),
@@ -512,13 +167,13 @@ class _DateButtonState extends State<_DateButton> {
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
-    final d = now.day.toString().padLeft(2, '0');
-    final m = now.month.toString().padLeft(2, '0');
+    final d   = now.day.toString().padLeft(2, '0');
+    final m   = now.month.toString().padLeft(2, '0');
     final formatted = '$d/$m/${now.year}';
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
+      onExit:  (_) => setState(() => _hovered = false),
       cursor: SystemMouseCursors.click,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 120),
@@ -531,11 +186,7 @@ class _DateButtonState extends State<_DateButton> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
-              Icons.calendar_today_outlined,
-              size: 13,
-              color: AppColors.ctText,
-            ),
+            const Icon(Icons.calendar_today_outlined, size: 13, color: AppColors.ctText),
             const SizedBox(width: 6),
             Text(
               '$formatted  ▾',
@@ -652,11 +303,11 @@ class KpiCard extends StatelessWidget {
     this.hasError = false,
   });
 
-  final Color topBorderColor;
+  final Color  topBorderColor;
   final String label;
   final String value;
   final String subtext;
-  final bool hasError;
+  final bool   hasError;
 
   @override
   Widget build(BuildContext context) {
@@ -698,7 +349,7 @@ class KpiCard extends StatelessWidget {
             decoration: BoxDecoration(
               color: topBorderColor,
               borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(10),
+                topLeft:  Radius.circular(10),
                 topRight: Radius.circular(10),
               ),
             ),
@@ -731,299 +382,6 @@ class KpiCard extends StatelessWidget {
   }
 }
 
-// ── Grid de operadores ────────────────────────────────────────────────────────
-
-class _OperatorGrid extends StatefulWidget {
-  const _OperatorGrid({required this.tenantId});
-
-  final String tenantId;
-
-  @override
-  State<_OperatorGrid> createState() => _OperatorGridState();
-}
-
-class _OperatorGridState extends State<_OperatorGrid> {
-  bool _loading = false;
-  String? _error;
-  List<OperatorData> _operators = [];
-
-  @override
-  void initState() {
-    super.initState();
-    // Guard: only load when tenantId is available.
-    if (widget.tenantId.isNotEmpty) _load();
-  }
-
-  @override
-  void didUpdateWidget(_OperatorGrid oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    // Tenant arrived after widget was first built with an empty id.
-    if (oldWidget.tenantId.isEmpty && widget.tenantId.isNotEmpty) {
-      _load();
-    }
-  }
-
-  Future<void> _load() async {
-    if (widget.tenantId.isEmpty) return;
-    if (kMockMode) {
-      setState(() {
-        _operators = _kOperators.toList();
-      });
-      return;
-    }
-
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-
-    try {
-      final raw = await OperatorsApi.listOperators();
-      setState(() {
-        _operators = raw.map(_operatorFromApi).toList();
-        _loading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _error = e.toString();
-        _loading = false;
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_loading) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(32),
-          child: CircularProgressIndicator(),
-        ),
-      );
-    }
-
-    if (_error != null) {
-      return Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: AppColors.ctRedBg,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: AppColors.ctDanger),
-        ),
-        child: Row(
-          children: [
-            const Icon(Icons.error_outline, color: AppColors.ctRedText, size: 16),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                'Error al cargar operadores: $_error',
-                style: AppTextStyles.formLabel.copyWith(color: AppColors.ctRedText),
-              ),
-            ),
-            const SizedBox(width: 8),
-            GestureDetector(
-              onTap: _load,
-              child: const Text(
-                'Reintentar',
-                style: TextStyle(
-                  fontFamily: 'Geist',
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.ctRedText,
-                  decoration: TextDecoration.underline,
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    if (_operators.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.all(32),
-        child: Text(
-          'No hay operadores registrados.',
-          style: AppTextStyles.body.copyWith(color: AppColors.ctText2),
-        ),
-      );
-    }
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final cols = constraints.maxWidth >= 900 ? 3 : 2;
-        return GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: cols,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-            childAspectRatio: cols == 3 ? 2.1 : 1.9,
-          ),
-          itemCount: _operators.length,
-          itemBuilder: (context, i) => OperatorCard(operator: _operators[i]),
-        );
-      },
-    );
-  }
-}
-
-// ── OperatorCard ──────────────────────────────────────────────────────────────
-
-class OperatorCard extends StatefulWidget {
-  const OperatorCard({super.key, required this.operator});
-  final OperatorData operator;
-
-  @override
-  State<OperatorCard> createState() => _OperatorCardState();
-}
-
-class _OperatorCardState extends State<OperatorCard> {
-  bool _hovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final op = widget.operator;
-
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      cursor: SystemMouseCursors.basic,
-      child: GestureDetector(
-        onTap: null,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          decoration: BoxDecoration(
-            color: AppColors.ctSurface,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: _hovered ? AppColors.ctBorder2 : AppColors.ctBorder,
-            ),
-            boxShadow: _hovered
-                ? [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.04),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ]
-                : null,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(13, 13, 13, 10),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _OperatorAvatar(
-                      initials: op.initials,
-                      bg: op.avatarBg,
-                      textColor: op.avatarTextColor,
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            op.name,
-                            style: AppFonts.onest(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.ctText,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            op.phone,
-                            style: const TextStyle(
-                              fontFamily: 'Geist',
-                              fontSize: 10,
-                              color: AppColors.ctText2,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    StatusBadge(
-                      label: op.statusLabel,
-                      bg: op.statusBg,
-                      textColor: op.statusTextColor,
-                    ),
-                  ],
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(13, 0, 13, 10),
-                child: Wrap(
-                  spacing: 5,
-                  runSpacing: 5,
-                  children: op.flows.map((f) => FlowBadge(data: f)).toList(),
-                ),
-              ),
-              const Spacer(),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
-                decoration: const BoxDecoration(
-                  border: Border(top: BorderSide(color: AppColors.ctBorder)),
-                ),
-                child: Text(
-                  op.footerText,
-                  style: const TextStyle(
-                    fontFamily: 'Geist',
-                    fontSize: 10,
-                    color: AppColors.ctText2,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ── _OperatorAvatar ───────────────────────────────────────────────────────────
-
-class _OperatorAvatar extends StatelessWidget {
-  const _OperatorAvatar({
-    required this.initials,
-    required this.bg,
-    required this.textColor,
-  });
-  final String initials;
-  final Color bg;
-  final Color textColor;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 34,
-      height: 34,
-      decoration: BoxDecoration(
-        color: bg,
-        shape: BoxShape.circle,
-      ),
-      alignment: Alignment.center,
-      child: Text(
-        initials,
-        style: AppFonts.onest(
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
-          color: textColor,
-        ),
-      ),
-    );
-  }
-}
-
 // ── _HeroBand ─────────────────────────────────────────────────────────────────
 
 class _HeroBand extends StatelessWidget {
@@ -1034,14 +392,14 @@ class _HeroBand extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final operatorsActive = (kpis?['operators_active']   as num?)?.toInt();
-    final operatorsTotal  = (kpis?['operators_total']    as num?)?.toInt();
-    final flowsRunning    = (kpis?['flows_running_now']  as num?)?.toInt();
-    final flowsCompleted  = (kpis?['flows_completed_today'] as num?)?.toInt();
+    final operatorsActive = (kpis?['operators_active']       as num?)?.toInt();
+    final operatorsTotal  = (kpis?['operators_total']        as num?)?.toInt();
+    final flowsRunning    = (kpis?['flows_running_now']      as num?)?.toInt();
+    final flowsCompleted  = (kpis?['flows_completed_today']  as num?)?.toInt();
     final eventsProcessed = (kpis?['events_processed_today'] as num?)?.toInt();
-    final completionRate  = (kpis?['completion_rate']    as num?)?.toDouble();
-    final workersCont     = (kpis?['workers_contracted'] as num?)?.toInt();
-    final flowsCatalog    = (kpis?['flows_catalog_count'] as num?)?.toInt();
+    final completionRate  = (kpis?['completion_rate']        as num?)?.toDouble();
+    final workersCont     = (kpis?['workers_contracted']     as num?)?.toInt();
+    final flowsCatalog    = (kpis?['flows_catalog_count']    as num?)?.toInt();
 
     final pct = (operatorsActive != null &&
             operatorsTotal != null &&
@@ -1078,8 +436,8 @@ class _HeroBand extends StatelessWidget {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              Color(0xB80B132B), // rgba(11,19,43,0.72)
-              Color(0x520B132B), // rgba(11,19,43,0.32)
+              Color(0xB80B132B),
+              Color(0x520B132B),
             ],
           ),
         ),
@@ -1255,33 +613,25 @@ class _DonutPainter extends CustomPainter {
     final radius = (size.width - 14) / 2;
     final rect   = Rect.fromCircle(center: center, radius: radius);
 
-    // Track
     canvas.drawArc(
-      rect,
-      -pi / 2,
-      2 * pi,
-      false,
+      rect, -pi / 2, 2 * pi, false,
       Paint()
-        ..color      = const Color(0x1AFFFFFF)
-        ..style      = PaintingStyle.stroke
+        ..color       = const Color(0x1AFFFFFF)
+        ..style       = PaintingStyle.stroke
         ..strokeWidth = 14
-        ..strokeCap  = StrokeCap.round,
+        ..strokeCap   = StrokeCap.round,
     );
 
-    // Progress arc with gradient
     if (progress > 0) {
       canvas.drawArc(
-        rect,
-        -pi / 2,
-        2 * pi * progress,
-        false,
+        rect, -pi / 2, 2 * pi * progress, false,
         Paint()
           ..shader = const LinearGradient(
             colors: [Color(0xFF66E2D0), Color(0xFF5BC0BE)],
           ).createShader(rect)
-          ..style      = PaintingStyle.stroke
+          ..style       = PaintingStyle.stroke
           ..strokeWidth = 14
-          ..strokeCap  = StrokeCap.round,
+          ..strokeCap   = StrokeCap.round,
       );
     }
   }
@@ -1308,14 +658,10 @@ class _MiniMetricChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
-        color: highlight
-            ? const Color(0x2E59E0CC)
-            : const Color(0x0FFFFFFF),
+        color: highlight ? const Color(0x2E59E0CC) : const Color(0x0FFFFFFF),
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
-          color: highlight
-              ? const Color(0x6659E0CC)
-              : const Color(0x1AFFFFFF),
+          color: highlight ? const Color(0x6659E0CC) : const Color(0x1AFFFFFF),
         ),
       ),
       child: Column(
@@ -1346,486 +692,1264 @@ class _MiniMetricChip extends StatelessWidget {
   }
 }
 
-// ── StatusBadge ───────────────────────────────────────────────────────────────
+// ── _OperatorsSection ─────────────────────────────────────────────────────────
 
-class StatusBadge extends StatelessWidget {
-  const StatusBadge({
-    super.key,
-    required this.label,
-    required this.bg,
-    required this.textColor,
-  });
-  final String label;
-  final Color bg;
-  final Color textColor;
+class _OperatorsSection extends StatefulWidget {
+  const _OperatorsSection({required this.tenantId});
+  final String tenantId;
+
+  @override
+  State<_OperatorsSection> createState() => _OperatorsSectionState();
+}
+
+class _OperatorsSectionState extends State<_OperatorsSection> {
+  String _viewMode     = 'chips'; // 'chips' | 'cards'
+  String _filterStatus = 'all';
+
+  bool   _loading = false;
+  String? _error;
+  List<Map<String, dynamic>> _operators = [];
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.tenantId.isNotEmpty) _load();
+  }
+
+  @override
+  void didUpdateWidget(_OperatorsSection old) {
+    super.didUpdateWidget(old);
+    if (old.tenantId.isEmpty && widget.tenantId.isNotEmpty) _load();
+  }
+
+  Future<void> _load() async {
+    if (widget.tenantId.isEmpty) return;
+    setState(() { _loading = true; _error = null; });
+    try {
+      final raw = await OperatorsApi.listOperators();
+      setState(() { _operators = raw; _loading = false; });
+    } catch (e) {
+      setState(() { _error = e.toString(); _loading = false; });
+    }
+  }
+
+  String _statusOf(Map<String, dynamic> op) {
+    final s = (op['status'] as String? ?? '').toLowerCase();
+    return switch (s) {
+      'active'   => 'active',
+      'waiting'  => 'waiting',
+      'incident' => 'incident',
+      _          => 'off',
+    };
+  }
+
+  Color _colorOf(String status) => switch (status) {
+    'active'   => const Color(0xFF10B981),
+    'waiting'  => const Color(0xFFFFB700),
+    'incident' => const Color(0xFFE24C4B),
+    _          => const Color(0xFF9AA0A3),
+  };
+
+  String _labelOf(String status) => switch (status) {
+    'active'   => 'Activo',
+    'waiting'  => 'En espera',
+    'incident' => 'Incidencia',
+    _          => 'Sin turno',
+  };
+
+  int? _lastEventMin(Map<String, dynamic> op) {
+    final raw = op['last_inbound_at'] as String?;
+    if (raw == null) return null;
+    try {
+      return DateTime.now().difference(DateTime.parse(raw)).inMinutes;
+    } catch (_) {
+      return null;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(20),
+    final filtered = _filterStatus == 'all'
+        ? _operators
+        : _operators.where((op) => _statusOf(op) == _filterStatus).toList();
+
+    final activeCount = _operators.where((op) => _statusOf(op) != 'off').length;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildHeader(activeCount),
+        const SizedBox(height: 12),
+        if (_loading)
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.all(24),
+              child: CircularProgressIndicator(color: AppColors.ctTeal),
+            ),
+          )
+        else if (_error != null)
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.ctRedBg,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppColors.ctDanger),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.error_outline, color: AppColors.ctRedText, size: 16),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(_error!, style: AppFonts.geist(fontSize: 12, color: AppColors.ctRedText)),
+                ),
+                const SizedBox(width: 8),
+                GestureDetector(
+                  onTap: _load,
+                  child: Text('Reintentar', style: AppFonts.geist(fontSize: 12, color: AppColors.ctRedText, fontWeight: FontWeight.w600)),
+                ),
+              ],
+            ),
+          )
+        else if (_viewMode == 'chips')
+          _buildChipsView(filtered)
+        else
+          _buildCardsView(filtered),
+      ],
+    );
+  }
+
+  Widget _buildHeader(int activeCount) {
+    const filterOptions = [
+      ('all',      'Todos',      null),
+      ('active',   'Activos',    Color(0xFF10B981)),
+      ('waiting',  'En espera',  Color(0xFFFFB700)),
+      ('incident', 'Incidencia', Color(0xFFE24C4B)),
+      ('off',      'Sin turno',  Color(0xFF9AA0A3)),
+    ];
+
+    return Row(
+      children: [
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Operadores en turno',
+              style: AppFonts.onest(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.ctText),
+            ),
+            Text(
+              '$activeCount de ${_operators.length} · agrupados por estado',
+              style: AppFonts.geist(fontSize: 12, color: AppColors.ctText2),
+            ),
+          ],
+        ),
+        const Spacer(),
+        // Filter pills
+        Row(
+          children: filterOptions.map((opt) {
+            final (status, label, dotColor) = opt;
+            final isActive = _filterStatus == status;
+            return GestureDetector(
+              onTap: () => setState(() => _filterStatus = status),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 120),
+                margin: const EdgeInsets.only(right: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: isActive ? const Color(0xFF0B132B) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (dotColor != null) ...[
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          color: dotColor,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 5),
+                    ],
+                    Text(
+                      label,
+                      style: TextStyle(
+                        fontFamily: 'Geist',
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: isActive ? Colors.white : const Color(0xFF4C5D73),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+        const SizedBox(width: 10),
+        // View toggle
+        Row(
+          children: [
+            _ViewToggleBtn(
+              icon: Icons.view_headline,
+              active: _viewMode == 'chips',
+              onTap: () => setState(() => _viewMode = 'chips'),
+            ),
+            const SizedBox(width: 4),
+            _ViewToggleBtn(
+              icon: Icons.grid_view,
+              active: _viewMode == 'cards',
+              onTap: () => setState(() => _viewMode = 'cards'),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildChipsView(List<Map<String, dynamic>> ops) {
+    if (_filterStatus != 'all') {
+      return Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: ops.map((op) {
+          final status = _statusOf(op);
+          return _OpChip(
+            op: op,
+            statusColor: _colorOf(status),
+            lastEventMin: _lastEventMin(op),
+          );
+        }).toList(),
+      );
+    }
+
+    const groupOrder = ['active', 'waiting', 'incident', 'off'];
+    const groupLabels = {
+      'active':   'Activos',
+      'waiting':  'En espera',
+      'incident': 'Incidencia',
+      'off':      'Sin turno',
+    };
+
+    final groups = <String, List<Map<String, dynamic>>>{};
+    for (final status in groupOrder) {
+      final group = ops.where((op) => _statusOf(op) == status).toList();
+      if (group.isNotEmpty) groups[status] = group;
+    }
+
+    if (groups.isEmpty) {
+      return Text(
+        'Sin operadores',
+        style: AppFonts.geist(fontSize: 13, color: AppColors.ctText3),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: groups.entries.map((entry) {
+        final status = entry.key;
+        final group  = entry.value;
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 7, height: 7,
+                    decoration: BoxDecoration(
+                      color: _colorOf(status),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    groupLabels[status]!.toUpperCase(),
+                    style: AppFonts.geist(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.08,
+                      color: AppColors.ctText,
+                    ),
+                  ),
+                  const SizedBox(width: 5),
+                  Text(
+                    '· ${group.length}',
+                    style: AppFonts.geist(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.ctText2),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: group.map((op) => _OpChip(
+                  op: op,
+                  statusColor: _colorOf(status),
+                  lastEventMin: _lastEventMin(op),
+                )).toList(),
+              ),
+            ],
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildCardsView(List<Map<String, dynamic>> ops) {
+    if (ops.isEmpty) {
+      return Text(
+        'Sin operadores',
+        style: AppFonts.geist(fontSize: 13, color: AppColors.ctText3),
+      );
+    }
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        childAspectRatio: 2.4,
+        crossAxisSpacing: 10,
+        mainAxisSpacing: 10,
       ),
-      child: Text(
-        label,
-        style: AppTextStyles.badge.copyWith(color: textColor),
-      ),
+      itemCount: ops.length,
+      itemBuilder: (_, i) {
+        final op     = ops[i];
+        final status = _statusOf(op);
+        return _OpCard(
+          op:           op,
+          statusColor:  _colorOf(status),
+          statusLabel:  _labelOf(status),
+          lastEventMin: _lastEventMin(op),
+        );
+      },
     );
   }
 }
 
-// ── FlowBadge ─────────────────────────────────────────────────────────────────
+// ── _ViewToggleBtn ────────────────────────────────────────────────────────────
 
-class FlowBadge extends StatelessWidget {
-  const FlowBadge({super.key, required this.data});
-  final FlowBadgeData data;
+class _ViewToggleBtn extends StatelessWidget {
+  const _ViewToggleBtn({
+    required this.icon,
+    required this.active,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final bool     active;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-      decoration: BoxDecoration(
-        color: data.bg,
-        borderRadius: BorderRadius.circular(5),
-      ),
-      child: Text(
-        data.label,
-        style: TextStyle(
-          fontFamily: 'Geist',
-          fontSize: 10,
-          fontWeight: FontWeight.w600,
-          color: data.textColor,
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 120),
+        width: 30,
+        height: 30,
+        decoration: BoxDecoration(
+          color: active ? const Color(0xFF0B132B) : Colors.white,
+          borderRadius: BorderRadius.circular(7),
+          border: Border.all(color: AppColors.ctBorder),
+        ),
+        child: Icon(
+          icon,
+          size: 16,
+          color: active ? Colors.white : const Color(0xFF7B92A7),
         ),
       ),
     );
   }
 }
 
-// ── Helpers para executions (comentado — sección movida a ExecutionsScreen) ───
+// ── _OpChip ───────────────────────────────────────────────────────────────────
 
-// String _formatElapsed(int? seconds) {
-//   if (seconds == null) return '—';
-//   if (seconds < 60) return '${seconds}s';
-//   if (seconds < 3600) return '${seconds ~/ 60}m ${seconds % 60}s';
-//   return '${seconds ~/ 3600}h ${(seconds % 3600) ~/ 60}m';
-// }
-//
-// String _elapsedSince(DateTime t) {
-//   final diff = DateTime.now().difference(t);
-//   if (diff.inSeconds < 60) return 'hace ${diff.inSeconds}s';
-//   if (diff.inMinutes < 60) return 'hace ${diff.inMinutes}m';
-//   return 'hace ${diff.inHours}h';
-// }
+class _OpChip extends StatefulWidget {
+  const _OpChip({
+    required this.op,
+    required this.statusColor,
+    this.lastEventMin,
+  });
 
-// ── _ExecutionsSection (comentado — sección movida a ExecutionsScreen) ─────────
+  final Map<String, dynamic> op;
+  final Color statusColor;
+  final int?  lastEventMin;
 
-// class _ExecutionsSection extends StatelessWidget {
-//   const _ExecutionsSection({
-//     required this.executions,
-//     required this.loading,
-//     required this.error,
-//     required this.onRefresh,
-//     required this.lastFetch,
-//   });
-//
-//   final List<dynamic> executions;
-//   final bool loading;
-//   final bool error;
-//   final VoidCallback onRefresh;
-//   final DateTime? lastFetch;
-//
-//   @override
-//   Widget build(BuildContext context) {
-//     return Column(
-//       crossAxisAlignment: CrossAxisAlignment.start,
-//       children: [
-//         // Header
-//         Row(
-//           children: [
-//             const Text(
-//               'FLUJOS EN CURSO',
-//               style: TextStyle(
-//                 fontFamily: 'Geist',
-//                 fontSize: 10,
-//                 fontWeight: FontWeight.w600,
-//                 color: AppColors.ctText3,
-//                 letterSpacing: 1.2,
-//               ),
-//             ),
-//             const SizedBox(width: 8),
-//             Container(
-//               padding:
-//                   const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-//               decoration: BoxDecoration(
-//                 color: AppColors.ctTealLight,
-//                 borderRadius: BorderRadius.circular(10),
-//               ),
-//               child: Text(
-//                 '${executions.length}',
-//                 style: const TextStyle(
-//                   fontFamily: 'Geist',
-//                   fontSize: 11,
-//                   fontWeight: FontWeight.w600,
-//                   color: AppColors.ctTealDark,
-//                 ),
-//               ),
-//             ),
-//             const Spacer(),
-//             if (lastFetch != null)
-//               Text(
-//                 'Act. ${_elapsedSince(lastFetch!)}',
-//                 style: const TextStyle(
-//                   fontFamily: 'Geist',
-//                   fontSize: 10,
-//                   color: AppColors.ctText3,
-//                 ),
-//               ),
-//             const SizedBox(width: 4),
-//             SizedBox(
-//               width: 30,
-//               height: 30,
-//               child: IconButton(
-//                 padding: EdgeInsets.zero,
-//                 icon: const Icon(Icons.refresh,
-//                     size: 16, color: AppColors.ctText3),
-//                 onPressed: onRefresh,
-//               ),
-//             ),
-//           ],
-//         ),
-//         const SizedBox(height: 12),
-//         // Body
-//         if (loading && executions.isEmpty)
-//           const Center(
-//             child: Padding(
-//               padding: EdgeInsets.all(24),
-//               child: CircularProgressIndicator(strokeWidth: 2),
-//             ),
-//           )
-//         else if (error)
-//           Center(
-//             child: Column(
-//               mainAxisSize: MainAxisSize.min,
-//               children: [
-//                 const Text(
-//                   'Error al cargar executions',
-//                   style: TextStyle(
-//                     fontFamily: 'Geist',
-//                     fontSize: 13,
-//                     color: AppColors.ctText3,
-//                   ),
-//                 ),
-//                 TextButton(
-//                   onPressed: onRefresh,
-//                   child: const Text('Reintentar'),
-//                 ),
-//               ],
-//             ),
-//           )
-//         else if (executions.isEmpty)
-//           const Center(
-//             child: Padding(
-//               padding: EdgeInsets.all(24),
-//               child: Text(
-//                 'Sin executions registradas',
-//                 style: TextStyle(
-//                   fontFamily: 'Geist',
-//                   fontSize: 13,
-//                   color: AppColors.ctText3,
-//                 ),
-//               ),
-//             ),
-//           )
-//         else
-//           ListView.builder(
-//             shrinkWrap: true,
-//             physics: const NeverScrollableScrollPhysics(),
-//             itemCount: executions.length,
-//             itemBuilder: (context, i) => _ExecutionTile(
-//               execution: executions[i] as Map<String, dynamic>,
-//             ),
-//           ),
-//       ],
-//     );
-//   }
-// }
-//
-// // ── _ExecutionTile ────────────────────────────────────────────────────────────
-//
-// class _ExecutionTile extends StatelessWidget {
-//   const _ExecutionTile({required this.execution});
-//
-//   final Map<String, dynamic> execution;
-//
-//   @override
-//   Widget build(BuildContext context) {
-//     final flowDef = execution['flow_definition'] as Map<String, dynamic>?;
-//     final operator_ = execution['operator'] as Map<String, dynamic>?;
-//     final status = execution['status'] as String? ?? 'unknown';
-//     final elapsedSeconds = execution['elapsed_seconds'] as int?;
-//     final fieldsCaptured =
-//         (execution['fields_captured'] as Map?)
-//             ?.map((k, v) => MapEntry(k.toString(), v)) ??
-//         <String, dynamic>{};
-//
-//     final fieldsExpected = flowDef != null
-//         ? List<Map<String, dynamic>>.from(
-//             (flowDef['fields_expected'] as List? ?? [])
-//                 .map((f) => Map<String, dynamic>.from(f as Map)),
-//           )
-//         : <Map<String, dynamic>>[];
-//
-//     final captured = fieldsExpected.where((f) {
-//       final v = fieldsCaptured[f['key']];
-//       return v != null && v.toString().isNotEmpty;
-//     }).length;
-//
-//     final flowName = flowDef?['name'] as String?;
-//
-//     return Card(
-//       margin: const EdgeInsets.only(bottom: 4),
-//       elevation: 0,
-//       shape: RoundedRectangleBorder(
-//         borderRadius: BorderRadius.circular(8),
-//         side: const BorderSide(color: AppColors.ctBorder),
-//       ),
-//       child: ExpansionTile(
-//         tilePadding:
-//             const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-//         childrenPadding:
-//             const EdgeInsets.fromLTRB(16, 0, 16, 12),
-//         shape: const RoundedRectangleBorder(),
-//         collapsedShape: const RoundedRectangleBorder(),
-//         title: Row(
-//           children: [
-//             Expanded(
-//               child: flowDef != null
-//                   ? Text(
-//                       flowName ?? 'Sin nombre',
-//                       overflow: TextOverflow.ellipsis,
-//                       style: const TextStyle(
-//                         fontFamily: 'Geist',
-//                         fontSize: 13,
-//                         fontWeight: FontWeight.w500,
-//                         color: AppColors.ctText,
-//                       ),
-//                     )
-//                   : const Text(
-//                       'Flow eliminado',
-//                       style: TextStyle(
-//                         fontFamily: 'Geist',
-//                         fontSize: 13,
-//                         fontStyle: FontStyle.italic,
-//                         color: AppColors.ctText3,
-//                       ),
-//                     ),
-//             ),
-//             const SizedBox(width: 8),
-//             _ExecStatusBadge(status: status),
-//           ],
-//         ),
-//         subtitle: Padding(
-//           padding: const EdgeInsets.only(top: 4, bottom: 4),
-//           child: Row(
-//             children: [
-//               const Icon(Icons.person_outline,
-//                   size: 12, color: AppColors.ctText3),
-//               const SizedBox(width: 4),
-//               Text(
-//                 operator_?['name'] as String? ?? 'Sin operador',
-//                 style: const TextStyle(
-//                   fontFamily: 'Geist',
-//                   fontSize: 11,
-//                   color: AppColors.ctText3,
-//                 ),
-//               ),
-//               const SizedBox(width: 12),
-//               const Icon(Icons.timer_outlined,
-//                   size: 12, color: AppColors.ctText3),
-//               const SizedBox(width: 4),
-//               Text(
-//                 _formatElapsed(elapsedSeconds),
-//                 style: const TextStyle(
-//                   fontFamily: 'Geist',
-//                   fontSize: 11,
-//                   color: AppColors.ctText3,
-//                 ),
-//               ),
-//               if (flowDef != null) ...[
-//                 const SizedBox(width: 12),
-//                 Text(
-//                   '$captured/${fieldsExpected.length} campos',
-//                   style: const TextStyle(
-//                     fontFamily: 'Geist',
-//                     fontSize: 11,
-//                     color: AppColors.ctTealDark,
-//                   ),
-//                 ),
-//               ],
-//             ],
-//           ),
-//         ),
-//         children: [
-//           if (flowDef != null && fieldsExpected.isNotEmpty)
-//             ...List.generate(fieldsExpected.length, (i) {
-//               final field = fieldsExpected[i];
-//               final key = field['key'] as String? ?? '';
-//               final label = field['label'] as String? ?? key;
-//               final isRequired = field['required'] == true;
-//               final value = fieldsCaptured[key];
-//               final hasValue =
-//                   value != null && value.toString().isNotEmpty;
-//
-//               return Column(
-//                 mainAxisSize: MainAxisSize.min,
-//                 children: [
-//                   if (i > 0) const Divider(height: 1),
-//                   Padding(
-//                     padding: const EdgeInsets.symmetric(vertical: 6),
-//                     child: Row(
-//                       children: [
-//                         Icon(
-//                           hasValue
-//                               ? Icons.check_circle
-//                               : Icons.radio_button_unchecked,
-//                           size: 14,
-//                           color: hasValue
-//                               ? AppColors.ctOk
-//                               : AppColors.ctText3,
-//                         ),
-//                         const SizedBox(width: 8),
-//                         Expanded(
-//                           child: Text(
-//                             label,
-//                             style: const TextStyle(
-//                               fontFamily: 'Geist',
-//                               fontSize: 12,
-//                               color: AppColors.ctText,
-//                             ),
-//                           ),
-//                         ),
-//                         if (isRequired)
-//                           Container(
-//                             padding: const EdgeInsets.symmetric(
-//                                 horizontal: 4, vertical: 2),
-//                             decoration: BoxDecoration(
-//                               color: AppColors.ctWarnBg,
-//                               borderRadius: BorderRadius.circular(4),
-//                             ),
-//                             child: const Text(
-//                               'req',
-//                               style: TextStyle(
-//                                 fontFamily: 'Geist',
-//                                 fontSize: 9,
-//                                 fontWeight: FontWeight.w600,
-//                                 color: AppColors.ctWarnText,
-//                               ),
-//                             ),
-//                           ),
-//                         const SizedBox(width: 8),
-//                         Text(
-//                           hasValue ? value.toString() : '—',
-//                           style: TextStyle(
-//                             fontFamily: 'Geist',
-//                             fontSize: 12,
-//                             color: hasValue
-//                                 ? AppColors.ctText
-//                                 : AppColors.ctText3,
-//                           ),
-//                         ),
-//                       ],
-//                     ),
-//                   ),
-//                 ],
-//               );
-//             }),
-//           if (flowDef == null)
-//             Column(
-//               crossAxisAlignment: CrossAxisAlignment.start,
-//               mainAxisSize: MainAxisSize.min,
-//               children: [
-//                 const Text(
-//                   'Definición de flujo no disponible',
-//                   style: TextStyle(
-//                     fontFamily: 'Geist',
-//                     fontSize: 12,
-//                     fontStyle: FontStyle.italic,
-//                     color: AppColors.ctText3,
-//                   ),
-//                 ),
-//                 const SizedBox(height: 8),
-//                 Text(
-//                   jsonEncode(execution['fields_captured']),
-//                   style: const TextStyle(
-//                     fontSize: 10,
-//                     fontFamily: 'monospace',
-//                     color: AppColors.ctText2,
-//                   ),
-//                 ),
-//               ],
-//             ),
-//           const SizedBox(height: 8),
-//           SelectableText(
-//             'ID: ${execution['execution_id']}',
-//             style: const TextStyle(
-//               fontSize: 10,
-//               fontFamily: 'monospace',
-//               color: AppColors.ctText3,
-//             ),
-//           ),
-//         ],
-//       ),
-//     );
-//   }
-// }
-//
-// // ── _ExecStatusBadge ──────────────────────────────────────────────────────────
-//
-// class _ExecStatusBadge extends StatelessWidget {
-//   const _ExecStatusBadge({required this.status});
-//
-//   final String status;
-//
-//   @override
-//   Widget build(BuildContext context) {
-//     final Color bg;
-//     final Color fg;
-//
-//     switch (status) {
-//       case 'active':
-//       case 'in_progress':
-//         bg = AppColors.ctTealLight;
-//         fg = AppColors.ctTealDark;
-//       case 'completed':
-//         bg = AppColors.ctOkBg;
-//         fg = AppColors.ctOkText;
-//       case 'abandoned':
-//         bg = AppColors.ctSurface2;
-//         fg = AppColors.ctText3;
-//       case 'paused':
-//         bg = AppColors.ctWarnBg;
-//         fg = AppColors.ctWarnText;
-//       default:
-//         bg = AppColors.ctSurface2;
-//         fg = AppColors.ctText2;
-//     }
-//
-//     return Container(
-//       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-//       decoration: BoxDecoration(
-//         color: bg,
-//         borderRadius: BorderRadius.circular(10),
-//       ),
-//       child: Text(
-//         status,
-//         style: TextStyle(
-//           fontFamily: 'Geist',
-//           fontSize: 10,
-//           fontWeight: FontWeight.w600,
-//           color: fg,
-//         ),
-//       ),
-//     );
-//   }
-// }
+  @override
+  State<_OpChip> createState() => _OpChipState();
+}
+
+class _OpChipState extends State<_OpChip> {
+  bool _hovered = false;
+
+  String get _shortName {
+    final name  = widget.op['name'] as String? ?? '—';
+    final parts = name.trim().split(' ').where((p) => p.isNotEmpty).toList();
+    if (parts.isEmpty) return name;
+    if (parts.length == 1) return parts[0];
+    return '${parts[0]} ${parts[1][0]}.';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit:  (_) => setState(() => _hovered = false),
+      cursor: SystemMouseCursors.click,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 120),
+        transform: _hovered
+            ? (Matrix4.identity()..translateByDouble(0.0, -1.0, 0.0, 1.0))
+            : Matrix4.identity(),
+        decoration: BoxDecoration(
+          color: AppColors.ctSurface,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: _hovered ? AppColors.ctTeal : AppColors.ctBorder,
+          ),
+          boxShadow: _hovered
+              ? [BoxShadow(
+                  color: const Color(0xFF5BC0BE).withValues(alpha: 0.18),
+                  blurRadius: 6,
+                )]
+              : null,
+        ),
+        child: InkWell(
+          onTap: () {},
+          borderRadius: BorderRadius.circular(999),
+          child: Padding(
+            padding: const EdgeInsets.only(left: 4, right: 11, top: 4, bottom: 4),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    OperatorAvatar(
+                      name:     widget.op['name'] as String? ?? '',
+                      photoUrl: widget.op['profile_picture_url'] as String?,
+                      size:     26,
+                    ),
+                    Positioned(
+                      bottom: -1,
+                      right:  -1,
+                      child: Container(
+                        width:  8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: widget.statusColor,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 1.5),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(width: 7),
+                Text(
+                  _shortName,
+                  style: const TextStyle(
+                    fontFamily: 'Geist',
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF0B132B),
+                  ),
+                ),
+                if (widget.lastEventMin != null) ...[
+                  const SizedBox(width: 7),
+                  Container(width: 1, height: 12, color: AppColors.ctBorder),
+                  const SizedBox(width: 7),
+                  Text(
+                    '${widget.lastEventMin}m',
+                    style: AppFonts.geist(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.ctText2,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── _OpCard ───────────────────────────────────────────────────────────────────
+
+class _OpCard extends StatefulWidget {
+  const _OpCard({
+    required this.op,
+    required this.statusColor,
+    required this.statusLabel,
+    this.lastEventMin,
+  });
+
+  final Map<String, dynamic> op;
+  final Color  statusColor;
+  final String statusLabel;
+  final int?   lastEventMin;
+
+  @override
+  State<_OpCard> createState() => _OpCardState();
+}
+
+class _OpCardState extends State<_OpCard> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final flowsRaw = widget.op['flows'];
+    final flowCount = flowsRaw is List ? flowsRaw.length : 0;
+    final lm        = widget.lastEventMin;
+    final lmColor   = lm != null && lm >= 30 ? AppColors.ctDanger : AppColors.ctText;
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit:  (_) => setState(() => _hovered = false),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 120),
+        decoration: BoxDecoration(
+          color: AppColors.ctSurface,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: _hovered ? AppColors.ctBorder2 : AppColors.ctBorder,
+          ),
+          boxShadow: _hovered
+              ? [BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.04),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                )]
+              : null,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: widget.statusColor, width: 2),
+                    ),
+                    child: OperatorAvatar(
+                      name:     widget.op['name'] as String? ?? '',
+                      photoUrl: widget.op['profile_picture_url'] as String?,
+                      size:     34,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      widget.op['name'] as String? ?? '—',
+                      style: AppFonts.onest(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.ctText,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: widget.statusColor.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      widget.statusLabel.toUpperCase(),
+                      style: TextStyle(
+                        fontFamily: 'Geist',
+                        fontSize: 9,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.06,
+                        color: widget.statusColor,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              const Divider(height: 1, color: AppColors.ctBorder),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  _MetaItem(
+                    label: 'Flujos',
+                    value: flowCount.toString(),
+                    valueColor: AppColors.ctText,
+                  ),
+                  const SizedBox(width: 16),
+                  _MetaItem(
+                    label: 'Último evento',
+                    value: lm != null ? '${lm}m' : '—',
+                    valueColor: lmColor,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MetaItem extends StatelessWidget {
+  const _MetaItem({
+    required this.label,
+    required this.value,
+    this.valueColor = AppColors.ctText,
+  });
+
+  final String label;
+  final String value;
+  final Color  valueColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: AppFonts.geist(fontSize: 10, color: AppColors.ctText3)),
+        Text(value, style: AppFonts.geist(fontSize: 12, fontWeight: FontWeight.w600, color: valueColor)),
+      ],
+    );
+  }
+}
+
+// ── _WorkersFlows ─────────────────────────────────────────────────────────────
+
+class _WorkersFlows extends StatefulWidget {
+  const _WorkersFlows({required this.tenantId});
+  final String tenantId;
+
+  @override
+  State<_WorkersFlows> createState() => _WorkersFlowsState();
+}
+
+class _WorkersFlowsState extends State<_WorkersFlows> {
+  bool   _loading = false;
+  String? _error;
+  List<Map<String, dynamic>> _workers = [];
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.tenantId.isNotEmpty) _load();
+  }
+
+  @override
+  void didUpdateWidget(_WorkersFlows old) {
+    super.didUpdateWidget(old);
+    if (old.tenantId.isEmpty && widget.tenantId.isNotEmpty) _load();
+  }
+
+  Future<void> _load() async {
+    setState(() { _loading = true; _error = null; });
+    try {
+      final raw = await AiWorkersApi.listWorkers();
+      setState(() { _workers = raw; _loading = false; });
+    } catch (e) {
+      setState(() { _error = e.toString(); _loading = false; });
+    }
+  }
+
+  int get _totalFlows => _workers.fold(0, (acc, w) {
+    final f = w['flows'];
+    return acc + (f is List ? f.length : 0);
+  });
+
+  int get _totalCompleted => _workers.fold(0, (acc, w) {
+    final f = w['flows'];
+    if (f is! List) return acc;
+    return acc + f.fold<int>(0, (a, flow) {
+      return a + ((flow['completed_today'] as num?)?.toInt() ?? 0);
+    });
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.ctSurface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.ctBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Workers contratados · ${_workers.length}',
+                      style: AppFonts.geist(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.ctText,
+                      ),
+                    ),
+                    Text(
+                      '$_totalFlows flujos · $_totalCompleted ejecuciones hoy',
+                      style: AppFonts.geist(fontSize: 12, color: AppColors.ctText2),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          if (_loading)
+            const Center(child: Padding(
+              padding: EdgeInsets.all(20),
+              child: CircularProgressIndicator(color: AppColors.ctTeal),
+            ))
+          else if (_error != null)
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppColors.ctRedBg,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.ctDanger),
+              ),
+              child: Text(_error!, style: AppFonts.geist(fontSize: 12, color: AppColors.ctRedText)),
+            )
+          else if (_workers.isEmpty)
+            Center(
+              child: Text(
+                'Sin workers contratados.',
+                style: AppFonts.geist(fontSize: 13, color: AppColors.ctText3),
+              ),
+            )
+          else
+            GridView.count(
+              crossAxisCount: 2,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 10,
+              childAspectRatio: 1.5,
+              children: _workers
+                  .map((w) => _WorkerCard(worker: w, totalFlows: _totalFlows))
+                  .toList(),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── _WorkerCard ───────────────────────────────────────────────────────────────
+
+class _WorkerCard extends StatefulWidget {
+  const _WorkerCard({required this.worker, required this.totalFlows});
+  final Map<String, dynamic> worker;
+  final int totalFlows;
+
+  @override
+  State<_WorkerCard> createState() => _WorkerCardState();
+}
+
+class _WorkerCardState extends State<_WorkerCard>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _pulse;
+  late Animation<double>   _pulseAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulse = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat(reverse: true);
+    _pulseAnim = Tween<double>(begin: 0.55, end: 1.0).animate(_pulse);
+  }
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    super.dispose();
+  }
+
+  Color _iconBg(String? colorHex) {
+    if (colorHex == null) return AppColors.ctTealLight;
+    try {
+      final hex = colorHex.replaceAll('#', '');
+      return Color(int.parse('0xFF$hex')).withValues(alpha: 0.1);
+    } catch (_) {
+      return AppColors.ctTealLight;
+    }
+  }
+
+  IconData _iconFor(String? type) => switch (type) {
+    'logistics'      => Icons.local_shipping_outlined,
+    'communication'  => Icons.chat_bubble_outline,
+    'analytics'      => Icons.bar_chart,
+    _                => Icons.smart_toy_outlined,
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final w             = widget.worker;
+    final name          = w['catalog_name'] as String? ?? w['display_name'] as String? ?? '—';
+    final type          = w['catalog_worker_type'] as String?;
+    final colorHex      = w['catalog_color'] as String?;
+    final flowsRaw      = w['flows'];
+    final flows         = flowsRaw is List ? flowsRaw : <dynamic>[];
+    final runningNow    = (w['running_now'] as num?)?.toInt() ?? 0;
+    final completedToday = flows.fold<int>(0, (a, f) =>
+        a + ((f['completed_today'] as num?)?.toInt() ?? 0));
+    final fraction      = widget.totalFlows > 0 ? flows.length / widget.totalFlows : 0.0;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFAFAFA),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.ctBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 34, height: 34,
+                decoration: BoxDecoration(
+                  color: _iconBg(colorHex),
+                  borderRadius: BorderRadius.circular(9),
+                ),
+                child: Icon(_iconFor(type), size: 18, color: AppColors.ctTealDark),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      style: AppFonts.geist(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.ctText),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      '${flows.length} flujos del catálogo',
+                      style: AppFonts.geist(fontSize: 11, color: AppColors.ctText2),
+                    ),
+                  ],
+                ),
+              ),
+              if (runningNow > 0)
+                AnimatedBuilder(
+                  animation: _pulseAnim,
+                  builder: (context, child) => Opacity(
+                    opacity: _pulseAnim.value,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: AppColors.ctOkBg,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 5, height: 5,
+                            decoration: const BoxDecoration(
+                              color: AppColors.ctOk,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '$runningNow',
+                            style: AppFonts.geist(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.ctOkText),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Hoy', style: AppFonts.geist(fontSize: 10, color: AppColors.ctText3)),
+                  Text(
+                    '$completedToday',
+                    style: AppFonts.onest(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.ctText, height: 1),
+                  ),
+                ],
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: fraction.clamp(0.0, 1.0),
+                    backgroundColor: AppColors.ctBorder,
+                    color: AppColors.ctTeal,
+                    minHeight: 6,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (flows.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            ...flows.take(3).map((f) {
+              final fname = (f['name'] as String? ?? '—');
+              final count = (f['completed_today'] as num?)?.toInt() ?? 0;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 2),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        fname,
+                        style: AppFonts.geist(fontSize: 11, color: AppColors.ctText2),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: AppColors.ctSurface2,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        '$count',
+                        style: AppFonts.geist(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.ctText2),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+            if (flows.length > 3)
+              Text(
+                '+${flows.length - 3} más',
+                style: AppFonts.geist(fontSize: 11, color: AppColors.ctTeal),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// ── _Attention ────────────────────────────────────────────────────────────────
+
+class _Attention extends StatefulWidget {
+  const _Attention({required this.tenantId});
+  final String tenantId;
+
+  @override
+  State<_Attention> createState() => _AttentionState();
+}
+
+class _AttentionState extends State<_Attention> {
+  bool   _loading = false;
+  String? _error;
+  List<Map<String, dynamic>> _items = [];
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.tenantId.isNotEmpty) _load();
+  }
+
+  @override
+  void didUpdateWidget(_Attention old) {
+    super.didUpdateWidget(old);
+    if (old.tenantId.isEmpty && widget.tenantId.isNotEmpty) _load();
+  }
+
+  Future<void> _load() async {
+    setState(() { _loading = true; _error = null; });
+    try {
+      final raw = await EscalacionesApi.getEscalaciones();
+      final filtered = raw
+          .where((e) => (e['status'] as String? ?? '') != 'resolved')
+          .take(4)
+          .toList();
+      setState(() { _items = filtered; _loading = false; });
+    } catch (e) {
+      setState(() { _error = e.toString(); _loading = false; });
+    }
+  }
+
+  String _severityOf(Map<String, dynamic> item) {
+    final status = (item['status'] as String? ?? '').toLowerCase();
+    return switch (status) {
+      'open'     => 'incident',
+      'reopened' => 'incident',
+      'assigned' => 'warn',
+      _          => 'info',
+    };
+  }
+
+  Color _colorOf(String sev) => switch (sev) {
+    'incident' => const Color(0xFFE24C4B),
+    'warn'     => const Color(0xFFFFB700),
+    _          => AppColors.ctTeal,
+  };
+
+  int get _incidentCount =>
+      _items.where((e) => _severityOf(e) == 'incident').length;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.ctSurface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.ctBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          'Atención',
+                          style: AppFonts.onest(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.ctText,
+                          ),
+                        ),
+                        if (_incidentCount > 0) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppColors.ctRedBg,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              '$_incidentCount',
+                              style: AppFonts.geist(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.ctRedText,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    Text(
+                      'lo que necesita decisión ahora',
+                      style: AppFonts.geist(fontSize: 12, color: AppColors.ctText2),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          if (_loading)
+            const Center(child: Padding(
+              padding: EdgeInsets.all(20),
+              child: CircularProgressIndicator(color: AppColors.ctTeal),
+            ))
+          else if (_error != null)
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppColors.ctRedBg,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.ctDanger),
+              ),
+              child: Text(_error!, style: AppFonts.geist(fontSize: 12, color: AppColors.ctRedText)),
+            )
+          else if (_items.isEmpty)
+            Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(height: 8),
+                  const Icon(Icons.check_circle_outline, size: 28, color: AppColors.ctTeal),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Sin alertas activas',
+                    style: AppFonts.geist(fontSize: 13, color: AppColors.ctText2),
+                  ),
+                ],
+              ),
+            )
+          else
+            Column(
+              children: _items.map((item) {
+                final sev = _severityOf(item);
+                return _AttentionItem(item: item, color: _colorOf(sev));
+              }).toList(),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── _AttentionItem ────────────────────────────────────────────────────────────
+
+class _AttentionItem extends StatelessWidget {
+  const _AttentionItem({required this.item, required this.color});
+
+  final Map<String, dynamic> item;
+  final Color color;
+
+  String _operatorName() {
+    final op = item['operator'];
+    if (op is Map) return op['name'] as String? ?? op['email'] as String? ?? 'Operador';
+    return item['operator_name'] as String? ?? '—';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final reason   = item['reason'] as String? ?? '—';
+    final canResume = item['worker_can_resume'] as bool? ?? false;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(9),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 28, height: 28,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.warning_amber_rounded,
+              size: 15,
+              color: color,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _operatorName(),
+                  style: AppFonts.geist(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.ctText,
+                  ),
+                ),
+                Text(
+                  reason,
+                  style: AppFonts.geist(fontSize: 11, color: AppColors.ctText2),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          if (canResume) ...[
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppColors.ctTealLight,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                'Reanudar',
+                style: AppFonts.geist(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.ctTealDark,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// ── _DayThread ────────────────────────────────────────────────────────────────
+
+class _DayThread extends StatelessWidget {
+  const _DayThread();
+
+  @override
+  Widget build(BuildContext context) {
+    // TODO: nutrir con flow_events y sesiones reales
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.ctSurface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.ctBorder),
+      ),
+      child: const Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.timeline_outlined, size: 32, color: AppColors.ctText3),
+            SizedBox(height: 8),
+            Text(
+              'Hilo del día',
+              style: TextStyle(
+                fontFamily: 'Geist',
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: AppColors.ctText,
+              ),
+            ),
+            SizedBox(height: 4),
+            Text(
+              'Próximamente',
+              style: TextStyle(
+                fontFamily: 'Geist',
+                fontSize: 12,
+                color: AppColors.ctText3,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
