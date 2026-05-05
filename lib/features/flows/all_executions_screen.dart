@@ -109,6 +109,9 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
   String?      _filterFlowId;
   String?      _filterChannelType;
   String?      _filterDateRange;
+  String       _filterDateField   = 'created_at';
+  String?      _filterDateFrom;
+  String?      _filterDateTo;
   String       _searchText        = '';
   bool         _showFilterSidebar = false;
   bool         _showExportModal   = false;
@@ -198,6 +201,9 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
         flowId:      _filterFlowId,
         channelType: _filterChannelType,
         dateRange:   _filterDateRange,
+        dateField:   _filterDateField,
+        dateFrom:    _filterDateFrom,
+        dateTo:      _filterDateTo,
         search:      _searchText.isNotEmpty ? _searchText : null,
         fieldKey:    fieldEntry?.key,
         fieldValues: fieldEntry?.value,
@@ -359,6 +365,9 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
       _filterFlowId        = null;
       _filterChannelType   = null;
       _filterDateRange     = null;
+      _filterDateField     = 'created_at';
+      _filterDateFrom      = null;
+      _filterDateTo        = null;
       _searchText          = '';
       _searchCtrl.clear();
       _activeFieldSearches = {};
@@ -380,6 +389,9 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
       _filterFlowId      = filters['flow_id']      as String?;
       _filterChannelType = filters['channel_type'] as String?;
       _filterDateRange   = filters['date_range']   as String?;
+      _filterDateField   = filters['date_field']   as String? ?? 'created_at';
+      _filterDateFrom    = filters['date_from']    as String?;
+      _filterDateTo      = filters['date_to']      as String?;
       _searchText        = filters['search']       as String? ?? '';
       if (_searchText.isNotEmpty) _searchCtrl.text = _searchText;
       _activeFieldSearches = {
@@ -399,7 +411,10 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
     if (_filterOperatorIds.isNotEmpty)      'operator_ids':   _filterOperatorIds,
     'flow_id':      ?_filterFlowId,
     'channel_type': ?_filterChannelType,
-    'date_range':   ?_filterDateRange,
+    if (_filterDateRange != null) 'date_range': _filterDateRange,
+    'date_field': _filterDateField,
+    if (_filterDateFrom != null) 'date_from': _filterDateFrom,
+    if (_filterDateTo != null)   'date_to':   _filterDateTo,
     if (_searchText.isNotEmpty)             'search':         _searchText,
     if (_activeFieldSearches.isNotEmpty)    'field_searches': _activeFieldSearches,
   };
@@ -422,8 +437,20 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
     'last_7_days'  => 'Últimos 7 días',
     'last_30_days' => 'Últimos 30 días',
     'this_month'   => 'Este mes',
+    'custom'       => 'Rango personalizado',
     _              => r,
   };
+
+  String _formatDateTimeShort(String isoStr) {
+    try {
+      final dt = DateTime.parse(isoStr).toLocal();
+      final d = '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}';
+      final h = '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+      return '$d $h';
+    } catch (_) {
+      return isoStr;
+    }
+  }
 
   // ── Sort ──────────────────────────────────────────────────────────────────
 
@@ -523,6 +550,24 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
                         },
                         onDateRangeSelect: (d) {
                           setState(() { _filterDateRange = d; _page = 1; });
+                          _markDirty();
+                          _load();
+                        },
+                        filterDateField: _filterDateField,
+                        filterDateFrom:  _filterDateFrom,
+                        filterDateTo:    _filterDateTo,
+                        onDateFieldSelect: (field) {
+                          setState(() { _filterDateField = field; _page = 1; });
+                          _markDirty();
+                          _load();
+                        },
+                        onDateRangeChange: (range, from, to) {
+                          setState(() {
+                            _filterDateRange = range;
+                            _filterDateFrom  = from;
+                            _filterDateTo    = to;
+                            _page = 1;
+                          });
                           _markDirty();
                           _load();
                         },
@@ -1312,11 +1357,32 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
         },
       ));
     }
-    if (_filterDateRange != null) {
+    if (_filterDateRange != null || _filterDateFrom != null) {
+      final fieldLabel = switch (_filterDateField) {
+        'updated_at'   => 'Actualizada',
+        'completed_at' => 'Completada',
+        _              => 'Creada',
+      };
+      String dateLabel;
+      if (_filterDateRange == 'custom' &&
+          (_filterDateFrom != null || _filterDateTo != null)) {
+        final from = _filterDateFrom != null
+            ? _formatDateTimeShort(_filterDateFrom!) : '?';
+        final to = _filterDateTo != null
+            ? _formatDateTimeShort(_filterDateTo!) : '?';
+        dateLabel = '$fieldLabel: $from → $to';
+      } else {
+        dateLabel = '$fieldLabel: ${_dateRangeLabel(_filterDateRange ?? '')}';
+      }
       chips.add(_FilterChip(
-        label: _dateRangeLabel(_filterDateRange!),
+        label: dateLabel,
         onRemove: () {
-          setState(() { _filterDateRange = null; _page = 1; });
+          setState(() {
+            _filterDateRange = null;
+            _filterDateFrom  = null;
+            _filterDateTo    = null;
+            _page = 1;
+          });
           _markDirty();
           _load();
         },
@@ -1902,6 +1968,9 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
         flowId:      _filterFlowId,
         channelType: _filterChannelType,
         dateRange:   _filterDateRange,
+        dateField:   _filterDateField,
+        dateFrom:    _filterDateFrom,
+        dateTo:      _filterDateTo,
         search:      _searchText.isEmpty ? null : _searchText,
         fieldKey:    fieldEntry?.key,
         fieldValues: fieldEntry?.value,
@@ -2718,6 +2787,9 @@ class _FilterSidebar extends StatelessWidget {
     required this.filterStatus,
     required this.filterChannelType,
     required this.filterDateRange,
+    required this.filterDateField,
+    required this.filterDateFrom,
+    required this.filterDateTo,
     required this.filterOperatorIds,
     required this.availableOperators,
     required this.filterFlowId,
@@ -2725,22 +2797,29 @@ class _FilterSidebar extends StatelessWidget {
     required this.onStatusToggle,
     required this.onChannelTypeSelect,
     required this.onDateRangeSelect,
+    required this.onDateFieldSelect,
+    required this.onDateRangeChange,
     required this.onOperatorToggle,
     required this.onFlowSelect,
   });
 
-  final List<String>                 filterStatus;
-  final String?                      filterChannelType;
-  final String?                      filterDateRange;
-  final List<String>                 filterOperatorIds;
-  final List<Map<String, dynamic>>   availableOperators;
-  final String?                      filterFlowId;
-  final List<Map<String, dynamic>>   availableFlows;
-  final void Function(String)        onStatusToggle;
-  final void Function(String?)       onChannelTypeSelect;
-  final void Function(String?)       onDateRangeSelect;
-  final void Function(String)        onOperatorToggle;
-  final void Function(String?)       onFlowSelect;
+  final List<String>                              filterStatus;
+  final String?                                   filterChannelType;
+  final String?                                   filterDateRange;
+  final String                                    filterDateField;
+  final String?                                   filterDateFrom;
+  final String?                                   filterDateTo;
+  final List<String>                              filterOperatorIds;
+  final List<Map<String, dynamic>>                availableOperators;
+  final String?                                   filterFlowId;
+  final List<Map<String, dynamic>>                availableFlows;
+  final void Function(String)                     onStatusToggle;
+  final void Function(String?)                    onChannelTypeSelect;
+  final void Function(String?)                    onDateRangeSelect;
+  final void Function(String)                     onDateFieldSelect;
+  final void Function(String?, String?, String?)  onDateRangeChange;
+  final void Function(String)                     onOperatorToggle;
+  final void Function(String?)                    onFlowSelect;
 
   @override
   Widget build(BuildContext context) {
@@ -2752,13 +2831,6 @@ class _FilterSidebar extends StatelessWidget {
       ('paused',           'Pausada'),
       ('abandoned',        'Abandonada'),
       ('failed',           'Error'),
-    ];
-    final dateRanges = [
-      ('today',        'Hoy'),
-      ('yesterday',    'Ayer'),
-      ('last_7_days',  'Últimos 7 días'),
-      ('last_30_days', 'Últimos 30 días'),
-      ('this_month',   'Este mes'),
     ];
     final channels = [
       ('whatsapp', 'WhatsApp'),
@@ -2789,13 +2861,84 @@ class _FilterSidebar extends StatelessWidget {
           _SidebarSection(
             title: 'Fecha',
             children: [
-              for (final (value, label) in dateRanges)
+              // Selector de campo
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
+                child: Row(
+                  children: [
+                    Text('Campo:', style: AppFonts.geist(
+                      fontSize: 11, color: AppColors.ctText2)),
+                    const SizedBox(width: 8),
+                    for (final (field, label) in [
+                      ('created_at',   'Creada'),
+                      ('updated_at',   'Actualizada'),
+                      ('completed_at', 'Completada'),
+                    ])
+                      GestureDetector(
+                        onTap: () => onDateFieldSelect(field),
+                        child: Container(
+                          margin: const EdgeInsets.only(right: 4),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: filterDateField == field
+                                ? AppColors.ctTeal
+                                : AppColors.ctSurface2,
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: filterDateField == field
+                                  ? AppColors.ctTeal
+                                  : AppColors.ctBorder,
+                            ),
+                          ),
+                          child: Text(label, style: AppFonts.geist(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: filterDateField == field
+                                ? AppColors.ctNavy
+                                : AppColors.ctText2,
+                          )),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              // Opciones rápidas
+              for (final (value, label) in [
+                ('today',        'Hoy'),
+                ('yesterday',    'Ayer'),
+                ('last_7_days',  'Últimos 7 días'),
+                ('last_30_days', 'Últimos 30 días'),
+                ('this_month',   'Este mes'),
+              ])
                 _SidebarRadioRow(
                   label:    label,
                   selected: filterDateRange == value,
-                  onTap:    () =>
-                      onDateRangeSelect(filterDateRange == value ? null : value),
+                  onTap: () => onDateRangeChange(
+                    filterDateRange == value ? null : value, null, null),
                 ),
+              // Rango personalizado
+              _SidebarRadioRow(
+                label: 'Rango personalizado',
+                selected: filterDateRange == 'custom',
+                onTap: () => onDateRangeChange(
+                    'custom', filterDateFrom, filterDateTo),
+              ),
+              // Date-time pickers (solo visibles cuando custom está activo)
+              if (filterDateRange == 'custom') ...[
+                _DateTimePickerRow(
+                  label: 'Desde',
+                  value: filterDateFrom,
+                  onChanged: (iso) => onDateRangeChange(
+                      'custom', iso, filterDateTo),
+                ),
+                _DateTimePickerRow(
+                  label: 'Hasta',
+                  value: filterDateTo,
+                  onChanged: (iso) => onDateRangeChange(
+                      'custom', filterDateFrom, iso),
+                ),
+              ],
             ],
           ),
           const SizedBox(height: 8),
@@ -2848,6 +2991,124 @@ class _FilterSidebar extends StatelessWidget {
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+// ── _DateTimePickerRow ────────────────────────────────────────────────────────
+
+class _DateTimePickerRow extends StatefulWidget {
+  const _DateTimePickerRow({
+    required this.label,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final String                  label;
+  final String?                 value;
+  final void Function(String?)  onChanged;
+
+  @override
+  State<_DateTimePickerRow> createState() => _DateTimePickerRowState();
+}
+
+class _DateTimePickerRowState extends State<_DateTimePickerRow> {
+  static String _formatDtLocal(String iso) {
+    try {
+      final dt = DateTime.parse(iso).toLocal();
+      final d =
+          '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
+      final h =
+          '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+      return '$d $h';
+    } catch (_) {
+      return iso;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: () async {
+        final ctx = context;
+        final date = await showDatePicker(
+          context: ctx,
+          initialDate: widget.value != null
+              ? DateTime.tryParse(widget.value!)?.toLocal() ?? DateTime.now()
+              : DateTime.now(),
+          firstDate: DateTime(2020),
+          lastDate: DateTime(2030),
+          builder: (ctx, child) => Theme(
+            data: ThemeData.light().copyWith(
+              colorScheme: const ColorScheme.light(
+                primary: AppColors.ctTeal,
+                onPrimary: AppColors.ctNavy,
+              ),
+            ),
+            child: child!,
+          ),
+        );
+        if (date == null || !mounted) return;
+
+        final time = await showTimePicker(
+          context: ctx, // ignore: use_build_context_synchronously
+          initialTime: widget.value != null &&
+                  DateTime.tryParse(widget.value!) != null
+              ? TimeOfDay.fromDateTime(
+                  DateTime.parse(widget.value!).toLocal())
+              : const TimeOfDay(hour: 0, minute: 0),
+          builder: (ctx, child) => Theme(
+            data: ThemeData.light().copyWith(
+              colorScheme: const ColorScheme.light(
+                primary: AppColors.ctTeal,
+                onPrimary: AppColors.ctNavy,
+              ),
+            ),
+            child: child!,
+          ),
+        );
+        if (time == null || !mounted) return;
+
+        final local = DateTime(
+          date.year, date.month, date.day,
+          time.hour, time.minute,
+        );
+        widget.onChanged(local.toUtc().toIso8601String());
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Row(children: [
+          const Icon(Icons.calendar_today_outlined,
+              size: 13, color: AppColors.ctText2),
+          const SizedBox(width: 8),
+          Text(widget.label,
+              style: AppFonts.geist(
+                  fontSize: 12, color: AppColors.ctText2)),
+          const Spacer(),
+          Text(
+            widget.value != null
+                ? _formatDtLocal(widget.value!)
+                : 'Seleccionar',
+            style: AppFonts.geist(
+              fontSize: 12,
+              color: widget.value != null
+                  ? AppColors.ctText
+                  : AppColors.ctText3,
+              fontWeight: widget.value != null
+                  ? FontWeight.w500
+                  : FontWeight.w400,
+            ),
+          ),
+          if (widget.value != null) ...[
+            const SizedBox(width: 6),
+            GestureDetector(
+              onTap: () => widget.onChanged(null),
+              child: const Icon(Icons.close_rounded,
+                  size: 12, color: AppColors.ctText3),
+            ),
+          ],
+        ]),
       ),
     );
   }

@@ -18,6 +18,7 @@ class ExecutionsApi {
     String? flowId,
     String? channelType,
     String? dateRange,
+    String dateField = 'created_at',
     String? dateFrom,
     String? dateTo,
     String? search,
@@ -29,10 +30,11 @@ class ExecutionsApi {
     int limit = 25,
   }) async {
     final params = <String, dynamic>{
-      'sort_col': sortCol,
-      'sort_dir': sortDir,
-      'page':     page,
-      'limit':    limit,
+      'sort_col':   sortCol,
+      'sort_dir':   sortDir,
+      'page':       page,
+      'limit':      limit,
+      'date_field': dateField,
     };
     if (status != null && status.isNotEmpty) params['status'] = status;
     if (workerIds != null && workerIds.isNotEmpty) params['worker_id'] = workerIds;
@@ -103,13 +105,14 @@ class ExecutionsApi {
     String? flowId,
     String? channelType,
     String? dateRange,
+    String dateField = 'created_at',
     String? dateFrom,
     String? dateTo,
     String? search,
     String? fieldKey,
     List<String>? fieldValues,
   }) async {
-    final params = <String, dynamic>{};
+    final params = <String, dynamic>{'date_field': dateField};
     if (status != null && status.isNotEmpty) params['status'] = status;
     if (workerIds != null && workerIds.isNotEmpty) params['worker_id'] = workerIds;
     if (operatorIds != null && operatorIds.isNotEmpty) params['operator_id'] = operatorIds;
