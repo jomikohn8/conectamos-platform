@@ -368,6 +368,23 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
     }
   }
 
+  void _toggleWorker(String id) {
+    setState(() {
+      if (_filterWorkerIds.contains(id)) {
+        _filterWorkerIds = List.from(_filterWorkerIds)..remove(id);
+      } else {
+        _filterWorkerIds = List.from(_filterWorkerIds)..add(id);
+      }
+      _page = 1;
+      _filterFlowId      = null;
+      _filterOperatorIds = [];
+    });
+    _markDirty();
+    _loadFlows();
+    _loadOperators();
+    _load();
+  }
+
   Future<void> _loadSearchableFields() async {
     final tenantId = ref.read(activeTenantIdProvider);
     debugPrint('[SearchableFields] tenantId="$tenantId"');
@@ -1024,26 +1041,7 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
                         ?? id;
                     final selected = _filterWorkerIds.contains(id);
                     return InkWell(
-                      onTap: () {
-                        setState(() {
-                          if (selected) {
-                            _filterWorkerIds =
-                                List.from(_filterWorkerIds)..remove(id);
-                          } else {
-                            _filterWorkerIds =
-                                List.from(_filterWorkerIds)..add(id);
-                          }
-                          _page = 1;
-                          // Limpiar filtros dependientes al cambiar workers
-                          _filterFlowId      = null;
-                          _filterOperatorIds = [];
-                        });
-                        _markDirty();
-                        // Recargar flows y operadores filtrados por nuevos workers
-                        _loadFlows();
-                        _loadOperators();
-                        _load();
-                      },
+                      onTap: () => _toggleWorker(id),
                       child: Padding(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 12, vertical: 9),
