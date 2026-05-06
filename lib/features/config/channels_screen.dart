@@ -466,7 +466,9 @@ class _CreateChannelStepperState extends State<_CreateChannelStepper> {
   late final TextEditingController _pinConfirmCtrl;
   String _color             = '#59E0CC';
   bool   _tokenVisible      = false;
+  // ignore: prefer_final_fields, unused_field
   bool   _pinVisible        = false;
+  // ignore: prefer_final_fields, unused_field
   bool   _pinConfirmVisible = false;
 
   // Step 2 verify
@@ -502,6 +504,7 @@ class _CreateChannelStepperState extends State<_CreateChannelStepper> {
     super.dispose();
   }
 
+  // ignore: unused_element
   bool get _isPinValid {
     final pin = _pinCtrl.text.trim();
     return pin.length == 6 && RegExp(r'^\d{6}$').hasMatch(pin) && pin == _pinConfirmCtrl.text.trim();
@@ -513,11 +516,9 @@ class _CreateChannelStepperState extends State<_CreateChannelStepper> {
       if (_channelType == 'telegram') {
         return _nameCtrl.text.trim().isNotEmpty && _tokenCtrl.text.trim().isNotEmpty;
       }
-      return _nameCtrl.text.trim().isNotEmpty &&
-          _phoneCtrl.text.trim().isNotEmpty &&
-          _wabaCtrl.text.trim().isNotEmpty &&
-          _tokenCtrl.text.trim().isNotEmpty &&
-          _isPinValid;
+      // Configuración manual deshabilitada — solo embedded signup disponible para WhatsApp.
+      // TODO: restaurar validación manual cuando se re-habiliten los campos.
+      return false;
     }
     return true;
   }
@@ -841,77 +842,28 @@ class _CreateChannelStepperState extends State<_CreateChannelStepper> {
         ),
         const SizedBox(height: 20),
 
+        // TODO: re-habilitar configuración manual cuando el backend soporte PIN sin embedded signup
         // ── Separator ────────────────────────────────────────────────────
-        Row(children: [
-          const Expanded(child: Divider(color: AppColors.ctBorder)),
-          Padding(padding: const EdgeInsets.symmetric(horizontal: 12), child: Text('o configura manualmente', style: const TextStyle(fontFamily: 'Geist', fontSize: 12, color: AppColors.ctText3))),
-          const Expanded(child: Divider(color: AppColors.ctBorder)),
-        ]),
-        const SizedBox(height: 20),
+        // Row(children: [
+        //   const Expanded(child: Divider(color: AppColors.ctBorder)),
+        //   Padding(padding: const EdgeInsets.symmetric(horizontal: 12), child: Text('o configura manualmente', style: const TextStyle(fontFamily: 'Geist', fontSize: 12, color: AppColors.ctText3))),
+        //   const Expanded(child: Divider(color: AppColors.ctBorder)),
+        // ]),
+        // const SizedBox(height: 20),
 
         // ── Manual fields ─────────────────────────────────────────────────
-        _label('Nombre del canal *'),
-        TextField(controller: _nameCtrl, style: const TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText), decoration: _fieldDec('Ej: Canal Logística Norte')),
-        const SizedBox(height: 14),
-
-        _label('Phone Number ID *'),
-        TextField(controller: _phoneCtrl, style: const TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText), decoration: _fieldDec('Ej. 1077435892114696')),
-        const SizedBox(height: 14),
-
-        _label('WABA ID *'),
-        TextField(controller: _wabaCtrl, style: const TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText), decoration: _fieldDec('Ej. 1744815743186774')),
-        const SizedBox(height: 14),
-
-        _label('Token de acceso *'),
-        TextField(
-          controller: _tokenCtrl,
-          obscureText: !_tokenVisible,
-          style: const TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText),
-          decoration: _fieldDec('Token de acceso de Meta').copyWith(
-            suffixIcon: IconButton(
-              icon: Icon(_tokenVisible ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 18, color: AppColors.ctText3),
-              onPressed: () => setState(() => _tokenVisible = !_tokenVisible),
-            ),
-          ),
-        ),
-        const SizedBox(height: 14),
-
-        _label('Crea un PIN de 6 dígitos para este canal *'),
-        TextField(
-          controller: _pinCtrl,
-          obscureText: !_pinVisible,
-          keyboardType: TextInputType.number,
-          maxLength: 6,
-          style: const TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText),
-          decoration: _fieldDec('6 dígitos numéricos').copyWith(
-            counterText: '',
-            suffixIcon: IconButton(
-              icon: Icon(_pinVisible ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 18, color: AppColors.ctText3),
-              onPressed: () => setState(() => _pinVisible = !_pinVisible),
-            ),
-          ),
-        ),
-        const SizedBox(height: 14),
-
-        _label('Confirmar PIN *'),
-        TextField(
-          controller: _pinConfirmCtrl,
-          obscureText: !_pinConfirmVisible,
-          keyboardType: TextInputType.number,
-          maxLength: 6,
-          style: const TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText),
-          decoration: _fieldDec('Repite los 6 dígitos').copyWith(
-            counterText: '',
-            suffixIcon: IconButton(
-              icon: Icon(_pinConfirmVisible ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 18, color: AppColors.ctText3),
-              onPressed: () => setState(() => _pinConfirmVisible = !_pinConfirmVisible),
-            ),
-            errorText: _pinConfirmCtrl.text.isNotEmpty && _pinCtrl.text != _pinConfirmCtrl.text
-                ? 'Los PINs no coinciden'
-                : null,
-          ),
-        ),
-        const SizedBox(height: 14),
+        // _label('Nombre del canal *'),
+        // TextField(controller: _nameCtrl, ...),
+        // _label('Phone Number ID *'),
+        // TextField(controller: _phoneCtrl, ...),
+        // _label('WABA ID *'),
+        // TextField(controller: _wabaCtrl, ...),
+        // _label('Token de acceso *'),
+        // TextField(controller: _tokenCtrl, ...),
+        // _label('Crea un PIN de 6 dígitos para este canal *'),
+        // TextField(controller: _pinCtrl, ...),
+        // _label('Confirmar PIN *'),
+        // TextField(controller: _pinConfirmCtrl, ...),
 
       ],
     );
