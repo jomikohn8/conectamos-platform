@@ -6350,6 +6350,7 @@ class _NewMessageDialogState extends ConsumerState<_NewMessageDialog> {
   final _msgCtrl = TextEditingController();
   List<Map<String, dynamic>> _templates = [];
   String? _selectedTemplateId;
+  String? _selectedChannelId;
   bool _sending = false;
   String? _sendError;
 
@@ -6395,7 +6396,13 @@ class _NewMessageDialogState extends ConsumerState<_NewMessageDialog> {
   }
 
   Future<void> _selectRecipient(Map<String, dynamic> recipient) async {
-    setState(() { _selected = recipient; _checkingWindow = true; _step = 1; });
+    final channelId = recipient['channel_id'] as String? ?? '';
+    setState(() {
+      _selected = recipient;
+      _checkingWindow = true;
+      _step = 1;
+      _selectedChannelId = channelId.isNotEmpty ? channelId : null;
+    });
     try {
       final phone = recipient['phone'] as String? ?? '';
       final chatId = PhoneNormalizer.toChatId(phone);
@@ -6443,12 +6450,11 @@ class _NewMessageDialogState extends ConsumerState<_NewMessageDialog> {
 
     setState(() { _sending = true; _sendError = null; });
     try {
-      final channels = ref.read(selectedOperatorChannelsProvider);
-      final idx = ref.read(selectedChannelIndexProvider).clamp(
-          0, channels.isEmpty ? 0 : channels.length - 1);
-      final channelId = channels.isNotEmpty
-          ? channels[idx]['channel_id'] as String? ?? ''
-          : '';
+      final channelId = _selectedChannelId ?? '';
+      if (channelId.isEmpty) {
+        setState(() { _sending = false; _sendError = 'No se encontró canal WhatsApp para este operador.'; });
+        return;
+      }
       if (_useTemplate && _selectedTemplateId != null) {
         final tpl = _templates.firstWhere(
           (t) => (t['id'] ?? t['template_id'])?.toString() == _selectedTemplateId,
@@ -6469,11 +6475,6 @@ class _NewMessageDialogState extends ConsumerState<_NewMessageDialog> {
         final text = _msgCtrl.text.trim();
         if (text.isEmpty) {
           setState(() { _sending = false; _sendError = 'Escribe un mensaje.'; });
-          return;
-        }
-        if (channelId.isEmpty) {
-          debugPrint('[_NewMessageDialog._send] SKIP — no channelId');
-          setState(() { _sending = false; _sendError = 'No hay canal activo. Selecciona un operador primero.'; });
           return;
         }
         await MessagesApi.sendWhatsAppMessage(
@@ -6591,14 +6592,28 @@ class _NewMessageDialogState extends ConsumerState<_NewMessageDialog> {
                       children: [
                         if (_filteredOps.isNotEmpty) ...[
                           _NmSectionHeader(label: 'Operadores (${_filteredOps.length})'),
-                          ..._filteredOps.map((op) => _NmRecipientItem(
-                            name: op['display_name'] ?? op['name'] ?? '—',
-                            phone: op['phone'] ?? '',
-                            onTap: () => _selectRecipient({
-                              'name': op['display_name'] ?? op['name'] ?? '',
-                              'phone': op['phone'] ?? '',
-                            }),
-                          )),
+                          ..._filteredOps.map((op) {
+                            final flows = (op['flows'] as List? ?? []);
+                            String? chId;
+                            for (final f in flows) {
+                              if (f is Map) {
+                                final types = f['channel_types'];
+                                if (types is List && types.contains('whatsapp')) {
+                                  final cid = f['channel_id'] as String?;
+                                  if (cid != null && cid.isNotEmpty) { chId = cid; break; }
+                                }
+                              }
+                            }
+                            return _NmRecipientItem(
+                              name: op['display_name'] ?? op['name'] ?? '—',
+                              phone: op['phone'] ?? '',
+                              onTap: () => _selectRecipient({
+                                'name': op['display_name'] ?? op['name'] ?? '',
+                                'phone': op['phone'] ?? '',
+                                'channel_id': chId ?? '',
+                              }),
+                            );
+                          }),
                         ],
                         if (_filteredOps.isEmpty)
                           Padding(
