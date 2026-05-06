@@ -1362,8 +1362,8 @@ class _ArchivedPanelState extends ConsumerState<_ArchivedPanel> {
 
   @override
   Widget build(BuildContext context) {
-    final isAdmin =
-        ref.watch(userRoleProvider).valueOrNull?.toLowerCase() == 'admin';
+    final role = ref.watch(userRoleProvider).valueOrNull?.toLowerCase();
+    final isAdmin = role == 'admin' || role == 'super_admin';
     return Container(
       constraints: const BoxConstraints(maxHeight: 280),
       decoration: const BoxDecoration(
@@ -6339,7 +6339,6 @@ class _NewMessageDialogState extends ConsumerState<_NewMessageDialog> {
   // Step 1 — recipient selection
   final _searchCtrl = TextEditingController();
   List<Map<String, dynamic>> _operators = [];
-  List<Map<String, dynamic>> _iamUsers = [];
   bool _loadingAll = true;
   String? _loadError;
 
@@ -6372,18 +6371,11 @@ class _NewMessageDialogState extends ConsumerState<_NewMessageDialog> {
     try {
       final results = await Future.wait([
         OperatorsApi.listOperators(),
-        ApiClient.instance.get('/iam/users'),
         ApiClient.instance.get('/templates'),
       ]);
       final ops = results[0] as List<Map<String, dynamic>>;
-      final iamRaw = results[1] as dynamic;
-      final iamData = iamRaw.data;
-      final List iamList = iamData is List
-          ? iamData
-          : (iamData['users'] ?? iamData['items'] ?? []) as List;
-      final iamUsers = iamList.map((e) => Map<String, dynamic>.from(e as Map)).toList();
 
-      final tplRaw = results[2] as dynamic;
+      final tplRaw = results[1] as dynamic;
       final tplData = tplRaw.data;
       final List tplList = tplData is List
           ? tplData
@@ -6393,7 +6385,6 @@ class _NewMessageDialogState extends ConsumerState<_NewMessageDialog> {
       if (mounted) {
         setState(() {
           _operators = ops;
-          _iamUsers = iamUsers;
           _templates = templates;
           _loadingAll = false;
         });
@@ -6452,6 +6443,12 @@ class _NewMessageDialogState extends ConsumerState<_NewMessageDialog> {
 
     setState(() { _sending = true; _sendError = null; });
     try {
+      final channels = ref.read(selectedOperatorChannelsProvider);
+      final idx = ref.read(selectedChannelIndexProvider).clamp(
+          0, channels.isEmpty ? 0 : channels.length - 1);
+      final channelId = channels.isNotEmpty
+          ? channels[idx]['channel_id'] as String? ?? ''
+          : '';
       if (_useTemplate && _selectedTemplateId != null) {
         final tpl = _templates.firstWhere(
           (t) => (t['id'] ?? t['template_id'])?.toString() == _selectedTemplateId,
@@ -6461,6 +6458,7 @@ class _NewMessageDialogState extends ConsumerState<_NewMessageDialog> {
           '/messages/send',
           data: {
             'to': phone,
+            'channel_id': channelId,
             'template_name': tpl['name'] ?? tpl['template_name'] ?? '',
             'template_language': tpl['language'] ?? tpl['lang'] ?? 'es',
             'template_variables': _resolveVars(tpl),
@@ -6473,12 +6471,6 @@ class _NewMessageDialogState extends ConsumerState<_NewMessageDialog> {
           setState(() { _sending = false; _sendError = 'Escribe un mensaje.'; });
           return;
         }
-        final channels = ref.read(selectedOperatorChannelsProvider);
-        final idx = ref.read(selectedChannelIndexProvider).clamp(
-            0, channels.isEmpty ? 0 : channels.length - 1);
-        final channelId = channels.isNotEmpty
-            ? channels[idx]['channel_id'] as String? ?? ''
-            : '';
         if (channelId.isEmpty) {
           debugPrint('[_NewMessageDialog._send] SKIP — no channelId');
           setState(() { _sending = false; _sendError = 'No hay canal activo. Selecciona un operador primero.'; });
@@ -6526,16 +6518,6 @@ class _NewMessageDialogState extends ConsumerState<_NewMessageDialog> {
     return _operators.where((o) {
       final n = (o['display_name'] ?? o['name'] ?? '').toString().toLowerCase();
       final p = (o['phone'] ?? '').toString();
-      return n.contains(q) || p.contains(q);
-    }).toList();
-  }
-
-  List<Map<String, dynamic>> get _filteredIam {
-    final q = _searchCtrl.text.trim().toLowerCase();
-    if (q.isEmpty) return _iamUsers;
-    return _iamUsers.where((u) {
-      final n = (u['display_name'] ?? u['name'] ?? u['email'] ?? '').toString().toLowerCase();
-      final p = (u['phone'] ?? '').toString();
       return n.contains(q) || p.contains(q);
     }).toList();
   }
@@ -6618,18 +6600,7 @@ class _NewMessageDialogState extends ConsumerState<_NewMessageDialog> {
                             }),
                           )),
                         ],
-                        if (_filteredIam.isNotEmpty) ...[
-                          _NmSectionHeader(label: 'Usuarios de la plataforma (${_filteredIam.length})'),
-                          ..._filteredIam.map((u) => _NmRecipientItem(
-                            name: u['display_name'] ?? u['name'] ?? u['email'] ?? '—',
-                            phone: u['phone'] ?? '',
-                            onTap: () => _selectRecipient({
-                              'name': u['display_name'] ?? u['name'] ?? u['email'] ?? '',
-                              'phone': u['phone'] ?? '',
-                            }),
-                          )),
-                        ],
-                        if (_filteredOps.isEmpty && _filteredIam.isEmpty)
+                        if (_filteredOps.isEmpty)
                           Padding(
                             padding: const EdgeInsets.all(24),
                             child: Center(child: Text('Sin resultados', style: AppTextStyles.body.copyWith(color: AppColors.ctText3))),
@@ -6775,30 +6746,13 @@ class _NewMessageDialogState extends ConsumerState<_NewMessageDialog> {
           ],
           // Input area
           if (!_checkingWindow) ...[
-            if (!_useTemplate || !_windowOpen) ...[
-              // Template selector (required when window closed, or optional when toggled)
-              if (_useTemplate || !_windowOpen)
-                _NmTemplateDropdown(
-                  templates: _templates,
-                  selectedId: _selectedTemplateId,
-                  onChanged: (id) => setState(() => _selectedTemplateId = id),
-                )
-              else
-                TextField(
-                  controller: _msgCtrl,
-                  maxLines: 4,
-                  style: const TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctNavy),
-                  decoration: InputDecoration(
-                    hintText: 'Escribe tu mensaje…',
-                    hintStyle: const TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText3),
-                    filled: true,
-                    fillColor: AppColors.ctSurface2,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
-                    contentPadding: const EdgeInsets.all(12),
-                  ),
-                ),
+            if (_useTemplate) ...[
+              _NmTemplateDropdown(
+                templates: _templates,
+                selectedId: _selectedTemplateId,
+                onChanged: (id) => setState(() { _selectedTemplateId = id; _useTemplate = true; }),
+              ),
             ] else ...[
-              // Free text field
               TextField(
                 controller: _msgCtrl,
                 maxLines: 4,
