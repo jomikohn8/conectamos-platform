@@ -6437,9 +6437,21 @@ class _NewMessageDialogState extends ConsumerState<_NewMessageDialog> {
     return result;
   }
 
-  Map<String, String> _resolveVars(Map<String, dynamic> tpl) {
-    final vars = tpl['variables'] as Map? ?? {};
-    return vars.map((k, v) => MapEntry(k.toString(), v?.toString() ?? ''));
+  List<String> _resolveVars(Map<String, dynamic> tpl) {
+    final raw = tpl['variables'];
+    if (raw is List) {
+      return raw.map((v) => v?.toString() ?? '').toList();
+    }
+    if (raw is Map) {
+      final entries = raw.entries.toList()
+        ..sort((a, b) {
+          final ia = int.tryParse(a.key.toString()) ?? 0;
+          final ib = int.tryParse(b.key.toString()) ?? 0;
+          return ia.compareTo(ib);
+        });
+      return entries.map((e) => e.value?.toString() ?? '').toList();
+    }
+    return [];
   }
 
   Future<void> _send() async {
@@ -6448,6 +6460,7 @@ class _NewMessageDialogState extends ConsumerState<_NewMessageDialog> {
     final name = _selected!['name'] as String? ?? phone;
     final userId = Supabase.instance.client.auth.currentUser?.id;
 
+    debugPrint('[_send] channelId=$_selectedChannelId useTemplate=$_useTemplate templateId=$_selectedTemplateId');
     setState(() { _sending = true; _sendError = null; });
     try {
       final channelId = _selectedChannelId ?? '';
@@ -6460,6 +6473,7 @@ class _NewMessageDialogState extends ConsumerState<_NewMessageDialog> {
           (t) => (t['id'] ?? t['template_id'])?.toString() == _selectedTemplateId,
           orElse: () => {},
         );
+        debugPrint('[_send] payload: to=$phone channel=$channelId template=${tpl['name'] ?? tpl['template_name']} lang=${tpl['language'] ?? tpl['lang']}');
         await ApiClient.instance.post(
           '/messages/send',
           data: {
@@ -6491,9 +6505,11 @@ class _NewMessageDialogState extends ConsumerState<_NewMessageDialog> {
         ref.read(selectedChatNameProvider.notifier).state = name;
       }
     } on DioException catch (e) {
+      debugPrint('[_send] DioException: status=${e.response?.statusCode} data=${e.response?.data}');
       final raw = e.response?.data?.toString() ?? e.message ?? '';
       if (mounted) setState(() { _sending = false; _sendError = _parseErrorMessage(raw); });
     } catch (e) {
+      debugPrint('[_send] Exception: $e');
       if (mounted) setState(() { _sending = false; _sendError = _parseErrorMessage(e.toString()); });
     }
   }
