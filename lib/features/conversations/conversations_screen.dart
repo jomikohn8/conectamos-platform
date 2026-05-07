@@ -4699,10 +4699,6 @@ class _TabFeedState extends ConsumerState<_TabFeed> {
   void initState() {
     super.initState();
     _resubscribe();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final tenantId = ref.read(activeTenantIdProvider);
-      if (tenantId.isNotEmpty) _loadOperatorMap(tenantId);
-    });
   }
 
   @override
@@ -4749,6 +4745,7 @@ class _TabFeedState extends ConsumerState<_TabFeed> {
     setState(() => _loading = true);
     final tenantId = ref.read(activeTenantIdProvider);
     if (tenantId.isEmpty) return;
+    _loadOperatorMap(tenantId);
 
     DateTime? fromDate;
     DateTime? toDate;
