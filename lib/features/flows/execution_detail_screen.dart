@@ -327,12 +327,75 @@ class _FieldsBlockState extends State<_FieldsBlock> {
   }
 
   static Map<String, dynamic>? _resolveLocation(Map<String, dynamic> fv) {
+    // 1. Fuente ideal: value_jsonb como Map
     final jsonb = fv['value_jsonb'];
-    if (jsonb is! Map) return null;
-    final result = Map<String, dynamic>.from(jsonb.cast<String, dynamic>());
-    final address = fv['value_text'] as String?;
-    if (address != null) result['address'] = address;
-    return result;
+    if (jsonb is Map) {
+      final result = Map<String, dynamic>.from(jsonb.cast<String, dynamic>());
+      final address = fv['value_text'] as String?;
+      if (address != null && !address.trim().startsWith('{') &&
+          !address.trim().startsWith('http')) {
+        result['address'] = address;
+      }
+      return result;
+    }
+
+    // 2. Intentar parsear value_text como coordenadas
+    final vText = fv['value_text'] as String?;
+    if (vText != null && vText.isNotEmpty) {
+      final fromText = _parseLocationString(vText);
+      if (fromText != null) return fromText;
+    }
+
+    // 3. Intentar parsear value_media_url como coordenadas
+    final vMedia = fv['value_media_url'] as String?;
+    if (vMedia != null && vMedia.isNotEmpty) {
+      final fromMedia = _parseLocationString(vMedia);
+      if (fromMedia != null) return fromMedia;
+    }
+
+    // 4. Sin coordenadas extraíbles → null (field_card usará _LocationUrlLink o _PendingSlot)
+    return null;
+  }
+
+  static Map<String, dynamic>? _parseLocationString(String raw) {
+    final s = raw.trim();
+
+    // Caso A: JSON o dict Python con lat/lng o latitude/longitude
+    if (s.startsWith('{')) {
+      try {
+        final normalized = s.replaceAll("'", '"');
+        final decoded = jsonDecode(normalized) as Map<String, dynamic>;
+        final lat = (decoded['lat'] ?? decoded['latitude']) as num?;
+        final lng = (decoded['lng'] ?? decoded['longitude']) as num?;
+        if (lat != null && lng != null) {
+          return {
+            'lat': lat.toDouble(),
+            'lng': lng.toDouble(),
+            if (decoded['address'] != null) 'address': decoded['address'],
+            if (decoded['name'] != null && decoded['address'] == null)
+              'address': decoded['name'],
+          };
+        }
+      } catch (_) {}
+    }
+
+    // Caso B: URL de Google Maps con ?q=lat,lng
+    final urlMatch = RegExp(r'https?://[^\s]+').firstMatch(s);
+    if (urlMatch != null) {
+      final url = urlMatch.group(0)!;
+      final coordMatch = RegExp(
+        r'[?&]q=([+-]?\d+\.?\d*),([+-]?\d+\.?\d*)',
+      ).firstMatch(url);
+      if (coordMatch != null) {
+        return {
+          'lat': double.parse(coordMatch.group(1)!),
+          'lng': double.parse(coordMatch.group(2)!),
+          'address': url,
+        };
+      }
+    }
+
+    return null;
   }
 
   @override
