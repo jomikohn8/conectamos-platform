@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -279,13 +281,36 @@ class _FieldsBlockState extends State<_FieldsBlock> {
   }
 
   static List<String> _resolveMedia(Map<String, dynamic> fv) {
+    // 1. Intentar value_jsonb como Map (caso ideal)
     final jsonb = fv['value_jsonb'];
     if (jsonb is Map) {
       final url = jsonb['url'] as String?;
       if (url != null) return [url];
     }
-    final mediaUrl = fv['value_media_url'] as String?;
-    if (mediaUrl != null) return [mediaUrl];
+
+    // 2. value_media_url puede ser una URL limpia o un JSON serializado
+    final rawMediaUrl = fv['value_media_url'];
+    if (rawMediaUrl is String && rawMediaUrl.isNotEmpty) {
+      final trimmed = rawMediaUrl.trim();
+      if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+        try {
+          // Normalizar comillas simples a dobles para parsear
+          final normalized = trimmed.replaceAll("'", '"');
+          final decoded = jsonDecode(normalized);
+          if (decoded is Map) {
+            final url = decoded['url'] as String?;
+            if (url != null) return [url];
+          }
+        } catch (_) {
+          // Si falla el parse, extraer URL con regex
+          final match = RegExp(r'https?://[^ \t\n"]+').firstMatch(trimmed);
+          if (match != null) return [match.group(0)!];
+        }
+      }
+      // Es una URL directa
+      return [trimmed];
+    }
+
     return [];
   }
 
