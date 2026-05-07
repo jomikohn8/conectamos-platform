@@ -16,8 +16,8 @@ import 'dashboard_providers.dart';
 
 // ── Providers ─────────────────────────────────────────────────────────────────
 
-/// Key compuesta: slug + rango de fechas opcional (Dart record → == y hashCode automáticos)
-typedef _DashKey = ({String slug, String? start, String? end});
+/// Key compuesta: slug + rango de fechas + filtro metadata opcional
+typedef _DashKey = ({String slug, String? start, String? end, String? filterKey, String? filterValue});
 
 /// Carga la lista de dashboards desde API.
 final dashboardsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
@@ -26,6 +26,10 @@ final dashboardsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) asyn
 
 /// Rango de fechas seleccionado. null = hoy (sin filtro explícito)
 final dashboardDateRangeProvider = StateProvider<DateTimeRange?>((ref) => null);
+
+/// Filtro metadata activo (e.g. CRUM). key = nombre del campo, value = valor buscado.
+final dashboardMetaFilterKeyProvider   = StateProvider<String?>((ref) => null);
+final dashboardMetaFilterValueProvider = StateProvider<String?>((ref) => null);
 
 final dashboardKpisProvider =
     FutureProvider.family<Map<String, dynamic>, _DashKey>((ref, key) async {
@@ -78,6 +82,21 @@ class _ActionBar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final range = ref.watch(dashboardDateRangeProvider);
+    final metaFilterValue = ref.watch(dashboardMetaFilterValueProvider);
+
+    // Resolve metadata_filters from the active dashboard config (cached, no extra call).
+    final dashboards = ref.watch(dashboardsProvider).valueOrNull ?? [];
+    final activeDash = dashboards.isEmpty
+        ? null
+        : dashboards.firstWhere(
+            (d) => d['is_default'] == true,
+            orElse: () => dashboards.first,
+          );
+    final metaFilters = activeDash == null
+        ? <Map<String, dynamic>>[]
+        : (activeDash['metadata_filters'] as List?)
+                ?.cast<Map<String, dynamic>>() ??
+            <Map<String, dynamic>>[];
 
     return Container(
       height: 48,
@@ -111,6 +130,25 @@ class _ActionBar extends ConsumerWidget {
               ],
             ),
           ),
+          // ── Metadata filter fields ─────────────────────────────────────────
+          for (final filter in metaFilters) ...[
+            const SizedBox(width: 8),
+            Text(
+              filter['label'] as String? ?? filter['key'] as String? ?? '',
+              style: const TextStyle(
+                fontFamily: 'Geist',
+                fontSize: 12,
+                color: AppColors.ctText2,
+              ),
+            ),
+            const SizedBox(width: 6),
+            _MetaFilterField(
+              filterKey: filter['key'] as String? ?? '',
+              currentValue: metaFilterValue,
+            ),
+          ],
+          // ── Date range ────────────────────────────────────────────────────
+          const SizedBox(width: 8),
           _DateRangeButton(
             range: range,
             onTap: () async {
@@ -134,6 +172,7 @@ class _ActionBar extends ConsumerWidget {
               ref.invalidate(dashboardChartsProvider);
               ref.invalidate(dashboardActivityProvider);
               ref.invalidate(dashboardsProvider);
+              ref.invalidate(tableDataProvider);
             },
           ),
         ],
@@ -201,6 +240,88 @@ class _DateRangeButton extends StatelessWidget {
             ],
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ── Metadata filter field ─────────────────────────────────────────────────────
+
+class _MetaFilterField extends ConsumerStatefulWidget {
+  const _MetaFilterField({required this.filterKey, this.currentValue});
+  final String filterKey;
+  final String? currentValue;
+
+  @override
+  ConsumerState<_MetaFilterField> createState() => _MetaFilterFieldState();
+}
+
+class _MetaFilterFieldState extends ConsumerState<_MetaFilterField> {
+  late final TextEditingController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = TextEditingController(text: widget.currentValue ?? '');
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  void _apply() {
+    final val = _ctrl.text.trim();
+    ref.read(dashboardMetaFilterKeyProvider.notifier).state =
+        val.isEmpty ? null : widget.filterKey;
+    ref.read(dashboardMetaFilterValueProvider.notifier).state =
+        val.isEmpty ? null : val;
+  }
+
+  void _clear() {
+    _ctrl.clear();
+    ref.read(dashboardMetaFilterKeyProvider.notifier).state = null;
+    ref.read(dashboardMetaFilterValueProvider.notifier).state = null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasValue = ref.watch(dashboardMetaFilterValueProvider) != null;
+    return SizedBox(
+      width: 140,
+      height: 32,
+      child: TextField(
+        controller: _ctrl,
+        style: const TextStyle(
+          fontFamily: 'Geist', fontSize: 12, color: AppColors.ctText,
+        ),
+        decoration: InputDecoration(
+          hintText: 'Filtrar...',
+          hintStyle: const TextStyle(
+            fontFamily: 'Geist', fontSize: 12, color: AppColors.ctText3,
+          ),
+          isDense: true,
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          suffixIcon: hasValue
+              ? GestureDetector(
+                  onTap: _clear,
+                  child: const Icon(Icons.close_rounded,
+                      size: 14, color: AppColors.ctText2),
+                )
+              : null,
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: const BorderSide(color: AppColors.ctBorder2),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: const BorderSide(color: AppColors.ctTeal, width: 1.5),
+          ),
+        ),
+        onEditingComplete: _apply,
+        onSubmitted: (_) => _apply(),
       ),
     );
   }
@@ -338,6 +459,8 @@ class _ConfiguredView extends ConsumerWidget {
     String slug = '',
     String? start,
     String? end,
+    String? filterKey,
+    String? filterValue,
   }) {
     final result = <Widget>[];
     final buffer = <Map<String, dynamic>>[];
@@ -352,6 +475,8 @@ class _ConfiguredView extends ConsumerWidget {
           widgetId: id,
           dateRangeStart: start,
           dateRangeEnd: end,
+          metadataFilterKey: filterKey,
+          metadataFilterValue: filterValue,
         );
       }
       return _DashboardWidgetRenderer(
@@ -428,6 +553,8 @@ class _ConfiguredView extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final slug = dashboard['slug'] as String? ?? '';
     final range = ref.watch(dashboardDateRangeProvider);
+    final metaFilterKey   = ref.watch(dashboardMetaFilterKeyProvider);
+    final metaFilterValue = ref.watch(dashboardMetaFilterValueProvider);
     String? start;
     String? end;
     if (range != null) {
@@ -436,7 +563,8 @@ class _ConfiguredView extends ConsumerWidget {
           .add(const Duration(hours: 23, minutes: 59, seconds: 59))
           .toIso8601String();
     }
-    final key = (slug: slug, start: start, end: end);
+    final key = (slug: slug, start: start, end: end,
+        filterKey: metaFilterKey, filterValue: metaFilterValue);
 
     final asyncKpis = ref.watch(dashboardKpisProvider(key));
     final kpis = asyncKpis.valueOrNull ?? <String, dynamic>{};
@@ -454,7 +582,8 @@ class _ConfiguredView extends ConsumerWidget {
       builder: (context, constraints) {
         final rows = _buildRows(
             widgets, kpis, charts, activityData, constraints.maxWidth,
-            slug: slug, start: start, end: end);
+            slug: slug, start: start, end: end,
+            filterKey: metaFilterKey, filterValue: metaFilterValue);
         return SingleChildScrollView(
           padding: const EdgeInsets.all(22),
           child: Column(
@@ -1114,12 +1243,16 @@ class _DataTableWidget extends ConsumerWidget {
     required this.widgetId,
     this.dateRangeStart,
     this.dateRangeEnd,
+    this.metadataFilterKey,
+    this.metadataFilterValue,
   });
   final Map<String, dynamic> config;
   final String dashboardSlug;
   final String widgetId;
   final String? dateRangeStart;
   final String? dateRangeEnd;
+  final String? metadataFilterKey;
+  final String? metadataFilterValue;
 
   static String _fmtCell(dynamic value) {
     if (value == null) return '';
@@ -1146,8 +1279,8 @@ class _DataTableWidget extends ConsumerWidget {
           .toList();
       final dataRows = rows.map((row) {
         return columns.map((col) {
-          final field = col['field'] as String? ?? '';
-          return _fmtCell(row[field]);
+          final colKey = col['key'] as String? ?? '';
+          return _fmtCell(row[colKey]);
         }).toList();
       }).toList();
 
@@ -1244,8 +1377,8 @@ class _DataTableWidget extends ConsumerWidget {
       widgetId: widgetId,
       start: dateRangeStart,
       end: dateRangeEnd,
-      filterKey: null as String?,
-      filterValue: null as String?,
+      filterKey: metadataFilterKey,
+      filterValue: metadataFilterValue,
     );
     final asyncData = ref.watch(tableDataProvider(key));
     final title = config['title'] as String? ?? widgetId;
@@ -1293,7 +1426,7 @@ class _DataTableWidget extends ConsumerWidget {
           }
 
           final completedAtIdx =
-              columns.indexWhere((c) => c['field'] == 'completed_at');
+              columns.indexWhere((c) => (c['field'] as String?) == 'completed_at');
 
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1338,21 +1471,20 @@ class _DataTableWidget extends ConsumerWidget {
                       ),
                       columns: columns.map((col) {
                         final label =
-                            col['label'] as String? ?? col['field'] as String? ?? '';
+                            col['label'] as String? ?? col['key'] as String? ?? '';
                         return DataColumn(label: Text(label));
                       }).toList(),
                       rows: rows.map((row) {
                         final isOpen = completedAtIdx >= 0 &&
-                            row[columns[completedAtIdx]['field'] as String? ??
-                                'completed_at'] == null;
+                            row[columns[completedAtIdx]['key'] as String? ?? ''] == null;
                         return DataRow(
                           color: isOpen
                               ? MaterialStateProperty.all(
                                   Colors.amber.withOpacity(0.12))
                               : null,
                           cells: columns.map((col) {
-                            final field = col['field'] as String? ?? '';
-                            return DataCell(Text(_fmtCell(row[field])));
+                            final colKey = col['key'] as String? ?? '';
+                            return DataCell(Text(_fmtCell(row[colKey])));
                           }).toList(),
                         );
                       }).toList(),
