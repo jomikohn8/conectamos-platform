@@ -656,7 +656,7 @@ class _PhotoThumb extends StatelessWidget {
             children: [
               Image.network(src,
                   fit: BoxFit.cover,
-                  errorBuilder: (ctx, err, stack) => Container(color: AppColors.ctSurface2)),
+                  errorBuilder: (ctx, err, stack) => _MediaErrorSlot(url: src)),
               // Top-left numerator
               Positioned(
                 top: 6, left: 6,
@@ -962,6 +962,58 @@ class _UrlLink extends StatelessWidget {
             const Icon(Icons.open_in_new_rounded, size: 13, color: AppColors.ctTeal),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ── Media Error Slot ──────────────────────────────────────────────────────────
+
+class _MediaErrorSlot extends StatelessWidget {
+  const _MediaErrorSlot({required this.url});
+  final String url;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: AppColors.ctSurface2,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(
+            Icons.broken_image_rounded,
+            color: AppColors.ctText3,
+            size: 22,
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'No se pudo cargar',
+            style: TextStyle(
+              fontFamily: 'Geist',
+              fontSize: 11,
+              color: AppColors.ctText3,
+            ),
+          ),
+          const SizedBox(height: 6),
+          GestureDetector(
+            onTap: () async {
+              final uri = Uri.tryParse(url);
+              if (uri != null && await canLaunchUrl(uri)) {
+                await launchUrl(uri, mode: LaunchMode.externalApplication);
+              }
+            },
+            child: const Text(
+              'Abrir en navegador',
+              style: TextStyle(
+                fontFamily: 'Geist',
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: AppColors.ctTeal,
+                decoration: TextDecoration.underline,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
