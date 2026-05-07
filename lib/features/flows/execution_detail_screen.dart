@@ -406,6 +406,7 @@ class _FieldsBlockState extends State<_FieldsBlock> {
               pending: pending,
               totalWidth: totalWidth,
               gap: gap,
+              fvMap: fvMap,
             );
           },
         ),
@@ -486,6 +487,7 @@ class _WrapGrid extends StatelessWidget {
     required this.pending,
     required this.totalWidth,
     required this.gap,
+    this.fvMap = const {},
   });
 
   final List<Map<String, dynamic>> fields;
@@ -493,6 +495,7 @@ class _WrapGrid extends StatelessWidget {
   final List<String> pending;
   final double totalWidth;
   final double gap;
+  final Map<String, Map> fvMap;
 
   @override
   Widget build(BuildContext context) {
@@ -507,6 +510,7 @@ class _WrapGrid extends StatelessWidget {
         value: value,
         isPending: isPending,
         isInherited: false,
+        fv: fvMap[key]?.cast<String, dynamic>(),
       );
       final isWide = card.isWide;
       return SizedBox(

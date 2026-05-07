@@ -16,12 +16,14 @@ class FieldCard extends StatelessWidget {
     required this.value,
     required this.isPending,
     required this.isInherited,
+    this.fv,
   });
 
   final Map<String, dynamic> field;
   final dynamic value;
   final bool isPending;
   final bool isInherited;
+  final Map<String, dynamic>? fv;
 
   bool get _isWide {
     final type = field['type'] as String? ?? 'text';
@@ -52,7 +54,7 @@ class FieldCard extends StatelessWidget {
           _FieldHeader(
               field: field, value: value, isPending: isPending, isInherited: isInherited),
           const SizedBox(height: 10),
-          _FieldValue(field: field, value: value),
+          _FieldValue(field: field, value: value, fv: fv),
         ],
       ),
     );
@@ -202,28 +204,55 @@ class _SmallBadge extends StatelessWidget {
 // ── Field Value Dispatcher ────────────────────────────────────────────────────
 
 class _FieldValue extends StatelessWidget {
-  const _FieldValue({required this.field, required this.value});
+  const _FieldValue({required this.field, required this.value, this.fv});
   final Map<String, dynamic> field;
   final dynamic value;
+  final Map<String, dynamic>? fv;
 
   @override
   Widget build(BuildContext context) {
     final type = field['type'] as String? ?? 'text';
-    final isPending = value == null;
 
-    if (isPending && type != 'photo' && type != 'media' && type != 'location') {
-      return const _PendingSlot();
+    // When resolved value is null, try to recover directly from raw fv row
+    dynamic effectiveValue = value;
+    String? rawMediaUrl;
+    final fvLocal = fv;
+    if (effectiveValue == null && fvLocal != null) {
+      final vText  = fvLocal['value_text'] as String?;
+      final vNum   = fvLocal['value_numeric'];
+      final vJsonb = fvLocal['value_jsonb'];
+      final vMedia = fvLocal['value_media_url'] as String?;
+      if (vText != null && vText.isNotEmpty) {
+        effectiveValue = vText;
+      } else if (vNum != null) {
+        effectiveValue = vNum;
+      } else if (vJsonb is Map) {
+        effectiveValue = vJsonb;
+      } else if (vMedia != null && vMedia.isNotEmpty) {
+        rawMediaUrl = vMedia;
+      }
+    }
+
+    if (effectiveValue == null && rawMediaUrl == null) return const _PendingSlot();
+
+    // URL-only fallback: raw media URL without structured value
+    if (rawMediaUrl != null && effectiveValue == null) {
+      return switch (type) {
+        'photo' || 'media' => _PhotoGallery(photos: [rawMediaUrl]),
+        'location'         => _LocationUrlLink(url: rawMediaUrl),
+        _                  => _UrlLink(url: rawMediaUrl),
+      };
     }
 
     return switch (type) {
-      'text'           => _TextValue(value: value, multiline: field['multiline'] == true),
-      'number'         => _NumberValue(value: value, unit: field['unit'] as String?),
-      'date'           => _DateValue(value: value),
-      'yesno'          => _YesNoValue(value: value),
-      'select'         => _SelectValue(value: value, options: field['options'] as List? ?? []),
-      'photo' || 'media' => _PhotoGallery(photos: _toPhotoList(value)),
-      'location'       => _LocationMap(value: _toLocation(value)),
-      _                => _TextValue(value: value?.toString(), multiline: false),
+      'text'             => _TextValue(value: effectiveValue, multiline: field['multiline'] == true),
+      'number'           => _NumberValue(value: effectiveValue, unit: field['unit'] as String?),
+      'date'             => _DateValue(value: effectiveValue),
+      'yesno'            => _YesNoValue(value: effectiveValue),
+      'select'           => _SelectValue(value: effectiveValue, options: field['options'] as List? ?? []),
+      'photo' || 'media' => _PhotoGallery(photos: _toPhotoList(effectiveValue)),
+      'location'         => _LocationMap(value: _toLocation(effectiveValue)),
+      _                  => _TextValue(value: effectiveValue?.toString(), multiline: false),
     };
   }
 
@@ -857,6 +886,85 @@ class _TrianglePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_TrianglePainter old) => old.color != color;
+}
+
+// ── Location URL Link (fallback when only value_media_url is available) ───────
+
+class _LocationUrlLink extends StatelessWidget {
+  const _LocationUrlLink({required this.url});
+  final String url;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: () async {
+        final uri = Uri.tryParse(url);
+        if (uri != null) await launchUrl(uri, mode: LaunchMode.externalApplication);
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF1F3F5),
+          border: Border.all(color: AppColors.ctBorder),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.location_on_rounded, size: 16, color: AppColors.ctTeal),
+            const SizedBox(width: 8),
+            Text('Ver ubicación',
+                style: AppFonts.geist(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.ctTeal)),
+            const SizedBox(width: 4),
+            const Icon(Icons.open_in_new_rounded, size: 13, color: AppColors.ctTeal),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Generic URL Link ──────────────────────────────────────────────────────────
+
+class _UrlLink extends StatelessWidget {
+  const _UrlLink({required this.url});
+  final String url;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: () async {
+        final uri = Uri.tryParse(url);
+        if (uri != null) await launchUrl(uri, mode: LaunchMode.externalApplication);
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF1F3F5),
+          border: Border.all(color: AppColors.ctBorder),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.link_rounded, size: 14, color: AppColors.ctTeal),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(url,
+                  style: AppFonts.geist(fontSize: 12, color: AppColors.ctTeal),
+                  overflow: TextOverflow.ellipsis),
+            ),
+            const SizedBox(width: 4),
+            const Icon(Icons.open_in_new_rounded, size: 13, color: AppColors.ctTeal),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 // ── Pending Slot ──────────────────────────────────────────────────────────────
