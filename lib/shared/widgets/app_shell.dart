@@ -262,13 +262,12 @@ class _TenantSelector extends ConsumerWidget {
       ],
     ).then((selectedId) {
       if (selectedId == null) return;
-      final selected = tenants.firstWhere(
-        (t) => t.id == selectedId,
-        orElse: () => null,
-      );
-      if (selected != null) {
-        ref.read(tenantNotifierProvider.notifier).select(selected);
-      }
+      final matches = tenants
+          .whereType<TenantInfo>()
+          .where((t) => t.id == selectedId)
+          .toList();
+      if (matches.isEmpty) return;
+      ref.read(tenantNotifierProvider.notifier).select(matches.first);
     });
   }
 
@@ -782,14 +781,15 @@ class _Sidebar extends ConsumerWidget {
                           label: 'Workers',
                           collapsed: collapsed,
                         ),
-                        _NavItem(
-                          icon: Icons.smart_toy_rounded,
-                          label: 'Mis Workers',
-                          route: '/workers',
-                          currentRoute: currentRoute,
-                          collapsed: collapsed,
-                          navigationShell: navigationShell,
-                        ),
+                        if (hasPermission(ref, 'settings', 'manage'))
+                          _NavItem(
+                            icon: Icons.smart_toy_rounded,
+                            label: 'Mis Workers',
+                            route: '/workers',
+                            currentRoute: currentRoute,
+                            collapsed: collapsed,
+                            navigationShell: navigationShell,
+                          ),
                         if (hasPermission(ref, 'flows', 'view'))
                           _NavItem(
                             icon: Icons.account_tree_outlined,

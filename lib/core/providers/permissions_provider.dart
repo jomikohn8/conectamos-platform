@@ -27,6 +27,8 @@ const _kAllPermissions = {
 
 final userRoleProvider = FutureProvider.autoDispose<String?>((ref) async {
   if (kMockMode) return kMockUser.role;
+  // Bypass para super_admin — sin llamada a GET /iam/users
+  if (ref.watch(isSuperAdminProvider)) return 'super_admin';
   final user = ref.watch(currentUserProvider);
   if (user == null) return null;
   // BUG 1: esperar a que activeTenantIdProvider tenga valor antes de llamar al backend
@@ -65,6 +67,8 @@ final userRoleProvider = FutureProvider.autoDispose<String?>((ref) async {
 
 final userPermissionsProvider = FutureProvider.autoDispose<Set<String>>((ref) async {
   if (kMockMode) return _kAllPermissions;
+  // Bypass para super_admin — sin llamadas a IAM
+  if (ref.watch(isSuperAdminProvider)) return _kAllPermissions;
   final role = await ref.watch(userRoleProvider.future);
   if (role == null) return {};
   if (role.toLowerCase() == 'admin') return _kAllPermissions;
@@ -172,6 +176,7 @@ const kPermLabels = <String, String>{
   'users.manage':         'Gestionar usuarios',
   'dashboards.view':      'Ver dashboards',
   'dashboards.manage':    'Gestionar dashboards',
+  'webhook_secrets.view': 'Ver webhook secrets',
 };
 
 // ── Prerequisitos ─────────────────────────────────────────────────────────────
