@@ -23,6 +23,7 @@ class ExecutionDetailScreen extends ConsumerStatefulWidget {
 class _ExecutionDetailScreenState
     extends ConsumerState<ExecutionDetailScreen> {
   bool _loading = true;
+  bool _reloading = false;
   String? _error;
   Map<String, dynamic>? _exec;
   Map<String, dynamic>? _flow;
@@ -35,7 +36,8 @@ class _ExecutionDetailScreenState
 
   Future<void> _load() async {
     setState(() {
-      _loading = true;
+      _loading = _exec == null;
+      _reloading = true;
       _error = null;
     });
     try {
@@ -54,6 +56,8 @@ class _ExecutionDetailScreenState
         _error = e.toString();
         _loading = false;
       });
+    } finally {
+      setState(() { _reloading = false; });
     }
   }
 
@@ -173,6 +177,25 @@ final content = _MainContent(exec: exec, flow: flow);
         icon: const Icon(Icons.arrow_back_rounded, color: AppColors.ctText),
         onPressed: () => context.go('/executions'),
       ),
+      actions: [
+        _reloading
+            ? const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16),
+                child: SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: AppColors.ctTeal,
+                  ),
+                ),
+              )
+            : IconButton(
+                icon: const Icon(Icons.refresh_rounded, color: AppColors.ctText2),
+                tooltip: 'Actualizar',
+                onPressed: _load,
+              ),
+      ],
     );
   }
 }

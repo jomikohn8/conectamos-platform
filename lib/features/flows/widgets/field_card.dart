@@ -716,8 +716,8 @@ class _LocationMap extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (value == null) return const _PendingSlot();
-    final lat = (value!['lat'] as num?)?.toDouble() ?? 0;
-    final lng = (value!['lng'] as num?)?.toDouble() ?? 0;
+    final lat = ((value!['lat'] ?? value!['latitude']) as num?)?.toDouble() ?? 0;
+    final lng = ((value!['lng'] ?? value!['longitude']) as num?)?.toDouble() ?? 0;
     final address = value!['address'] as String? ?? '';
     if (lat == 0 && lng == 0) return const _PendingSlot();
 
