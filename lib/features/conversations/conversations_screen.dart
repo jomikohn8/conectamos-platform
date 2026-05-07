@@ -6396,7 +6396,7 @@ class _NewMessageDialogState extends ConsumerState<_NewMessageDialog> {
   }
 
   Future<void> _selectRecipient(Map<String, dynamic> recipient) async {
-    final channelId = recipient['channel_id'] as String? ?? '';
+    final channelId = ref.read(selectedChannelIdProvider) ?? '';
     setState(() {
       _selected = recipient;
       _checkingWindow = true;
