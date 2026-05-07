@@ -4693,11 +4693,16 @@ class _TabFeedState extends ConsumerState<_TabFeed> {
   StreamSubscription<List<Map<String, dynamic>>>? _feedSub;
   Timer? _keywordDebounce;
   bool _loading = true;
+  Map<String, String> _operatorNameMap = {};
 
   @override
   void initState() {
     super.initState();
     _resubscribe();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final tenantId = ref.read(activeTenantIdProvider);
+      if (tenantId.isNotEmpty) _loadOperatorMap(tenantId);
+    });
   }
 
   @override
@@ -4719,6 +4724,24 @@ class _TabFeedState extends ConsumerState<_TabFeed> {
       _toTime = null;
       _keyword = '';
     });
+  }
+
+  Future<void> _loadOperatorMap(String tenantId) async {
+    try {
+      final rows = await Supabase.instance.client
+          .from('operators')
+          .select('id, name')
+          .eq('tenant_id', tenantId);
+      if (mounted) {
+        setState(() {
+          _operatorNameMap = {
+            for (final r in rows as List) r['id'] as String: r['name'] as String,
+          };
+        });
+      }
+    } catch (e) {
+      debugPrint('_loadOperatorMap error: $e');
+    }
   }
 
   void _resubscribe() {
@@ -4939,6 +4962,7 @@ class _TabFeedState extends ConsumerState<_TabFeed> {
                       _toTime != null ||
                       _keyword.isNotEmpty,
                   messageCount: _feedMessages.length,
+                  operatorNameMap: _operatorNameMap,
                   onClearFilters: () {
                     _clearFilters();
                     _resubscribe();
@@ -5190,6 +5214,7 @@ class _FeedMessages extends StatefulWidget {
     required this.channelType,
     required this.hasActiveFilters,
     required this.messageCount,
+    required this.operatorNameMap,
     this.onClearFilters,
   });
 
@@ -5197,6 +5222,7 @@ class _FeedMessages extends StatefulWidget {
   final String channelType;
   final bool hasActiveFilters;
   final int messageCount;
+  final Map<String, String> operatorNameMap;
   final VoidCallback? onClearFilters;
 
   @override
@@ -5436,6 +5462,10 @@ class _FeedMessagesState extends State<_FeedMessages> {
                 final origin = msg['origin'] as String? ?? 'ai_worker';
 
                 if (isOutbound) {
+                  final operatorId = msg['operator_id'] as String?;
+                  final resolvedName = operatorId != null
+                      ? widget.operatorNameMap[operatorId]
+                      : null;
                   return _FeedOutboundBubble(
                     key: ValueKey(msgId),
                     body: body,
@@ -5447,7 +5477,7 @@ class _FeedMessagesState extends State<_FeedMessages> {
                     channelType: widget.channelType,
                     messageType: messageType,
                     mediaUrl: mediaUrl,
-                    recipientName: msg['recipient_name'] as String?,
+                    recipientName: resolvedName,
                     broadcastId: msg['broadcast_id'] as String?,
                   );
                 }
