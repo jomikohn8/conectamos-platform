@@ -251,7 +251,9 @@ class _FieldValue extends StatelessWidget {
       'yesno'            => _YesNoValue(value: effectiveValue),
       'select'           => _SelectValue(value: effectiveValue, options: field['options'] as List? ?? []),
       'photo' || 'media' => _PhotoGallery(photos: _toPhotoList(effectiveValue)),
-      'location'         => _LocationMap(value: _toLocation(effectiveValue)),
+      'location'         => effectiveValue is String && effectiveValue.trim().startsWith('http')
+          ? _LocationUrlLink(url: effectiveValue.trim())
+          : _LocationMap(value: _toLocation(effectiveValue)),
       _                  => _TextValue(value: effectiveValue?.toString(), multiline: false),
     };
   }
