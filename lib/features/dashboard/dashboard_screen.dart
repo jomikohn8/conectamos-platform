@@ -1,11 +1,18 @@
-// ignore_for_file: deprecated_member_use
+// ignore_for_file: deprecated_member_use, avoid_web_libraries_in_flutter
+import 'dart:convert';
+import 'dart:html' as html;
+import 'dart:typed_data';
+
+import 'package:archive/archive.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 
 import '../../core/api/flows_api.dart';
 import '../../core/theme/app_theme.dart';
+import 'dashboard_providers.dart';
 
 // ── Providers ─────────────────────────────────────────────────────────────────
 
@@ -327,13 +334,26 @@ class _ConfiguredView extends ConsumerWidget {
     Map<String, dynamic> kpis,
     Map<String, dynamic> charts,
     List<Map<String, dynamic>> activityData,
-    double maxWidth,
-  ) {
+    double maxWidth, {
+    String slug = '',
+    String? start,
+    String? end,
+  }) {
     final result = <Widget>[];
     final buffer = <Map<String, dynamic>>[];
 
     Widget rendererFor(Map<String, dynamic> w) {
       final id = w['id'] as String? ?? '';
+      final type = w['widget_type'] as String? ?? '';
+      if (type == 'data_table') {
+        return _DataTableWidget(
+          config: (w['config'] as Map<String, dynamic>?) ?? {},
+          dashboardSlug: slug,
+          widgetId: id,
+          dateRangeStart: start,
+          dateRangeEnd: end,
+        );
+      }
       return _DashboardWidgetRenderer(
         widgetConfig: w,
         kpiData: kpis[id] as Map<String, dynamic>?,
@@ -432,8 +452,9 @@ class _ConfiguredView extends ConsumerWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final rows =
-            _buildRows(widgets, kpis, charts, activityData, constraints.maxWidth);
+        final rows = _buildRows(
+            widgets, kpis, charts, activityData, constraints.maxWidth,
+            slug: slug, start: start, end: end);
         return SingleChildScrollView(
           padding: const EdgeInsets.all(22),
           child: Column(
@@ -1082,6 +1103,308 @@ class _OperatorRankingWidget extends StatelessWidget {
       ),
     );
   }
+}
+
+// ── data_table ────────────────────────────────────────────────────────────────
+
+class _DataTableWidget extends ConsumerWidget {
+  const _DataTableWidget({
+    required this.config,
+    required this.dashboardSlug,
+    required this.widgetId,
+    this.dateRangeStart,
+    this.dateRangeEnd,
+  });
+  final Map<String, dynamic> config;
+  final String dashboardSlug;
+  final String widgetId;
+  final String? dateRangeStart;
+  final String? dateRangeEnd;
+
+  static String _fmtCell(dynamic value) {
+    if (value == null) return '';
+    final str = value.toString();
+    if (str.isEmpty) return '';
+    if (!str.contains('T') && !(str.contains('-') && str.length >= 10)) return str;
+    try {
+      // UTC-6 approximation for America/Mexico_City (no timezone package)
+      final dt = DateTime.parse(str).toUtc().subtract(const Duration(hours: 6));
+      return DateFormat('dd/MM HH:mm').format(dt);
+    } catch (_) {
+      return str;
+    }
+  }
+
+  static void _downloadXlsx(
+    List<Map<String, dynamic>> columns,
+    List<Map<String, dynamic>> rows,
+    String title,
+  ) {
+    try {
+      final headers = columns
+          .map((c) => c['label'] as String? ?? c['field'] as String? ?? '')
+          .toList();
+      final dataRows = rows.map((row) {
+        return columns.map((col) {
+          final field = col['field'] as String? ?? '';
+          return _fmtCell(row[field]);
+        }).toList();
+      }).toList();
+
+      final allRows = [headers, ...dataRows];
+      final sheetName = title.replaceAll(RegExp(r'[^\w\s]'), '').trim();
+
+      final archive = Archive();
+      void addFile(String name, String content) {
+        final bytes = utf8.encode(content);
+        archive.addFile(ArchiveFile(name, bytes.length, bytes));
+      }
+
+      addFile('[Content_Types].xml', [
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+        '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">',
+        '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>',
+        '<Default Extension="xml" ContentType="application/xml"/>',
+        '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>',
+        '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>',
+        '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>',
+        '</Types>',
+      ].join());
+
+      addFile('_rels/.rels', [
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">',
+        '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>',
+        '</Relationships>',
+      ].join());
+
+      addFile('xl/_rels/workbook.xml.rels', [
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">',
+        '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>',
+        '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>',
+        '</Relationships>',
+      ].join());
+
+      addFile('xl/workbook.xml', [
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+        '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"'
+            ' xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">',
+        '<sheets>',
+        '<sheet name="${_dtXmlEscape(sheetName.isEmpty ? 'Datos' : sheetName)}" sheetId="1" r:id="rId1"/>',
+        '</sheets>',
+        '</workbook>',
+      ].join());
+
+      addFile('xl/styles.xml', [
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+        '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">',
+        '<fonts count="2">',
+        '<font><sz val="11"/><name val="Calibri"/></font>',
+        '<font><b/><sz val="11"/><name val="Calibri"/></font>',
+        '</fonts>',
+        '<fills count="2">',
+        '<fill><patternFill patternType="none"/></fill>',
+        '<fill><patternFill patternType="gray125"/></fill>',
+        '</fills>',
+        '<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>',
+        '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>',
+        '<cellXfs count="2">',
+        '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>',
+        '<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0"/>',
+        '</cellXfs>',
+        '</styleSheet>',
+      ].join());
+
+      addFile('xl/worksheets/sheet1.xml', _dtSheetXml(allRows));
+
+      final zipBytes = ZipEncoder().encode(archive)!;
+      final fileName =
+          '${title}_${DateTime.now().millisecondsSinceEpoch}.xlsx'.replaceAll(' ', '_');
+
+      final blob = html.Blob(
+        [Uint8List.fromList(zipBytes)],
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      );
+      final url = html.Url.createObjectUrlFromBlob(blob);
+      (html.AnchorElement(href: url)
+            ..setAttribute('download', fileName)
+            ..click())
+          .remove();
+      html.Url.revokeObjectUrl(url);
+    } catch (e, st) {
+      debugPrint('[_DataTableWidget._downloadXlsx] error: $e\n$st');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final key = (
+      dashboardSlug: dashboardSlug,
+      widgetId: widgetId,
+      start: dateRangeStart,
+      end: dateRangeEnd,
+      filterKey: null as String?,
+      filterValue: null as String?,
+    );
+    final asyncData = ref.watch(tableDataProvider(key));
+    final title = config['title'] as String? ?? widgetId;
+    final subtitle = config['subtitle'] as String?;
+
+    return _DashCard(
+      title: title.toUpperCase(),
+      subtitle: subtitle,
+      child: asyncData.when(
+        loading: () => const SizedBox(
+          height: 80,
+          child: Center(
+            child: CircularProgressIndicator(color: AppColors.ctTeal, strokeWidth: 2),
+          ),
+        ),
+        error: (e, _) => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Center(
+            child: Text(
+              e.toString(),
+              style: const TextStyle(
+                fontFamily: 'Geist', fontSize: 12, color: AppColors.ctDanger,
+              ),
+            ),
+          ),
+        ),
+        data: (data) {
+          final columns = (data['columns'] as List<dynamic>? ?? [])
+              .cast<Map<String, dynamic>>();
+          final rows = (data['rows'] as List<dynamic>? ?? [])
+              .cast<Map<String, dynamic>>();
+
+          if (columns.isEmpty || rows.isEmpty) {
+            return const Padding(
+              padding: EdgeInsets.symmetric(vertical: 24),
+              child: Center(
+                child: Text(
+                  'Sin resultados',
+                  style: TextStyle(
+                    fontFamily: 'Geist', fontSize: 12, color: AppColors.ctText2,
+                  ),
+                ),
+              ),
+            );
+          }
+
+          final completedAtIdx =
+              columns.indexWhere((c) => c['field'] == 'completed_at');
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Align(
+                alignment: Alignment.topRight,
+                child: OutlinedButton.icon(
+                  onPressed: () => _downloadXlsx(columns, rows, title),
+                  icon: const Icon(Icons.download_rounded, size: 14),
+                  label: const Text('Descargar Excel'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.ctText2,
+                    side: const BorderSide(color: AppColors.ctBorder2),
+                    textStyle: const TextStyle(
+                      fontFamily: 'Geist', fontSize: 12,
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                height: 320,
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.vertical,
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: DataTable(
+                      headingRowHeight: 36,
+                      dataRowMinHeight: 32,
+                      dataRowMaxHeight: 32,
+                      columnSpacing: 16,
+                      headingTextStyle: const TextStyle(
+                        fontFamily: 'Geist',
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.ctText,
+                      ),
+                      dataTextStyle: const TextStyle(
+                        fontFamily: 'Geist', fontSize: 11, color: AppColors.ctText,
+                      ),
+                      columns: columns.map((col) {
+                        final label =
+                            col['label'] as String? ?? col['field'] as String? ?? '';
+                        return DataColumn(label: Text(label));
+                      }).toList(),
+                      rows: rows.map((row) {
+                        final isOpen = completedAtIdx >= 0 &&
+                            row[columns[completedAtIdx]['field'] as String? ??
+                                'completed_at'] == null;
+                        return DataRow(
+                          color: isOpen
+                              ? MaterialStateProperty.all(
+                                  Colors.amber.withOpacity(0.12))
+                              : null,
+                          cells: columns.map((col) {
+                            final field = col['field'] as String? ?? '';
+                            return DataCell(Text(_fmtCell(row[field])));
+                          }).toList(),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+// ── XLSX helpers (data_table) ─────────────────────────────────────────────────
+
+String _dtColName(int index) {
+  var name = '';
+  var i = index;
+  do {
+    name = String.fromCharCode(65 + (i % 26)) + name;
+    i = (i ~/ 26) - 1;
+  } while (i >= 0);
+  return name;
+}
+
+String _dtXmlEscape(String s) => s
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&apos;');
+
+String _dtSheetXml(List<List<String>> rows) {
+  final sb = StringBuffer()
+    ..write('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>')
+    ..write('<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">')
+    ..write('<sheetData>');
+  for (var r = 0; r < rows.length; r++) {
+    sb.write('<row r="${r + 1}">');
+    final bold = r == 0;
+    for (var c = 0; c < rows[r].length; c++) {
+      final cell = '${_dtColName(c)}${r + 1}';
+      final val = _dtXmlEscape(rows[r][c]);
+      final sAttr = bold ? ' s="1"' : '';
+      sb.write('<c r="$cell" t="inlineStr"$sAttr><is><t>$val</t></is></c>');
+    }
+    sb.write('</row>');
+  }
+  sb.write('</sheetData></worksheet>');
+  return sb.toString();
 }
 
 // ── Placeholder chip ──────────────────────────────────────────────────────────
