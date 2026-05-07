@@ -19,6 +19,7 @@ const _kPermGroups = [
   (label: 'Ejecuciones',    keys: ['flow_executions.view_all', 'flow_executions.execute_dashboard']),
   (label: 'Integraciones',  keys: ['flow_integrations.view', 'flow_integrations.manage']),
   (label: 'Webhooks',       keys: ['webhook_secrets.view']),
+  (label: 'Conectores',     keys: ['integrations.view', 'integrations.manage']),
 ];
 
 // ── Panel principal ───────────────────────────────────────────────────────────
