@@ -36,6 +36,7 @@ const _kRoutePermissions = {
   '/channels':     'settings.view',
   '/connections':  'settings.view',
   '/settings':     'settings.view',
+  '/workers':      'settings.manage',
   '/broadcast':    'broadcasts.send',
   '/escalaciones': 'escalations.view',
 };

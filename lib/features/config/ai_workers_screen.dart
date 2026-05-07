@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api/ai_workers_api.dart';
+import '../../core/providers/permissions_provider.dart';
 import '../../core/providers/tenant_provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/widgets/page_header.dart';
@@ -153,6 +154,10 @@ class _AiWorkersScreenState extends ConsumerState<AiWorkersScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<String>(activeTenantIdProvider, (prev, next) {
+      if (prev != next) _fetchAll();
+    });
+    final canManage = hasPermission(ref, 'settings', 'manage');
     return Column(
       children: [
         PageHeader(
@@ -160,7 +165,7 @@ class _AiWorkersScreenState extends ConsumerState<AiWorkersScreen> {
           title: 'Mis AI Workers',
           description: 'Workers de IA contratados para tu operación',
           actions: [
-            _PrimaryBtn(label: '+ Contratar worker', onTap: _openCatalog, disabled: _loading),
+            _PrimaryBtn(label: '+ Contratar worker', onTap: _openCatalog, disabled: _loading || !canManage),
           ],
         ),
         Expanded(
@@ -192,11 +197,12 @@ class _AiWorkersScreenState extends ConsumerState<AiWorkersScreen> {
                   : SingleChildScrollView(
                       padding: const EdgeInsets.all(22),
                       child: _myWorkers.isEmpty
-                          ? _EmptyState(onOpenCatalog: _openCatalog)
+                          ? _EmptyState(onOpenCatalog: _openCatalog, canManage: canManage)
                           : _WorkersBody(
                               workers: _myWorkers,
                               onToggle: _toggleActive,
                               onRename: _openRename,
+                              canManage: canManage,
                             ),
                     ),
         ),
@@ -208,8 +214,9 @@ class _AiWorkersScreenState extends ConsumerState<AiWorkersScreen> {
 // ── Empty state ───────────────────────────────────────────────────────────────
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState({required this.onOpenCatalog});
+  const _EmptyState({required this.onOpenCatalog, this.canManage = true});
   final VoidCallback onOpenCatalog;
+  final bool canManage;
 
   @override
   Widget build(BuildContext context) {
@@ -224,7 +231,7 @@ class _EmptyState extends StatelessWidget {
               style: AppTextStyles.body.copyWith(color: AppColors.ctText2),
             ),
             const SizedBox(height: 14),
-            _PrimaryBtn(label: 'Ver catálogo', onTap: onOpenCatalog),
+            _PrimaryBtn(label: 'Ver catálogo', onTap: onOpenCatalog, disabled: !canManage),
           ],
         ),
       ),
@@ -239,10 +246,12 @@ class _WorkersBody extends StatelessWidget {
     required this.workers,
     required this.onToggle,
     required this.onRename,
+    this.canManage = true,
   });
   final List<Map<String, dynamic>> workers;
   final void Function(Map<String, dynamic>) onToggle;
   final void Function(Map<String, dynamic>) onRename;
+  final bool canManage;
 
   static const _headerStyle = TextStyle(
     fontFamily: 'Geist',
@@ -289,8 +298,8 @@ class _WorkersBody extends StatelessWidget {
               children: [
                 _WorkerRow(
                   worker: entry.value,
-                  onToggle: () => onToggle(entry.value),
-                  onRename: () => onRename(entry.value),
+                  onToggle: canManage ? () => onToggle(entry.value) : null,
+                  onRename: canManage ? () => onRename(entry.value) : null,
                 ),
                 if (!isLast)
                   const Divider(height: 1, color: AppColors.ctBorder),
@@ -308,12 +317,12 @@ class _WorkersBody extends StatelessWidget {
 class _WorkerRow extends StatefulWidget {
   const _WorkerRow({
     required this.worker,
-    required this.onToggle,
-    required this.onRename,
+    this.onToggle,
+    this.onRename,
   });
   final Map<String, dynamic> worker;
-  final VoidCallback onToggle;
-  final VoidCallback onRename;
+  final VoidCallback? onToggle;
+  final VoidCallback? onRename;
 
   @override
   State<_WorkerRow> createState() => _WorkerRowState();
@@ -1077,11 +1086,11 @@ class _ActionBtn extends StatefulWidget {
   const _ActionBtn({
     required this.label,
     required this.color,
-    required this.onTap,
+    this.onTap,
   });
   final String label;
   final Color color;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   State<_ActionBtn> createState() => _ActionBtnState();
@@ -1095,7 +1104,7 @@ class _ActionBtnState extends State<_ActionBtn> {
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit:  (_) => setState(() => _hovered = false),
-      cursor: SystemMouseCursors.click,
+      cursor: widget.onTap == null ? SystemMouseCursors.forbidden : SystemMouseCursors.click,
       child: GestureDetector(
         onTap: widget.onTap,
         child: AnimatedContainer(

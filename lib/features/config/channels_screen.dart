@@ -153,6 +153,9 @@ class _ChannelsScreenState extends ConsumerState<ChannelsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<String>(activeTenantIdProvider, (prev, next) {
+      if (prev != next) _fetchAll();
+    });
     return Column(
       children: [
         PageHeader(

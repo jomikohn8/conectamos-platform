@@ -53,3 +53,10 @@ final currentTenantProvider = Provider<String>((ref) {
   if (kMockMode) return kMockUser.tenant;
   return ref.watch(activeTenantDisplayProvider);
 });
+
+// ── Super admin ───────────────────────────────────────────────────────────────
+
+final isSuperAdminProvider = Provider<bool>((ref) {
+  final user = ref.watch(currentUserProvider);
+  return user?.appMetadata['role'] == 'super_admin';
+});

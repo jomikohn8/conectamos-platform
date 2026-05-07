@@ -54,8 +54,9 @@ class TenantNotifier extends StateNotifier<TenantState> {
   Future<void> load(String userEmail) async {
     if (state.all.isNotEmpty) return; // already loaded
     try {
-      final userId = Supabase.instance.client.auth.currentUser?.id;
-      final isSuperAdmin = userEmail == 'miguel@conectamos.mx';
+      final supabaseUser = Supabase.instance.client.auth.currentUser;
+      final userId = supabaseUser?.id;
+      final isSuperAdmin = supabaseUser?.appMetadata['role'] == 'super_admin';
       final list = await TenantsApi.getTenants(
         userId: isSuperAdmin ? null : userId,
       );
@@ -70,16 +71,9 @@ class TenantNotifier extends StateNotifier<TenantState> {
         if (matches.isNotEmpty) active = matches.first;
       }
 
-      // 2. Fallback: default by email
+      // 2. Fallback: tenants.first si no hay UUID guardado
       if (active == null && tenants.isNotEmpty) {
-        if (userEmail == 'miguel@conectamos.mx') {
-          active = tenants.firstWhere(
-            (t) => t.slug == 'tmr-prixz',
-            orElse: () => tenants.first,
-          );
-        } else {
-          active = tenants.first;
-        }
+        active = tenants.first;
       }
 
       // Persist active tenant so ApiClient interceptor can read it

@@ -428,7 +428,7 @@ class _GeneralInfoCardState extends ConsumerState<_GeneralInfoCard> {
       loading: _loading,
       error: _error,
       success: _success,
-      onSave: _saving ? null : _save,
+      onSave: (_saving || !hasPermission(ref, 'settings', 'manage')) ? null : _save,
       saving: _saving,
       child: Column(
         children: [
@@ -552,7 +552,7 @@ class _BillingCardState extends ConsumerState<_BillingCard> {
       loading: _loading,
       error: _error,
       success: _success,
-      onSave: _saving ? null : _save,
+      onSave: (_saving || !hasPermission(ref, 'settings', 'manage')) ? null : _save,
       saving: _saving,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
