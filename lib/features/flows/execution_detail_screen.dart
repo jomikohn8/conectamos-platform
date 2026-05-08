@@ -395,6 +395,17 @@ class _FieldsBlockState extends State<_FieldsBlock> {
       }
     }
 
+    // Caso C: coordenadas crudas "lat,lng"
+    final rawCoord = RegExp(
+      r'^([+-]?\d+\.?\d*),\s*([+-]?\d+\.?\d*)$',
+    ).firstMatch(s);
+    if (rawCoord != null) {
+      return {
+        'lat': double.parse(rawCoord.group(1)!),
+        'lng': double.parse(rawCoord.group(2)!),
+      };
+    }
+
     return null;
   }
 

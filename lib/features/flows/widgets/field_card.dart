@@ -233,7 +233,20 @@ class _FieldValue extends StatelessWidget {
       }
     }
 
-    if (effectiveValue == null && rawMediaUrl == null) return const _PendingSlot();
+    final bool hasAnyValue = fvLocal != null && (
+      (fvLocal['value_text'] as String?)?.isNotEmpty == true ||
+      fvLocal['value_numeric'] != null ||
+      fvLocal['value_jsonb'] != null ||
+      (fvLocal['value_media_url'] as String?)?.isNotEmpty == true
+    );
+
+    if (effectiveValue == null && rawMediaUrl == null) {
+      return hasAnyValue
+          ? _CapturedRawSlot(
+              rawValue: fvLocal['value_text'] as String? ??
+                  fvLocal['value_media_url'] as String?)
+          : const _PendingSlot();
+    }
 
     // URL-only fallback: raw media URL without structured value
     if (rawMediaUrl != null && effectiveValue == null) {
@@ -253,8 +266,20 @@ class _FieldValue extends StatelessWidget {
       'photo' || 'media' => _PhotoGallery(photos: _toPhotoList(effectiveValue)),
       'location'         => effectiveValue is String && effectiveValue.trim().startsWith('http')
           ? _LocationUrlLink(url: effectiveValue.trim())
-          : _LocationMap(value: _toLocation(effectiveValue)),
-      _                  => _TextValue(value: effectiveValue?.toString(), multiline: false),
+          : _toLocation(effectiveValue) != null
+              ? _LocationMap(value: _toLocation(effectiveValue))
+              : hasAnyValue
+                  ? _CapturedRawSlot(
+                      rawValue: fvLocal['value_text'] as String? ??
+                          fvLocal['value_media_url'] as String?)
+                  : const _PendingSlot(),
+      _                  => effectiveValue != null
+          ? _TextValue(value: effectiveValue.toString(), multiline: false)
+          : hasAnyValue
+              ? _CapturedRawSlot(
+                  rawValue: fvLocal['value_text'] as String? ??
+                      fvLocal['value_media_url'] as String?)
+              : const _PendingSlot(),
     };
   }
 
@@ -1013,6 +1038,63 @@ class _MediaErrorSlot extends StatelessWidget {
                 color: AppColors.ctTeal,
                 decoration: TextDecoration.underline,
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Captured Raw Slot ─────────────────────────────────────────────────────────
+
+class _CapturedRawSlot extends StatelessWidget {
+  const _CapturedRawSlot({this.rawValue});
+  final String? rawValue;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFFBEB),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFFCD34D)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.warning_amber_rounded,
+              size: 16, color: Color(0xFFD97706)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Capturado · no se puede visualizar',
+                  style: TextStyle(
+                    fontFamily: 'Geist',
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFFD97706),
+                  ),
+                ),
+                if (rawValue != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    rawValue!,
+                    style: const TextStyle(
+                      fontFamily: 'Geist',
+                      fontSize: 11,
+                      color: Color(0xFF92400E),
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ],
             ),
           ),
         ],
