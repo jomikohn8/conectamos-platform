@@ -182,9 +182,13 @@ final routerProvider = Provider<GoRouter>((ref) {
               routes: [
                 GoRoute(
                   path: ':executionId',
-                  pageBuilder: (c, s) => NoTransitionPage(
-                    child: ExecutionDetailScreen(executionId: s.pathParameters['executionId'] ?? ''),
-                  ),
+                  pageBuilder: (c, s) {
+                    final executionId = s.pathParameters['executionId'] ?? '';
+                    return NoTransitionPage(
+                      key: ValueKey(executionId),
+                      child: ExecutionDetailScreen(executionId: executionId),
+                    );
+                  },
                 ),
               ],
             ),
