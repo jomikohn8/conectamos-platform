@@ -1188,6 +1188,10 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
               fieldKey: entry.key,
               values:   entry.value,
               label:    _fieldLabel(entry.key),
+              onEdit: () => setState(() {
+                _pendingField = entry.key;
+                _showFieldDropdown = false;
+              }),
               onRemove: () {
                 setState(() {
                   _activeFieldSearches = Map.from(_activeFieldSearches)
@@ -1292,9 +1296,9 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
       ));
       for (final f in generals) {
         result.add(_buildFieldItem(
-          f['key']   as String? ?? '',
-          f['label'] as String? ?? (f['key'] as String? ?? ''),
-          f['type']  as String? ?? 'text',
+          f['key']        as String? ?? '',
+          f['label']      as String? ?? (f['key'] as String? ?? ''),
+          f['field_type'] as String? ?? 'text',
           null,
         ));
       }
@@ -1318,9 +1322,9 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
       ));
       for (final f in entry.value) {
         result.add(_buildFieldItem(
-          f['key']   as String? ?? '',
-          f['label'] as String? ?? (f['key'] as String? ?? ''),
-          f['type']  as String? ?? 'text',
+          f['key']        as String? ?? '',
+          f['label']      as String? ?? (f['key'] as String? ?? ''),
+          f['field_type'] as String? ?? 'text',
           entry.key,
         ));
       }
@@ -2442,12 +2446,14 @@ class _FieldSearchTag extends StatelessWidget {
     required this.values,
     required this.label,
     required this.onRemove,
+    this.onEdit,
   });
 
-  final String       fieldKey;
-  final List<String> values;
-  final String       label;
-  final VoidCallback onRemove;
+  final String        fieldKey;
+  final List<String>  values;
+  final String        label;
+  final VoidCallback  onRemove;
+  final VoidCallback? onEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -2465,12 +2471,20 @@ class _FieldSearchTag extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            '$label: $displayValues',
-            style: AppFonts.geist(
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
-              color: AppColors.ctTealDark,
+          MouseRegion(
+            cursor: onEdit != null
+                ? SystemMouseCursors.click
+                : MouseCursor.defer,
+            child: GestureDetector(
+              onTap: onEdit,
+              child: Text(
+                '$label: $displayValues',
+                style: AppFonts.geist(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.ctTealDark,
+                ),
+              ),
             ),
           ),
           const SizedBox(width: 3),
