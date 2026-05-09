@@ -135,7 +135,7 @@ class _ExecutionDetailScreenState
       'pending_dashboard', 'pending_input', 'created',
     };
     final canManageExecutions =
-        perms.valueOrNull?.contains('flow_executions.manage') == true;
+        hasPermission(ref, 'flow_executions', 'execute_dashboard');
     final showAbandon =
         canManageExecutions && abandonableStatuses.contains(execStatus);
 
