@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/api/flows_api.dart';
 import '../../core/providers/permissions_provider.dart';
+import '../../core/providers/tenant_provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../conversations/conversations_screen.dart' show selectedChannelIdProvider;
 import 'widgets/execution_header_block.dart';
@@ -45,7 +46,16 @@ class _ExecutionDetailScreenState
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final tenantId = ref.read(activeTenantIdProvider);
+      if (tenantId.isNotEmpty) {
+        _load();
+        _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+          if (mounted) _load();
+        });
+      }
+    });
   }
 
   @override
@@ -81,10 +91,6 @@ class _ExecutionDetailScreenState
       _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
         if (mounted) setState(() {});
       });
-      _refreshTimer?.cancel();
-      _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
-        if (mounted) _load();
-      });
       setState(() { _lastFetch = DateTime.now(); });
     }
   }
@@ -99,6 +105,17 @@ class _ExecutionDetailScreenState
           .addPostFrameCallback((_) => context.go('/overview'));
       return const SizedBox.shrink();
     }
+
+    ref.listen<String>(activeTenantIdProvider, (prev, next) {
+      if (next.isNotEmpty && prev != next) {
+        _load();
+        if (_refreshTimer == null || !_refreshTimer!.isActive) {
+          _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+            if (mounted) _load();
+          });
+        }
+      }
+    });
 
     if (_loading) {
       return Scaffold(
