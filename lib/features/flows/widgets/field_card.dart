@@ -793,7 +793,8 @@ class _PhotoThumb extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final num = '${(index + 1).toString().padLeft(2, '0')} / ${total.toString().padLeft(2, '0')}';
-    return MouseRegion(
+    return SelectionContainer.disabled(
+      child: MouseRegion(
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
         onTap: onTap,
@@ -870,6 +871,7 @@ class _PhotoThumb extends StatelessWidget {
           ),
         ),
       ),
+    ),
     );
   }
 }
