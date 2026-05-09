@@ -184,13 +184,7 @@ class _ExecutionDetailScreenState
                               ),
                             ),
                             if (showAbandon) ...[
-                              const SizedBox(width: 4),
-                              Container(
-                                width: 1,
-                                height: 14,
-                                color: AppColors.ctBorder,
-                              ),
-                              const SizedBox(width: 4),
+                              const SizedBox(width: 8),
                               TextButton.icon(
                                 onPressed: () => _abandon(
                                     context, exec['id'] as String? ?? ''),
