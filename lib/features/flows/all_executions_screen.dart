@@ -810,21 +810,20 @@ class _AllExecutionsScreenState extends ConsumerState<AllExecutionsScreen> {
               color: AppColors.ctText,
             ),
           ),
-          if (!_loading && _total > 0) ...[
-            const SizedBox(width: 10),
+          if (_total > 0) ...[
+            const SizedBox(width: 8),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
               decoration: BoxDecoration(
-                color: AppColors.ctSurface2,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: AppColors.ctBorder),
+                color: AppColors.ctNavy,
+                borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
                 '$_total',
                 style: AppFonts.geist(
-                  fontSize: 11,
+                  fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.ctText2,
+                  color: Colors.white,
                 ),
               ),
             ),
