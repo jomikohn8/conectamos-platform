@@ -2571,6 +2571,7 @@ class _ValueInputState extends State<_ValueInput> {
       }
       _ctrl.clear();
     });
+    widget.onSubmit(_values);
     if (_values.length >= _maxValues) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
@@ -2588,7 +2589,10 @@ class _ValueInputState extends State<_ValueInput> {
     }
   }
 
-  void _removeValue(String v) => setState(() => _values.remove(v));
+  void _removeValue(String v) {
+    setState(() => _values.remove(v));
+    widget.onSubmit(_values);
+  }
 
   void _submit() {
     if (_ctrl.text.trim().isNotEmpty) _addValues(_ctrl.text);
