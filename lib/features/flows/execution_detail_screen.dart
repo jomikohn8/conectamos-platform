@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -128,6 +129,16 @@ class _ExecutionDetailScreenState
     final exec = _exec!;
     final flow = _flow!;
 
+    final execStatus = exec['status'] as String? ?? '';
+    const abandonableStatuses = {
+      'active', 'paused', 'pending_completion',
+      'pending_dashboard', 'pending_input', 'created',
+    };
+    final canManageExecutions =
+        perms.valueOrNull?.contains('flow_executions.manage') == true;
+    final showAbandon =
+        canManageExecutions && abandonableStatuses.contains(execStatus);
+
     return Scaffold(
       backgroundColor: AppColors.ctBg,
       appBar: _buildAppBar(context),
@@ -147,6 +158,27 @@ class _ExecutionDetailScreenState
                         Row(
                           mainAxisAlignment: MainAxisAlignment.end,
                           children: [
+                            if (showAbandon) ...[
+                              TextButton.icon(
+                                onPressed: () => _abandon(
+                                    context, exec['id'] as String? ?? ''),
+                                icon: const Icon(Icons.cancel_outlined,
+                                    size: 14,
+                                    color: Color(0xFFEF4444)),
+                                label: const Text('Abandonar',
+                                    style: TextStyle(
+                                        fontFamily: 'Geist',
+                                        fontSize: 13,
+                                        color: Color(0xFFEF4444))),
+                                style: TextButton.styleFrom(
+                                  foregroundColor: const Color(0xFFEF4444),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 6),
+                                  minimumSize: Size.zero,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                            ],
                             if (_lastFetch != null)
                               Text(
                                 'Act. ${_elapsedSince(_lastFetch!)}',
@@ -216,6 +248,86 @@ final content = _MainContent(exec: exec, flow: flow);
           ),
         ],
       )),
+    );
+  }
+
+  Future<void> _abandon(BuildContext context, String executionId) async {
+    final messenger = ScaffoldMessenger.of(context);
+    bool loading = false;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: Text('¿Abandonar ejecución?',
+              style: AppFonts.onest(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.ctNavy)),
+          content: Text(
+            'Esta acción marcará la ejecución como abandonada y no se podrá revertir.',
+            style: AppFonts.geist(fontSize: 14, color: AppColors.ctText2),
+          ),
+          actions: [
+            TextButton(
+              onPressed: loading ? null : () => Navigator.pop(ctx),
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFEF4444),
+                foregroundColor: Colors.white,
+              ),
+              onPressed: loading
+                  ? null
+                  : () async {
+                      setDialogState(() => loading = true);
+                      try {
+                        await FlowsApi.abandonExecution(
+                            executionId: executionId);
+                        if (ctx.mounted) Navigator.pop(ctx);
+                        if (mounted) {
+                          messenger.showSnackBar(
+                            const SnackBar(
+                              content: Text('Ejecución abandonada'),
+                              duration: Duration(milliseconds: 2000),
+                            ),
+                          );
+                          _load();
+                        }
+                      } on DioException catch (e) {
+                        final data = e.response?.data;
+                        final code =
+                            data is Map ? data['code'] as String? : null;
+                        if (ctx.mounted) Navigator.pop(ctx);
+                        if (mounted) {
+                          final msg = code == 'execution_not_abandonable'
+                              ? 'Esta ejecución no se puede abandonar (estado: ${data['current_status'] ?? '—'})'
+                              : 'Error al abandonar la ejecución';
+                          messenger.showSnackBar(
+                            SnackBar(
+                              content: Text(msg),
+                              duration: const Duration(milliseconds: 3000),
+                            ),
+                          );
+                        }
+                      } catch (_) {
+                        if (ctx.mounted) Navigator.pop(ctx);
+                        if (mounted) {
+                          messenger.showSnackBar(
+                            const SnackBar(
+                              content: Text('Error al abandonar la ejecución'),
+                              duration: Duration(milliseconds: 2000),
+                            ),
+                          );
+                        }
+                      }
+                    },
+              child: const Text('Sí, abandonar'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
