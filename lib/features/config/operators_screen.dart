@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/api/operator_roles_api.dart';
 import '../../core/api/operators_api.dart';
 import '../../core/providers/permissions_provider.dart';
 import '../../core/providers/tenant_provider.dart';
@@ -81,6 +82,7 @@ class OperatorsScreen extends ConsumerStatefulWidget {
 
 class _OperatorsScreenState extends ConsumerState<OperatorsScreen> {
   List<Map<String, dynamic>> _operators = [];
+  List<Map<String, dynamic>> _roles = [];
   bool _loading = true;
 
   @override
@@ -92,10 +94,15 @@ class _OperatorsScreenState extends ConsumerState<OperatorsScreen> {
   Future<void> _fetchOperators() async {
     setState(() => _loading = true);
     try {
-      final ops = await OperatorsApi.listOperators();
+      final tenantId = ref.read(activeTenantIdProvider);
+      final results = await Future.wait([
+        OperatorsApi.listOperators(),
+        OperatorRolesApi.listRoles(tenantId: tenantId),
+      ]);
       if (mounted) {
         setState(() {
-          _operators = ops;
+          _operators = results[0];
+          _roles = results[1];
           _loading = false;
         });
       }
@@ -141,6 +148,7 @@ class _OperatorsScreenState extends ConsumerState<OperatorsScreen> {
                   padding: const EdgeInsets.all(22),
                   child: _OperatorsBody(
                     operators: _operators,
+                    roles: _roles,
                     onRefresh: _fetchOperators,
                     canManage: canManage,
                     onOperatorMetadataUpdated: _updateOperatorMetadata,
@@ -176,11 +184,13 @@ class _ActionBar extends StatelessWidget {
 class _OperatorsBody extends StatefulWidget {
   const _OperatorsBody({
     required this.operators,
+    required this.roles,
     required this.onRefresh,
     required this.canManage,
     this.onOperatorMetadataUpdated,
   });
   final List<Map<String, dynamic>> operators;
+  final List<Map<String, dynamic>> roles;
   final VoidCallback onRefresh;
   final bool canManage;
   final void Function(String id, Map<String, dynamic> metadata)?
@@ -194,6 +204,7 @@ class _OperatorsBodyState extends State<_OperatorsBody> {
   String _search = '';
   String _filterStatus = 'Todos';
   String _filterFlow = 'Todos';
+  String _filterRole = 'Todos';
 
   static const _statusOptions = [
     'Todos',
@@ -231,7 +242,23 @@ class _OperatorsBodyState extends State<_OperatorsBody> {
       final matchFlow = _filterFlow == 'Todos' ||
           flows.any((f) => _filterFlow.startsWith(f['name'] as String? ?? ''));
 
-      return matchSearch && matchStatus && matchFlow;
+      bool matchRole = true;
+      if (_filterRole != 'Todos') {
+        final role = widget.roles.firstWhere(
+          (r) => r['label'] == _filterRole,
+          orElse: () => {},
+        );
+        if (role.isEmpty) {
+          matchRole = false;
+        } else {
+          final roleId = role['id'] as String?;
+          final roleIds =
+              (op['role_ids'] as List?)?.cast<String>() ?? [];
+          matchRole = roleIds.contains(roleId);
+        }
+      }
+
+      return matchSearch && matchStatus && matchFlow && matchRole;
     }).toList();
   }
 
@@ -272,6 +299,18 @@ class _OperatorsBodyState extends State<_OperatorsBody> {
               options: _flowOptions,
               onChanged: (v) => setState(() => _filterFlow = v),
             ),
+            const SizedBox(width: 10),
+            _FilterDropdown(
+              width: 170,
+              value: _filterRole,
+              options: [
+                'Todos',
+                ...widget.roles
+                    .map((r) => r['label'] as String? ?? '')
+                    .where((s) => s.isNotEmpty),
+              ],
+              onChanged: (v) => setState(() => _filterRole = v),
+            ),
           ],
         ),
         const SizedBox(height: 14),
@@ -310,6 +349,9 @@ class _OperatorsBodyState extends State<_OperatorsBody> {
                         flex: 1,
                         child: Text('ESTADO', style: _headerStyle)),
                     Expanded(
+                        flex: 2,
+                        child: Text('ROL', style: _headerStyle)),
+                    Expanded(
                         flex: 3,
                         child: Text('FLUJOS ASIGNADOS',
                             style: _headerStyle)),
@@ -343,6 +385,7 @@ class _OperatorsBodyState extends State<_OperatorsBody> {
                     children: [
                       _OperatorRow(
                         op: entry.value,
+                        roles: widget.roles,
                         onRefresh: widget.onRefresh,
                         canManage: widget.canManage,
                         onOperatorMetadataUpdated:
@@ -376,11 +419,13 @@ class _OperatorsBodyState extends State<_OperatorsBody> {
 class _OperatorRow extends StatefulWidget {
   const _OperatorRow({
     required this.op,
+    required this.roles,
     required this.onRefresh,
     required this.canManage,
     this.onOperatorMetadataUpdated,
   });
   final Map<String, dynamic> op;
+  final List<Map<String, dynamic>> roles;
   final VoidCallback onRefresh;
   final bool canManage;
   final void Function(String id, Map<String, dynamic> metadata)?
@@ -577,6 +622,28 @@ class _OperatorRowState extends State<_OperatorRow> {
                   textColor: st.fg,
                 ),
               ),
+            ),
+
+            // Rol
+            Expanded(
+              flex: 2,
+              child: () {
+                final roleIds =
+                    (op['role_ids'] as List?)?.cast<String>() ?? [];
+                if (roleIds.isEmpty) return const SizedBox.shrink();
+                final matched = widget.roles.where(
+                    (r) => r['id'] == roleIds.first).toList();
+                if (matched.isNotEmpty) {
+                  return _RoleBadge(role: matched.first);
+                }
+                return Text(
+                  roleIds.first.length > 8
+                      ? roleIds.first.substring(0, 8)
+                      : roleIds.first,
+                  style: AppFonts.geist(
+                      fontSize: 11, color: AppColors.ctText2),
+                );
+              }(),
             ),
 
             // Flujos asignados
@@ -850,6 +917,41 @@ class _FlowBadge extends StatelessWidget {
             color: AppColors.ctInfoText,
           ),
         ),
+      ),
+    );
+  }
+}
+
+Color _parseColor(String hex) {
+  try {
+    return Color(int.parse(hex.replaceFirst('#', '0xFF')));
+  } catch (_) {
+    return const Color(0xFF59E0CC);
+  }
+}
+
+class _RoleBadge extends StatelessWidget {
+  const _RoleBadge({required this.role});
+  final Map<String, dynamic> role;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = role['label'] as String? ?? '—';
+    final color = _parseColor(role['color'] as String? ?? '#59E0CC');
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.4)),
+      ),
+      child: Text(
+        label,
+        style: AppFonts.geist(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: color),
+        overflow: TextOverflow.ellipsis,
       ),
     );
   }
