@@ -6,6 +6,7 @@ import '../../core/providers/permissions_provider.dart';
 import '../../core/providers/tenant_provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/widgets/screen_header.dart';
+import 'new_catalog_wizard.dart';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -107,6 +108,21 @@ class _CatalogsScreenState extends ConsumerState<CatalogsScreen> {
     }
   }
 
+  void _openWizard(BuildContext ctx) {
+    final tenantId = ref.read(activeTenantIdProvider);
+    showDialog<void>(
+      context: ctx,
+      barrierDismissible: false,
+      builder: (_) => NewCatalogWizard(
+        tenantId: tenantId,
+        onSuccess: (slug) {
+          Navigator.of(ctx).pop();
+          ctx.go('/catalogs/$slug');
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     ref.listen<String>(activeTenantIdProvider, (prev, next) {
@@ -122,9 +138,9 @@ class _CatalogsScreenState extends ConsumerState<CatalogsScreen> {
           subtitle: 'Datos del tenant referenciables desde flujos y workers.',
           actions: [
             if (canManage)
-              Tooltip(
-                message: 'Próximamente',
-                child: _PrimaryButton(label: '+ Nuevo catálogo', onTap: null),
+              _PrimaryButton(
+                label: '+ Nuevo catálogo',
+                onTap: () => _openWizard(context),
               ),
           ],
         ),
