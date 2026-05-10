@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/api/flows_api.dart';
 import '../../core/api/operator_roles_api.dart';
-import 'widgets/flow_graph_panel.dart';
 import '../../core/providers/permissions_provider.dart';
 import '../../core/providers/tenant_provider.dart';
 import '../../core/theme/app_theme.dart';
@@ -156,7 +155,7 @@ class _FlowDetailScreenState extends ConsumerState<FlowDetailScreen>
   @override
   void initState() {
     super.initState();
-    _tabCtrl = TabController(length: 5, vsync: this);
+    _tabCtrl = TabController(length: 4, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
@@ -549,7 +548,6 @@ class _FlowDetailScreenState extends ConsumerState<FlowDetailScreen>
               _save(silent: true);
             },
           ),
-          FlowGraphPanel(fields: _fields),
         ],
       ),
     );
@@ -622,7 +620,6 @@ class _FlowDetailScreenState extends ConsumerState<FlowDetailScreen>
           Tab(text: 'CAMPOS'),
           Tab(text: 'COMPORTAMIENTO'),
           Tab(text: 'AL CERRAR'),
-          Tab(text: 'VISUALIZACIÓN'),
         ],
       ),
     );
