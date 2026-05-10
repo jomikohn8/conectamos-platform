@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/api/catalogs_api.dart';
 import '../../core/api/flows_api.dart';
+import '../../shared/widgets/asset_item_selector.dart';
 import '../../core/api/operator_roles_api.dart';
 import '../../core/constants/field_types.dart';
 import '../../core/providers/permissions_provider.dart';
@@ -1215,6 +1216,8 @@ class _FieldDialogState extends State<_FieldDialog> {
   String? _catalogSlug;
   List<Map<String, dynamic>> _availableCatalogs = [];
   bool _loadingCatalogs = false;
+  String? _selectedItemId;
+  String? _selectedItemDisplay;
 
   bool get _isEdit => widget.field != null;
   bool get _assetRefValid => _type != 'asset_ref' || _catalogSlug != null;
@@ -1265,6 +1268,8 @@ class _FieldDialogState extends State<_FieldDialog> {
       if (_staticOptions.isNotEmpty && ds == null) _dataSourceBase = 'static';
     }
     _catalogSlug = widget.field?['catalog_slug'] as String?;
+    _selectedItemId = widget.field?['item_id'] as String?;
+    _selectedItemDisplay = widget.field?['item_display'] as String?;
     _labelCtrl.addListener(_onLabelChanged);
     if (_type == 'select') _loadFlows();
     if (_type == 'asset_ref') _loadCatalogs();
@@ -1359,8 +1364,17 @@ class _FieldDialogState extends State<_FieldDialog> {
     }
     if (_type == 'asset_ref') {
       updated['catalog_slug'] = _catalogSlug;
+      if (_selectedItemId != null) {
+        updated['item_id'] = _selectedItemId;
+        updated['item_display'] = _selectedItemDisplay;
+      } else {
+        updated.remove('item_id');
+        updated.remove('item_display');
+      }
     } else {
       updated.remove('catalog_slug');
+      updated.remove('item_id');
+      updated.remove('item_display');
     }
     if (!_isEdit || updated['id'] == null) {
       updated['id'] =
@@ -1487,7 +1501,11 @@ class _FieldDialogState extends State<_FieldDialog> {
                     if (v != null) {
                       setState(() {
                         _type = v;
-                        if (v != 'asset_ref') _catalogSlug = null;
+                        if (v != 'asset_ref') {
+                          _catalogSlug = null;
+                          _selectedItemId = null;
+                          _selectedItemDisplay = null;
+                        }
                       });
                       if (v == 'select' && _availableFlows.isEmpty) {
                         _loadFlows();
@@ -1810,9 +1828,35 @@ class _FieldDialogState extends State<_FieldDialog> {
                           ),
                         );
                       }).toList(),
-                      onChanged: (v) => setState(() => _catalogSlug = v),
+                      onChanged: (v) {
+                        setState(() {
+                          _catalogSlug = v;
+                          _selectedItemId = null;
+                          _selectedItemDisplay = null;
+                        });
+                      },
                     ),
                   ),
+              if (_catalogSlug != null) ...[
+                const SizedBox(height: 10),
+                const Text(
+                  'Item predeterminado (opcional)',
+                  style: AppTextStyles.btnSecondary,
+                ),
+                const SizedBox(height: 6),
+                AssetItemSelector(
+                  key: ValueKey(_catalogSlug),
+                  catalogSlug: _catalogSlug!,
+                  initialItemId: _selectedItemId,
+                  initialDisplayText: _selectedItemDisplay,
+                  onSelected: (item) {
+                    setState(() {
+                      _selectedItemId = item['item_id'] as String?;
+                      _selectedItemDisplay = item['display_text'] as String?;
+                    });
+                  },
+                ),
+              ],
               ],
 
               const SizedBox(height: 14),
