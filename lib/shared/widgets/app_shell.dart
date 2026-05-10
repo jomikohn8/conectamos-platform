@@ -827,13 +827,26 @@ class _Sidebar extends ConsumerWidget {
                               navigationShell: navigationShell,
                             ),
                           if (hasPermission(ref, 'operators', 'view'))
-                            _NavItem(
+                            _ExpandableNavItem(
                               icon: Icons.people_outline_rounded,
                               label: 'Operadores',
-                              route: '/operators',
                               currentRoute: currentRoute,
                               collapsed: collapsed,
-                              navigationShell: navigationShell,
+                              children: [
+                                _ExpandableSubItem(
+                                  icon: Icons.people_outline_rounded,
+                                  label: 'Operadores',
+                                  route: '/operators',
+                                  currentRoute: currentRoute,
+                                ),
+                                if (hasPermission(ref, 'operator_roles', 'view'))
+                                  _ExpandableSubItem(
+                                    icon: Icons.badge_outlined,
+                                    label: 'Roles',
+                                    route: '/operators/roles',
+                                    currentRoute: currentRoute,
+                                  ),
+                              ],
                             ),
                           if (hasPermission(ref, 'settings', 'view')) ...[
                             _NavItem(

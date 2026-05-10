@@ -14,6 +14,7 @@ import '../../features/config/channel_detail_screen.dart';
 import '../../features/config/channels_screen.dart';
 import '../../features/config/connections_screen.dart';
 import '../../features/config/operator_detail_screen.dart';
+import '../../features/config/operator_roles_screen.dart';
 import '../../features/config/operators_screen.dart';
 import '../../features/config/settings_screen.dart';
 import '../../features/settings/operator_fields_screen.dart';
@@ -168,6 +169,10 @@ final routerProvider = Provider<GoRouter>((ref) {
               path: '/operators',
               pageBuilder: (c, s) => const NoTransitionPage(child: OperatorsScreen()),
               routes: [
+                GoRoute(
+                  path: 'roles',
+                  pageBuilder: (c, s) => const NoTransitionPage(child: OperatorRolesScreen()),
+                ),
                 GoRoute(
                   path: ':id',
                   pageBuilder: (c, s) => NoTransitionPage(
