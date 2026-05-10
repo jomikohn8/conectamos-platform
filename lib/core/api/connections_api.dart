@@ -18,4 +18,35 @@ class ConnectionsApi {
   static Future<void> disconnectGoogle() async {
     await ApiClient.instance.delete('/integrations/google');
   }
+
+  // ── Microsoft OAuth ────────────────────────────────────────────────────────
+
+  /// Returns the Microsoft OAuth authorization URL.
+  /// Shape: { url: "https://login.microsoftonline.com/..." }
+  static Future<String> getMicrosoftAuthUrl({required String tenantId}) async {
+    final resp = await ApiClient.instance.get(
+      '/oauth/microsoft/url',
+      queryParameters: {'tenant_id': tenantId},
+    );
+    return resp.data['url'] as String;
+  }
+
+  /// Returns Microsoft connection status for the tenant.
+  static Future<Map<String, dynamic>> getMicrosoftStatus({
+    required String tenantId,
+  }) async {
+    final resp = await ApiClient.instance.get(
+      '/oauth/status',
+      queryParameters: {'tenant_id': tenantId},
+    );
+    return Map<String, dynamic>.from(resp.data as Map);
+  }
+
+  /// Revokes the Microsoft integration for the active tenant.
+  static Future<void> disconnectMicrosoft({required String tenantId}) async {
+    await ApiClient.instance.delete(
+      '/oauth/microsoft/revoke',
+      queryParameters: {'tenant_id': tenantId},
+    );
+  }
 }

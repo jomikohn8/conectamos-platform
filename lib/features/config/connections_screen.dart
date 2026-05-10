@@ -8,9 +8,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:go_router/go_router.dart';
+import '../../core/api/catalogs_api.dart';
 import '../../core/api/connections_api.dart';
 import '../../core/api/flows_api.dart';
 import '../../core/api/ai_workers_api.dart';
+import '../../core/providers/tenant_provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/widgets/app_shell.dart';
 
@@ -239,6 +242,12 @@ class _ConnectionsScreenState extends ConsumerState<ConnectionsScreen>
   Timer? _gsheetsOAuthTimer;
   StreamSubscription<html.MessageEvent>? _oauthMessageSub;
 
+  // Microsoft / OneDrive runtime state
+  String? _microsoftEmail;
+  String? _microsoftConnectedAt;
+  Timer? _microsoftOAuthTimer;
+  StreamSubscription<html.MessageEvent>? _microsoftOAuthSub;
+
   late final AnimationController _drawerCtrl;
   late final Animation<Offset> _drawerSlide;
 
@@ -258,6 +267,7 @@ class _ConnectionsScreenState extends ConsumerState<ConnectionsScreen>
       ref.read(topbarSubtitleProvider.notifier).state = 'Centro de aplicaciones';
       ref.read(topbarActionsProvider.notifier).state = [];
       _loadGoogleStatus();
+      _loadMicrosoftStatus();
     });
   }
 
@@ -282,11 +292,35 @@ class _ConnectionsScreenState extends ConsumerState<ConnectionsScreen>
     }
   }
 
+  Future<void> _loadMicrosoftStatus() async {
+    try {
+      final tenantId = ref.read(activeTenantIdProvider);
+      if (tenantId.isEmpty) return;
+      final status = await ConnectionsApi.getMicrosoftStatus(tenantId: tenantId);
+      if (!mounted) return;
+      final connected = status['connected'] as bool? ?? false;
+      setState(() {
+        if (connected) {
+          _connectedIds = {..._connectedIds, 'onedrive'};
+          _microsoftEmail = status['email'] as String?;
+          _microsoftConnectedAt = status['connected_at'] as String?;
+        } else {
+          _connectedIds = Set.from(_connectedIds)..remove('onedrive');
+          _microsoftEmail = null;
+          _microsoftConnectedAt = null;
+        }
+      });
+    } catch (_) {
+      // silently ignore — keep static state
+    }
+  }
 
   @override
   void dispose() {
     _gsheetsOAuthTimer?.cancel();
     _oauthMessageSub?.cancel();
+    _microsoftOAuthTimer?.cancel();
+    _microsoftOAuthSub?.cancel();
     _drawerCtrl.dispose();
     _searchCtrl.dispose();
     super.dispose();
@@ -310,6 +344,13 @@ class _ConnectionsScreenState extends ConsumerState<ConnectionsScreen>
             state: IntegrationState.connected,
             accountLabel: _gsheetsEmail,
             lastSync: _gsheetsConnectedAt != null ? 'Conectado el $_gsheetsConnectedAt' : null,
+          );
+        }
+        if (it.id == 'onedrive') {
+          return it.copyWith(
+            state: IntegrationState.connected,
+            accountLabel: _microsoftEmail,
+            lastSync: _microsoftConnectedAt != null ? 'Conectado el $_microsoftConnectedAt' : null,
           );
         }
         return it.copyWith(state: IntegrationState.connected);
@@ -338,6 +379,15 @@ class _ConnectionsScreenState extends ConsumerState<ConnectionsScreen>
         _openManage(item);
       } else {
         _connectGsheets();
+      }
+      return;
+    }
+    if (item.id == 'onedrive') {
+      final isConnected = _connectedIds.contains('onedrive');
+      if (isConnected || item.state == IntegrationState.attention) {
+        _openManage(item);
+      } else {
+        _connectMicrosoft();
       }
       return;
     }
@@ -406,6 +456,64 @@ class _ConnectionsScreenState extends ConsumerState<ConnectionsScreen>
     }
   }
 
+  Future<void> _connectMicrosoft() async {
+    try {
+      final tenantId = ref.read(activeTenantIdProvider);
+      final authUrl = await ConnectionsApi.getMicrosoftAuthUrl(tenantId: tenantId);
+      final popup = html.window.open(
+        authUrl,
+        'microsoft_oauth',
+        'width=500,height=600,scrollbars=yes,resizable=yes',
+      );
+
+      // Primary: receive postMessage from the popup close page
+      _microsoftOAuthSub?.cancel();
+      _microsoftOAuthSub = html.window.onMessage.listen((event) {
+        final data = event.data?.toString() ?? '';
+        if (data != 'microsoft=success' && data != 'microsoft=error') return;
+        _microsoftOAuthSub?.cancel();
+        _microsoftOAuthTimer?.cancel();
+        if (!mounted) return;
+        _loadMicrosoftStatus();
+        if (data == 'microsoft=success') {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('OneDrive conectado correctamente.'),
+            backgroundColor: Color(0xFF107C41),
+            duration: Duration(seconds: 4),
+          ));
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: const Text('Error al conectar OneDrive. Intenta de nuevo.'),
+            backgroundColor: AppColors.ctDanger,
+            duration: const Duration(seconds: 4),
+          ));
+        }
+      });
+
+      // Fallback: poll popup.closed (user closed manually or postMessage missed)
+      _microsoftOAuthTimer?.cancel();
+      _microsoftOAuthTimer = Timer.periodic(const Duration(milliseconds: 500), (_) {
+        if (!mounted) {
+          _microsoftOAuthTimer?.cancel();
+          _microsoftOAuthSub?.cancel();
+          return;
+        }
+        if (popup.closed == true) {
+          _microsoftOAuthTimer?.cancel();
+          _microsoftOAuthSub?.cancel();
+          _loadMicrosoftStatus();
+        }
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('No se pudo iniciar la conexión: ${_connDioError(e)}'),
+        backgroundColor: AppColors.ctDanger,
+        duration: const Duration(seconds: 4),
+      ));
+    }
+  }
+
   void _showManageSheet(Integration item, String typeFilter) {
     showModalBottomSheet(
       context: context,
@@ -450,6 +558,29 @@ class _ConnectionsScreenState extends ConsumerState<ConnectionsScreen>
           ));
           // Reload real status to reconcile UI
           _loadGoogleStatus();
+        }
+      });
+      return;
+    }
+    if (item.id == 'onedrive') {
+      Future.delayed(const Duration(milliseconds: 260), () async {
+        if (!mounted) return;
+        setState(() {
+          _connectedIds = Set.from(_connectedIds)..remove('onedrive');
+          _microsoftEmail = null;
+          _microsoftConnectedAt = null;
+        });
+        try {
+          final tenantId = ref.read(activeTenantIdProvider);
+          await ConnectionsApi.disconnectMicrosoft(tenantId: tenantId);
+        } catch (e) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('Error al desconectar: ${_connDioError(e)}'),
+            backgroundColor: AppColors.ctDanger,
+            duration: const Duration(seconds: 4),
+          ));
+          _loadMicrosoftStatus();
         }
       });
       return;
@@ -1029,6 +1160,223 @@ class _ContentArea extends StatelessWidget {
               items: filtered,
               onCardTap: onCardTap,
             ),
+          const SizedBox(height: 40),
+          const Divider(color: AppColors.ctBorder),
+          const SizedBox(height: 32),
+          const _CatalogsSection(),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Catálogos conectados ──────────────────────────────────────────────────────
+
+class _CatalogsSection extends StatefulWidget {
+  const _CatalogsSection();
+
+  @override
+  State<_CatalogsSection> createState() => _CatalogsSectionState();
+}
+
+class _CatalogsSectionState extends State<_CatalogsSection> {
+  bool _loading = true;
+  List<Map<String, dynamic>> _catalogs = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    // tenantId from closest ConsumerWidget ancestor is not available here
+    // since _CatalogsSection is a plain StatefulWidget inside a StatelessWidget.
+    // We read the provider via context once it's available.
+    setState(() => _loading = true);
+    try {
+      // Provider is accessible via ProviderScope.containerOf
+      final container = ProviderScope.containerOf(context, listen: false);
+      final tenantId = container.read(activeTenantIdProvider);
+      final data = await CatalogsApi.listCatalogs(tenantId: tenantId);
+      if (mounted) setState(() { _catalogs = data; _loading = false; });
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Catálogos conectados',
+          style: AppFonts.onest(
+              fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.ctText),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Fuentes de datos sincronizadas con tu operación.',
+          style: AppFonts.geist(fontSize: 13, color: AppColors.ctText2),
+        ),
+        const SizedBox(height: 16),
+        if (_loading)
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 24),
+              child: CircularProgressIndicator(
+                  color: AppColors.ctTeal, strokeWidth: 2),
+            ),
+          )
+        else if (_catalogs.isEmpty)
+          _EmptyCatalogsState()
+        else
+          Column(
+            children: _catalogs
+                .map((cat) => _CatalogTile(catalog: cat))
+                .toList(),
+          ),
+      ],
+    );
+  }
+}
+
+class _EmptyCatalogsState extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        border: Border.all(color: AppColors.ctBorder),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.folder_open_outlined,
+                size: 36, color: AppColors.ctText2),
+            const SizedBox(height: 10),
+            Text(
+              'Sin catálogos configurados',
+              style: AppFonts.onest(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.ctText2),
+            ),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: () => context.go('/catalogs'),
+              child: const Text('Crear catálogo'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CatalogTile extends StatelessWidget {
+  const _CatalogTile({required this.catalog});
+  final Map<String, dynamic> catalog;
+
+  static const _sourceIcons = <String, IconData>{
+    'manual':          Icons.edit_note_rounded,
+    'google_sheets':   Icons.table_chart_outlined,
+    'onedrive_excel':  Icons.grid_on_outlined,
+    'webhook_push':    Icons.webhook_outlined,
+    'api_pull':        Icons.cloud_download_outlined,
+  };
+
+  static const _syncColors = <String, Color>{
+    'synced':  AppColors.ctTeal,
+    'failed':  AppColors.ctDanger,
+    'running': _warn,
+    'manual':  AppColors.ctText3,
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final label      = catalog['label'] as String? ?? catalog['name'] as String? ?? '—';
+    final slug       = catalog['slug'] as String? ?? '';
+    final sourceType = catalog['source_type'] as String? ?? '';
+    final itemsCount = catalog['items_count'] as int? ?? 0;
+    final syncStatus = catalog['sync_status'] as String? ?? 'manual';
+
+    final sourceIcon = _sourceIcons[sourceType] ?? Icons.storage_rounded;
+    final syncColor  = _syncColors[syncStatus] ?? AppColors.ctText3;
+    final syncLabel  = switch (syncStatus) {
+      'synced'  => 'Sincronizado',
+      'failed'  => 'Error',
+      'running' => 'Sincronizando',
+      'manual'  => 'Manual',
+      _         => syncStatus,
+    };
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.ctSurface,
+        border: Border.all(color: AppColors.ctBorder),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Icon(sourceIcon, size: 18, color: AppColors.ctText2),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  label,
+                  style: AppFonts.geist(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.ctText),
+                ),
+                if (slug.isNotEmpty)
+                  Text(slug,
+                      style: AppFonts.geist(
+                          fontSize: 11, color: AppColors.ctText3)),
+              ],
+            ),
+          ),
+          Text(
+            '$itemsCount items',
+            style: AppFonts.geist(fontSize: 12, color: AppColors.ctText2),
+          ),
+          const SizedBox(width: 12),
+          Container(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+            decoration: BoxDecoration(
+              color: syncColor.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: syncColor.withValues(alpha: 0.35)),
+            ),
+            child: Text(
+              syncLabel,
+              style: AppFonts.geist(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  color: syncColor),
+            ),
+          ),
+          const SizedBox(width: 12),
+          TextButton(
+            onPressed: slug.isNotEmpty ? () => context.go('/catalogs/$slug') : null,
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.ctTeal,
+              textStyle: AppFonts.geist(
+                  fontSize: 12, fontWeight: FontWeight.w600),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            ),
+            child: const Text('Ver'),
+          ),
         ],
       ),
     );
