@@ -72,4 +72,58 @@ class AssignmentsApi {
     );
     return Map<String, dynamic>.from(response.data as Map);
   }
+
+  // ── Assignment Types ──────────────────────────────────────────────────────
+
+  static Future<List<Map<String, dynamic>>> getAssignmentTypes({
+    required String tenantId,
+  }) async {
+    final response = await ApiClient.instance.get(
+      '/api/v1/assignment-types',
+      queryParameters: {'tenant_id': tenantId},
+    );
+    final raw = response.data;
+    final list = raw is List
+        ? raw
+        : (raw is Map
+            ? (raw['items'] ?? raw['types'] ?? raw['data'] ?? [])
+            : []);
+    return List<Map<String, dynamic>>.from(
+        (list as List).whereType<Map>().map((e) => Map<String, dynamic>.from(e)));
+  }
+
+  static Future<Map<String, dynamic>> createAssignmentType({
+    required String tenantId,
+    required Map<String, dynamic> body,
+  }) async {
+    final response = await ApiClient.instance.post(
+      '/api/v1/assignment-types',
+      data: {'tenant_id': tenantId, ...body},
+    );
+    return Map<String, dynamic>.from(response.data as Map);
+  }
+
+  static Future<Map<String, dynamic>> updateAssignmentType({
+    required String tenantId,
+    required String slug,
+    required Map<String, dynamic> body,
+  }) async {
+    final response = await ApiClient.instance.put(
+      '/api/v1/assignment-types/$slug',
+      queryParameters: {'tenant_id': tenantId},
+      data: body,
+    );
+    return Map<String, dynamic>.from(response.data as Map);
+  }
+
+  static Future<Map<String, dynamic>> deleteAssignmentType({
+    required String tenantId,
+    required String slug,
+  }) async {
+    final response = await ApiClient.instance.delete(
+      '/api/v1/assignment-types/$slug',
+      queryParameters: {'tenant_id': tenantId},
+    );
+    return Map<String, dynamic>.from(response.data as Map);
+  }
 }

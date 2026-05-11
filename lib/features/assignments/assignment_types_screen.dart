@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/api/assignments_api.dart';
+import '../../core/providers/tenant_provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/widgets/screen_header.dart';
 
@@ -22,43 +24,6 @@ Color _hexColor(String hex) {
   return Color(int.parse('FF$h', radix: 16));
 }
 
-// ── Mock data ─────────────────────────────────────────────────────────────────
-
-final _kInitialTypes = <Map<String, dynamic>>[
-  {
-    'slug': 'crum_daily',
-    'label': 'CRUM diario',
-    'scope': 'date',
-    'color': '#59E0CC',
-    'fields': [
-      {'key': 'crum', 'label': 'CRUM', 'type': 'text'},
-    ],
-    'materializes': true,
-    'is_active': true,
-  },
-  {
-    'slug': 'vehicle_daily',
-    'label': 'Vehículo del día',
-    'scope': 'date',
-    'color': '#F59E0B',
-    'fields': [
-      {'key': 'vehicle_id', 'label': 'Vehículo', 'type': 'text'},
-    ],
-    'materializes': false,
-    'is_active': true,
-  },
-  {
-    'slug': 'route_assignment',
-    'label': 'Ruta asignada',
-    'scope': 'window',
-    'color': '#8B5CF6',
-    'fields': [
-      {'key': 'zone', 'label': 'Zona', 'type': 'text'},
-    ],
-    'materializes': false,
-    'is_active': true,
-  },
-];
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
@@ -72,7 +37,9 @@ class AssignmentTypesScreen extends ConsumerStatefulWidget {
 
 class _AssignmentTypesScreenState
     extends ConsumerState<AssignmentTypesScreen> {
-  late List<Map<String, dynamic>> _types;
+  List<Map<String, dynamic>> _types = [];
+  bool _isLoading = true;
+  bool _isSaving = false;
 
   // Drawer state
   Map<String, dynamic>? _editingType;
@@ -96,8 +63,7 @@ class _AssignmentTypesScreenState
   @override
   void initState() {
     super.initState();
-    _types =
-        _kInitialTypes.map((t) => Map<String, dynamic>.from(t)).toList();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadTypes());
   }
 
   @override
@@ -106,6 +72,28 @@ class _AssignmentTypesScreenState
     _slugCtrl.dispose();
     _toastTimer?.cancel();
     super.dispose();
+  }
+
+  Future<void> _loadTypes() async {
+    final tenantId = ref.read(activeTenantIdProvider);
+    setState(() => _isLoading = true);
+    try {
+      final types = await AssignmentsApi.getAssignmentTypes(tenantId: tenantId);
+      if (!mounted) return;
+      setState(() { _types = types; _isLoading = false; });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      _showToast('Error al cargar tipos: $e');
+    }
+  }
+
+  void _showToast(String msg) {
+    setState(() => _toast = msg);
+    _toastTimer?.cancel();
+    _toastTimer = Timer(const Duration(seconds: 3), () {
+      if (mounted) setState(() => _toast = null);
+    });
   }
 
   void _openNew() {
@@ -127,7 +115,8 @@ class _AssignmentTypesScreenState
       _slugCtrl.text = type['slug'] as String? ?? '';
       _editScope = type['scope'] as String? ?? 'date';
       _editColor = type['color'] as String? ?? '#59E0CC';
-      _editFields = ((type['fields'] as List?) ?? [])
+      final schema = type['data_schema'] ?? type['fields'];
+      _editFields = (schema as List? ?? [])
           .map((f) => Map<String, dynamic>.from(f as Map))
           .toList();
       _editIsActive = type['is_active'] as bool? ?? true;
@@ -142,33 +131,91 @@ class _AssignmentTypesScreenState
 
   void _removeField(int idx) => setState(() => _editFields.removeAt(idx));
 
-  void _save() {
-    final updated = <String, dynamic>{
-      'slug': _slugCtrl.text.trim(),
-      'label': _labelCtrl.text.trim(),
-      'scope': _editScope,
-      'color': _editColor,
-      'fields': _editFields
-          .where((f) => (f['key'] as String? ?? '').isNotEmpty)
-          .toList(),
-      'materializes': _editingType?['materializes'] ?? false,
-      'is_active': _editIsActive,
-    };
-    setState(() {
+  Future<void> _save() async {
+    final tenantId = ref.read(activeTenantIdProvider);
+    final slug = _slugCtrl.text.trim();
+    final label = _labelCtrl.text.trim();
+    if (slug.isEmpty || label.isEmpty) return;
+    final schema = _editFields
+        .where((f) => (f['key'] as String? ?? '').isNotEmpty)
+        .toList();
+    setState(() => _isSaving = true);
+    try {
       if (_isNewType) {
-        _types.add(updated);
+        await AssignmentsApi.createAssignmentType(
+          tenantId: tenantId,
+          body: {
+            'slug': slug,
+            'label': label,
+            'scope': _editScope,
+            'color': _editColor,
+            'data_schema': schema,
+          },
+        );
+        if (!mounted) return;
+        setState(() { _isSaving = false; _editingType = null; });
+        _showToast('Tipo creado');
       } else {
-        final idx = _types
-            .indexWhere((t) => t['slug'] == _editingType!['slug']);
-        if (idx >= 0) _types[idx] = updated;
+        await AssignmentsApi.updateAssignmentType(
+          tenantId: tenantId,
+          slug: _editingType!['slug'] as String,
+          body: {
+            'label': label,
+            'scope': _editScope,
+            'color': _editColor,
+            'data_schema': schema,
+            'is_active': _editIsActive,
+          },
+        );
+        if (!mounted) return;
+        setState(() { _isSaving = false; _editingType = null; });
+        _showToast('Tipo actualizado');
       }
-      _editingType = null;
-      _toast = 'Tipo guardado';
-    });
-    _toastTimer?.cancel();
-    _toastTimer = Timer(const Duration(seconds: 2), () {
-      if (mounted) setState(() => _toast = null);
-    });
+      await _loadTypes();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isSaving = false);
+      _showToast('Error: $e');
+    }
+  }
+
+  Future<void> _delete() async {
+    final tenantId = ref.read(activeTenantIdProvider);
+    final slug = _editingType!['slug'] as String;
+    setState(() => _isSaving = true);
+    try {
+      final result = await AssignmentsApi.deleteAssignmentType(
+        tenantId: tenantId,
+        slug: slug,
+      );
+      if (!mounted) return;
+      setState(() { _isSaving = false; _editingType = null; });
+      if (result['deactivated'] == true) {
+        _showToast('Tipo desactivado — tiene asignaciones existentes');
+      } else {
+        _showToast('Tipo eliminado');
+      }
+      await _loadTypes();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isSaving = false);
+      _showToast('Error: $e');
+    }
+  }
+
+  Future<void> _toggleActive(Map<String, dynamic> type, bool value) async {
+    final tenantId = ref.read(activeTenantIdProvider);
+    final slug = type['slug'] as String;
+    try {
+      await AssignmentsApi.updateAssignmentType(
+        tenantId: tenantId,
+        slug: slug,
+        body: {'is_active': value},
+      );
+      await _loadTypes();
+    } catch (e) {
+      _showToast('Error: $e');
+    }
   }
 
   @override
@@ -216,9 +263,18 @@ class _AssignmentTypesScreenState
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
-                  child: _types.isEmpty
-                      ? _EmptyState(onNew: _openNew)
-                      : _TypesTable(types: _types, onEdit: _openEdit),
+                  child: _isLoading
+                      ? const Center(
+                          child: CircularProgressIndicator(
+                              color: AppColors.ctTeal),
+                        )
+                      : _types.isEmpty
+                          ? _EmptyState(onNew: _openNew)
+                          : _TypesTable(
+                              types: _types,
+                              onEdit: _openEdit,
+                              onToggleActive: _toggleActive,
+                            ),
                 ),
               ),
             ],
@@ -467,12 +523,18 @@ class _AssignmentTypesScreenState
               border: Border(top: BorderSide(color: AppColors.ctBorder)),
             ),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
               children: [
+                if (!_isNewType)
+                  _DeleteButton(
+                    onTap: _isSaving ? null : _delete,
+                  ),
+                const Spacer(),
                 _SecondaryButton(
-                    label: 'Cancelar', onTap: _closeDrawer),
+                    label: 'Cancelar', onTap: _isSaving ? () {} : _closeDrawer),
                 const SizedBox(width: 8),
-                _PrimaryButton(label: 'Guardar', onTap: _save),
+                _PrimaryButton(
+                    label: _isSaving ? 'Guardando…' : 'Guardar',
+                    onTap: _isSaving ? () {} : _save),
               ],
             ),
           ),
@@ -485,10 +547,15 @@ class _AssignmentTypesScreenState
 // ── Types table ───────────────────────────────────────────────────────────────
 
 class _TypesTable extends StatelessWidget {
-  const _TypesTable({required this.types, required this.onEdit});
+  const _TypesTable({
+    required this.types,
+    required this.onEdit,
+    required this.onToggleActive,
+  });
 
   final List<Map<String, dynamic>> types;
   final void Function(Map<String, dynamic>) onEdit;
+  final void Function(Map<String, dynamic>, bool) onToggleActive;
 
   @override
   Widget build(BuildContext context) {
@@ -518,13 +585,17 @@ class _TypesTable extends StatelessWidget {
                 _ColHeader('Scope', flex: 1),
                 _ColHeader('Color', flex: 1),
                 _ColHeader('Schema', flex: 2),
-                _ColHeader('Materializa', flex: 1),
+                _ColHeader('Activo', flex: 1),
                 _ColHeader('Acciones', flex: 1),
               ],
             ),
           ),
           // Data rows
-          ...types.map((t) => _TypeRow(type: t, onEdit: onEdit)),
+          ...types.map((t) => _TypeRow(
+                type: t,
+                onEdit: onEdit,
+                onToggleActive: onToggleActive,
+              )),
         ],
       ),
     );
@@ -553,17 +624,23 @@ class _ColHeader extends StatelessWidget {
 }
 
 class _TypeRow extends StatelessWidget {
-  const _TypeRow({required this.type, required this.onEdit});
+  const _TypeRow({
+    required this.type,
+    required this.onEdit,
+    required this.onToggleActive,
+  });
 
   final Map<String, dynamic> type;
   final void Function(Map<String, dynamic>) onEdit;
+  final void Function(Map<String, dynamic>, bool) onToggleActive;
 
   @override
   Widget build(BuildContext context) {
-    final fields = (type['fields'] as List?) ?? [];
+    final schema = type['data_schema'] ?? type['fields'];
+    final fields = (schema as List?) ?? [];
     final colorHex = type['color'] as String? ?? '#9CA3AF';
     final scope = type['scope'] as String? ?? 'date';
-    final materializes = type['materializes'] as bool? ?? false;
+    final isActive = type['is_active'] as bool? ?? true;
 
     return Container(
       padding:
@@ -628,20 +705,19 @@ class _TypeRow extends StatelessWidget {
                   fontSize: 12, color: AppColors.ctText2),
             ),
           ),
-          // Materializa
+          // Activo toggle
           Expanded(
             flex: 1,
-            child: materializes
-                ? const _StatusChip(
-                    label: 'Sí',
-                    bg: Color(0xFFD1FAE5),
-                    fg: Color(0xFF065F46),
-                  )
-                : const _StatusChip(
-                    label: 'No',
-                    bg: AppColors.ctSurface2,
-                    fg: AppColors.ctText3,
-                  ),
+            child: Transform.scale(
+              scale: 0.75,
+              alignment: Alignment.centerLeft,
+              child: Switch(
+                value: isActive,
+                onChanged: (v) => onToggleActive(type, v),
+                activeThumbColor: AppColors.ctTeal,
+                activeTrackColor: AppColors.ctTeal.withValues(alpha: 0.3),
+              ),
+            ),
           ),
           // Edit action
           Expanded(
@@ -918,34 +994,6 @@ class _ScopeBadge extends StatelessWidget {
   }
 }
 
-// ── Status chip ───────────────────────────────────────────────────────────────
-
-class _StatusChip extends StatelessWidget {
-  const _StatusChip(
-      {required this.label, required this.bg, required this.fg});
-
-  final String label;
-  final Color bg;
-  final Color fg;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding:
-          const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Text(
-        label,
-        style: AppFonts.geist(
-            fontSize: 11, fontWeight: FontWeight.w600, color: fg),
-      ),
-    );
-  }
-}
-
 // ── Field label ───────────────────────────────────────────────────────────────
 
 class _FieldLabel extends StatelessWidget {
@@ -966,6 +1014,39 @@ class _FieldLabel extends StatelessWidget {
 }
 
 // ── Buttons ───────────────────────────────────────────────────────────────────
+
+class _DeleteButton extends StatelessWidget {
+  const _DeleteButton({required this.onTap});
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: MouseRegion(
+        cursor: onTap != null
+            ? SystemMouseCursors.click
+            : SystemMouseCursors.forbidden,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            color: AppColors.ctDanger.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+                color: AppColors.ctDanger.withValues(alpha: 0.4)),
+          ),
+          child: Text(
+            'Eliminar',
+            style: AppFonts.geist(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: AppColors.ctDanger),
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class _PrimaryButton extends StatelessWidget {
   const _PrimaryButton({required this.label, required this.onTap});
