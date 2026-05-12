@@ -131,6 +131,16 @@ class CatalogsApi {
         (list as List).whereType<Map>().map((e) => Map<String, dynamic>.from(e)));
   }
 
+  static Future<List<Map<String, dynamic>>> getFieldTypes() async {
+    final response = await ApiClient.instance.get('/api/v1/field-types');
+    final raw = response.data;
+    final list = raw is Map
+        ? (raw['types'] ?? raw['items'] ?? raw['data'] ?? [])
+        : (raw is List ? raw : []);
+    return List<Map<String, dynamic>>.from(
+        (list as List).whereType<Map>().map((e) => Map<String, dynamic>.from(e)));
+  }
+
   // stub — endpoint de sync log no disponible aún
   static Future<List<Map<String, dynamic>>> listSyncLog({
     required String tenantId,

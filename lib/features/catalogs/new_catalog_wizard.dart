@@ -58,6 +58,9 @@ class _NewCatalogWizardState extends State<NewCatalogWizard> {
   String? _primaryKeyField;
   String? _displayField;
   int _uidCounter = 0;
+  List<Map<String, dynamic>> _fieldTypes = [];
+  bool _loadingFieldTypes = false;
+  bool _columnsFromPreview = false;
 
   @override
   void initState() {
@@ -66,6 +69,7 @@ class _NewCatalogWizardState extends State<NewCatalogWizard> {
     _nameCtrl.addListener(_onNameChanged);
     _slugCtrl.addListener(_onSlugEdited);
     _sheetUrlCtrl.addListener(_onSheetUrlChanged);
+    _loadFieldTypes();
   }
 
   @override
@@ -118,6 +122,18 @@ class _NewCatalogWizardState extends State<NewCatalogWizard> {
         const Duration(milliseconds: 800),
         () { if (mounted) _loadSheetPreview(); },
       );
+    }
+  }
+
+  Future<void> _loadFieldTypes() async {
+    setState(() => _loadingFieldTypes = true);
+    try {
+      final types = await CatalogsApi.getFieldTypes();
+      if (mounted) setState(() => _fieldTypes = types);
+    } catch (_) {
+      // silencioso — fallback a lista vacía
+    } finally {
+      if (mounted) setState(() => _loadingFieldTypes = false);
     }
   }
 
@@ -239,7 +255,7 @@ class _NewCatalogWizardState extends State<NewCatalogWizard> {
   Future<void> _prepopulateSchemaFromColumns() async {
     if (_previewColumns.isEmpty) return;
 
-    if (_fields.length > 1) {
+    if (_fields.isNotEmpty && !_columnsFromPreview) {
       final replace = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
@@ -285,6 +301,7 @@ class _NewCatalogWizardState extends State<NewCatalogWizard> {
       if (_primaryKeyField == null && _fields.isNotEmpty) {
         _primaryKeyField = _fields.first['key'] as String?;
       }
+      _columnsFromPreview = true;
     });
   }
 
@@ -510,21 +527,24 @@ class _NewCatalogWizardState extends State<NewCatalogWizard> {
         children: [
           _WizardLabel('Tipo de fuente'),
           const SizedBox(height: 12),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: _sourceOptions.map((opt) {
-              final active = _sourceType == opt.value;
-              return _SourceCard(
-                label: opt.label,
-                logoKey: opt.logoKey,
-                active: active,
-                onTap: () {
-                  setState(() => _sourceType = opt.value);
-                  if (opt.value == 'google_sheets') _checkGoogleOAuth();
-                },
-              );
-            }).toList(),
+          Center(
+            child: Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              alignment: WrapAlignment.center,
+              children: _sourceOptions.map((opt) {
+                final active = _sourceType == opt.value;
+                return _SourceCard(
+                  label: opt.label,
+                  logoKey: opt.logoKey,
+                  active: active,
+                  onTap: () {
+                    setState(() => _sourceType = opt.value);
+                    if (opt.value == 'google_sheets') _checkGoogleOAuth();
+                  },
+                );
+              }).toList(),
+            ),
           ),
           const SizedBox(height: 24),
           _buildSourceConfigFields(),
@@ -753,6 +773,13 @@ class _NewCatalogWizardState extends State<NewCatalogWizard> {
                     color: AppColors.ctText),
               ),
               const Spacer(),
+              if (_loadingFieldTypes)
+                const SizedBox(
+                  width: 12,
+                  height: 12,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 1.5, color: AppColors.ctTeal),
+                ),
               TextButton.icon(
                 onPressed: () =>
                     setState(() => _fields.add(_newField())),
@@ -772,16 +799,33 @@ class _NewCatalogWizardState extends State<NewCatalogWizard> {
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
           child: Row(
             children: [
-              Expanded(flex: 2, child: _ColHeader('Key')),
+              Expanded(
+                flex: 2,
+                child: Tooltip(
+                  message: 'Identificador técnico del campo. Sin espacios ni '
+                      'caracteres especiales. Se usa en templates y condiciones de flows.',
+                  child: const _ColHeader('Key'),
+                ),
+              ),
               const SizedBox(width: 6),
-              Expanded(flex: 2, child: _ColHeader('Label')),
+              Expanded(
+                flex: 2,
+                child: Tooltip(
+                  message: 'Nombre visible del campo para el operador y en reportes.',
+                  child: const _ColHeader('Label'),
+                ),
+              ),
               const SizedBox(width: 6),
-              const SizedBox(width: 90, child: _ColHeaderCenter('Tipo')),
+              Tooltip(
+                message: 'Tipo de dato. Determina cómo se almacena y cómo lo '
+                    'interpreta el AI Worker.',
+                child: const SizedBox(width: 90, child: _ColHeaderCenter('Tipo')),
+              ),
               const SizedBox(width: 4),
               Tooltip(
                 message: 'Los operadores podrán buscar items por este campo '
                     'desde el AI Worker',
-                child: _ColHeaderCenter('Buscable'),
+                child: const _ColHeaderCenter('Buscable'),
               ),
               const SizedBox(width: 28),
             ],
@@ -808,6 +852,7 @@ class _NewCatalogWizardState extends State<NewCatalogWizard> {
                     return _FieldRow(
                       key: ValueKey(uid),
                       field: field,
+                      fieldTypes: _fieldTypes,
                       onChange: (updated) =>
                           setState(() => _fields[i] = updated),
                       onDelete: () => setState(() {
@@ -859,16 +904,12 @@ class _NewCatalogWizardState extends State<NewCatalogWizard> {
   // ── Step 3 — Confirmar ────────────────────────────────────────────────────
 
   Widget _buildStep3() {
-    final sourceLabel = _sourceOptions
-        .firstWhere(
-          (o) => o.value == _sourceType,
-          orElse: () => (
-            value: _sourceType,
-            label: _sourceType,
-            logoKey: 'api',
-          ),
-        )
-        .label;
+    final sourceOpt = _sourceOptions.firstWhere(
+      (o) => o.value == _sourceType,
+      orElse: () => (value: _sourceType, label: _sourceType, logoKey: 'api'),
+    );
+    final visibleFields = _fields.take(8).toList();
+    final overflow = _fields.length - 8;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
@@ -883,6 +924,40 @@ class _NewCatalogWizardState extends State<NewCatalogWizard> {
                 color: AppColors.ctText),
           ),
           const SizedBox(height: 14),
+          // Source banner for google_sheets
+          if (_sourceType == 'google_sheets') ...[
+            Row(
+              children: [
+                Image.asset(
+                  'assets/logos/google-sheets',
+                  width: 24,
+                  height: 24,
+                  errorBuilder: (context2, error, stack) => const Icon(
+                    Icons.table_chart_outlined,
+                    size: 24,
+                    color: AppColors.ctTeal,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Google Sheets',
+                  style: AppFonts.geist(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.ctText),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  _previewColumns.isNotEmpty
+                      ? '${_previewColumns.length} columnas detectadas'
+                      : 'Configurado',
+                  style: AppFonts.geist(
+                      fontSize: 12, color: AppColors.ctText2),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+          ],
           Container(
             decoration: BoxDecoration(
               color: AppColors.ctSurface,
@@ -893,20 +968,92 @@ class _NewCatalogWizardState extends State<NewCatalogWizard> {
               children: [
                 _SummaryRow('Nombre', _nameCtrl.text.trim()),
                 _SummaryRow('Slug', _slugCtrl.text.trim()),
-                _SummaryRow('Fuente', sourceLabel),
-                _SummaryRow(
-                    'Campos', '${_fields.length} campos definidos'),
-                _SummaryRow(
-                    'Campo clave', _primaryKeyField ?? '—'),
-                _SummaryRow(
-                    'Campo display', _displayField ?? '—'),
+                _SummaryRow('Fuente', sourceOpt.label),
+                _SummaryRow('Campos', '${_fields.length} campos definidos'),
+                _SummaryRow('Campo clave', _primaryKeyField ?? '—'),
+                _SummaryRow('Campo display', _displayField ?? '—'),
                 if (_descCtrl.text.trim().isNotEmpty)
-                  _SummaryRow(
-                      'Descripción', _descCtrl.text.trim(),
+                  _SummaryRow('Descripción', _descCtrl.text.trim(),
                       isLast: true),
               ],
             ),
           ),
+          if (_fields.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Text(
+              'Vista previa del schema',
+              style: AppFonts.geist(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.ctText2),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: AppColors.ctBorder),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Table(
+                columnWidths: const {
+                  0: FlexColumnWidth(2),
+                  1: FlexColumnWidth(2),
+                  2: FlexColumnWidth(2),
+                  3: FixedColumnWidth(60),
+                },
+                children: [
+                  // Header
+                  TableRow(
+                    decoration:
+                        const BoxDecoration(color: AppColors.ctSurface2),
+                    children: [
+                      _TableHeader('Key'),
+                      _TableHeader('Label'),
+                      _TableHeader('Tipo'),
+                      _TableHeader('Buscable'),
+                    ],
+                  ),
+                  // Rows
+                  ...visibleFields.map((f) {
+                    final key        = f['key']        as String? ?? '';
+                    final label      = f['label']      as String? ?? '';
+                    final type       = f['type']       as String? ?? 'text';
+                    final searchable = f['searchable'] as bool?   ?? false;
+                    return TableRow(
+                      children: [
+                        _TableCell(key),
+                        _TableCell(label),
+                        _TableCell(type),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 8),
+                          child: Icon(
+                            searchable
+                                ? Icons.check_rounded
+                                : Icons.remove_rounded,
+                            size: 14,
+                            color: searchable
+                                ? AppColors.ctTeal
+                                : AppColors.ctText3,
+                          ),
+                        ),
+                      ],
+                    );
+                  }),
+                ],
+              ),
+            ),
+            if (overflow > 0) ...[
+              const SizedBox(height: 6),
+              Center(
+                child: Text(
+                  '+$overflow campos más',
+                  style: AppFonts.geist(
+                      fontSize: 11, color: AppColors.ctText2),
+                ),
+              ),
+            ],
+          ],
           if (_error != null) ...[
             const SizedBox(height: 12),
             Text(
@@ -1150,10 +1297,12 @@ class _FieldRow extends StatefulWidget {
   const _FieldRow({
     super.key,
     required this.field,
+    required this.fieldTypes,
     required this.onChange,
     required this.onDelete,
   });
   final Map<String, dynamic> field;
+  final List<Map<String, dynamic>> fieldTypes;
   final ValueChanged<Map<String, dynamic>> onChange;
   final VoidCallback onDelete;
 
@@ -1200,10 +1349,27 @@ class _FieldRowState extends State<_FieldRow> {
     });
   }
 
-  static const _typeOptions = ['text', 'number', 'boolean', 'date'];
+  List<String> get _typeOptions {
+    if (widget.fieldTypes.isEmpty) {
+      return [
+        'text', 'number', 'boolean', 'date', 'datetime',
+        'phone', 'location', 'image', 'currency', 'select', 'url',
+      ];
+    }
+    return widget.fieldTypes
+        .map((t) => t['key'] as String? ?? '')
+        .where((k) => k.isNotEmpty)
+        .toList();
+  }
 
   @override
   Widget build(BuildContext context) {
+    final typeOpts = _typeOptions;
+    // Ensure current _type is valid in the list; fallback to first
+    if (!typeOpts.contains(_type) && typeOpts.isNotEmpty) {
+      _type = typeOpts.first;
+    }
+
     return Container(
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
@@ -1242,7 +1408,7 @@ class _FieldRowState extends State<_FieldRow> {
               ),
               child: DropdownButtonHideUnderline(
                 child: DropdownButton<String>(
-                  value: _type,
+                  value: typeOpts.contains(_type) ? _type : null,
                   isDense: true,
                   isExpanded: true,
                   style: AppFonts.geist(
@@ -1251,10 +1417,21 @@ class _FieldRowState extends State<_FieldRow> {
                       Icons.keyboard_arrow_down_rounded,
                       size: 13,
                       color: AppColors.ctText3),
-                  items: _typeOptions
-                      .map((t) =>
-                          DropdownMenuItem(value: t, child: Text(t)))
-                      .toList(),
+                  items: typeOpts.map((key) {
+                    final meta = widget.fieldTypes.firstWhere(
+                      (t) => t['key'] == key,
+                      orElse: () => {'key': key, 'label': key},
+                    );
+                    final label = meta['label'] as String? ?? key;
+                    return DropdownMenuItem(
+                      value: key,
+                      child: Tooltip(
+                        message: meta['description'] as String? ?? '',
+                        child: Text(label,
+                            style: AppFonts.geist(fontSize: 11)),
+                      ),
+                    );
+                  }).toList(),
                   onChanged: (v) {
                     if (v == null) return;
                     setState(() => _type = v);
@@ -1530,6 +1707,40 @@ class _SummaryRow extends StatelessWidget {
       ),
     );
   }
+}
+
+// ── Schema preview table helpers ──────────────────────────────────────────────
+
+class _TableHeader extends StatelessWidget {
+  const _TableHeader(this.text);
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        child: Text(
+          text,
+          style: AppFonts.geist(
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              color: AppColors.ctText3),
+        ),
+      );
+}
+
+class _TableCell extends StatelessWidget {
+  const _TableCell(this.text);
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        child: Text(
+          text,
+          style: AppFonts.geist(fontSize: 12, color: AppColors.ctText),
+          overflow: TextOverflow.ellipsis,
+        ),
+      );
 }
 
 // ── Input formatters ──────────────────────────────────────────────────────────
