@@ -1456,7 +1456,7 @@ class _ItemsTabState extends ConsumerState<_ItemsTab> {
                             Expanded(
                               child: ListView.separated(
                                 itemCount: _items.length,
-                                separatorBuilder: (_, __) => const Divider(
+                                separatorBuilder: (context, i) => const Divider(
                                     height: 1, color: AppColors.ctBorder),
                                 itemBuilder: (_, i) {
                                   final item = _items[i];
@@ -1947,7 +1947,7 @@ class _SyncTabState extends ConsumerState<_SyncTab> {
             decoration: BoxDecoration(
               color: AppColors.ctTealLight,
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: AppColors.ctTeal.withOpacity(0.3)),
+              border: Border.all(color: AppColors.ctTeal.withValues(alpha: 0.3)),
             ),
             child: Row(
               children: [
@@ -2115,13 +2115,52 @@ class _DeltaBadge extends StatelessWidget {
 
 // ── Tab 4 — USO ───────────────────────────────────────────────────────────────
 
-class _UsoTab extends StatelessWidget {
+class _UsoTab extends ConsumerStatefulWidget {
   const _UsoTab({required this.catalog});
   final Map<String, dynamic> catalog;
 
   @override
+  ConsumerState<_UsoTab> createState() => _UsoTabState();
+}
+
+class _UsoTabState extends ConsumerState<_UsoTab> {
+  List<Map<String, dynamic>> _usages = [];
+  bool _loading = true;
+  String? _error;
+
+  String get _catalogId => widget.catalog['id'] as String? ?? '';
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+  }
+
+  Future<void> _load() async {
+    if (!mounted) return;
+    final tenantId = ref.read(activeTenantIdProvider);
+    setState(() { _loading = true; _error = null; });
+    try {
+      final usages = await CatalogsApi.getUsages(
+          tenantId: tenantId, catalogId: _catalogId);
+      if (mounted) setState(() { _usages = usages; _loading = false; });
+    } catch (e) {
+      if (mounted) setState(() { _error = e.toString(); _loading = false; });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final slug = catalog['slug'] as String? ?? '';
+    if (_loading) {
+      return const Center(
+          child: CircularProgressIndicator(color: AppColors.ctTeal));
+    }
+    if (_error != null) {
+      return Center(
+          child: Text(_error!,
+              style: AppFonts.geist(fontSize: 13, color: AppColors.ctDanger)));
+    }
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -2129,46 +2168,76 @@ class _UsoTab extends StatelessWidget {
         children: [
           _SectionCard(
             title: 'Flujos que usan este catálogo',
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Icon(Icons.hub_outlined,
-                    size: 36, color: AppColors.ctText2),
-                const SizedBox(height: 8),
-                Text(
-                  'Las referencias al catálogo "$slug" aparecerán aquí.',
-                  style: AppFonts.geist(
-                      fontSize: 12, color: AppColors.ctText2),
-                ),
-                const SizedBox(height: 4),
-                Text('Disponible en Fase 1.B — asset_ref',
-                    style: AppFonts.geist(
-                        fontSize: 11, color: AppColors.ctText3)),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          _SectionCard(
-            title: 'Workers IA',
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Icon(Icons.smart_toy_outlined,
-                    size: 36, color: AppColors.ctText2),
-                const SizedBox(height: 8),
-                Text(
-                  'Los workers que consultan este catálogo aparecerán aquí.',
-                  style: AppFonts.geist(
-                      fontSize: 12, color: AppColors.ctText2),
-                ),
-                const SizedBox(height: 4),
-                Text('Disponible en Fase 1.B — asset_ref',
-                    style: AppFonts.geist(
-                        fontSize: 11, color: AppColors.ctText3)),
-              ],
-            ),
+            child: _usages.isEmpty
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.hub_outlined, size: 36,
+                          color: AppColors.ctText2),
+                      const SizedBox(height: 8),
+                      Text(
+                          'Este catálogo no está referenciado en ningún flujo aún.',
+                          style: AppFonts.geist(
+                              fontSize: 12, color: AppColors.ctText2)),
+                    ],
+                  )
+                : Column(
+                    children: _usages
+                        .map((u) => _UsageRow(
+                              flowSlug: u['flow_slug'] as String? ?? '',
+                              flowLabel: u['flow_label'] as String? ?? '',
+                              fieldLabel: u['field_label'] as String? ?? '',
+                            ))
+                        .toList(),
+                  ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _UsageRow extends StatelessWidget {
+  const _UsageRow({
+    required this.flowSlug,
+    required this.flowLabel,
+    required this.fieldLabel,
+  });
+  final String flowSlug;
+  final String flowLabel;
+  final String fieldLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: flowSlug.isNotEmpty ? () => context.go('/flows/$flowSlug') : null,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+        child: Row(
+          children: [
+            const Icon(Icons.account_tree_outlined,
+                size: 16, color: AppColors.ctTeal),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(flowLabel,
+                      style: AppFonts.geist(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.ctText)),
+                  Text('Campo: $fieldLabel',
+                      style: AppFonts.geist(
+                          fontSize: 11, color: AppColors.ctText2)),
+                ],
+              ),
+            ),
+            const Icon(Icons.arrow_forward_ios_rounded,
+                size: 12, color: AppColors.ctText3),
+          ],
+        ),
       ),
     );
   }

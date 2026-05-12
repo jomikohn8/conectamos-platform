@@ -233,4 +233,15 @@ class CatalogsApi {
     );
     return Map<String, dynamic>.from(response.data as Map);
   }
+
+  static Future<List<Map<String, dynamic>>> getUsages({
+    required String tenantId,
+    required String catalogId,
+  }) async {
+    final response = await ApiClient.instance.get(
+      '/api/v1/catalogs/$catalogId/usages',
+    );
+    final list = response.data as List? ?? [];
+    return list.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+  }
 }
