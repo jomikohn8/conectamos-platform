@@ -92,7 +92,7 @@ class CatalogsApi {
       params['sheet_name'] = sheetName;
     }
     final response = await ApiClient.instance.get(
-      '/api/v1/catalogs/sheets-preview',
+      '/api/v1/catalogs/tools/sheets-preview',
       queryParameters: params,
     );
     return Map<String, dynamic>.from(response.data as Map);

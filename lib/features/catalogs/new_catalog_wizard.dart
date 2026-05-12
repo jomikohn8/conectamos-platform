@@ -51,6 +51,7 @@ class _NewCatalogWizardState extends State<NewCatalogWizard> {
   String? _selectedSheet;
   List<String> _previewColumns = [];
   bool _previewLoaded = false;
+  Timer? _sheetUrlDebounce;
 
   // Step 2 — Schema
   final List<Map<String, dynamic>> _fields = [];
@@ -64,6 +65,7 @@ class _NewCatalogWizardState extends State<NewCatalogWizard> {
     _sheetNameCtrl.text = 'Sheet1';
     _nameCtrl.addListener(_onNameChanged);
     _slugCtrl.addListener(_onSlugEdited);
+    _sheetUrlCtrl.addListener(_onSheetUrlChanged);
   }
 
   @override
@@ -75,7 +77,10 @@ class _NewCatalogWizardState extends State<NewCatalogWizard> {
       ..removeListener(_onSlugEdited)
       ..dispose();
     _descCtrl.dispose();
-    _sheetUrlCtrl.dispose();
+    _sheetUrlDebounce?.cancel();
+    _sheetUrlCtrl
+      ..removeListener(_onSheetUrlChanged)
+      ..dispose();
     _fileIdCtrl.dispose();
     _sheetNameCtrl.dispose();
     _apiUrlCtrl.dispose();
@@ -102,6 +107,18 @@ class _NewCatalogWizardState extends State<NewCatalogWizard> {
       _slugManuallyEdited = true;
     }
     setState(() {});
+  }
+
+  void _onSheetUrlChanged() {
+    setState(() {});
+    final url = _sheetUrlCtrl.text.trim();
+    _sheetUrlDebounce?.cancel();
+    if (url.contains('spreadsheets/d/')) {
+      _sheetUrlDebounce = Timer(
+        const Duration(milliseconds: 800),
+        () { if (mounted) _loadSheetPreview(); },
+      );
+    }
   }
 
   static String _slugify(String input) => input
@@ -672,7 +689,6 @@ class _NewCatalogWizardState extends State<NewCatalogWizard> {
         _WizardTextField(
           controller: _sheetUrlCtrl,
           hint: 'https://docs.google.com/spreadsheets/d/…',
-          onEditingComplete: _loadSheetPreview,
         ),
         if (_loadingPreview) ...[
           const SizedBox(height: 6),
@@ -1330,14 +1346,12 @@ class _WizardTextField extends StatelessWidget {
     this.helperText,
     this.maxLines = 1,
     this.inputFormatters,
-    this.onEditingComplete,
   });
   final TextEditingController controller;
   final String hint;
   final String? helperText;
   final int maxLines;
   final List<TextInputFormatter>? inputFormatters;
-  final VoidCallback? onEditingComplete;
 
   @override
   Widget build(BuildContext context) {
@@ -1345,7 +1359,6 @@ class _WizardTextField extends StatelessWidget {
       controller: controller,
       maxLines: maxLines,
       inputFormatters: inputFormatters,
-      onEditingComplete: onEditingComplete,
       style: AppFonts.geist(fontSize: 13, color: AppColors.ctText),
       decoration: InputDecoration(
         hintText: hint,
