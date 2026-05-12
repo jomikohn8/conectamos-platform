@@ -79,6 +79,40 @@ class CatalogsApi {
     return Map<String, dynamic>.from(response.data as Map);
   }
 
+  static Future<List<Map<String, dynamic>>> getOnedriveFiles({
+    required String tenantId,
+  }) async {
+    final response = await ApiClient.instance.get(
+      '/api/v1/catalogs/tools/onedrive-files',
+      queryParameters: {'tenant_id': tenantId},
+    );
+    final raw = response.data;
+    final list = raw is Map
+        ? (raw['files'] ?? [])
+        : (raw is List ? raw : []);
+    return List<Map<String, dynamic>>.from(
+        (list as List).whereType<Map>().map((e) => Map<String, dynamic>.from(e)));
+  }
+
+  static Future<Map<String, dynamic>> getOnedrivePreview({
+    required String tenantId,
+    required String fileId,
+    String? sheetName,
+  }) async {
+    final params = <String, dynamic>{
+      'tenant_id': tenantId,
+      'file_id': fileId,
+    };
+    if (sheetName != null && sheetName.isNotEmpty) {
+      params['sheet_name'] = sheetName;
+    }
+    final response = await ApiClient.instance.get(
+      '/api/v1/catalogs/tools/onedrive-preview',
+      queryParameters: params,
+    );
+    return Map<String, dynamic>.from(response.data as Map);
+  }
+
   static Future<Map<String, dynamic>> sheetsPreview({
     required String tenantId,
     required String sheetUrl,
@@ -141,10 +175,62 @@ class CatalogsApi {
         (list as List).whereType<Map>().map((e) => Map<String, dynamic>.from(e)));
   }
 
-  // stub — endpoint de sync log no disponible aún
   static Future<List<Map<String, dynamic>>> listSyncLog({
     required String tenantId,
     required String catalogId,
-  }) async =>
-      [];
+    int limit = 50,
+  }) async {
+    final response = await ApiClient.instance.get(
+      '/api/v1/catalogs/$catalogId/sync-log',
+      queryParameters: {'tenant_id': tenantId, 'limit': limit},
+    );
+    final raw = response.data;
+    final list = raw is Map ? (raw['logs'] ?? []) : (raw is List ? raw : []);
+    return List<Map<String, dynamic>>.from(
+        (list as List).whereType<Map>().map((e) => Map<String, dynamic>.from(e)));
+  }
+
+  static Future<Map<String, dynamic>> listItemsPaged({
+    required String tenantId,
+    required String catalogId,
+    int page = 1,
+    int pageSize = 50,
+    String? search,
+  }) async {
+    final params = <String, dynamic>{
+      'tenant_id': tenantId,
+      'page': page,
+      'page_size': pageSize,
+    };
+    if (search != null && search.isNotEmpty) params['search'] = search;
+    final response = await ApiClient.instance.get(
+      '/api/v1/catalogs/$catalogId/items',
+      queryParameters: params,
+    );
+    final raw = response.data;
+    if (raw is Map) {
+      final list = raw['items'] ?? raw['data'] ?? [];
+      return {
+        'items': List<Map<String, dynamic>>.from(
+            (list as List).whereType<Map>().map((e) => Map<String, dynamic>.from(e))),
+        'total': raw['total'] ?? 0,
+        'page': raw['page'] ?? page,
+        'pages': raw['pages'] ?? 1,
+      };
+    }
+    return {'items': <Map<String, dynamic>>[], 'total': 0, 'page': 1, 'pages': 1};
+  }
+
+  static Future<Map<String, dynamic>> createItem({
+    required String tenantId,
+    required String catalogId,
+    required Map<String, dynamic> data,
+  }) async {
+    final response = await ApiClient.instance.post(
+      '/api/v1/catalogs/$catalogId/items',
+      queryParameters: {'tenant_id': tenantId},
+      data: {'data': data},
+    );
+    return Map<String, dynamic>.from(response.data as Map);
+  }
 }

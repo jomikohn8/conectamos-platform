@@ -108,19 +108,16 @@ class _CatalogsScreenState extends ConsumerState<CatalogsScreen> {
     }
   }
 
-  void _openWizard(BuildContext ctx) {
+  Future<void> _openWizard() async {
     final tenantId = ref.read(activeTenantIdProvider);
-    showDialog<void>(
-      context: ctx,
+    final slug = await showDialog<String>(
+      context: context,
       barrierDismissible: false,
-      builder: (_) => NewCatalogWizard(
-        tenantId: tenantId,
-        onSuccess: (slug) {
-          Navigator.of(ctx).pop();
-          ctx.go('/catalogs/$slug');
-        },
-      ),
+      builder: (_) => NewCatalogWizard(tenantId: tenantId),
     );
+    if (slug != null && mounted) {
+      context.go('/catalogs/$slug');
+    }
   }
 
   @override
@@ -140,7 +137,7 @@ class _CatalogsScreenState extends ConsumerState<CatalogsScreen> {
             if (canManage)
               _PrimaryButton(
                 label: '+ Nuevo catálogo',
-                onTap: () => _openWizard(context),
+                onTap: () => _openWizard(),
               ),
           ],
         ),

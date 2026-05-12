@@ -15,10 +15,8 @@ class NewCatalogWizard extends StatefulWidget {
   const NewCatalogWizard({
     super.key,
     required this.tenantId,
-    required this.onSuccess,
   });
   final String tenantId;
-  final void Function(String slug) onSuccess;
 
   @override
   State<NewCatalogWizard> createState() => _NewCatalogWizardState();
@@ -53,6 +51,17 @@ class _NewCatalogWizardState extends State<NewCatalogWizard> {
   bool _previewLoaded = false;
   Timer? _sheetUrlDebounce;
 
+  // Step 1 — Microsoft / OneDrive state
+  bool _checkingMicrosoftOAuth = false;
+  bool _microsoftConnected = false;
+  bool _loadingOnedriveFiles = false;
+  List<Map<String, dynamic>> _onedriveFiles = [];
+  String? _selectedFileId;
+  String? _selectedFileName;
+  bool _loadingOnedrivePreview = false;
+  bool _showManualFileId = false;
+  final _manualFileIdCtrl = TextEditingController();
+
   // Step 2 — Schema
   final List<Map<String, dynamic>> _fields = [];
   String? _primaryKeyField;
@@ -69,6 +78,7 @@ class _NewCatalogWizardState extends State<NewCatalogWizard> {
     _nameCtrl.addListener(_onNameChanged);
     _slugCtrl.addListener(_onSlugEdited);
     _sheetUrlCtrl.addListener(_onSheetUrlChanged);
+    _manualFileIdCtrl.addListener(() => setState(() {}));
     _loadFieldTypes();
   }
 
@@ -89,6 +99,7 @@ class _NewCatalogWizardState extends State<NewCatalogWizard> {
     _sheetNameCtrl.dispose();
     _apiUrlCtrl.dispose();
     _authHeaderCtrl.dispose();
+    _manualFileIdCtrl.dispose(); // listener is anonymous, GC'd with controller
     super.dispose();
   }
 
@@ -153,6 +164,11 @@ class _NewCatalogWizardState extends State<NewCatalogWizard> {
         if (_sourceType == 'google_sheets') {
           return _googleConnected && _sheetUrlCtrl.text.trim().isNotEmpty;
         }
+        if (_sourceType == 'onedrive_excel') {
+          return _microsoftConnected &&
+              _selectedFileId != null &&
+              _previewLoaded;
+        }
         return true;
       case 2:
         if (_fields.isEmpty) return false;
@@ -192,10 +208,9 @@ class _NewCatalogWizardState extends State<NewCatalogWizard> {
         };
       case 'onedrive_excel':
         return {
-          'file_id': _fileIdCtrl.text.trim(),
-          'sheet_name': _sheetNameCtrl.text.trim().isEmpty
-              ? 'Sheet1'
-              : _sheetNameCtrl.text.trim(),
+          'file_id':    _selectedFileId   ?? '',
+          'sheet_name': _selectedSheet    ?? 'Sheet1',
+          'file_name':  _selectedFileName ?? '',
         };
       case 'api_pull':
         return {
@@ -219,6 +234,83 @@ class _NewCatalogWizardState extends State<NewCatalogWizard> {
       setState(() => _googleConnected = false);
     } finally {
       if (mounted) setState(() => _checkingOAuth = false);
+    }
+  }
+
+  // ── Schema editability ──────────────────────────────────────────────────────
+
+  bool get _canEditSchema =>
+      ['manual', 'webhook_push', 'api_pull'].contains(_sourceType);
+
+  // ── Microsoft OAuth / OneDrive ──────────────────────────────────────────────
+
+  Future<void> _checkMicrosoftOAuth() async {
+    setState(() => _checkingMicrosoftOAuth = true);
+    try {
+      final status = await ConnectionsApi.getMicrosoftStatus(
+          tenantId: widget.tenantId);
+      final connections = status['connections'] as List? ?? [];
+      final msConn = connections.firstWhere(
+        (c) => c['provider'] == 'microsoft',
+        orElse: () => <String, dynamic>{},
+      );
+      setState(() => _microsoftConnected = msConn['status'] == 'active');
+      if (_microsoftConnected) _loadOnedriveFiles();
+    } catch (_) {
+      setState(() => _microsoftConnected = false);
+    } finally {
+      if (mounted) setState(() => _checkingMicrosoftOAuth = false);
+    }
+  }
+
+  Future<void> _loadOnedriveFiles() async {
+    setState(() => _loadingOnedriveFiles = true);
+    try {
+      final files = await CatalogsApi.getOnedriveFiles(
+          tenantId: widget.tenantId);
+      if (!mounted) return;
+      setState(() {
+        _onedriveFiles = files;
+        _loadingOnedriveFiles = false;
+      });
+      if (files.length == 1) {
+        setState(() {
+          _selectedFileId   = files[0]['id'] as String?;
+          _selectedFileName = files[0]['name'] as String?;
+        });
+        _loadOnedrivePreview();
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loadingOnedriveFiles = false);
+    }
+  }
+
+  Future<void> _loadOnedrivePreview({String? sheetName}) async {
+    if (_selectedFileId == null) return;
+    setState(() { _loadingOnedrivePreview = true; _previewLoaded = false; });
+    try {
+      final result = await CatalogsApi.getOnedrivePreview(
+        tenantId: widget.tenantId,
+        fileId: _selectedFileId!,
+        sheetName: sheetName ?? _selectedSheet,
+      );
+      if (!mounted) return;
+      setState(() {
+        _availableSheets       = List<String>.from(result['sheets'] as List? ?? []);
+        _selectedSheet         = result['selected_sheet'] as String?;
+        _previewColumns        = List<String>.from(result['columns'] as List? ?? []);
+        _previewLoaded         = true;
+        _loadingOnedrivePreview = false;
+      });
+      await _prepopulateSchemaFromColumns();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _loadingOnedrivePreview = false);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Error al cargar preview: $e'),
+        backgroundColor: AppColors.ctDanger,
+        duration: const Duration(seconds: 4),
+      ));
     }
   }
 
@@ -348,7 +440,8 @@ class _NewCatalogWizardState extends State<NewCatalogWizard> {
         unawaited(CatalogsApi.syncCatalog(catalogId: createdId));
       }
 
-      if (mounted) widget.onSuccess(_slugCtrl.text.trim());
+      final slug = created['slug'] as String? ?? _slugCtrl.text.trim();
+      if (mounted) Navigator.of(context).pop(slug);
     } catch (e) {
       if (mounted) {
         setState(() { _error = e.toString(); _saving = false; });
@@ -541,6 +634,7 @@ class _NewCatalogWizardState extends State<NewCatalogWizard> {
                   onTap: () {
                     setState(() => _sourceType = opt.value);
                     if (opt.value == 'google_sheets') _checkGoogleOAuth();
+                    if (opt.value == 'onedrive_excel') _checkMicrosoftOAuth();
                   },
                 );
               }).toList(),
@@ -559,42 +653,51 @@ class _NewCatalogWizardState extends State<NewCatalogWizard> {
         return _buildGoogleSheetsConfig();
 
       case 'onedrive_excel':
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _WizardLabel('File ID de OneDrive'),
-            const SizedBox(height: 6),
-            _WizardTextField(
-              controller: _fileIdCtrl,
-              hint: 'ID del archivo Excel en OneDrive',
-            ),
-            const SizedBox(height: 12),
-            _WizardLabel('Nombre de la hoja'),
-            const SizedBox(height: 6),
-            _WizardTextField(
-              controller: _sheetNameCtrl,
-              hint: 'Sheet1',
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Requiere conexión Microsoft activa en Conexiones.',
-              style: AppFonts.geist(fontSize: 12, color: AppColors.ctText2)
-                  .copyWith(fontStyle: FontStyle.italic),
-            ),
-          ],
-        );
+        return _buildOnedriveConfig();
 
       case 'webhook_push':
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'El catálogo recibirá actualizaciones via webhook entrante.',
-              style: AppFonts.geist(fontSize: 12, color: AppColors.ctText2),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.ctSurface2,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.ctBorder),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.webhook_rounded,
+                          size: 16, color: AppColors.ctTeal),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Webhook entrante',
+                        style: AppFonts.geist(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.ctText),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Un sistema externo enviará actualizaciones a un '
+                    'endpoint generado por Conectamos. El endpoint se '
+                    'mostrará al crear el catálogo.',
+                    style: AppFonts.geist(
+                        fontSize: 12, color: AppColors.ctText2),
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 16),
             Text(
-              'El endpoint se configurará después de crear el catálogo.',
+              'Define los campos que recibirás en el webhook. '
+              'Deben coincidir con las keys del payload JSON.',
               style: AppFonts.geist(fontSize: 12, color: AppColors.ctText2),
             ),
           ],
@@ -604,7 +707,32 @@ class _NewCatalogWizardState extends State<NewCatalogWizard> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _WizardLabel('URL del endpoint'),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFFBEB),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFF59E0B)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.info_outline_rounded,
+                      size: 14, color: Color(0xFFB45309)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'El sync automático desde API REST está en desarrollo. '
+                      'Por ahora define el schema manualmente — el sync '
+                      'se activará cuando esté disponible.',
+                      style: AppFonts.geist(
+                          fontSize: 12, color: const Color(0xFF92400E)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            _WizardLabel('URL del endpoint (para referencia)'),
             const SizedBox(height: 6),
             _WizardTextField(
               controller: _apiUrlCtrl,
@@ -616,6 +744,11 @@ class _NewCatalogWizardState extends State<NewCatalogWizard> {
             _WizardTextField(
               controller: _authHeaderCtrl,
               hint: 'Bearer token123…',
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Define los campos que esperas recibir.',
+              style: AppFonts.geist(fontSize: 12, color: AppColors.ctText2),
             ),
           ],
         );
@@ -741,6 +874,281 @@ class _NewCatalogWizardState extends State<NewCatalogWizard> {
     );
   }
 
+  Widget _buildOnedriveConfig() {
+    if (_checkingMicrosoftOAuth) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 16),
+          child: CircularProgressIndicator(
+              strokeWidth: 2, color: AppColors.ctTeal),
+        ),
+      );
+    }
+
+    if (!_microsoftConnected) {
+      return Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFFBEB),
+          border: Border.all(color: const Color(0xFFF59E0B)),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.warning_amber_rounded,
+                    size: 16, color: Color(0xFFB45309)),
+                const SizedBox(width: 8),
+                Text(
+                  'Tu cuenta de Microsoft no está conectada.',
+                  style: AppFonts.geist(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: const Color(0xFF92400E)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.ctTeal,
+                foregroundColor: AppColors.ctNavy,
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 14, vertical: 8),
+                textStyle: AppFonts.geist(
+                    fontSize: 13, fontWeight: FontWeight.w600),
+              ),
+              icon: const Icon(Icons.open_in_new_rounded, size: 14),
+              label: const Text('Conectar Microsoft'),
+              onPressed: () {
+                Navigator.of(context).pop();
+                context.go('/connections');
+              },
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Connected
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(Icons.check_circle_rounded,
+                size: 16, color: Color(0xFF16A34A)),
+            const SizedBox(width: 6),
+            Text(
+              'Microsoft conectado',
+              style: AppFonts.geist(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: const Color(0xFF16A34A)),
+            ),
+          ],
+        ),
+        if (_loadingOnedriveFiles) ...[
+          const SizedBox(height: 12),
+          const LinearProgressIndicator(color: AppColors.ctTeal),
+          const SizedBox(height: 6),
+          Text(
+            'Buscando archivos Excel…',
+            style: AppFonts.geist(fontSize: 12, color: AppColors.ctText2),
+          ),
+        ] else ...[
+          const SizedBox(height: 16),
+          if (_onedriveFiles.isEmpty)
+            Text(
+              'No se encontraron archivos Excel en tu OneDrive.',
+              style: AppFonts.geist(
+                  fontSize: 12, color: AppColors.ctText2),
+            )
+          else ...[
+            _WizardLabel('Archivo Excel'),
+            const SizedBox(height: 6),
+            Container(
+              height: 36,
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              decoration: BoxDecoration(
+                color: AppColors.ctSurface,
+                border: Border.all(color: AppColors.ctBorder2),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  value: _selectedFileId,
+                  hint: Text('Seleccionar archivo',
+                      style: AppFonts.geist(
+                          fontSize: 12, color: AppColors.ctText3)),
+                  isDense: true,
+                  isExpanded: true,
+                  style: AppFonts.geist(
+                      fontSize: 12, color: AppColors.ctText),
+                  icon: const Icon(Icons.keyboard_arrow_down_rounded,
+                      size: 15, color: AppColors.ctText3),
+                  items: _onedriveFiles.map((f) {
+                    return DropdownMenuItem<String>(
+                      value: f['id'] as String?,
+                      child: Row(
+                        children: [
+                          const Icon(Icons.grid_on_outlined,
+                              size: 14, color: AppColors.ctText2),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              f['name'] as String? ?? '',
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (id) {
+                    if (id == null) return;
+                    final file = _onedriveFiles
+                        .firstWhere((f) => f['id'] == id);
+                    setState(() {
+                      _selectedFileId   = id;
+                      _selectedFileName = file['name'] as String?;
+                      _selectedSheet    = null;
+                      _availableSheets  = [];
+                      _previewLoaded    = false;
+                    });
+                    _loadOnedrivePreview();
+                  },
+                ),
+              ),
+            ),
+            if (_loadingOnedrivePreview) ...[
+              const SizedBox(height: 6),
+              const LinearProgressIndicator(color: AppColors.ctTeal),
+            ],
+            if (_previewLoaded && _availableSheets.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              _WizardLabel('Hoja'),
+              const SizedBox(height: 6),
+              _SheetDropdown(
+                value: _selectedSheet,
+                sheets: _availableSheets,
+                onChanged: (s) {
+                  setState(() => _selectedSheet = s);
+                  if (s != null) _loadOnedrivePreview(sheetName: s);
+                },
+              ),
+              if (_previewColumns.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text(
+                  'Se detectaron ${_previewColumns.length} columnas: '
+                  '${_previewColumns.take(5).join(', ')}'
+                  '${_previewColumns.length > 5 ? '…' : ''}',
+                  style: AppFonts.geist(
+                      fontSize: 12, color: AppColors.ctText2),
+                ),
+              ],
+            ],
+          ],
+          // ── Fallback manual ID ─────────────────────────────────────────
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 16),
+            child: Divider(color: AppColors.ctBorder),
+          ),
+          TextButton(
+            onPressed: () =>
+                setState(() => _showManualFileId = !_showManualFileId),
+            style: TextButton.styleFrom(
+              padding: EdgeInsets.zero,
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: Text(
+              _showManualFileId
+                  ? 'Ocultar ingreso manual'
+                  : '¿No encuentras tu archivo? Ingresa el ID manualmente',
+              style: AppFonts.geist(fontSize: 12, color: AppColors.ctTeal),
+            ),
+          ),
+          if (_showManualFileId) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.ctSurface2,
+                border: Border.all(color: AppColors.ctBorder),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '¿Cómo encontrar el ID de tu archivo?',
+                    style: AppFonts.geist(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.ctText),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '1. Abre el archivo en Excel Online\n'
+                    '2. Copia la URL del navegador\n'
+                    '3. Busca el parámetro docId= en la URL\n'
+                    '4. El valor después de docId= es tu ID',
+                    style: AppFonts.geist(
+                        fontSize: 11, color: AppColors.ctText2),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Ej: ...docId=14F581EDA45A9C1C%21s6c56...',
+                    style: AppFonts.geist(
+                        fontSize: 10,
+                        color: AppColors.ctText3),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            _WizardLabel('ID del archivo'),
+            const SizedBox(height: 6),
+            _WizardTextField(
+              controller: _manualFileIdCtrl,
+              hint: '14F581EDA45A9C1C!s6c56e127…',
+            ),
+            const SizedBox(height: 8),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.ctTeal,
+                foregroundColor: AppColors.ctNavy,
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 16, vertical: 8),
+                textStyle: AppFonts.geist(
+                    fontSize: 13, fontWeight: FontWeight.w600),
+              ),
+              onPressed: _manualFileIdCtrl.text.trim().isEmpty
+                  ? null
+                  : () {
+                      final raw = _manualFileIdCtrl.text.trim();
+                      final decoded = Uri.decodeComponent(raw)
+                          .replaceAll('%21', '!');
+                      setState(() {
+                        _selectedFileId   = decoded;
+                        _selectedFileName = 'Archivo manual';
+                        _selectedSheet    = null;
+                        _availableSheets  = [];
+                        _previewLoaded    = false;
+                      });
+                      _loadOnedrivePreview();
+                    },
+              child: const Text('Cargar archivo'),
+            ),
+          ],
+        ],
+      ],
+    );
+  }
+
   // ── Step 2 — Schema ───────────────────────────────────────────────────────
 
   Widget _buildStep2() {
@@ -780,17 +1188,18 @@ class _NewCatalogWizardState extends State<NewCatalogWizard> {
                   child: CircularProgressIndicator(
                       strokeWidth: 1.5, color: AppColors.ctTeal),
                 ),
-              TextButton.icon(
-                onPressed: () =>
-                    setState(() => _fields.add(_newField())),
-                icon: const Icon(Icons.add_rounded, size: 15),
-                label: const Text('Agregar campo'),
-                style: TextButton.styleFrom(
-                  foregroundColor: AppColors.ctTeal,
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 10, vertical: 6),
+              if (_canEditSchema)
+                TextButton.icon(
+                  onPressed: () =>
+                      setState(() => _fields.add(_newField())),
+                  icon: const Icon(Icons.add_rounded, size: 15),
+                  label: const Text('Agregar campo'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.ctTeal,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 6),
+                  ),
                 ),
-              ),
             ],
           ),
         ),
@@ -853,6 +1262,7 @@ class _NewCatalogWizardState extends State<NewCatalogWizard> {
                       key: ValueKey(uid),
                       field: field,
                       fieldTypes: _fieldTypes,
+                      canDelete: _canEditSchema,
                       onChange: (updated) =>
                           setState(() => _fields[i] = updated),
                       onDelete: () => setState(() {
@@ -924,7 +1334,41 @@ class _NewCatalogWizardState extends State<NewCatalogWizard> {
                 color: AppColors.ctText),
           ),
           const SizedBox(height: 14),
-          // Source banner for google_sheets
+          // Source banners
+          if (_sourceType == 'onedrive_excel') ...[
+            Row(
+              children: [
+                SvgPicture.asset(
+                  'assets/logos/ondrive.svg',
+                  width: 24,
+                  height: 24,
+                  placeholderBuilder: (_) => const Icon(
+                    Icons.grid_on_outlined,
+                    size: 24,
+                    color: AppColors.ctTeal,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Excel (OneDrive)',
+                  style: AppFonts.geist(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.ctText),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  _selectedFileName ??
+                      (_previewColumns.isNotEmpty
+                          ? '${_previewColumns.length} columnas'
+                          : 'Configurado'),
+                  style: AppFonts.geist(
+                      fontSize: 12, color: AppColors.ctText2),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+          ],
           if (_sourceType == 'google_sheets') ...[
             Row(
               children: [
@@ -999,7 +1443,7 @@ class _NewCatalogWizardState extends State<NewCatalogWizard> {
                   0: FlexColumnWidth(2),
                   1: FlexColumnWidth(2),
                   2: FlexColumnWidth(2),
-                  3: FixedColumnWidth(60),
+                  3: FixedColumnWidth(72),
                 },
                 children: [
                   // Header
@@ -1010,7 +1454,15 @@ class _NewCatalogWizardState extends State<NewCatalogWizard> {
                       _TableHeader('Key'),
                       _TableHeader('Label'),
                       _TableHeader('Tipo'),
-                      _TableHeader('Buscable'),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 6),
+                        child: Tooltip(
+                          message: 'Buscable por el AI Worker',
+                          child: Icon(Icons.search_rounded,
+                              size: 14, color: AppColors.ctText3),
+                        ),
+                      ),
                     ],
                   ),
                   // Rows
@@ -1300,11 +1752,13 @@ class _FieldRow extends StatefulWidget {
     required this.fieldTypes,
     required this.onChange,
     required this.onDelete,
+    this.canDelete = true,
   });
   final Map<String, dynamic> field;
   final List<Map<String, dynamic>> fieldTypes;
   final ValueChanged<Map<String, dynamic>> onChange;
   final VoidCallback onDelete;
+  final bool canDelete;
 
   @override
   State<_FieldRow> createState() => _FieldRowState();
@@ -1378,6 +1832,7 @@ class _FieldRowState extends State<_FieldRow> {
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Expanded(
             flex: 2,
@@ -1442,27 +1897,42 @@ class _FieldRowState extends State<_FieldRow> {
             ),
           ),
           const SizedBox(width: 4),
-          Tooltip(
-            message: 'Los operadores podrán buscar items por este campo '
-                'desde el AI Worker',
-            child: Checkbox(
-              value: _searchable,
-              activeColor: AppColors.ctTeal,
-              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              onChanged: (v) {
-                setState(() => _searchable = v ?? false);
-                _notify();
-              },
+          SizedBox(
+            height: 36,
+            child: Align(
+              alignment: Alignment.center,
+              child: Tooltip(
+                message: 'Los operadores podrán buscar items por este campo '
+                    'desde el AI Worker',
+                child: Checkbox(
+                  value: _searchable,
+                  activeColor: AppColors.ctTeal,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  onChanged: (v) {
+                    setState(() => _searchable = v ?? false);
+                    _notify();
+                  },
+                ),
+              ),
             ),
           ),
-          IconButton(
-            icon: const Icon(Icons.delete_outline_rounded,
-                size: 16, color: AppColors.ctText2),
-            onPressed: widget.onDelete,
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
-            tooltip: 'Eliminar campo',
-          ),
+          if (widget.canDelete)
+            SizedBox(
+              height: 36,
+              child: Align(
+                alignment: Alignment.center,
+                child: IconButton(
+                  icon: const Icon(Icons.delete_outline_rounded,
+                      size: 16, color: AppColors.ctText2),
+                  onPressed: widget.onDelete,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  tooltip: 'Eliminar campo',
+                ),
+              ),
+            )
+          else
+            const SizedBox(width: 28),
         ],
       ),
     );

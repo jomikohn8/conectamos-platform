@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
 import '../../core/api/catalogs_api.dart';
 import '../../core/providers/permissions_provider.dart';
 import '../../core/providers/tenant_provider.dart';
@@ -43,6 +44,12 @@ class _CatalogDetailScreenState extends ConsumerState<CatalogDetailScreen>
   Map<String, dynamic>? _catalog;
   late TabController _tabCtrl;
 
+  bool _syncing = false;
+  bool _saving = false;
+  bool _hasChanges = false;
+  Map<String, dynamic> _pendingPatch = {};
+  bool _canManage = false;
+
   @override
   void initState() {
     super.initState();
@@ -58,16 +65,94 @@ class _CatalogDetailScreenState extends ConsumerState<CatalogDetailScreen>
 
   Future<void> _load() async {
     if (!mounted) return;
-    setState(() { _loading = true; _error = null; });
+    setState(() {
+      _loading = true;
+      _error = null;
+      _pendingPatch = {};
+      _hasChanges = false;
+    });
     try {
       final tenantId = ref.read(activeTenantIdProvider);
       final data = await CatalogsApi.getCatalogBySlug(
         tenantId: tenantId,
         slug: widget.slug,
       );
-      if (mounted) setState(() { _catalog = data; _loading = false; });
+      if (mounted) {
+        setState(() {
+          _catalog = data;
+          _canManage = hasPermission(ref, 'catalogs', 'manage');
+          _loading = false;
+        });
+      }
     } catch (e) {
       if (mounted) setState(() { _error = e.toString(); _loading = false; });
+    }
+  }
+
+  void _onPatchChanged(Map<String, dynamic> patch) {
+    setState(() {
+      _pendingPatch = {..._pendingPatch, ...patch};
+      _hasChanges = true;
+    });
+  }
+
+  Future<void> _doSave() async {
+    if (!_hasChanges || _saving) return;
+    final catalogId = _catalog?['id'] as String? ?? '';
+    if (catalogId.isEmpty) return;
+    final tenantId = ref.read(activeTenantIdProvider);
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _saving = true);
+    try {
+      await CatalogsApi.updateCatalog(
+        tenantId: tenantId,
+        catalogId: catalogId,
+        body: _pendingPatch,
+      );
+      await _load();
+      if (mounted) {
+        setState(() => _saving = false);
+        messenger.showSnackBar(const SnackBar(
+          content: Text('Cambios guardados'),
+          duration: Duration(milliseconds: 2000),
+        ));
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _saving = false);
+        messenger.showSnackBar(SnackBar(
+          content: Text('Error al guardar: $e'),
+          backgroundColor: AppColors.ctDanger,
+          duration: const Duration(milliseconds: 3000),
+        ));
+      }
+    }
+  }
+
+  Future<void> _doSync() async {
+    if (_syncing) return;
+    final catalogId = _catalog?['id'] as String? ?? '';
+    if (catalogId.isEmpty) return;
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _syncing = true);
+    try {
+      await CatalogsApi.syncCatalog(catalogId: catalogId);
+      if (mounted) {
+        messenger.showSnackBar(const SnackBar(
+          content: Text('Sincronización iniciada'),
+          duration: Duration(milliseconds: 2000),
+        ));
+      }
+    } catch (e) {
+      if (mounted) {
+        messenger.showSnackBar(SnackBar(
+          content: Text('Error al sincronizar: $e'),
+          backgroundColor: AppColors.ctDanger,
+          duration: const Duration(milliseconds: 3000),
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _syncing = false);
     }
   }
 
@@ -82,19 +167,18 @@ class _CatalogDetailScreenState extends ConsumerState<CatalogDetailScreen>
       title: Text(
         _catalog?['label'] as String? ?? widget.slug,
         style: AppFonts.onest(
-          fontSize: 16,
-          fontWeight: FontWeight.w600,
-          color: Colors.white,
-        ),
+            fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white),
       ),
       bottom: TabBar(
         controller: _tabCtrl,
+        isScrollable: true,
         labelColor: AppColors.ctTeal,
         unselectedLabelColor: Colors.white60,
         indicatorColor: AppColors.ctTeal,
         labelStyle: const TextStyle(
             fontFamily: 'Geist', fontSize: 12, fontWeight: FontWeight.w600),
-        unselectedLabelStyle: const TextStyle(fontFamily: 'Geist', fontSize: 12),
+        unselectedLabelStyle:
+            const TextStyle(fontFamily: 'Geist', fontSize: 12),
         tabs: const [
           Tab(text: 'CONFIGURACIÓN'),
           Tab(text: 'FUENTE'),
@@ -126,7 +210,8 @@ class _CatalogDetailScreenState extends ConsumerState<CatalogDetailScreen>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.error_outline, size: 48, color: AppColors.ctDanger),
+              const Icon(Icons.error_outline,
+                  size: 48, color: AppColors.ctDanger),
               const SizedBox(height: 12),
               Text(
                 _error ?? 'No se encontró el catálogo',
@@ -141,22 +226,367 @@ class _CatalogDetailScreenState extends ConsumerState<CatalogDetailScreen>
       );
     }
 
-    final canManage = hasPermission(ref, 'catalogs', 'manage');
     final catalog = _catalog!;
-
     return Scaffold(
       backgroundColor: AppColors.ctBg,
       appBar: _buildAppBar(),
-      body: TabBarView(
-        controller: _tabCtrl,
+      body: Column(
         children: [
-          _ConfigTab(catalog: catalog, canManage: canManage),
-          _SourceTab(catalog: catalog, canManage: canManage),
-          _ItemsTab(catalog: catalog),
-          const _SyncTab(),
-          const _UsoTab(),
+          _CatalogHeader(
+            catalog: catalog,
+            canManage: _canManage,
+            syncing: _syncing,
+            saving: _saving,
+            hasChanges: _hasChanges,
+            onSync: _doSync,
+            onSave: _doSave,
+            onReload: _load,
+          ),
+          Expanded(
+            child: TabBarView(
+              controller: _tabCtrl,
+              children: [
+                _ConfigTab(
+                  key: ValueKey(catalog['id']),
+                  catalog: catalog,
+                  canManage: _canManage,
+                  onChanged: _onPatchChanged,
+                ),
+                _SourceTab(
+                  catalog: catalog,
+                  canManage: _canManage,
+                ),
+                _ItemsTab(
+                  key: ValueKey(catalog['id']),
+                  catalog: catalog,
+                  canManage: _canManage,
+                ),
+                _SyncTab(
+                  key: ValueKey(catalog['id']),
+                  catalog: catalog,
+                ),
+                _UsoTab(catalog: catalog),
+              ],
+            ),
+          ),
         ],
       ),
+    );
+  }
+}
+
+// ── _CatalogHeader ─────────────────────────────────────────────────────────────
+
+class _CatalogHeader extends StatelessWidget {
+  const _CatalogHeader({
+    required this.catalog,
+    required this.canManage,
+    required this.syncing,
+    required this.saving,
+    required this.hasChanges,
+    required this.onSync,
+    required this.onSave,
+    required this.onReload,
+  });
+
+  final Map<String, dynamic> catalog;
+  final bool canManage;
+  final bool syncing;
+  final bool saving;
+  final bool hasChanges;
+  final VoidCallback onSync;
+  final VoidCallback onSave;
+  final VoidCallback onReload;
+
+  @override
+  Widget build(BuildContext context) {
+    final sourceType = catalog['source_type'] as String? ?? '';
+    final slug = catalog['slug'] as String? ?? '';
+    final description = catalog['description'] as String?;
+    final itemsCount = catalog['items_count'] as int? ?? 0;
+    final lastSynced = catalog['last_synced_at'] as String?;
+    final schemaFieldsCount = catalog['schema_fields_count'] as int? ?? 0;
+    final isSyncable =
+        sourceType == 'google_sheets' || sourceType == 'onedrive_excel';
+
+    return Container(
+      color: AppColors.ctSurface,
+      padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Row 1: title + sync status badge
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  catalog['label'] as String? ?? slug,
+                  style: AppFonts.onest(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.ctText),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 8),
+              _SyncStatusBadge(
+                  lastSynced: lastSynced, sourceType: sourceType),
+            ],
+          ),
+          const SizedBox(height: 8),
+          // Row 2: source pill + slug chip + description
+          Wrap(
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 8,
+            runSpacing: 4,
+            children: [
+              _SourcePill(sourceType: sourceType),
+              _SlugChip(slug: slug),
+              if (description != null && description.isNotEmpty)
+                Text(description,
+                    style: AppFonts.geist(
+                        fontSize: 12, color: AppColors.ctText2)),
+            ],
+          ),
+          const SizedBox(height: 12),
+          const Divider(height: 1, color: AppColors.ctBorder),
+          // Stats strip + action buttons
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            child: Row(
+              children: [
+                _StatCell(label: 'Items', value: itemsCount.toString()),
+                const _StatDivider(),
+                _StatCell(
+                    label: 'Último sync', value: _fmtSync(lastSynced)),
+                const _StatDivider(),
+                _StatCell(
+                    label: 'Campos', value: schemaFieldsCount.toString()),
+                const Spacer(),
+                if (canManage && isSyncable) ...[
+                  _ActionButton(
+                    onPressed: onSync,
+                    loading: syncing,
+                    icon: Icons.sync_rounded,
+                    label: 'Sincronizar',
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                if (canManage && hasChanges) ...[
+                  _ActionButton(
+                    onPressed: onSave,
+                    loading: saving,
+                    icon: Icons.save_rounded,
+                    label: 'Guardar',
+                    primary: true,
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                IconButton(
+                  tooltip: 'Recargar',
+                  icon: const Icon(Icons.refresh_rounded,
+                      size: 18, color: AppColors.ctText2),
+                  onPressed: onReload,
+                  padding: EdgeInsets.zero,
+                  constraints:
+                      const BoxConstraints(minWidth: 32, minHeight: 32),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Header widgets ─────────────────────────────────────────────────────────────
+
+class _SyncStatusBadge extends StatelessWidget {
+  const _SyncStatusBadge(
+      {required this.lastSynced, required this.sourceType});
+  final String? lastSynced;
+  final String sourceType;
+
+  @override
+  Widget build(BuildContext context) {
+    if (sourceType == 'manual' ||
+        sourceType == 'webhook_push' ||
+        sourceType == 'api_pull') {
+      return _badge(AppColors.ctSurface2, AppColors.ctText2, 'Manual');
+    }
+    if (lastSynced == null) {
+      return _badge(AppColors.ctWarnBg, AppColors.ctWarnText, 'Sin sincronizar');
+    }
+    try {
+      final dt = DateTime.parse(lastSynced!).toLocal();
+      final diff = DateTime.now().difference(dt);
+      if (diff.inHours < 2) {
+        return _badge(AppColors.ctOkBg, AppColors.ctOkText, 'Sincronizado');
+      }
+      if (diff.inDays < 1) {
+        return _badge(AppColors.ctWarnBg, AppColors.ctWarnText, 'Sync antiguo');
+      }
+      return _badge(AppColors.ctRedBg, AppColors.ctRedText, 'Necesita sync');
+    } catch (_) {
+      return _badge(AppColors.ctSurface2, AppColors.ctText2, '—');
+    }
+  }
+
+  Widget _badge(Color bg, Color fg, String label) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration:
+            BoxDecoration(color: bg, borderRadius: BorderRadius.circular(10)),
+        child: Text(label,
+            style: AppFonts.geist(
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                color: fg)),
+      );
+}
+
+class _SourcePill extends StatelessWidget {
+  const _SourcePill({required this.sourceType});
+  final String sourceType;
+
+  @override
+  Widget build(BuildContext context) {
+    final (icon, label) = switch (sourceType) {
+      'manual'         => (Icons.edit_note_rounded, 'Manual'),
+      'google_sheets'  => (Icons.table_chart_outlined, 'Google Sheets'),
+      'onedrive_excel' => (Icons.grid_on_outlined, 'OneDrive Excel'),
+      'webhook_push'   => (Icons.webhook_outlined, 'Webhook Push'),
+      'api_pull'       => (Icons.cloud_download_outlined, 'API Pull'),
+      _                => (Icons.storage_rounded,
+          sourceType.isEmpty ? 'Sin fuente' : sourceType),
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: AppColors.ctSurface2,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.ctBorder),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: AppColors.ctText2),
+          const SizedBox(width: 4),
+          Text(label,
+              style: AppFonts.geist(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.ctText2)),
+        ],
+      ),
+    );
+  }
+}
+
+class _SlugChip extends StatelessWidget {
+  const _SlugChip({required this.slug});
+  final String slug;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: AppColors.ctInfoBg,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Text(
+        slug,
+        style: AppFonts.geist(
+            fontSize: 11,
+            fontWeight: FontWeight.w500,
+            color: AppColors.ctInfoText),
+      ),
+    );
+  }
+}
+
+class _StatCell extends StatelessWidget {
+  const _StatCell({required this.label, required this.value});
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(label,
+              style:
+                  AppFonts.geist(fontSize: 10, color: AppColors.ctText3)),
+          const SizedBox(height: 1),
+          Text(value,
+              style: AppFonts.onest(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.ctText)),
+        ],
+      ),
+    );
+  }
+}
+
+class _StatDivider extends StatelessWidget {
+  const _StatDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 28,
+      width: 1,
+      color: AppColors.ctBorder,
+      margin: const EdgeInsets.only(right: 16),
+    );
+  }
+}
+
+class _ActionButton extends StatelessWidget {
+  const _ActionButton({
+    required this.onPressed,
+    required this.loading,
+    required this.icon,
+    required this.label,
+    this.primary = false,
+  });
+  final VoidCallback onPressed;
+  final bool loading;
+  final IconData icon;
+  final String label;
+  final bool primary;
+
+  @override
+  Widget build(BuildContext context) {
+    if (loading) {
+      return const SizedBox(
+        width: 20,
+        height: 20,
+        child: CircularProgressIndicator(
+            strokeWidth: 2, color: AppColors.ctTeal),
+      );
+    }
+    return OutlinedButton.icon(
+      style: OutlinedButton.styleFrom(
+        backgroundColor: primary ? AppColors.ctTeal : null,
+        foregroundColor:
+            primary ? AppColors.ctNavy : AppColors.ctText2,
+        side: BorderSide(
+            color: primary ? AppColors.ctTeal : AppColors.ctBorder),
+        padding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      ),
+      onPressed: onPressed,
+      icon: Icon(icon, size: 14),
+      label: Text(label,
+          style: AppFonts.geist(
+              fontSize: 12, fontWeight: FontWeight.w600)),
     );
   }
 }
@@ -164,26 +594,78 @@ class _CatalogDetailScreenState extends ConsumerState<CatalogDetailScreen>
 // ── Tab 0 — CONFIGURACIÓN ─────────────────────────────────────────────────────
 
 class _ConfigTab extends ConsumerStatefulWidget {
-  const _ConfigTab({required this.catalog, required this.canManage});
+  const _ConfigTab({
+    super.key,
+    required this.catalog,
+    required this.canManage,
+    required this.onChanged,
+  });
   final Map<String, dynamic> catalog;
   final bool canManage;
+  final void Function(Map<String, dynamic>) onChanged;
 
   @override
   ConsumerState<_ConfigTab> createState() => _ConfigTabState();
 }
 
 class _ConfigTabState extends ConsumerState<_ConfigTab> {
+  late TextEditingController _labelCtrl;
+  late TextEditingController _descriptionCtrl;
+  late TextEditingController _displayLabelCtrl;
+  late TextEditingController _embedThresholdCtrl;
   List<Map<String, dynamic>> _fields = [];
-  bool _saving = false;
+
+  bool get _isAutoSource {
+    final st = widget.catalog['source_type'] as String? ?? '';
+    return st == 'google_sheets' || st == 'onedrive_excel';
+  }
 
   @override
   void initState() {
     super.initState();
-    final raw = widget.catalog['fields_schema'];
+    _initFromCatalog(widget.catalog);
+  }
+
+  void _initFromCatalog(Map<String, dynamic> catalog) {
+    _labelCtrl =
+        TextEditingController(text: catalog['label'] as String? ?? '');
+    _descriptionCtrl = TextEditingController(
+        text: catalog['description'] as String? ?? '');
+    _displayLabelCtrl = TextEditingController(
+        text: catalog['display_label'] as String? ?? '');
+    final thresh = catalog['embed_threshold'];
+    _embedThresholdCtrl = TextEditingController(
+        text: thresh != null ? thresh.toString() : '');
+
+    final raw = catalog['fields_schema'];
     _fields = raw is List
         ? List<Map<String, dynamic>>.from(
             raw.whereType<Map>().map((e) => Map<String, dynamic>.from(e)))
         : [];
+  }
+
+  @override
+  void dispose() {
+    _labelCtrl.dispose();
+    _descriptionCtrl.dispose();
+    _displayLabelCtrl.dispose();
+    _embedThresholdCtrl.dispose();
+    super.dispose();
+  }
+
+  void _onIdentificationChanged() {
+    final patch = <String, dynamic>{
+      'label': _labelCtrl.text.trim(),
+    };
+    if (_descriptionCtrl.text.isNotEmpty) {
+      patch['description'] = _descriptionCtrl.text.trim();
+    }
+    if (_displayLabelCtrl.text.isNotEmpty) {
+      patch['display_label'] = _displayLabelCtrl.text.trim();
+    }
+    final thresh = double.tryParse(_embedThresholdCtrl.text.trim());
+    if (thresh != null) patch['embed_threshold'] = thresh;
+    widget.onChanged(patch);
   }
 
   void _onReorder(int oldIndex, int newIndex) {
@@ -192,111 +674,235 @@ class _ConfigTabState extends ConsumerState<_ConfigTab> {
       final item = _fields.removeAt(oldIndex);
       _fields.insert(newIndex, item);
     });
-  }
-
-  Future<void> _save() async {
-    final tenantId = ref.read(activeTenantIdProvider);
-    final catalogId = widget.catalog['id'] as String? ?? '';
-    if (catalogId.isEmpty) return;
-    final messenger = ScaffoldMessenger.of(context);
-    setState(() => _saving = true);
-    try {
-      await CatalogsApi.updateCatalog(
-        tenantId: tenantId,
-        catalogId: catalogId,
-        body: {'fields_schema': _fields},
-      );
-      if (mounted) {
-        messenger.showSnackBar(const SnackBar(
-          content: Text('Cambios guardados'),
-          duration: Duration(milliseconds: 2000),
-        ));
-      }
-    } catch (e) {
-      if (mounted) {
-        messenger.showSnackBar(SnackBar(
-          content: Text('Error al guardar: $e'),
-          backgroundColor: AppColors.ctDanger,
-          duration: const Duration(milliseconds: 3000),
-        ));
-      }
-    } finally {
-      if (mounted) setState(() => _saving = false);
-    }
+    widget.onChanged({'fields_schema': _fields});
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_fields.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.schema_outlined, size: 48, color: AppColors.ctText2),
-            const SizedBox(height: 10),
-            Text('Sin esquema de campos definido',
-                style: AppFonts.geist(fontSize: 14, color: AppColors.ctText2)),
-          ],
-        ),
-      );
-    }
-
-    return Stack(
-      children: [
-        CustomScrollView(
-          slivers: [
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 80),
-              sliver: SliverReorderableList(
-                itemCount: _fields.length,
-                onReorder: widget.canManage ? _onReorder : (a, b) {},
-                itemBuilder: (ctx, i) {
-                  final field = _fields[i];
-                  final fieldKey = field['key'] as String? ?? i.toString();
-                  return _FieldSchemaCard(
-                    key: ValueKey(fieldKey),
-                    field: field,
-                    index: i,
-                    canManage: widget.canManage,
-                    onSearchableChanged: (v) => setState(() {
-                      _fields[i] = {..._fields[i], 'searchable': v};
-                    }),
-                    onLiveChanged: (v) => setState(() {
-                      _fields[i] = {..._fields[i], 'is_live': v};
-                    }),
-                  );
-                },
+    return CustomScrollView(
+      slivers: [
+        // ── Identification section ───────────────────────────────────
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+          sliver: SliverToBoxAdapter(
+            child: _SectionCard(
+              title: 'Identificación',
+              child: Column(
+                children: [
+                  _IdField(
+                    label: 'Nombre (label)',
+                    ctrl: _labelCtrl,
+                    enabled: widget.canManage,
+                    onChanged: (_) => _onIdentificationChanged(),
+                  ),
+                  const SizedBox(height: 12),
+                  _IdField(
+                    label: 'Descripción',
+                    ctrl: _descriptionCtrl,
+                    enabled: widget.canManage,
+                    onChanged: (_) => _onIdentificationChanged(),
+                  ),
+                  const SizedBox(height: 12),
+                  _IdField(
+                    label: 'Etiqueta visible (display_label)',
+                    ctrl: _displayLabelCtrl,
+                    enabled: widget.canManage,
+                    onChanged: (_) => _onIdentificationChanged(),
+                  ),
+                  const SizedBox(height: 12),
+                  _ReadOnlyField(
+                    label: 'Slug',
+                    value: widget.catalog['slug'] as String? ?? '',
+                  ),
+                  const SizedBox(height: 12),
+                  _IdField(
+                    label: 'Umbral de relevancia (embed_threshold)',
+                    ctrl: _embedThresholdCtrl,
+                    enabled: widget.canManage,
+                    keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true),
+                    onChanged: (_) => _onIdentificationChanged(),
+                  ),
+                ],
               ),
             ),
-          ],
+          ),
         ),
-        if (widget.canManage)
-          Positioned(
-            bottom: 20,
-            right: 20,
-            child: _saving
-                ? const SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(
-                        strokeWidth: 2, color: AppColors.ctTeal),
-                  )
-                : ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.ctTeal,
-                      foregroundColor: AppColors.ctNavy,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 20, vertical: 12),
-                    ),
-                    onPressed: _save,
-                    child: Text(
-                      'Guardar cambios',
-                      style: AppFonts.geist(
-                          fontSize: 13, fontWeight: FontWeight.w600),
-                    ),
+        // ── Campos header ────────────────────────────────────────────
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+          sliver: SliverToBoxAdapter(
+            child: Row(
+              children: [
+                const Text(
+                  'CAMPOS',
+                  style: TextStyle(
+                    fontFamily: 'Geist',
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.ctText2,
+                    letterSpacing: 0.4,
                   ),
+                ),
+                const Spacer(),
+                Text(
+                  '${_fields.length} campo${_fields.length == 1 ? '' : 's'}',
+                  style: AppFonts.geist(
+                      fontSize: 11, color: AppColors.ctText3),
+                ),
+              ],
+            ),
+          ),
+        ),
+        // ── Info banner for auto sources ─────────────────────────────
+        if (_isAutoSource)
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+            sliver: SliverToBoxAdapter(
+              child: _InfoBanner(
+                icon: Icons.info_outline_rounded,
+                message:
+                    'Los campos se derivan automáticamente de la fuente. '
+                    'Puedes cambiar "Buscable" y "Live", pero el esquema '
+                    'se actualiza en el próximo sync.',
+              ),
+            ),
+          ),
+        // ── Fields list ──────────────────────────────────────────────
+        if (_fields.isEmpty)
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
+            sliver: SliverToBoxAdapter(
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const SizedBox(height: 16),
+                    const Icon(Icons.schema_outlined,
+                        size: 40, color: AppColors.ctText2),
+                    const SizedBox(height: 8),
+                    Text('Sin esquema de campos',
+                        style: AppFonts.geist(
+                            fontSize: 13, color: AppColors.ctText2)),
+                  ],
+                ),
+              ),
+            ),
+          )
+        else
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
+            sliver: SliverReorderableList(
+              itemCount: _fields.length,
+              onReorder: widget.canManage ? _onReorder : (a, b) {},
+              itemBuilder: (ctx, i) {
+                final field = _fields[i];
+                final fieldKey = field['key'] as String? ?? i.toString();
+                return _FieldSchemaCard(
+                  key: ValueKey(fieldKey),
+                  field: field,
+                  index: i,
+                  canManage: widget.canManage,
+                  onSearchableChanged: (v) {
+                    setState(() {
+                      _fields[i] = {..._fields[i], 'searchable': v};
+                    });
+                    widget.onChanged({'fields_schema': _fields});
+                  },
+                  onLiveChanged: (v) {
+                    setState(() {
+                      _fields[i] = {..._fields[i], 'is_live': v};
+                    });
+                    widget.onChanged({'fields_schema': _fields});
+                  },
+                );
+              },
+            ),
           ),
       ],
+    );
+  }
+}
+
+class _IdField extends StatelessWidget {
+  const _IdField({
+    required this.label,
+    required this.ctrl,
+    required this.onChanged,
+    this.enabled = true,
+    this.keyboardType,
+  });
+  final String label;
+  final TextEditingController ctrl;
+  final bool enabled;
+  final TextInputType? keyboardType;
+  final void Function(String) onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: ctrl,
+      enabled: enabled,
+      keyboardType: keyboardType,
+      onChanged: onChanged,
+      style: AppFonts.geist(fontSize: 13, color: AppColors.ctText),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle:
+            AppFonts.geist(fontSize: 12, color: AppColors.ctText2),
+      ),
+    );
+  }
+}
+
+class _ReadOnlyField extends StatelessWidget {
+  const _ReadOnlyField({required this.label, required this.value});
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      readOnly: true,
+      controller: TextEditingController(text: value),
+      style: AppFonts.geist(fontSize: 13, color: AppColors.ctText2),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle:
+            AppFonts.geist(fontSize: 12, color: AppColors.ctText3),
+        filled: true,
+        fillColor: AppColors.ctSurface2,
+      ),
+    );
+  }
+}
+
+class _InfoBanner extends StatelessWidget {
+  const _InfoBanner({required this.icon, required this.message});
+  final IconData icon;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.ctInfoBg,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.ctBorder),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 16, color: AppColors.ctInfoText),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(message,
+                style: AppFonts.geist(
+                    fontSize: 12, color: AppColors.ctInfoText)),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -417,17 +1023,10 @@ class _FieldSchemaCard extends StatelessWidget {
 
 // ── Tab 1 — FUENTE ────────────────────────────────────────────────────────────
 
-class _SourceTab extends StatefulWidget {
+class _SourceTab extends StatelessWidget {
   const _SourceTab({required this.catalog, required this.canManage});
   final Map<String, dynamic> catalog;
   final bool canManage;
-
-  @override
-  State<_SourceTab> createState() => _SourceTabState();
-}
-
-class _SourceTabState extends State<_SourceTab> {
-  bool _syncing = false;
 
   bool _isSensitive(String k) {
     final lower = k.toLowerCase();
@@ -436,35 +1035,8 @@ class _SourceTabState extends State<_SourceTab> {
         lower.contains('password');
   }
 
-  Future<void> _sync() async {
-    final catalogId = widget.catalog['id'] as String? ?? '';
-    if (catalogId.isEmpty) return;
-    final messenger = ScaffoldMessenger.of(context);
-    setState(() => _syncing = true);
-    try {
-      await CatalogsApi.syncCatalog(catalogId: catalogId);
-      if (mounted) {
-        messenger.showSnackBar(const SnackBar(
-          content: Text('Sincronización iniciada'),
-          duration: Duration(milliseconds: 2000),
-        ));
-      }
-    } catch (e) {
-      if (mounted) {
-        messenger.showSnackBar(SnackBar(
-          content: Text('Error al sincronizar: $e'),
-          backgroundColor: AppColors.ctDanger,
-          duration: const Duration(milliseconds: 3000),
-        ));
-      }
-    } finally {
-      if (mounted) setState(() => _syncing = false);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    final catalog = widget.catalog;
     final sourceType = catalog['source_type'] as String? ?? '';
     final rawConfig = catalog['source_config'];
     final sourceConfig = rawConfig is Map
@@ -492,7 +1064,6 @@ class _SourceTabState extends State<_SourceTab> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── Tipo de fuente ──────────────────────────────────────────
           _SectionCard(
             title: 'Fuente de datos',
             child: Column(
@@ -536,61 +1107,43 @@ class _SourceTabState extends State<_SourceTab> {
           ),
           if (sourceConfig.isNotEmpty) ...[
             const SizedBox(height: 16),
-            // ── Configuración key/value ─────────────────────────────
             _SectionCard(
               title: 'Configuración',
               child: Column(
-                children: sourceConfig.entries.map((e) => Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      SizedBox(
-                        width: 180,
-                        child: Text(
-                          e.key,
-                          style: AppFonts.geist(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.ctText2),
-                        ),
-                      ),
-                      Expanded(
-                        child: Text(
-                          _isSensitive(e.key)
-                              ? '••••••'
-                              : e.value.toString(),
-                          style: AppFonts.geist(
-                              fontSize: 12, color: AppColors.ctText),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                )).toList(),
+                children: sourceConfig.entries
+                    .map((e) => Padding(
+                          padding:
+                              const EdgeInsets.symmetric(vertical: 4),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              SizedBox(
+                                width: 180,
+                                child: Text(
+                                  e.key,
+                                  style: AppFonts.geist(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.ctText2),
+                                ),
+                              ),
+                              Expanded(
+                                child: Text(
+                                  _isSensitive(e.key)
+                                      ? '••••••'
+                                      : e.value.toString(),
+                                  style: AppFonts.geist(
+                                      fontSize: 12,
+                                      color: AppColors.ctText),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ))
+                    .toList(),
               ),
             ),
-          ],
-          if (widget.canManage) ...[
-            const SizedBox(height: 24),
-            _syncing
-                ? const SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(
-                        strokeWidth: 2, color: AppColors.ctTeal),
-                  )
-                : ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.ctTeal,
-                      foregroundColor: AppColors.ctNavy,
-                    ),
-                    onPressed: _sync,
-                    icon: const Icon(Icons.sync_rounded, size: 16),
-                    label: Text('Sincronizar ahora',
-                        style: AppFonts.geist(
-                            fontSize: 13, fontWeight: FontWeight.w600)),
-                  ),
           ],
         ],
       ),
@@ -601,8 +1154,10 @@ class _SourceTabState extends State<_SourceTab> {
 // ── Tab 2 — ITEMS ─────────────────────────────────────────────────────────────
 
 class _ItemsTab extends ConsumerStatefulWidget {
-  const _ItemsTab({required this.catalog});
+  const _ItemsTab(
+      {super.key, required this.catalog, required this.canManage});
   final Map<String, dynamic> catalog;
+  final bool canManage;
 
   @override
   ConsumerState<_ItemsTab> createState() => _ItemsTabState();
@@ -611,7 +1166,15 @@ class _ItemsTab extends ConsumerStatefulWidget {
 class _ItemsTabState extends ConsumerState<_ItemsTab> {
   List<Map<String, dynamic>> _items = [];
   bool _loading = true;
+  int _page = 1;
+  int _totalPages = 1;
+  int _totalItems = 0;
+  static const int _pageSize = 50;
+  final _searchCtrl = TextEditingController();
   Timer? _debounce;
+
+  bool get _isManual =>
+      (widget.catalog['source_type'] as String? ?? '') == 'manual';
 
   List<Map<String, dynamic>> get _fields {
     final raw = widget.catalog['fields_schema'];
@@ -627,43 +1190,41 @@ class _ItemsTabState extends ConsumerState<_ItemsTab> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadItems());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadPage());
   }
 
   @override
   void dispose() {
     _debounce?.cancel();
+    _searchCtrl.dispose();
     super.dispose();
   }
 
-  Future<void> _loadItems() async {
+  Future<void> _loadPage() async {
     if (!mounted) return;
     final tenantId = ref.read(activeTenantIdProvider);
     setState(() => _loading = true);
     try {
-      final items = await CatalogsApi.listItems(
+      final q = _searchCtrl.text.trim();
+      final result = await CatalogsApi.listItemsPaged(
         tenantId: tenantId,
         catalogId: _catalogId,
+        page: _page,
+        pageSize: _pageSize,
+        search: q.isNotEmpty ? q : null,
       );
-      if (mounted) setState(() { _items = items; _loading = false; });
-    } catch (_) {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
-
-  Future<void> _search(String q) async {
-    if (!mounted) return;
-    if (q.isEmpty) { _loadItems(); return; }
-    if (q.length < 2) return;
-    final tenantId = ref.read(activeTenantIdProvider);
-    setState(() => _loading = true);
-    try {
-      final items = await CatalogsApi.searchItems(
-        tenantId: tenantId,
-        catalogId: _catalogId,
-        q: q,
-      );
-      if (mounted) setState(() { _items = items; _loading = false; });
+      if (mounted) {
+        setState(() {
+          _items = (result['items'] as List?)
+                  ?.whereType<Map>()
+                  .map((e) => Map<String, dynamic>.from(e))
+                  .toList() ??
+              [];
+          _totalItems = result['total'] as int? ?? 0;
+          _totalPages = result['pages'] as int? ?? 1;
+          _loading = false;
+        });
+      }
     } catch (_) {
       if (mounted) setState(() => _loading = false);
     }
@@ -671,49 +1232,111 @@ class _ItemsTabState extends ConsumerState<_ItemsTab> {
 
   void _onSearchChanged(String q) {
     _debounce?.cancel();
-    _debounce =
-        Timer(const Duration(milliseconds: 400), () => _search(q));
+    _debounce = Timer(const Duration(milliseconds: 400), () {
+      setState(() { _page = 1; });
+      _loadPage();
+    });
+  }
+
+  Future<void> _showItemDetail(Map<String, dynamic> item) async {
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.ctSurface,
+      shape: const RoundedRectangleBorder(
+          borderRadius:
+              BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (_) =>
+          _ItemDetailSheet(item: item, fields: _fields),
+    );
+  }
+
+  Future<void> _showAddItem() async {
+    final ok = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.ctSurface,
+      shape: const RoundedRectangleBorder(
+          borderRadius:
+              BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (ctx) => _AddItemSheet(
+          catalog: widget.catalog, fields: _fields),
+    );
+    if (ok == true && mounted) {
+      setState(() { _page = 1; });
+      _loadPage();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
+        // ── Toolbar ─────────────────────────────────────────────────
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-          child: TextField(
-            onChanged: _onSearchChanged,
-            style: AppFonts.geist(fontSize: 13, color: AppColors.ctText),
-            decoration: InputDecoration(
-              hintText: 'Buscar en items...',
-              hintStyle:
-                  AppFonts.geist(fontSize: 13, color: AppColors.ctText3),
-              prefixIcon: const Icon(Icons.search_rounded,
-                  size: 17, color: AppColors.ctText3),
-              filled: true,
-              fillColor: AppColors.ctSurface,
-              contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 12, vertical: 10),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: AppColors.ctBorder2),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _searchCtrl,
+                  onChanged: _onSearchChanged,
+                  style: AppFonts.geist(
+                      fontSize: 13, color: AppColors.ctText),
+                  decoration: InputDecoration(
+                    hintText: 'Buscar en items...',
+                    hintStyle: AppFonts.geist(
+                        fontSize: 13, color: AppColors.ctText3),
+                    prefixIcon: const Icon(Icons.search_rounded,
+                        size: 17, color: AppColors.ctText3),
+                    filled: true,
+                    fillColor: AppColors.ctSurface,
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide:
+                          const BorderSide(color: AppColors.ctBorder2),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide:
+                          const BorderSide(color: AppColors.ctBorder2),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(
+                          color: AppColors.ctTeal, width: 1.5),
+                    ),
+                  ),
+                ),
               ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: AppColors.ctBorder2),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(
-                    color: AppColors.ctTeal, width: 1.5),
-              ),
-            ),
+              if (_isManual && widget.canManage) ...[
+                const SizedBox(width: 8),
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.ctTeal,
+                    foregroundColor: AppColors.ctNavy,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
+                  ),
+                  onPressed: _showAddItem,
+                  icon: const Icon(Icons.add_rounded, size: 16),
+                  label: Text('Agregar',
+                      style: AppFonts.geist(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600)),
+                ),
+              ],
+            ],
           ),
         ),
+        // ── Content ──────────────────────────────────────────────────
         Expanded(
           child: _loading
               ? const Center(
-                  child: CircularProgressIndicator(color: AppColors.ctTeal))
+                  child: CircularProgressIndicator(
+                      color: AppColors.ctTeal))
               : _items.isEmpty
                   ? Center(
                       child: Column(
@@ -722,42 +1345,96 @@ class _ItemsTabState extends ConsumerState<_ItemsTab> {
                           const Icon(Icons.inbox_outlined,
                               size: 48, color: AppColors.ctText2),
                           const SizedBox(height: 10),
-                          Text(
-                            'Sin items',
-                            style: AppFonts.onest(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.ctText2),
-                          ),
+                          Text('Sin items',
+                              style: AppFonts.onest(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.ctText2)),
                           const SizedBox(height: 4),
-                          Text(
-                            'No hay items que coincidan con la búsqueda.',
-                            style: AppFonts.geist(
-                                fontSize: 12, color: AppColors.ctText3),
-                          ),
+                          Text('No hay items que coincidan.',
+                              style: AppFonts.geist(
+                                  fontSize: 12,
+                                  color: AppColors.ctText3)),
                         ],
                       ),
                     )
                   : SingleChildScrollView(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                      padding:
+                          const EdgeInsets.fromLTRB(16, 0, 16, 8),
                       child: SingleChildScrollView(
                         scrollDirection: Axis.horizontal,
                         child: _ItemsTable(
                           items: _items,
                           fields: _fields,
+                          onRowTap: _showItemDetail,
                         ),
                       ),
                     ),
         ),
+        // ── Pagination ───────────────────────────────────────────────
+        if (!_loading && _totalPages > 1)
+          Container(
+            padding: const EdgeInsets.symmetric(
+                horizontal: 16, vertical: 8),
+            decoration: const BoxDecoration(
+              border:
+                  Border(top: BorderSide(color: AppColors.ctBorder)),
+            ),
+            child: Row(
+              children: [
+                Text(
+                  '$_totalItems resultado${_totalItems == 1 ? '' : 's'}',
+                  style: AppFonts.geist(
+                      fontSize: 12, color: AppColors.ctText2),
+                ),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.chevron_left_rounded,
+                      size: 20),
+                  onPressed: _page > 1
+                      ? () {
+                          setState(() => _page--);
+                          _loadPage();
+                        }
+                      : null,
+                  color: AppColors.ctText2,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                      minWidth: 32, minHeight: 32),
+                ),
+                Text('$_page / $_totalPages',
+                    style: AppFonts.geist(
+                        fontSize: 12, color: AppColors.ctText)),
+                IconButton(
+                  icon: const Icon(Icons.chevron_right_rounded,
+                      size: 20),
+                  onPressed: _page < _totalPages
+                      ? () {
+                          setState(() => _page++);
+                          _loadPage();
+                        }
+                      : null,
+                  color: AppColors.ctText2,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                      minWidth: 32, minHeight: 32),
+                ),
+              ],
+            ),
+          ),
       ],
     );
   }
 }
 
 class _ItemsTable extends StatelessWidget {
-  const _ItemsTable({required this.items, required this.fields});
+  const _ItemsTable(
+      {required this.items,
+      required this.fields,
+      this.onRowTap});
   final List<Map<String, dynamic>> items;
   final List<Map<String, dynamic>> fields;
+  final void Function(Map<String, dynamic>)? onRowTap;
 
   static const double _cellWidth = 160;
   static const _headerStyle = TextStyle(
@@ -774,13 +1451,15 @@ class _ItemsTable extends StatelessWidget {
         ? fields
         : items.isNotEmpty
             ? items.first.keys
-                .map((k) => <String, dynamic>{'key': k, 'label': k})
+                .map((k) =>
+                    <String, dynamic>{'key': k, 'label': k})
                 .toList()
             : <Map<String, dynamic>>[];
 
     if (columns.isEmpty) {
       return Text('Sin columnas',
-          style: AppFonts.geist(fontSize: 12, color: AppColors.ctText2));
+          style:
+              AppFonts.geist(fontSize: 12, color: AppColors.ctText2));
     }
 
     final tableWidth = columns.length * _cellWidth;
@@ -797,8 +1476,8 @@ class _ItemsTable extends StatelessWidget {
         children: [
           Container(
             width: tableWidth,
-            padding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            padding: const EdgeInsets.symmetric(
+                horizontal: 12, vertical: 10),
             decoration: const BoxDecoration(
               color: AppColors.ctSurface2,
               borderRadius: BorderRadius.only(
@@ -826,9 +1505,16 @@ class _ItemsTable extends StatelessWidget {
             final isLast = entry.key == items.length - 1;
             return Column(
               children: [
-                _ItemRow(item: entry.value, columns: columns),
+                _ItemRow(
+                  item: entry.value,
+                  columns: columns,
+                  onTap: onRowTap != null
+                      ? () => onRowTap!(entry.value)
+                      : null,
+                ),
                 if (!isLast)
-                  const Divider(height: 1, color: AppColors.ctBorder),
+                  const Divider(
+                      height: 1, color: AppColors.ctBorder),
               ],
             );
           }),
@@ -839,9 +1525,11 @@ class _ItemsTable extends StatelessWidget {
 }
 
 class _ItemRow extends StatefulWidget {
-  const _ItemRow({required this.item, required this.columns});
+  const _ItemRow(
+      {required this.item, required this.columns, this.onTap});
   final Map<String, dynamic> item;
   final List<Map<String, dynamic>> columns;
+  final VoidCallback? onTap;
 
   @override
   State<_ItemRow> createState() => _ItemRowState();
@@ -855,32 +1543,289 @@ class _ItemRowState extends State<_ItemRow> {
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 100),
-        color: _hovered ? AppColors.ctBg : AppColors.ctSurface,
-        padding:
-            const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        child: Row(
-          children: widget.columns.map((col) {
-            final key = col['key'] as String? ?? '';
-            final isPrimary = col['is_primary'] as bool? ?? false;
-            final value = widget.item[key];
-            final text = value == null ? '—' : value.toString();
-            return SizedBox(
-              width: _ItemsTable._cellWidth,
-              child: Text(
-                text,
-                style: TextStyle(
-                  fontFamily: 'Geist',
-                  fontSize: 12,
-                  fontWeight:
-                      isPrimary ? FontWeight.w600 : FontWeight.w400,
-                  color: AppColors.ctText,
+      cursor: widget.onTap != null
+          ? SystemMouseCursors.click
+          : MouseCursor.defer,
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 100),
+          color: _hovered ? AppColors.ctBg : AppColors.ctSurface,
+          padding: const EdgeInsets.symmetric(
+              horizontal: 12, vertical: 10),
+          child: Row(
+            children: widget.columns.map((col) {
+              final key = col['key'] as String? ?? '';
+              final isPrimary =
+                  col['is_primary'] as bool? ?? false;
+              final rawData = widget.item['data'] is Map
+                  ? widget.item['data'] as Map
+                  : null;
+              final value =
+                  widget.item[key] ?? rawData?[key];
+              final text =
+                  value == null ? '—' : value.toString();
+              return SizedBox(
+                width: _ItemsTable._cellWidth,
+                child: Text(
+                  text,
+                  style: TextStyle(
+                    fontFamily: 'Geist',
+                    fontSize: 12,
+                    fontWeight: isPrimary
+                        ? FontWeight.w600
+                        : FontWeight.w400,
+                    color: AppColors.ctText,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
-                overflow: TextOverflow.ellipsis,
+              );
+            }).toList(),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Item sheets ───────────────────────────────────────────────────────────────
+
+class _ItemDetailSheet extends StatelessWidget {
+  const _ItemDetailSheet(
+      {required this.item, required this.fields});
+  final Map<String, dynamic> item;
+  final List<Map<String, dynamic>> fields;
+
+  @override
+  Widget build(BuildContext context) {
+    final rawData =
+        item['data'] is Map ? item['data'] as Map : null;
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.6,
+      maxChildSize: 0.9,
+      minChildSize: 0.3,
+      expand: false,
+      builder: (_, ctrl) => Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+            child: Row(
+              children: [
+                Text('Detalle del item',
+                    style: AppFonts.onest(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.ctText)),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.close_rounded,
+                      size: 20, color: AppColors.ctText2),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1, color: AppColors.ctBorder),
+          Expanded(
+            child: fields.isNotEmpty
+                ? ListView.separated(
+                    controller: ctrl,
+                    padding: const EdgeInsets.all(20),
+                    itemCount: fields.length,
+                    separatorBuilder: (_, _) =>
+                        const Divider(
+                            height: 16, color: AppColors.ctBorder),
+                    itemBuilder: (_, i) {
+                      final field = fields[i];
+                      final k = field['key'] as String? ?? '';
+                      final lbl =
+                          field['label'] as String? ?? k;
+                      final val = item[k] ?? rawData?[k];
+                      return _DetailRow(
+                          label: lbl,
+                          value: val?.toString() ?? '—');
+                    },
+                  )
+                : ListView.separated(
+                    controller: ctrl,
+                    padding: const EdgeInsets.all(20),
+                    itemCount: item.length,
+                    separatorBuilder: (_, _) =>
+                        const Divider(
+                            height: 16, color: AppColors.ctBorder),
+                    itemBuilder: (_, i) {
+                      final entry =
+                          item.entries.elementAt(i);
+                      return _DetailRow(
+                          label: entry.key,
+                          value:
+                              entry.value?.toString() ?? '—');
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DetailRow extends StatelessWidget {
+  const _DetailRow({required this.label, required this.value});
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 140,
+          child: Text(label,
+              style: AppFonts.geist(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.ctText2)),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(value,
+              style: AppFonts.geist(
+                  fontSize: 12, color: AppColors.ctText)),
+        ),
+      ],
+    );
+  }
+}
+
+class _AddItemSheet extends ConsumerStatefulWidget {
+  const _AddItemSheet(
+      {required this.catalog, required this.fields});
+  final Map<String, dynamic> catalog;
+  final List<Map<String, dynamic>> fields;
+
+  @override
+  ConsumerState<_AddItemSheet> createState() =>
+      _AddItemSheetState();
+}
+
+class _AddItemSheetState extends ConsumerState<_AddItemSheet> {
+  final Map<String, TextEditingController> _ctrls = {};
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    for (final field in widget.fields) {
+      final key = field['key'] as String? ?? '';
+      if (key.isNotEmpty) _ctrls[key] = TextEditingController();
+    }
+  }
+
+  @override
+  void dispose() {
+    for (final ctrl in _ctrls.values) { ctrl.dispose(); }
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (_saving) return;
+    final tenantId = ref.read(activeTenantIdProvider);
+    final catalogId = widget.catalog['id'] as String? ?? '';
+    final data = {
+      for (final e in _ctrls.entries)
+        if (e.value.text.isNotEmpty) e.key: e.value.text.trim(),
+    };
+    setState(() => _saving = true);
+    try {
+      await CatalogsApi.createItem(
+          tenantId: tenantId, catalogId: catalogId, data: data);
+      if (mounted) Navigator.of(context).pop(true);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Error al crear item: $e'),
+          backgroundColor: AppColors.ctDanger,
+        ));
+        setState(() => _saving = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text('Agregar item',
+                    style: AppFonts.onest(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.ctText)),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.close_rounded,
+                      size: 20, color: AppColors.ctText2),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            ...widget.fields.map((field) {
+              final key = field['key'] as String? ?? '';
+              final label =
+                  field['label'] as String? ?? key;
+              final ctrl = _ctrls[key];
+              if (ctrl == null || key.isEmpty) {
+                return const SizedBox.shrink();
+              }
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: TextField(
+                  controller: ctrl,
+                  style: AppFonts.geist(
+                      fontSize: 13, color: AppColors.ctText),
+                  decoration: InputDecoration(
+                    labelText: label,
+                    labelStyle: AppFonts.geist(
+                        fontSize: 12, color: AppColors.ctText2),
+                  ),
+                ),
+              );
+            }),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.ctTeal,
+                  foregroundColor: AppColors.ctNavy,
+                ),
+                onPressed: _saving ? null : _submit,
+                child: _saving
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: AppColors.ctNavy),
+                      )
+                    : Text('Guardar',
+                        style: AppFonts.geist(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600)),
               ),
-            );
-          }).toList(),
+            ),
+          ],
         ),
       ),
     );
@@ -889,31 +1834,217 @@ class _ItemRowState extends State<_ItemRow> {
 
 // ── Tab 3 — SYNC ──────────────────────────────────────────────────────────────
 
-class _SyncTab extends StatelessWidget {
-  const _SyncTab();
+class _SyncTab extends ConsumerStatefulWidget {
+  const _SyncTab({super.key, required this.catalog});
+  final Map<String, dynamic> catalog;
+
+  @override
+  ConsumerState<_SyncTab> createState() => _SyncTabState();
+}
+
+class _SyncTabState extends ConsumerState<_SyncTab> {
+  List<Map<String, dynamic>> _logs = [];
+  bool _loading = true;
+  String? _error;
+
+  String get _catalogId => widget.catalog['id'] as String? ?? '';
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadLogs());
+  }
+
+  Future<void> _loadLogs() async {
+    if (!mounted) return;
+    final tenantId = ref.read(activeTenantIdProvider);
+    setState(() { _loading = true; _error = null; });
+    try {
+      final logs = await CatalogsApi.listSyncLog(
+          tenantId: tenantId, catalogId: _catalogId);
+      if (mounted) setState(() { _logs = logs; _loading = false; });
+    } catch (e) {
+      if (mounted) {
+        setState(() { _error = e.toString(); _loading = false; });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Center(
+    if (_loading) {
+      return const Center(
+          child: CircularProgressIndicator(color: AppColors.ctTeal));
+    }
+    if (_error != null) {
+      return Center(
+          child: Text(_error!,
+              style: AppFonts.geist(
+                  fontSize: 13, color: AppColors.ctDanger)));
+    }
+    if (_logs.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.history_rounded,
+                size: 48, color: AppColors.ctText2),
+            const SizedBox(height: 12),
+            Text('Sin historial de sync',
+                style: AppFonts.onest(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.ctText2)),
+            const SizedBox(height: 4),
+            Text(
+                'Aquí aparecerán los registros cuando se ejecute un sync.',
+                style: AppFonts.geist(
+                    fontSize: 12, color: AppColors.ctText3)),
+          ],
+        ),
+      );
+    }
+    return ListView.separated(
+      padding: const EdgeInsets.all(20),
+      itemCount: _logs.length,
+      separatorBuilder: (_, _) => const SizedBox(height: 8),
+      itemBuilder: (_, i) => _SyncLogRow(log: _logs[i]),
+    );
+  }
+}
+
+class _SyncLogRow extends StatelessWidget {
+  const _SyncLogRow({required this.log});
+  final Map<String, dynamic> log;
+
+  @override
+  Widget build(BuildContext context) {
+    final status = log['status'] as String? ?? 'unknown';
+    final startedAt = log['started_at'] as String?;
+    final durationMs = log['duration_ms'] as int?;
+    final added = log['items_added'] as int? ?? 0;
+    final updated = log['items_updated'] as int? ?? 0;
+    final deleted = log['items_deleted'] as int? ?? 0;
+    final triggeredBy =
+        log['triggered_by'] as String? ?? 'scheduled';
+    final errorMsg = log['error_message'] as String?;
+
+    final (statusBg, statusFg, statusLabel) = switch (status) {
+      'success'     => (AppColors.ctOkBg, AppColors.ctOkText, 'Exitoso'),
+      'error'       => (AppColors.ctRedBg, AppColors.ctRedText, 'Error'),
+      'in_progress' => (
+          AppColors.ctInfoBg,
+          AppColors.ctInfoText,
+          'En progreso'
+        ),
+      _ => (AppColors.ctSurface2, AppColors.ctText2, status),
+    };
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.ctSurface,
+        border: Border.all(color: AppColors.ctBorder),
+        borderRadius: BorderRadius.circular(8),
+      ),
       child: Column(
-        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.history_rounded, size: 48, color: AppColors.ctText2),
-          const SizedBox(height: 12),
-          Text(
-            'Historial de sincronizaciones',
-            style: AppFonts.onest(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: AppColors.ctText2),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 7, vertical: 3),
+                decoration: BoxDecoration(
+                    color: statusBg,
+                    borderRadius: BorderRadius.circular(8)),
+                child: Text(statusLabel,
+                    style: AppFonts.geist(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: statusFg)),
+              ),
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 6, vertical: 3),
+                decoration: BoxDecoration(
+                    color: AppColors.ctSurface2,
+                    borderRadius: BorderRadius.circular(8)),
+                child: Text(triggeredBy,
+                    style: AppFonts.geist(
+                        fontSize: 10, color: AppColors.ctText2)),
+              ),
+              const Spacer(),
+              if (startedAt != null)
+                Text(_fmtSync(startedAt),
+                    style: AppFonts.geist(
+                        fontSize: 11, color: AppColors.ctText3)),
+              if (durationMs != null) ...[
+                const SizedBox(width: 6),
+                Text(
+                    '${(durationMs / 1000).toStringAsFixed(1)}s',
+                    style: AppFonts.geist(
+                        fontSize: 11, color: AppColors.ctText3)),
+              ],
+            ],
           ),
-          const SizedBox(height: 6),
-          Text(
-            'Disponible próximamente — endpoint en desarrollo.',
-            style: AppFonts.geist(fontSize: 12, color: AppColors.ctText3),
-          ),
+          if (added > 0 || updated > 0 || deleted > 0) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                if (added > 0)
+                  _DeltaBadge(
+                      label: '+$added', color: AppColors.ctOk),
+                if (updated > 0) ...[
+                  if (added > 0) const SizedBox(width: 4),
+                  _DeltaBadge(
+                      label: '~$updated',
+                      color: AppColors.ctWarn),
+                ],
+                if (deleted > 0) ...[
+                  if (added > 0 || updated > 0)
+                    const SizedBox(width: 4),
+                  _DeltaBadge(
+                      label: '-$deleted',
+                      color: AppColors.ctDanger),
+                ],
+              ],
+            ),
+          ],
+          if (errorMsg != null && errorMsg.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(errorMsg,
+                style: AppFonts.geist(
+                    fontSize: 11, color: AppColors.ctDanger),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis),
+          ],
         ],
       ),
+    );
+  }
+}
+
+class _DeltaBadge extends StatelessWidget {
+  const _DeltaBadge({required this.label, required this.color});
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding:
+          const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(label,
+          style: AppFonts.geist(
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              color: color)),
     );
   }
 }
@@ -921,27 +2052,57 @@ class _SyncTab extends StatelessWidget {
 // ── Tab 4 — USO ───────────────────────────────────────────────────────────────
 
 class _UsoTab extends StatelessWidget {
-  const _UsoTab();
+  const _UsoTab({required this.catalog});
+  final Map<String, dynamic> catalog;
 
   @override
   Widget build(BuildContext context) {
-    return Center(
+    final slug = catalog['slug'] as String? ?? '';
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
       child: Column(
-        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.hub_outlined, size: 48, color: AppColors.ctText2),
-          const SizedBox(height: 12),
-          Text(
-            'Uso en flujos',
-            style: AppFonts.onest(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: AppColors.ctText2),
+          _SectionCard(
+            title: 'Flujos que usan este catálogo',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.hub_outlined,
+                    size: 36, color: AppColors.ctText2),
+                const SizedBox(height: 8),
+                Text(
+                  'Las referencias al catálogo "$slug" aparecerán aquí.',
+                  style: AppFonts.geist(
+                      fontSize: 12, color: AppColors.ctText2),
+                ),
+                const SizedBox(height: 4),
+                Text('Disponible en Fase 1.B — asset_ref',
+                    style: AppFonts.geist(
+                        fontSize: 11, color: AppColors.ctText3)),
+              ],
+            ),
           ),
-          const SizedBox(height: 6),
-          Text(
-            'Disponible en Fase 1.B — asset_ref',
-            style: AppFonts.geist(fontSize: 12, color: AppColors.ctText3),
+          const SizedBox(height: 16),
+          _SectionCard(
+            title: 'Workers IA',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.smart_toy_outlined,
+                    size: 36, color: AppColors.ctText2),
+                const SizedBox(height: 8),
+                Text(
+                  'Los workers que consultan este catálogo aparecerán aquí.',
+                  style: AppFonts.geist(
+                      fontSize: 12, color: AppColors.ctText2),
+                ),
+                const SizedBox(height: 4),
+                Text('Disponible en Fase 1.B — asset_ref',
+                    style: AppFonts.geist(
+                        fontSize: 11, color: AppColors.ctText3)),
+              ],
+            ),
           ),
         ],
       ),
@@ -960,19 +2121,26 @@ class _FieldTypeBadge extends StatelessWidget {
     final (bg, fg, label) = switch (type) {
       'text'    => (AppColors.ctInfoBg, AppColors.ctInfoText, 'texto'),
       'number'  => (AppColors.ctWarnBg, AppColors.ctWarnText, 'número'),
-      'date'    => (const Color(0xFFEDE9FE), const Color(0xFF5B21B6), 'fecha'),
+      'date'    => (
+          const Color(0xFFEDE9FE),
+          const Color(0xFF5B21B6),
+          'fecha'
+        ),
       'boolean' => (AppColors.ctOkBg, AppColors.ctOkText, 'booleano'),
-      'select'  => (const Color(0xFFFEF3C7), const Color(0xFF92400E), 'selección'),
-      _         => (AppColors.ctSurface2, AppColors.ctText2,
+      'select'  => (AppColors.ctWarnBg, AppColors.ctWarnText, 'selección'),
+      _ => (AppColors.ctSurface2, AppColors.ctText2,
           type.isEmpty ? 'tipo' : type),
     };
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration:
-          BoxDecoration(color: bg, borderRadius: BorderRadius.circular(8)),
+      padding:
+          const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+          color: bg, borderRadius: BorderRadius.circular(8)),
       child: Text(label,
           style: AppFonts.geist(
-              fontSize: 10, fontWeight: FontWeight.w600, color: fg)),
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              color: fg)),
     );
   }
 }
@@ -998,7 +2166,8 @@ class _OAuthBadge extends StatelessWidget {
       );
     }
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      padding:
+          const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
       decoration: BoxDecoration(
         color: connected! ? AppColors.ctOkBg : AppColors.ctRedBg,
         borderRadius: BorderRadius.circular(10),
