@@ -363,10 +363,11 @@ class _CatalogHeader extends StatelessWidget {
         border: Border(bottom: BorderSide(color: AppColors.ctBorder)),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // Row 1 — breadcrumb + botones
           Row(
+            mainAxisSize: MainAxisSize.max,
             children: [
               GestureDetector(
                 onTap: () => context.go('/catalogs'),
