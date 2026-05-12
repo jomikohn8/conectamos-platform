@@ -309,7 +309,7 @@ class _CatalogsBodyState extends State<_CatalogsBody> {
                     Expanded(flex: 1, child: Text('ITEMS', style: _headerStyle)),
                     Expanded(flex: 2, child: Text('ÚLTIMO SYNC', style: _headerStyle)),
                     Expanded(flex: 1, child: Text('STATUS', style: _headerStyle)),
-                    Expanded(flex: 1, child: Text('ACCIONES', style: _headerStyle)),
+                    Expanded(flex: 1, child: Center(child: Text('ACCIONES', style: _headerStyle))),
                   ],
                 ),
               ),
@@ -514,25 +514,27 @@ class _CatalogRowState extends State<_CatalogRow> {
             // ACCIONES
             Expanded(
               flex: 1,
-              child: widget.canManage
-                  ? _syncing
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: AppColors.ctTeal),
-                        )
-                      : Tooltip(
-                          message: 'Sincronizar ahora',
-                          child: IconButton(
-                            onPressed: () => _sync(context),
-                            icon: const Icon(Icons.sync_rounded,
-                                size: 18, color: AppColors.ctText2),
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(),
-                          ),
-                        )
-                  : const SizedBox.shrink(),
+              child: Center(
+                child: widget.canManage
+                    ? _syncing
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: AppColors.ctTeal),
+                          )
+                        : Tooltip(
+                            message: 'Sincronizar ahora',
+                            child: IconButton(
+                              onPressed: () => _sync(context),
+                              icon: const Icon(Icons.sync_rounded,
+                                  size: 18, color: AppColors.ctText2),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                            ),
+                          )
+                    : const SizedBox.shrink(),
+              ),
             ),
           ],
         ),
