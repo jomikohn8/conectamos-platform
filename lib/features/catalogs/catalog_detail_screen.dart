@@ -156,47 +156,11 @@ class _CatalogDetailScreenState extends ConsumerState<CatalogDetailScreen>
     }
   }
 
-  PreferredSizeWidget _buildAppBar() {
-    return AppBar(
-      backgroundColor: AppColors.ctNavy,
-      elevation: 0,
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back, color: Colors.white),
-        onPressed: () => context.go('/catalogs'),
-      ),
-      title: Text(
-        _catalog?['label'] as String? ?? widget.slug,
-        style: AppFonts.onest(
-            fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white),
-      ),
-      bottom: TabBar(
-        controller: _tabCtrl,
-        isScrollable: true,
-        labelColor: AppColors.ctTeal,
-        unselectedLabelColor: Colors.white60,
-        indicatorColor: AppColors.ctTeal,
-        labelStyle: const TextStyle(
-            fontFamily: 'Geist', fontSize: 12, fontWeight: FontWeight.w600),
-        unselectedLabelStyle:
-            const TextStyle(fontFamily: 'Geist', fontSize: 12),
-        tabs: const [
-          Tab(text: 'CONFIGURACIÓN'),
-          Tab(text: 'FUENTE'),
-          Tab(text: 'ITEMS'),
-          Tab(text: 'SYNC'),
-          Tab(text: 'USO'),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return Scaffold(
-        backgroundColor: AppColors.ctBg,
-        appBar: _buildAppBar(),
-        body: const Center(
+      return const Scaffold(
+        body: Center(
           child: CircularProgressIndicator(color: AppColors.ctTeal),
         ),
       );
@@ -204,8 +168,6 @@ class _CatalogDetailScreenState extends ConsumerState<CatalogDetailScreen>
 
     if (_error != null || _catalog == null) {
       return Scaffold(
-        backgroundColor: AppColors.ctBg,
-        appBar: _buildAppBar(),
         body: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -229,7 +191,6 @@ class _CatalogDetailScreenState extends ConsumerState<CatalogDetailScreen>
     final catalog = _catalog!;
     return Scaffold(
       backgroundColor: AppColors.ctBg,
-      appBar: _buildAppBar(),
       body: Column(
         children: [
           _CatalogHeader(
@@ -240,7 +201,31 @@ class _CatalogDetailScreenState extends ConsumerState<CatalogDetailScreen>
             hasChanges: _hasChanges,
             onSync: _doSync,
             onSave: _doSave,
-            onReload: _load,
+          ),
+          Container(
+            decoration: const BoxDecoration(
+              color: AppColors.ctSurface,
+              border: Border(bottom: BorderSide(color: AppColors.ctBorder)),
+            ),
+            child: TabBar(
+              controller: _tabCtrl,
+              isScrollable: true,
+              labelColor: AppColors.ctTeal,
+              unselectedLabelColor: AppColors.ctText2,
+              indicatorColor: AppColors.ctTeal,
+              indicatorWeight: 2,
+              labelStyle: AppFonts.geist(
+                  fontSize: 12, fontWeight: FontWeight.w600),
+              unselectedLabelStyle:
+                  AppFonts.geist(fontSize: 12, fontWeight: FontWeight.w400),
+              tabs: const [
+                Tab(text: 'CONFIGURACIÓN'),
+                Tab(text: 'FUENTE'),
+                Tab(text: 'ITEMS'),
+                Tab(text: 'SINCRONIZACIÓN'),
+                Tab(text: 'USO'),
+              ],
+            ),
           ),
           Expanded(
             child: TabBarView(
@@ -286,7 +271,6 @@ class _CatalogHeader extends StatelessWidget {
     required this.hasChanges,
     required this.onSync,
     required this.onSave,
-    required this.onReload,
   });
 
   final Map<String, dynamic> catalog;
@@ -296,101 +280,110 @@ class _CatalogHeader extends StatelessWidget {
   final bool hasChanges;
   final VoidCallback onSync;
   final VoidCallback onSave;
-  final VoidCallback onReload;
 
   @override
   Widget build(BuildContext context) {
     final sourceType = catalog['source_type'] as String? ?? '';
     final slug = catalog['slug'] as String? ?? '';
-    final description = catalog['description'] as String?;
+    final label = catalog['label'] as String? ?? slug;
     final itemsCount = catalog['items_count'] as int? ?? 0;
     final lastSynced = catalog['last_synced_at'] as String?;
-    final schemaFieldsCount = catalog['schema_fields_count'] as int? ?? 0;
     final isSyncable =
         sourceType == 'google_sheets' || sourceType == 'onedrive_excel';
 
     return Container(
-      color: AppColors.ctSurface,
-      padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+      padding: const EdgeInsets.fromLTRB(20, 10, 16, 12),
+      decoration: const BoxDecoration(
+        color: AppColors.ctSurface,
+        border: Border(bottom: BorderSide(color: AppColors.ctBorder)),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Row 1: title + sync status badge
+          // Row 1 — breadcrumb + botones
           Row(
             children: [
-              Expanded(
+              GestureDetector(
+                onTap: () => context.go('/catalogs'),
                 child: Text(
-                  catalog['label'] as String? ?? slug,
-                  style: AppFonts.onest(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.ctText),
+                  '← Catálogos',
+                  style: AppFonts.geist(
+                      fontSize: 12, color: AppColors.ctText3),
+                ),
+              ),
+              Text(
+                ' / ',
+                style: AppFonts.geist(
+                    fontSize: 12, color: AppColors.ctText3),
+              ),
+              Flexible(
+                child: Text(
+                  label,
+                  style: AppFonts.geist(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.ctText2),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              const SizedBox(width: 8),
+              const Spacer(),
+              if (canManage && isSyncable) ...[
+                _SyncButton(syncing: syncing, onSync: onSync),
+                const SizedBox(width: 8),
+              ],
+              if (canManage)
+                _SaveButton(
+                    saving: saving,
+                    hasChanges: hasChanges,
+                    onSave: onSave),
+            ],
+          ),
+          const SizedBox(height: 6),
+          // Row 2 — título + badge
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Text(
+                label,
+                style: AppFonts.onest(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.ctText),
+              ),
+              const SizedBox(width: 10),
               _SyncStatusBadge(
                   lastSynced: lastSynced, sourceType: sourceType),
             ],
           ),
-          const SizedBox(height: 8),
-          // Row 2: source pill + slug chip + description
-          Wrap(
-            crossAxisAlignment: WrapCrossAlignment.center,
-            spacing: 8,
-            runSpacing: 4,
-            children: [
-              _SourcePill(sourceType: sourceType),
-              _SlugChip(slug: slug),
-              if (description != null && description.isNotEmpty)
-                Text(description,
-                    style: AppFonts.geist(
-                        fontSize: 12, color: AppColors.ctText2)),
-            ],
-          ),
-          const SizedBox(height: 12),
-          const Divider(height: 1, color: AppColors.ctBorder),
-          // Stats strip + action buttons
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 10),
+          const SizedBox(height: 6),
+          // Row 3 — metadata inline
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
             child: Row(
               children: [
-                _StatCell(label: 'Items', value: itemsCount.toString()),
-                const _StatDivider(),
-                _StatCell(
-                    label: 'Último sync', value: _fmtSync(lastSynced)),
-                const _StatDivider(),
-                _StatCell(
-                    label: 'Campos', value: schemaFieldsCount.toString()),
-                const Spacer(),
-                if (canManage && isSyncable) ...[
-                  _ActionButton(
-                    onPressed: onSync,
-                    loading: syncing,
-                    icon: Icons.sync_rounded,
-                    label: 'Sincronizar',
-                  ),
-                  const SizedBox(width: 8),
-                ],
-                if (canManage && hasChanges) ...[
-                  _ActionButton(
-                    onPressed: onSave,
-                    loading: saving,
-                    icon: Icons.save_rounded,
-                    label: 'Guardar',
-                    primary: true,
-                  ),
-                  const SizedBox(width: 8),
-                ],
-                IconButton(
-                  tooltip: 'Recargar',
-                  icon: const Icon(Icons.refresh_rounded,
-                      size: 18, color: AppColors.ctText2),
-                  onPressed: onReload,
-                  padding: EdgeInsets.zero,
-                  constraints:
-                      const BoxConstraints(minWidth: 32, minHeight: 32),
+                Text(
+                  slug,
+                  style: AppFonts.geist(
+                      fontSize: 12, color: AppColors.ctText3),
                 ),
+                const _MetaDot(),
+                _SourcePill(sourceType: sourceType),
+                if (itemsCount > 0) ...[
+                  const _MetaDot(),
+                  Text(
+                    '$itemsCount items',
+                    style: AppFonts.geist(
+                        fontSize: 12, color: AppColors.ctText2),
+                  ),
+                ],
+                if (lastSynced != null) ...[
+                  const _MetaDot(),
+                  Text(
+                    'Sync ${_fmtSync(lastSynced)}',
+                    style: AppFonts.geist(
+                        fontSize: 12, color: AppColors.ctText3),
+                  ),
+                ],
               ],
             ),
           ),
@@ -416,7 +409,8 @@ class _SyncStatusBadge extends StatelessWidget {
       return _badge(AppColors.ctSurface2, AppColors.ctText2, 'Manual');
     }
     if (lastSynced == null) {
-      return _badge(AppColors.ctWarnBg, AppColors.ctWarnText, 'Sin sincronizar');
+      return _badge(
+          AppColors.ctWarnBg, AppColors.ctWarnText, 'Sin sincronizar');
     }
     try {
       final dt = DateTime.parse(lastSynced!).toLocal();
@@ -425,7 +419,8 @@ class _SyncStatusBadge extends StatelessWidget {
         return _badge(AppColors.ctOkBg, AppColors.ctOkText, 'Sincronizado');
       }
       if (diff.inDays < 1) {
-        return _badge(AppColors.ctWarnBg, AppColors.ctWarnText, 'Sync antiguo');
+        return _badge(
+            AppColors.ctWarnBg, AppColors.ctWarnText, 'Sync antiguo');
       }
       return _badge(AppColors.ctRedBg, AppColors.ctRedText, 'Necesita sync');
     } catch (_) {
@@ -434,14 +429,26 @@ class _SyncStatusBadge extends StatelessWidget {
   }
 
   Widget _badge(Color bg, Color fg, String label) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-        decoration:
-            BoxDecoration(color: bg, borderRadius: BorderRadius.circular(10)),
-        child: Text(label,
-            style: AppFonts.geist(
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
-                color: fg)),
+        padding:
+            const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+            color: bg, borderRadius: BorderRadius.circular(10)),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 5,
+              height: 5,
+              decoration: BoxDecoration(color: fg, shape: BoxShape.circle),
+            ),
+            const SizedBox(width: 5),
+            Text(label,
+                style: AppFonts.geist(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    color: fg)),
+          ],
+        ),
       );
 }
 
@@ -457,136 +464,100 @@ class _SourcePill extends StatelessWidget {
       'onedrive_excel' => (Icons.grid_on_outlined, 'OneDrive Excel'),
       'webhook_push'   => (Icons.webhook_outlined, 'Webhook Push'),
       'api_pull'       => (Icons.cloud_download_outlined, 'API Pull'),
-      _                => (Icons.storage_rounded,
+      _ => (Icons.storage_rounded,
           sourceType.isEmpty ? 'Sin fuente' : sourceType),
     };
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: AppColors.ctSurface2,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppColors.ctBorder),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 12, color: AppColors.ctText2),
-          const SizedBox(width: 4),
-          Text(label,
-              style: AppFonts.geist(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.ctText2)),
-        ],
-      ),
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 12, color: AppColors.ctText2),
+        const SizedBox(width: 4),
+        Text(label,
+            style: AppFonts.geist(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: AppColors.ctText2)),
+      ],
     );
   }
 }
 
-class _SlugChip extends StatelessWidget {
-  const _SlugChip({required this.slug});
-  final String slug;
+class _MetaDot extends StatelessWidget {
+  const _MetaDot();
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: AppColors.ctInfoBg,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Text(
-        slug,
-        style: AppFonts.geist(
-            fontSize: 11,
-            fontWeight: FontWeight.w500,
-            color: AppColors.ctInfoText),
-      ),
+    return Text(
+      ' · ',
+      style: AppFonts.geist(fontSize: 12, color: AppColors.ctText3),
     );
   }
 }
 
-class _StatCell extends StatelessWidget {
-  const _StatCell({required this.label, required this.value});
-  final String label;
-  final String value;
+class _SyncButton extends StatelessWidget {
+  const _SyncButton({required this.syncing, required this.onSync});
+  final bool syncing;
+  final VoidCallback onSync;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(right: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(label,
-              style:
-                  AppFonts.geist(fontSize: 10, color: AppColors.ctText3)),
-          const SizedBox(height: 1),
-          Text(value,
-              style: AppFonts.onest(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.ctText)),
-        ],
-      ),
-    );
-  }
-}
-
-class _StatDivider extends StatelessWidget {
-  const _StatDivider();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 28,
-      width: 1,
-      color: AppColors.ctBorder,
-      margin: const EdgeInsets.only(right: 16),
-    );
-  }
-}
-
-class _ActionButton extends StatelessWidget {
-  const _ActionButton({
-    required this.onPressed,
-    required this.loading,
-    required this.icon,
-    required this.label,
-    this.primary = false,
-  });
-  final VoidCallback onPressed;
-  final bool loading;
-  final IconData icon;
-  final String label;
-  final bool primary;
-
-  @override
-  Widget build(BuildContext context) {
-    if (loading) {
-      return const SizedBox(
-        width: 20,
-        height: 20,
-        child: CircularProgressIndicator(
-            strokeWidth: 2, color: AppColors.ctTeal),
-      );
-    }
     return OutlinedButton.icon(
       style: OutlinedButton.styleFrom(
-        backgroundColor: primary ? AppColors.ctTeal : null,
-        foregroundColor:
-            primary ? AppColors.ctNavy : AppColors.ctText2,
-        side: BorderSide(
-            color: primary ? AppColors.ctTeal : AppColors.ctBorder),
+        foregroundColor: AppColors.ctText,
+        side: const BorderSide(color: AppColors.ctBorder2),
         padding:
             const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       ),
-      onPressed: onPressed,
-      icon: Icon(icon, size: 14),
-      label: Text(label,
+      onPressed: syncing ? null : onSync,
+      icon: syncing
+          ? const SizedBox(
+              width: 14,
+              height: 14,
+              child: CircularProgressIndicator(
+                  strokeWidth: 2, color: AppColors.ctTeal),
+            )
+          : const Icon(Icons.sync_rounded, size: 14),
+      label: Text('Sincronizar ahora',
           style: AppFonts.geist(
               fontSize: 12, fontWeight: FontWeight.w600)),
+    );
+  }
+}
+
+class _SaveButton extends StatelessWidget {
+  const _SaveButton({
+    required this.saving,
+    required this.hasChanges,
+    required this.onSave,
+  });
+  final bool saving;
+  final bool hasChanges;
+  final VoidCallback onSave;
+
+  @override
+  Widget build(BuildContext context) {
+    return Opacity(
+      opacity: hasChanges ? 1.0 : 0.4,
+      child: ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.ctTeal,
+          foregroundColor: AppColors.ctNavy,
+          padding:
+              const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          elevation: 0,
+        ),
+        onPressed: hasChanges && !saving ? onSave : null,
+        child: saving
+            ? const SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(
+                    strokeWidth: 2, color: AppColors.ctNavy),
+              )
+            : Text('Guardar',
+                style: AppFonts.geist(
+                    fontSize: 12, fontWeight: FontWeight.w600)),
+      ),
     );
   }
 }
@@ -690,7 +661,7 @@ class _ConfigTabState extends ConsumerState<_ConfigTab> {
               child: Column(
                 children: [
                   _IdField(
-                    label: 'Nombre (label)',
+                    label: 'Nombre',
                     ctrl: _labelCtrl,
                     enabled: widget.canManage,
                     onChanged: (_) => _onIdentificationChanged(),
@@ -704,7 +675,7 @@ class _ConfigTabState extends ConsumerState<_ConfigTab> {
                   ),
                   const SizedBox(height: 12),
                   _IdField(
-                    label: 'Etiqueta visible (display_label)',
+                    label: 'Etiqueta visible al operador',
                     ctrl: _displayLabelCtrl,
                     enabled: widget.canManage,
                     onChanged: (_) => _onIdentificationChanged(),
@@ -716,7 +687,7 @@ class _ConfigTabState extends ConsumerState<_ConfigTab> {
                   ),
                   const SizedBox(height: 12),
                   _IdField(
-                    label: 'Umbral de relevancia (embed_threshold)',
+                    label: 'Umbral de embed',
                     ctrl: _embedThresholdCtrl,
                     enabled: widget.canManage,
                     keyboardType: const TextInputType.numberWithOptions(
@@ -734,15 +705,13 @@ class _ConfigTabState extends ConsumerState<_ConfigTab> {
           sliver: SliverToBoxAdapter(
             child: Row(
               children: [
-                const Text(
+                Text(
                   'CAMPOS',
-                  style: TextStyle(
-                    fontFamily: 'Geist',
+                  style: AppFonts.geist(
                     fontSize: 10,
                     fontWeight: FontWeight.w600,
                     color: AppColors.ctText2,
-                    letterSpacing: 0.4,
-                  ),
+                  ).copyWith(letterSpacing: 0.4),
                 ),
                 const Spacer(),
                 Text(
@@ -1437,13 +1406,11 @@ class _ItemsTable extends StatelessWidget {
   final void Function(Map<String, dynamic>)? onRowTap;
 
   static const double _cellWidth = 160;
-  static const _headerStyle = TextStyle(
-    fontFamily: 'Geist',
-    fontSize: 10,
-    fontWeight: FontWeight.w600,
-    color: AppColors.ctText2,
-    letterSpacing: 0.4,
-  );
+  static TextStyle get _headerStyle => AppFonts.geist(
+        fontSize: 10,
+        fontWeight: FontWeight.w600,
+        color: AppColors.ctText2,
+      ).copyWith(letterSpacing: 0.4);
 
   @override
   Widget build(BuildContext context) {
@@ -1569,8 +1536,7 @@ class _ItemRowState extends State<_ItemRow> {
                 width: _ItemsTable._cellWidth,
                 child: Text(
                   text,
-                  style: TextStyle(
-                    fontFamily: 'Geist',
+                  style: AppFonts.geist(
                     fontSize: 12,
                     fontWeight: isPrimary
                         ? FontWeight.w600
@@ -2121,11 +2087,7 @@ class _FieldTypeBadge extends StatelessWidget {
     final (bg, fg, label) = switch (type) {
       'text'    => (AppColors.ctInfoBg, AppColors.ctInfoText, 'texto'),
       'number'  => (AppColors.ctWarnBg, AppColors.ctWarnText, 'número'),
-      'date'    => (
-          const Color(0xFFEDE9FE),
-          const Color(0xFF5B21B6),
-          'fecha'
-        ),
+      'date'    => (AppColors.ctPurpleBg, AppColors.ctPurpleText, 'fecha'),
       'boolean' => (AppColors.ctOkBg, AppColors.ctOkText, 'booleano'),
       'select'  => (AppColors.ctWarnBg, AppColors.ctWarnText, 'selección'),
       _ => (AppColors.ctSurface2, AppColors.ctText2,
@@ -2204,13 +2166,11 @@ class _SectionCard extends StatelessWidget {
         children: [
           Text(
             title.toUpperCase(),
-            style: const TextStyle(
-              fontFamily: 'Geist',
+            style: AppFonts.geist(
               fontSize: 10,
               fontWeight: FontWeight.w600,
               color: AppColors.ctText2,
-              letterSpacing: 0.4,
-            ),
+            ).copyWith(letterSpacing: 0.4),
           ),
           const SizedBox(height: 10),
           child,

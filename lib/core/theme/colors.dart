@@ -49,6 +49,10 @@ abstract final class AppColors {
   static const ctOrangeBg   = Color(0xFFFFEDD5);
   static const ctOrangeText = Color(0xFF9A3412);
 
+  // Púrpura — tipo fecha en badges de campo
+  static const ctPurpleBg   = Color(0xFFEDE9FE);
+  static const ctPurpleText = Color(0xFF5B21B6);
+
   // Canales externos
   static const ctWa       = Color(0xFF25D366);
   static const ctWaBubble = Color(0xFFDCF8C6);
