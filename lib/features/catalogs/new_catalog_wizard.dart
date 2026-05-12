@@ -1339,7 +1339,7 @@ class _NewCatalogWizardState extends State<NewCatalogWizard> {
             Row(
               children: [
                 SvgPicture.asset(
-                  'assets/logos/ondrive.svg',
+                  'assets/logos/onedrive.svg',
                   width: 24,
                   height: 24,
                   placeholderBuilder: (_) => const Icon(
@@ -1536,7 +1536,7 @@ class _SourceCard extends StatelessWidget {
 
   static const _assetPaths = {
     'gsheets':  'assets/logos/google-sheets',
-    'onedrive': 'assets/logos/ondrive.svg',
+    'onedrive': 'assets/logos/onedrive.svg',
   };
 
   Widget _buildLogo() {
