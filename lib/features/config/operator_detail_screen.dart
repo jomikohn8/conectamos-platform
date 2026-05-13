@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/api/api_client.dart';
+import '../../core/api/operator_roles_api.dart';
 import '../../core/api/operators_api.dart';
 import '../../core/providers/permissions_provider.dart';
 import '../../core/providers/tenant_provider.dart';
@@ -519,6 +520,11 @@ class _DatosTabState extends ConsumerState<_DatosTab> {
   bool _loadingTypes = false;
   bool _saving = false;
 
+  // Rol
+  String? _roleId;
+  List<Map<String, dynamic>> _availableRoles = [];
+  bool _savingRole = false;
+
   @override
   void initState() {
     super.initState();
@@ -527,7 +533,15 @@ class _DatosTabState extends ConsumerState<_DatosTab> {
     if (raw is List) {
       _orderedTypes = raw.map((e) => e.toString()).toList();
     }
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadTypes());
+    // Seed role from operator data
+    final rawRoleIds = widget.op['role_ids'];
+    if (rawRoleIds is List && rawRoleIds.isNotEmpty) {
+      _roleId = rawRoleIds.first?.toString();
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadTypes();
+      _loadRoles();
+    });
   }
 
   Future<void> _loadTypes() async {
@@ -598,6 +612,54 @@ class _DatosTabState extends ConsumerState<_DatosTab> {
       }
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content:         Text(msg),
+        backgroundColor: AppColors.ctDanger,
+      ));
+    }
+  }
+
+  Future<void> _loadRoles() async {
+    if (!mounted) return;
+    final tenantId = ref.read(activeTenantIdProvider);
+    if (tenantId.isEmpty) return;
+    try {
+      final roles = await OperatorRolesApi.listRoles(tenantId: tenantId);
+      if (!mounted) return;
+      setState(() => _availableRoles = roles);
+    } catch (_) {}
+  }
+
+  Future<void> _saveRole(String? roleId) async {
+    final operatorId = widget.op['id'] as String? ?? '';
+    if (operatorId.isEmpty) return;
+    setState(() {
+      _roleId = roleId;
+      _savingRole = true;
+    });
+    try {
+      await OperatorsApi.patchRoleIds(
+        id: operatorId,
+        roleIds: roleId != null ? [roleId] : [],
+      );
+      if (!mounted) return;
+      setState(() => _savingRole = false);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Rol actualizado'),
+        backgroundColor: AppColors.ctOk,
+        duration: Duration(seconds: 2),
+      ));
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _savingRole = false);
+      String msg = 'Error al actualizar el rol';
+      if (e is DioException) {
+        final body = e.response?.data;
+        if (body is Map) {
+          final detail = body['detail'] ?? body['message'];
+          if (detail != null) msg = detail.toString();
+        }
+      }
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(msg),
         backgroundColor: AppColors.ctDanger,
       ));
     }
@@ -730,6 +792,58 @@ class _DatosTabState extends ConsumerState<_DatosTab> {
               enabled:    canManage && !_saving,
               onReorder:  canManage ? _saveOrder : null,
             ),
+
+          // ── Rol de operador ─────────────────────────────────────────────
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              const _SectionTitle('Rol'),
+              if (_savingRole) ...[
+                const SizedBox(width: 10),
+                const SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: AppColors.ctTeal),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 10),
+          DropdownButton<String?>(
+            value: _availableRoles.any((r) => r['id'] == _roleId)
+                ? _roleId
+                : null,
+            isExpanded: true,
+            underline: Container(height: 1, color: AppColors.ctBorder),
+            style: const TextStyle(
+                fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText),
+            items: [
+              const DropdownMenuItem<String?>(
+                value: null,
+                child: Text('Sin rol',
+                    style: TextStyle(
+                        fontFamily: 'Geist',
+                        fontSize: 13,
+                        color: AppColors.ctText3)),
+              ),
+              ..._availableRoles.map((role) {
+                final id = role['id'] as String? ?? '';
+                final label = role['label'] as String? ??
+                    role['slug'] as String? ??
+                    id;
+                return DropdownMenuItem<String?>(
+                  value: id,
+                  child: Text(label,
+                      style: const TextStyle(
+                          fontFamily: 'Geist',
+                          fontSize: 13,
+                          color: AppColors.ctText)),
+                );
+              }),
+            ],
+            onChanged: canManage && !_savingRole ? _saveRole : null,
+          ),
 
           const SizedBox(height: 16),
           const _SectionTitle('Auditoría'),

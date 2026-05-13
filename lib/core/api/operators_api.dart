@@ -131,6 +131,17 @@ class OperatorsApi {
     );
   }
 
+  /// PUT /operators/{id} — updates the operator's role_ids array.
+  static Future<void> patchRoleIds({
+    required String id,
+    required List<String> roleIds,
+  }) async {
+    await ApiClient.instance.put(
+      '/operators/$id',
+      data: {'role_ids': roleIds},
+    );
+  }
+
   static Future<List<Map<String, dynamic>>> listOperatorFlows({
     required String operatorId,
   }) async {
