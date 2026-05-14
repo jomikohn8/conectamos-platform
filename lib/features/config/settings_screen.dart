@@ -49,41 +49,41 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       _active = _Section.general;
     }
 
-    return Column(
+    return Row(
       children: [
-        const PageHeader(
-          eyebrow: 'Configuración',
-          title: 'Ajustes',
-          description: 'Configuración general del tenant',
-        ),
-        Expanded(
-          child: Row(
+        // ── Panel izquierdo ──────────────────────────────────────────
+        Container(
+          width: 220,
+          decoration: const BoxDecoration(
+            color: AppColors.ctSurface,
+            border: Border(
+              right: BorderSide(color: Color(0xFFE5E7EB)),
+            ),
+          ),
+          padding: const EdgeInsets.only(top: 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // ── Panel izquierdo ──────────────────────────────────────────
-              Container(
-                width: 220,
-                decoration: const BoxDecoration(
-                  color: AppColors.ctSurface,
-                  border: Border(
-                    right: BorderSide(color: Color(0xFFE5E7EB)),
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    ...items.map((item) => _NavItem(
-                          label: item.label,
-                          icon: item.icon,
-                          active: _active == item.section,
-                          onTap: () => setState(() => _active = item.section),
-                        )),
-                  ],
-                ),
+              ...items.map((item) => _NavItem(
+                    label: item.label,
+                    icon: item.icon,
+                    active: _active == item.section,
+                    onTap: () => setState(() => _active = item.section),
+                  )),
+            ],
+          ),
+        ),
+        // ── Panel derecho ────────────────────────────────────────────
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const PageHeader(
+                eyebrow: 'Configuración',
+                title: 'Ajustes',
+                description: 'Configuración general del tenant',
               ),
-              // ── Panel derecho ────────────────────────────────────────────
-              Expanded(
-                child: _SectionPanel(active: _active),
-              ),
+              Expanded(child: _SectionPanel(active: _active)),
             ],
           ),
         ),
