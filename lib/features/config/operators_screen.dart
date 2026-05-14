@@ -460,7 +460,6 @@ class _OperatorRowState extends State<_OperatorRow> {
         op['name'] as String? ?? '—';
     final phone = op['phone'] as String? ?? '—';
     final status = op['status'] as String?;
-    final verified = op['whatsapp_verified'] as bool? ?? false;
     final flows = (op['flows'] as List? ?? []).map((f) {
       if (f is Map) return Map<String, dynamic>.from(f);
       // Backend may return plain UUID strings instead of objects
@@ -551,41 +550,6 @@ class _OperatorRowState extends State<_OperatorRow> {
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(height: 2),
-                        if (verified)
-                          const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.check_circle_rounded,
-                                size: 11,
-                                color: AppColors.ctOk,
-                              ),
-                              SizedBox(width: 3),
-                              Text(
-                                'WhatsApp verificado',
-                                style: AppTextStyles.bodySmall,
-                              ),
-                            ],
-                          )
-                        else
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 1),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFFFEDD5),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: const Text(
-                              'Pendiente verificación',
-                              style: TextStyle(
-                                fontFamily: 'Geist',
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFF9A3412),
-                              ),
-                            ),
-                          ),
                         if (tgBadge != null) ...[
                           const SizedBox(height: 3),
                           tgBadge,
