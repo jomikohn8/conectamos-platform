@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../core/api/flows_api.dart';
 import '../../../core/api/operator_fields_api.dart';
 import '../../../core/api/operator_roles_api.dart';
 import '../../../core/api/operators_api.dart';
@@ -150,6 +151,12 @@ class _OperatorFormDialogState extends ConsumerState<OperatorFormDialog> {
   List<Map<String, dynamic>> _availableRoles = [];
   bool _rolesLoading = false;
 
+  // Flows del rol
+  List<Map<String, dynamic>> _availableFlows = [];
+  bool _flowsLoading = false;
+  Map<String, bool> _flowChecked = {};
+  Map<String, bool> _flowInitial = {};
+
   // Custom fields
   List<Map<String, dynamic>> _customFieldDefs = [];
   Map<String, dynamic> _customFieldValues = {};
@@ -203,6 +210,7 @@ class _OperatorFormDialogState extends ConsumerState<OperatorFormDialog> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadRoles();
+      _loadFlows();
       _loadCustomFields();
     });
 
@@ -282,6 +290,33 @@ class _OperatorFormDialogState extends ConsumerState<OperatorFormDialog> {
       }
     } catch (_) {
       if (mounted) setState(() => _rolesLoading = false);
+    }
+  }
+
+  // ── Flows del rol ─────────────────────────────────────────────────────────
+
+  Future<void> _loadFlows() async {
+    if (_selectedRoleId == null) return;
+    if (!mounted) return;
+    setState(() => _flowsLoading = true);
+    try {
+      final flows = await FlowsApi.listFlows();
+      if (!mounted) return;
+      final checked = <String, bool>{};
+      for (final f in flows) {
+        final id = f['id'] as String? ?? '';
+        if (id.isEmpty) continue;
+        final roleIds = (f['allowed_role_ids'] as List?)?.cast<String>() ?? [];
+        checked[id] = roleIds.contains(_selectedRoleId);
+      }
+      setState(() {
+        _availableFlows = flows;
+        _flowChecked = checked;
+        _flowInitial = Map.from(checked);
+        _flowsLoading = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _flowsLoading = false);
     }
   }
 
@@ -947,6 +982,32 @@ class _OperatorFormDialogState extends ConsumerState<OperatorFormDialog> {
               customFieldValues.isNotEmpty ? customFieldValues : null,
         );
       }
+
+      // ── Patch allowed_role_ids on changed flows ──────────────────────────
+      if (_selectedRoleId != null) {
+        for (final flow in _availableFlows) {
+          final id = flow['id'] as String? ?? '';
+          if (id.isEmpty) continue;
+          final current = _flowChecked[id] ?? false;
+          final initial = _flowInitial[id] ?? false;
+          if (current == initial) continue;
+          final existingRoleIds =
+              ((flow['allowed_role_ids'] as List?)?.cast<String>() ?? [])
+                  .toList();
+          final List<String> newRoleIds;
+          if (current) {
+            if (existingRoleIds.contains(_selectedRoleId!)) continue;
+            newRoleIds = [...existingRoleIds, _selectedRoleId!];
+          } else {
+            newRoleIds = existingRoleIds
+                .where((r) => r != _selectedRoleId!)
+                .toList();
+          }
+          await FlowsApi.updateFlow(
+              flowId: id, allowedRoleIds: newRoleIds);
+        }
+      }
+
       if (mounted) {
         Navigator.pop(context);
         widget.onSaved();
@@ -1432,9 +1493,96 @@ class _OperatorFormDialogState extends ConsumerState<OperatorFormDialog> {
                             );
                           }),
                         ],
-                        onChanged: (val) =>
-                            setState(() => _selectedRoleId = val),
+                        onChanged: (val) {
+                          setState(() {
+                            _selectedRoleId = val;
+                            _availableFlows = [];
+                            _flowChecked = {};
+                            _flowInitial = {};
+                          });
+                          _loadFlows();
+                        },
                       ),
+
+                    // ── SECCIÓN 4.5: Flujos del rol ───────────────────────
+                    if (_selectedRoleId != null) ...[
+                      const SizedBox(height: 20),
+                      _SectionHeader(label: 'Flujos del rol'),
+                      const SizedBox(height: 10),
+                      if (_flowsLoading)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 12),
+                          child: Center(
+                            child: SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: AppColors.ctTeal),
+                            ),
+                          ),
+                        )
+                      else if (_availableFlows.isEmpty)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 10),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: AppColors.ctBorder),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Text(
+                            'No hay flujos disponibles en este tenant.',
+                            style: TextStyle(
+                                fontFamily: 'Geist',
+                                fontSize: 12,
+                                color: AppColors.ctText2),
+                          ),
+                        )
+                      else
+                        Container(
+                          decoration: BoxDecoration(
+                            border: Border.all(color: AppColors.ctBorder),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Column(
+                            children: [
+                              for (int i = 0;
+                                  i < _availableFlows.length;
+                                  i++) ...[
+                                if (i > 0)
+                                  const Divider(
+                                      height: 1, color: AppColors.ctBorder),
+                                Builder(builder: (ctx) {
+                                  final flow = _availableFlows[i];
+                                  final id = flow['id'] as String? ?? '';
+                                  final name =
+                                      flow['name'] as String? ?? id;
+                                  return CheckboxListTile(
+                                    value: _flowChecked[id] ?? false,
+                                    onChanged: (v) => setState(
+                                        () => _flowChecked[id] = v ?? false),
+                                    activeColor: AppColors.ctTeal,
+                                    dense: true,
+                                    controlAffinity:
+                                        ListTileControlAffinity.leading,
+                                    contentPadding:
+                                        const EdgeInsets.symmetric(
+                                            horizontal: 12),
+                                    visualDensity: VisualDensity.compact,
+                                    title: Text(
+                                      name,
+                                      style: const TextStyle(
+                                        fontFamily: 'Geist',
+                                        fontSize: 12,
+                                        color: AppColors.ctText,
+                                      ),
+                                    ),
+                                  );
+                                }),
+                              ],
+                            ],
+                          ),
+                        ),
+                    ],
 
                     // ── SECCIÓN 5: Telegram Chat ID ───────────────────────
                     const SizedBox(height: 20),
