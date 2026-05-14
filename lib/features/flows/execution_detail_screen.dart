@@ -543,6 +543,16 @@ class _FieldsBlockState extends State<_FieldsBlock> {
       };
     }
 
+    // Caso D: formato "lat=X, lng=Y"
+    final latLngNamed = RegExp(
+      r'lat=([+-]?\d+\.?\d*)[,\s]+lng=([+-]?\d+\.?\d*)',
+    ).firstMatch(s);
+    if (latLngNamed != null) {
+      final lat = double.tryParse(latLngNamed.group(1) ?? '');
+      final lng = double.tryParse(latLngNamed.group(2) ?? '');
+      if (lat != null && lng != null) return {'lat': lat, 'lng': lng};
+    }
+
     return null;
   }
 
