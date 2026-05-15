@@ -190,13 +190,28 @@ class ChannelsApi {
 
   static Future<Map<String, dynamic>> embeddedSignup({
     required String code,
+    String? phoneNumberId,
+    String? wabaId,
+    String? businessId,
   }) async {
     final response = await ApiClient.instance.post(
       '/channels/embedded-signup',
       data: {
         'code': code,
+        'phone_number_id': ?phoneNumberId,
+        'waba_id': ?wabaId,
+        'business_id': ?businessId,
       },
     );
     return Map<String, dynamic>.from(response.data);
+  }
+
+  static Future<void> postSignupEvent(
+    Map<String, dynamic> eventData,
+  ) async {
+    await ApiClient.instance.post(
+      '/channels/embedded-signup/events',
+      data: eventData,
+    );
   }
 }

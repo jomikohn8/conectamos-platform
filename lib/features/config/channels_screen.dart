@@ -1,3 +1,4 @@
+import 'dart:convert';
 // ignore: avoid_web_libraries_in_flutter, deprecated_member_use
 import 'dart:html' as html;
 import 'dart:js_interop';
@@ -15,9 +16,9 @@ import '../../core/theme/app_theme.dart';
 import '../../shared/widgets/page_header.dart';
 
 /// JS bridge injected by [_CreateChannelStepperState._initFbSdk].
-/// Calls FB.login() and forwards the OAuth code (or cancellation) to Dart.
+/// Calls FB.login() and forwards the OAuth code + signup data (or cancellation) to Dart.
 @JS('_fbLaunchSignup')
-external void _fbLaunchSignup(JSFunction onCode, JSFunction onCancel);
+external void _fbLaunchSignup(JSFunction onFlush, JSFunction onCancel);
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -390,41 +391,112 @@ class _CreateChannelStepperState extends State<_CreateChannelStepper> {
 
     // Inject a JS helper that wraps FB.init + FB.login so Dart never needs
     // to touch dart:js directly — only dart:js_interop is used at call site.
+    //
+    // Double-listener pattern: the OAuth code (from FB.login callback) and the
+    // signup data (from WA_EMBEDDED_SIGNUP message event) arrive asynchronously.
+    // _waFlush() fires when both are present; _waRetryFlush() gives 3×500ms
+    // retries if the code arrives before the signup data.
     final helper = html.ScriptElement()
       ..text = '''
         window.fbAsyncInit = function() {
           FB.init({
-            appId            : '4149613485350757',
+            appId            : '980871654909798',
             autoLogAppEvents : true,
             xfbml            : true,
             version          : 'v25.0'
           });
         };
 
-        // ── Event listener para WA_EMBEDDED_SIGNUP ──
+        // ── State reset per signup attempt ──
+        window._waSignupData  = null;
+        window._waSignupCode  = null;
+        window._waDartFlush   = null;
+        window._waDartCancel  = null;
+
+        // ── Flush: merge code + signup data and call Dart ──
+        window._waFlush = function() {
+          var code = window._waSignupCode;
+          var sd   = window._waSignupData;
+          var fn   = window._waDartFlush;
+          if (!code || !fn) return;
+          var payload = { code: code, has_signup_data: !!sd };
+          if (sd && sd.data) {
+            payload.phone_number_id = sd.data.phone_number_id || null;
+            payload.waba_id         = sd.data.waba_id         || null;
+            payload.business_id     = sd.data.data ? sd.data.data.business_id || null : null;
+          }
+          console.log('_waFlush payload:', JSON.stringify(payload));
+          fn(JSON.stringify(payload));
+        };
+
+        // ── Retry flush: if code arrives first, wait for signup data ──
+        window._waRetryFlush = function(attempt) {
+          if (window._waSignupData) { window._waFlush(); return; }
+          if (attempt >= 3) {
+            console.warn('_waRetryFlush: signup data not received after 3 retries, flushing code only');
+            window._waFlush();
+            return;
+          }
+          setTimeout(function() { window._waRetryFlush(attempt + 1); }, 500);
+        };
+
+        // ── Message listener: WA_EMBEDDED_SIGNUP events ──
         window.addEventListener('message', function(event) {
           if (!event.origin.endsWith('facebook.com')) return;
           try {
             var data = JSON.parse(event.data);
+            if (data.type !== 'WA_EMBEDDED_SIGNUP') return;
             console.log('WA_EMBEDDED_SIGNUP event:', JSON.stringify(data));
-            if (data.type === 'WA_EMBEDDED_SIGNUP') {
-              // Aquí llegan waba_id, phone_number_id, etc.
+
+            if (data.event === 'FINISH') {
               window._waSignupData = data;
+              if (window._waSignupCode) window._waFlush();
+            } else if (data.event === 'CANCEL') {
+              var cancelFn = window._waDartCancel;
+              if (!cancelFn) return;
+              if (data.data && data.data.error_code) {
+                cancelFn(JSON.stringify({
+                  event_type:    'signup_error',
+                  error_message: data.data.error_message || '',
+                  error_code:    String(data.data.error_code),
+                  session_id:    data.data.session_id || '',
+                  timestamp:     new Date().toISOString()
+                }));
+              } else {
+                cancelFn(JSON.stringify({
+                  event_type:   'signup_cancelled',
+                  current_step: (data.data && data.data.current_step) || ''
+                }));
+              }
             }
           } catch(e) {
-            console.log('message event raw:', event.data);
+            // non-JSON message from Facebook iframe — ignore
           }
         });
 
-        window._fbLaunchSignup = function(onCode, onCancel) {
-          if (typeof FB === 'undefined') { onCancel('not_ready'); return; }
+        // ── Launch signup: reset state, open FB.login, wire callbacks ──
+        window._fbLaunchSignup = function(onFlush, onCancel) {
+          if (typeof FB === 'undefined') {
+            onCancel(JSON.stringify({ event_type: 'sdk_not_ready' }));
+            return;
+          }
+          // Reset per-attempt state
+          window._waSignupData = null;
+          window._waSignupCode = null;
+          window._waDartFlush  = onFlush;
+          window._waDartCancel = onCancel;
+
           FB.login(function(r) {
             console.log('FB.login response:', JSON.stringify(r));
             if (r && r.authResponse && r.authResponse.code) {
-              console.log('CODE:', r.authResponse.code);
-              onCode(r.authResponse.code);
+              window._waSignupCode = r.authResponse.code;
+              if (window._waSignupData) {
+                window._waFlush();
+              } else {
+                window._waRetryFlush(0);
+              }
             } else {
-              onCancel('cancelled');
+              onCancel(JSON.stringify({ event_type: 'fb_login_cancelled' }));
             }
           }, {
             scope: 'whatsapp_business_management,whatsapp_business_messaging',
@@ -570,12 +642,13 @@ class _CreateChannelStepperState extends State<_CreateChannelStepper> {
     setState(() { _creating = true; _createError = null; });
     try {
       _fbLaunchSignup(
-        // onCode: JS calls this with the OAuth code string
-        ((JSString jsCode) {
-          _callEmbeddedSignup(jsCode.toDart);
+        // onFlush: JS calls this with JSON {code, phone_number_id, waba_id, business_id, has_signup_data}
+        ((JSString jsPayload) {
+          _handleEmbeddedSignupFlush(jsPayload.toDart);
         }).toJS,
-        // onCancel: user dismissed popup or SDK not ready
-        ((JSString reason) {
+        // onCancel: user dismissed popup, Meta error, or SDK not ready
+        ((JSString jsPayload) {
+          _handleSignupEvent(jsPayload.toDart);
           if (mounted) setState(() => _creating = false);
         }).toJS,
       );
@@ -587,11 +660,60 @@ class _CreateChannelStepperState extends State<_CreateChannelStepper> {
     }
   }
 
-  Future<void> _callEmbeddedSignup(String code) async {
+  void _handleEmbeddedSignupFlush(String jsonPayload) {
+    try {
+      final data = jsonDecode(jsonPayload) as Map<String, dynamic>;
+      final code          = data['code'] as String? ?? '';
+      final phoneNumberId = data['phone_number_id'] as String?;
+      final wabaId        = data['waba_id'] as String?;
+      final businessId    = data['business_id'] as String?;
+      final hasSignupData = data['has_signup_data'] as bool? ?? false;
+      if (code.isEmpty) return;
+      _callEmbeddedSignup(
+        code,
+        phoneNumberId: phoneNumberId,
+        wabaId: wabaId,
+        businessId: businessId,
+        hasSignupData: hasSignupData,
+      );
+    } catch (_) {
+      // Malformed JSON from JS — should not happen
+    }
+  }
+
+  void _handleSignupEvent(String jsonPayload) {
+    try {
+      final data = jsonDecode(jsonPayload) as Map<String, dynamic>;
+      final eventType = data['event_type'] as String? ?? '';
+      // Fire-and-forget telemetry for actionable events
+      if (eventType == 'signup_cancelled' || eventType == 'signup_error') {
+        ChannelsApi.postSignupEvent(data).ignore();
+      }
+      // 'fb_login_cancelled' and 'sdk_not_ready' are expected — no POST needed
+    } catch (_) {
+      // Malformed JSON — ignore
+    }
+  }
+
+  Future<void> _callEmbeddedSignup(
+    String code, {
+    String? phoneNumberId,
+    String? wabaId,
+    String? businessId,
+    bool hasSignupData = false,
+  }) async {
     if (_embeddedSignupInProgress) return;
     _embeddedSignupInProgress = true;
     try {
-      final result = await ChannelsApi.embeddedSignup(code: code);
+      if (!hasSignupData) {
+        ChannelsApi.postSignupEvent({'event_type': 'missing_signup_data'}).ignore();
+      }
+      final result = await ChannelsApi.embeddedSignup(
+        code: code,
+        phoneNumberId: phoneNumberId,
+        wabaId: wabaId,
+        businessId: businessId,
+      );
       if (!mounted) return;
       setState(() => _creating = false);
       final newId = result['id'] as String? ?? result['channel_id'] as String? ?? '';
