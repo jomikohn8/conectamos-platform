@@ -1,5 +1,5 @@
-/// Cambia a `false` para conectarse a Supabase real.
-const kMockMode = false;
+/// Activar con --dart-define=MOCK_MODE=true para datos simulados.
+const kMockMode = bool.fromEnvironment('MOCK_MODE', defaultValue: false);
 
 /// Usuario simulado cuando [kMockMode] es true.
 const kMockEmail = 'supervisor@conectamos.mx';

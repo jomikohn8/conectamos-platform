@@ -3,12 +3,21 @@ import 'dart:html' as html;
 import 'package:dio/dio.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+const _apiBaseUrl = String.fromEnvironment(
+  'API_BASE_URL',
+  defaultValue: '',
+);
+
 class ApiClient {
-  static const String baseUrl = 'https://conectamos-meta-api.vercel.app';
+  static const String baseUrl = _apiBaseUrl;
 
   static final Dio _dio = _buildDio();
 
   static Dio _buildDio() {
+    assert(
+      baseUrl.isNotEmpty,
+      'API_BASE_URL no está definida. Usa run_dev.sh para correr en local.',
+    );
     final dio = Dio(BaseOptions(
       baseUrl: baseUrl,
       connectTimeout: const Duration(seconds: 10),

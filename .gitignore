@@ -45,3 +45,6 @@ app.*.map.json
 /android/app/release
 
 .flutter-plugins
+
+# Local dev script — contiene credenciales, no commitear
+run_dev.sh

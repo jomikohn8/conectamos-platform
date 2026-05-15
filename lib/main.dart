@@ -7,8 +7,14 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 
-const _supabaseUrl = 'https://atqmtsmjpjtrqooibubm.supabase.co';
-const _supabaseAnonKey = 'sb_publishable_DqEJfyb-C4-0GfrmLI-QdQ_nwRmghCG';
+const supabaseUrl = String.fromEnvironment(
+  'SUPABASE_URL',
+  defaultValue: '',
+);
+const supabaseAnonKey = String.fromEnvironment(
+  'SUPABASE_ANON_KEY',
+  defaultValue: '',
+);
 
 Future<void> main() async {
   usePathUrlStrategy();
@@ -17,9 +23,12 @@ Future<void> main() async {
   await initializeDateFormatting('es_MX', null);
   await initializeDateFormatting('es', null);
 
+  assert(supabaseUrl.isNotEmpty, 'SUPABASE_URL no está definida. Usa run_dev.sh.');
+  assert(supabaseAnonKey.isNotEmpty, 'SUPABASE_ANON_KEY no está definida. Usa run_dev.sh.');
+
   await Supabase.initialize(
-    url: _supabaseUrl,
-    anonKey: _supabaseAnonKey,
+    url: supabaseUrl,
+    anonKey: supabaseAnonKey,
   );
 
   runApp(
