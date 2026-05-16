@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart';
 import 'package:calendar_view/calendar_view.dart';
-import '../../shared/widgets/app_date_time_picker.dart';
+import 'package:omni_datetime_picker/omni_datetime_picker.dart';
 
 import '../../core/api/assignments_api.dart';
 import '../../core/api/catalogs_api.dart';
@@ -2310,8 +2310,13 @@ class _DateTimePickerBtn extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () async {
-        final picked =
-            await AppDateTimePicker.show(context, initial: value);
+        final picked = await showOmniDateTimePicker(
+          context: context,
+          initialDate: value ?? DateTime.now(),
+          firstDate: DateTime(2020),
+          lastDate: DateTime(2030),
+          is24HourMode: true,
+        );
         if (picked != null) onChanged(picked);
       },
       child: Container(
