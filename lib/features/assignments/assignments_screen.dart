@@ -101,13 +101,9 @@ Color _behaviorColor(List<dynamic> flows) {
 String _resourceLabel(Map<String, dynamic> r) {
   final type =
       r['resource_type'] as String? ?? r['catalog_slug'] as String? ?? '';
-  final data = r['data'];
-  String value = r['asset_item_id'] as String? ?? '—';
-  if (data is Map) {
-    value = data['nombre'] as String? ??
-        data['placas'] as String? ??
-        (data.values.isNotEmpty ? data.values.first.toString() : value);
-  }
+  String value = r['item_name'] as String? ??
+      r['asset_item_id'] as String? ??
+      '—';
   return type.isNotEmpty ? '$type: $value' : value;
 }
 
