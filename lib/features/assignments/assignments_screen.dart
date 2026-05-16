@@ -45,14 +45,19 @@ String _weekRangeLabel(DateTime monday) {
 (DateTime?, DateTime?) _parseScope(String? raw) {
   if (raw == null || raw.isEmpty) return (null, null);
   try {
+    // Eliminar delimitadores de rango y comillas
     final clean = raw
+        .replaceAll('"', '')
         .replaceAll('[', '')
         .replaceAll('(', '')
         .replaceAll(']', '')
         .replaceAll(')', '');
     final parts = clean.split(',');
     if (parts.length < 2) return (null, null);
-    return (DateTime.parse(parts[0].trim()), DateTime.parse(parts[1].trim()));
+    final lower = parts[0].trim();
+    final upper = parts[1].trim();
+    if (lower.isEmpty || upper.isEmpty) return (null, null);
+    return (DateTime.parse(lower), DateTime.parse(upper));
   } catch (_) {
     return (null, null);
   }
@@ -108,11 +113,13 @@ String _resourceLabel(Map<String, dynamic> r) {
 }
 
 String _flowLabel(Map<String, dynamic> f) {
-  final id = f['flow_slug'] as String? ??
-      f['flow_definition_id'] as String? ??
-      '—';
+  // TODO: backend debe incluir flow_name en assignment_flows response
+  final rawId = f['flow_definition_id'] as String? ?? '';
+  final name = f['flow_name'] as String? ??
+      f['flow_slug'] as String? ??
+      (rawId.length > 8 ? '${rawId.substring(0, 8)}…' : rawId.isNotEmpty ? rawId : '—');
   final behavior = f['behavior'] as String? ?? '';
-  return behavior.isNotEmpty ? '$id ($behavior)' : id;
+  return behavior.isNotEmpty ? '$name ($behavior)' : name;
 }
 
 ({Color bg, Color fg, String label}) _sourceBadge(String? source) =>
@@ -173,9 +180,14 @@ class _AssignmentsScreenState extends ConsumerState<AssignmentsScreen> {
       final dayResults = await Future.wait(dayFutures);
       final operators = await operatorsFuture;
       final data = dayResults.expand((list) => list).toList();
+      final seen = <String>{};
+      final deduped = data.where((a) {
+        final id = a['id'] as String? ?? '';
+        return seen.add(id);
+      }).toList();
       if (!mounted) return;
       setState(() {
-        _assignments = List<Map<String, dynamic>>.from(data);
+        _assignments = List<Map<String, dynamic>>.from(deduped);
         _operators = operators;
         _loading = false;
       });
