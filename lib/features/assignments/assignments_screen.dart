@@ -1473,6 +1473,104 @@ class _SchedulerLegend extends StatelessWidget {
   }
 }
 
+// ── Step indicator (custom, sin Stepper widget) ───────────────────────────────
+
+class _StepIndicator extends StatelessWidget {
+  const _StepIndicator({
+    required this.currentStep,
+    required this.steps,
+  });
+
+  final int currentStep;
+  final List<String> steps;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
+      decoration: const BoxDecoration(
+        border: Border(bottom: BorderSide(color: AppColors.ctBorder)),
+      ),
+      child: Row(
+        children: [
+          for (var i = 0; i < steps.length; i++) ...[
+            _StepDot(
+              index: i,
+              label: steps[i],
+              isDone: currentStep > i,
+              isActive: currentStep == i,
+            ),
+            if (i < steps.length - 1)
+              Expanded(
+                child: Container(
+                  height: 1,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  color: currentStep > i
+                      ? AppColors.ctTeal
+                      : AppColors.ctBorder,
+                ),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _StepDot extends StatelessWidget {
+  const _StepDot({
+    required this.index,
+    required this.label,
+    required this.isDone,
+    required this.isActive,
+  });
+
+  final int index;
+  final String label;
+  final bool isDone;
+  final bool isActive;
+
+  @override
+  Widget build(BuildContext context) {
+    final active = isDone || isActive;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 24,
+          height: 24,
+          decoration: BoxDecoration(
+            color: active ? AppColors.ctTeal : AppColors.ctBorder,
+            shape: BoxShape.circle,
+          ),
+          child: Center(
+            child: isDone
+                ? const Icon(Icons.check, size: 14, color: Colors.white)
+                : Text(
+                    '${index + 1}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: active ? Colors.white : AppColors.ctText2,
+                    ),
+                  ),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: AppFonts.geist(
+            fontSize: 10,
+            fontWeight:
+                isActive ? FontWeight.w600 : FontWeight.w400,
+            color: active ? AppColors.ctText : AppColors.ctText2,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 // ── Empty state ───────────────────────────────────────────────────────────────
 
 class _EmptyState extends StatelessWidget {
@@ -1704,77 +1802,78 @@ class _NewAssignmentDialogState extends State<_NewAssignmentDialog> {
       ),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 560, maxHeight: 720),
-        child: Stepper(
-          currentStep: _step,
-          onStepContinue: _onContinue,
-          onStepCancel: _onCancel,
-          controlsBuilder: (context, details) => Padding(
-            padding: const EdgeInsets.only(top: 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (_error != null)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Text(_error!,
-                        style: AppFonts.geist(
-                            fontSize: 12,
-                            color: AppColors.ctDanger)),
-                  ),
-                Row(
-                  children: [
-                    _PrimaryButton(
-                      label: _step == 3
-                          ? (_saving ? 'Guardando…' : 'Confirmar')
-                          : 'Siguiente',
-                      onTap: _saving ? null : details.onStepContinue,
-                    ),
-                    const SizedBox(width: 10),
-                    _GhostButton(
-                      label: _step == 0 ? 'Cancelar' : 'Atrás',
-                      onTap: details.onStepCancel ?? () {},
-                    ),
-                  ],
-                ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _StepIndicator(
+              currentStep: _step,
+              steps: const [
+                'Operador y ventana',
+                'Activos',
+                'Flows',
+                'Confirmación',
               ],
             ),
-          ),
-          steps: [
-            Step(
-              title: Text('Operador y ventana',
-                  style: AppFonts.geist(
-                      fontSize: 13, fontWeight: FontWeight.w500)),
-              isActive: _step >= 0,
-              state: _step > 0 ? StepState.complete : StepState.indexed,
-              content: _buildStep1(),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: _buildCurrentStep(),
+              ),
             ),
-            Step(
-              title: Text('Activos',
-                  style: AppFonts.geist(
-                      fontSize: 13, fontWeight: FontWeight.w500)),
-              isActive: _step >= 1,
-              state: _step > 1 ? StepState.complete : StepState.indexed,
-              content: _buildStep2(),
-            ),
-            Step(
-              title: Text('Flows',
-                  style: AppFonts.geist(
-                      fontSize: 13, fontWeight: FontWeight.w500)),
-              isActive: _step >= 2,
-              state: _step > 2 ? StepState.complete : StepState.indexed,
-              content: _buildStep3(),
-            ),
-            Step(
-              title: Text('Confirmación',
-                  style: AppFonts.geist(
-                      fontSize: 13, fontWeight: FontWeight.w500)),
-              isActive: _step >= 3,
-              state: StepState.indexed,
-              content: _buildStep4(),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+              child: _buildStepControls(),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildCurrentStep() {
+    switch (_step) {
+      case 0: return _buildStep1();
+      case 1: return _buildStep2();
+      case 2: return _buildStep3();
+      case 3: return _buildStep4();
+      default: return _buildStep1();
+    }
+  }
+
+  Widget _buildStepControls() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (_error != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(_error!,
+                style: AppFonts.geist(
+                    fontSize: 12, color: AppColors.ctDanger)),
+          ),
+        Row(
+          children: [
+            if (_step > 0) ...[
+              _GhostButton(label: 'Atrás', onTap: _onCancel),
+              const SizedBox(width: 10),
+            ],
+            _PrimaryButton(
+              label: _step == 3
+                  ? (_saving ? 'Guardando…' : 'Confirmar')
+                  : 'Siguiente',
+              onTap: _saving ? null : _onContinue,
+            ),
+            const Spacer(),
+            _GhostButton(
+              label: 'Cancelar',
+              onTap: () {
+                widget.onCancel();
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        ),
+      ],
     );
   }
 
