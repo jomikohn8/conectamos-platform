@@ -1641,10 +1641,7 @@ class _NewAssignmentDialogState extends State<_NewAssignmentDialog> {
   final List<TextEditingController> _resTypeCtrls = [];
 
   // Flows
-  final List<String> _flowDefIds = [];
-  final List<String> _flowBehaviors = [];
-  final List<TextEditingController> _flowTriggerCtrls = [];
-  final List<TextEditingController> _flowWindowCtrls = [];
+  final Set<String> _selectedFlowIds = {};
 
   List<Map<String, dynamic>> _catalogs = [];
   List<Map<String, dynamic>> _flowDefs = [];
@@ -1677,8 +1674,7 @@ class _NewAssignmentDialogState extends State<_NewAssignmentDialog> {
 
   @override
   void dispose() {
-    for (final c in [..._resItemIdCtrls, ..._resTypeCtrls,
-        ..._flowTriggerCtrls, ..._flowWindowCtrls]) {
+    for (final c in [..._resItemIdCtrls, ..._resTypeCtrls]) {
       c.dispose();
     }
     super.dispose();
@@ -1707,27 +1703,7 @@ class _NewAssignmentDialogState extends State<_NewAssignmentDialog> {
     });
   }
 
-  void _addFlow() {
-    setState(() {
-      _flowDefIds.add('');   // vacío → dropdown muestra hint
-      _flowBehaviors.add('scheduled');
-      _flowTriggerCtrls.add(TextEditingController());
-      _flowWindowCtrls.add(TextEditingController());
-    });
-  }
-
-  void _removeFlow(int i) {
-    setState(() {
-      _flowDefIds.removeAt(i);
-      _flowBehaviors.removeAt(i);
-      _flowTriggerCtrls[i].dispose();
-      _flowTriggerCtrls.removeAt(i);
-      _flowWindowCtrls[i].dispose();
-      _flowWindowCtrls.removeAt(i);
-    });
-  }
-
-  bool get _step1Valid =>
+bool get _step1Valid =>
       _selectedOperatorId != null &&
       _scopeStart != null &&
       _scopeEnd != null &&
@@ -1745,20 +1721,10 @@ class _NewAssignmentDialogState extends State<_NewAssignmentDialog> {
           if (rt.isNotEmpty) 'resource_type': rt,
         };
       });
-      final flows = List.generate(_flowDefIds.length, (i) {
-        final behavior = _flowBehaviors[i];
-        final trigger =
-            int.tryParse(_flowTriggerCtrls[i].text.trim());
-        final window =
-            int.tryParse(_flowWindowCtrls[i].text.trim());
-        return <String, dynamic>{
-          'flow_definition_id': _flowDefIds[i],
-          'behavior': behavior,
-          if (trigger != null) 'trigger_offset': trigger * 60,
-          if (window != null && behavior == 'scheduled')
-            'completion_window': window * 3600,
-        };
-      });
+      final flows = _selectedFlowIds.map((id) => <String, dynamic>{
+        'flow_definition_id': id,
+        'behavior': 'permissive',
+      }).toList();
       await AssignmentsApi.createAssignment(
         tenantId: widget.tenantId,
         operatorId: _selectedOperatorId!,
@@ -2004,46 +1970,55 @@ class _NewAssignmentDialogState extends State<_NewAssignmentDialog> {
       );
     }
     return Column(
+      mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (_flowDefIds.isEmpty)
+        Text('Selecciona los flows a asignar:',
+            style: AppFonts.geist(fontSize: 13, color: AppColors.ctText2)),
+        const SizedBox(height: 8),
+        ..._flowDefs.map((f) {
+          final id = f['id'] as String? ?? '';
+          final name = f['name'] as String? ?? f['slug'] as String? ?? id;
+          final isSelected = _selectedFlowIds.contains(id);
+          return InkWell(
+            onTap: () => setState(() {
+              if (isSelected) {
+                _selectedFlowIds.remove(id);
+              } else {
+                _selectedFlowIds.add(id);
+              }
+            }),
+            borderRadius: BorderRadius.circular(6),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+              child: Row(
+                children: [
+                  Icon(
+                    isSelected
+                        ? Icons.check_box
+                        : Icons.check_box_outline_blank,
+                    color: isSelected ? AppColors.ctTeal : AppColors.ctText2,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(name,
+                        style: AppFonts.geist(
+                            fontSize: 13, color: AppColors.ctText)),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }),
+        if (_selectedFlowIds.isEmpty)
           Padding(
-            padding: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.only(top: 8),
             child: Text(
-              'Sin flows — el assignment se crea sin trigger automático',
-              style: AppFonts.geist(fontSize: 12, color: AppColors.ctText2),
+              'Sin flows seleccionados — el assignment se crea sin trigger automático',
+              style: AppFonts.geist(fontSize: 11, color: AppColors.ctText2),
             ),
           ),
-        ...List.generate(_flowDefIds.length, (i) => _FlowRow(
-              index: i,
-              flowDefId: _flowDefIds[i],
-              behavior: _flowBehaviors[i],
-              flowDefs: _flowDefs,
-              triggerCtrl: _flowTriggerCtrls[i],
-              windowCtrl: _flowWindowCtrls[i],
-              onFlowChanged: (v) =>
-                  setState(() => _flowDefIds[i] = v ?? ''),
-              onBehaviorChanged: (v) =>
-                  setState(() => _flowBehaviors[i] = v ?? 'scheduled'),
-              onRemove: () => _removeFlow(i),
-            )),
-        const SizedBox(height: 8),
-        GestureDetector(
-          onTap: _addFlow,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.add_circle_outline,
-                  size: 16, color: AppColors.ctTeal),
-              const SizedBox(width: 4),
-              Text('+ Agregar flow',
-                  style: AppFonts.geist(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      color: AppColors.ctTeal)),
-            ],
-          ),
-        ),
       ],
     );
   }
@@ -2107,30 +2082,22 @@ class _NewAssignmentDialogState extends State<_NewAssignmentDialog> {
                           : (_resItemIds[i] ?? _resItemIdCtrls[i].text.trim()),
                     )),
               ],
-              if (_flowDefIds.any((id) => id.isNotEmpty)) ...[
+              if (_selectedFlowIds.isNotEmpty) ...[
                 const SizedBox(height: 6),
                 Text('Flows',
                     style: AppFonts.geist(
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
                         color: AppColors.ctText2)),
-                ..._flowDefIds.asMap().entries
-                    .where((e) => e.value.isNotEmpty)
-                    .map((e) {
-                      final i = e.key;
-                      final flowLabel = _flowDefs
-                              .where((f) => f['id'] == _flowDefIds[i])
-                              .map((f) =>
-                                  f['name'] as String? ??
-                                  f['slug'] as String? ??
-                                  _flowDefIds[i])
-                              .firstOrNull ??
-                          _flowDefIds[i];
-                      return _SummaryRow(
-                        label: flowLabel,
-                        value: _flowBehaviors[i],
-                      );
-                    }),
+                ..._selectedFlowIds.map((id) {
+                  final f = _flowDefs.firstWhere(
+                      (f) => f['id'] == id,
+                      orElse: () => {});
+                  final name = f['name'] as String? ??
+                      f['slug'] as String? ??
+                      id;
+                  return _SummaryRow(label: name, value: 'permissive');
+                }),
               ],
             ],
           ),
@@ -2331,228 +2298,6 @@ class _ResourceRowState extends State<_ResourceRow> {
               isDense: true,
             ),
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class _FlowSelector extends StatefulWidget {
-  const _FlowSelector({
-    required this.value,
-    required this.flowDefs,
-    required this.onChanged,
-  });
-
-  final String? value;
-  final List<Map<String, dynamic>> flowDefs;
-  final ValueChanged<String?> onChanged;
-
-  @override
-  State<_FlowSelector> createState() => _FlowSelectorState();
-}
-
-class _FlowSelectorState extends State<_FlowSelector> {
-  bool _expanded = false;
-
-  String _label() {
-    const hint = 'Selecciona un flow';
-    if (widget.value == null || widget.value!.isEmpty) return hint;
-    final match = widget.flowDefs
-        .where((f) => f['id'] == widget.value)
-        .firstOrNull;
-    if (match == null) return hint;
-    return match['name'] as String? ??
-        match['slug'] as String? ??
-        widget.value!;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final selected = widget.value != null && widget.value!.isNotEmpty;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        InkWell(
-          onTap: () => setState(() => _expanded = !_expanded),
-          borderRadius: BorderRadius.circular(8),
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: AppColors.ctSurface2,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: AppColors.ctBorder2),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    _label(),
-                    style: AppFonts.geist(
-                      fontSize: 12,
-                      color: selected
-                          ? AppColors.ctText
-                          : AppColors.ctText2,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                Icon(
-                  _expanded
-                      ? Icons.expand_less
-                      : Icons.expand_more,
-                  size: 16,
-                  color: AppColors.ctText2,
-                ),
-              ],
-            ),
-          ),
-        ),
-        if (_expanded)
-          SizedBox(
-            width: double.infinity,
-            child: Container(
-              constraints: const BoxConstraints(maxHeight: 200),
-              margin: const EdgeInsets.only(top: 2),
-              decoration: BoxDecoration(
-                color: AppColors.ctSurface,
-                border: Border.all(color: AppColors.ctBorder),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: ListView(
-                padding: EdgeInsets.zero,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-              children: widget.flowDefs.map((f) {
-                final id = f['id'] as String? ?? '';
-                final name = f['name'] as String? ??
-                    f['slug'] as String? ??
-                    id;
-                final isSelected = id == widget.value;
-                return ListTile(
-                  dense: true,
-                  selected: isSelected,
-                  selectedColor: AppColors.ctTeal,
-                  title: Text(
-                    name,
-                    style: AppFonts.geist(
-                      fontSize: 12,
-                      color: isSelected
-                          ? AppColors.ctTeal
-                          : AppColors.ctText,
-                    ),
-                  ),
-                  onTap: () {
-                    widget.onChanged(id);
-                    setState(() => _expanded = false);
-                  },
-                );
-              }).toList(),
-            ),
-          ),
-          ),
-      ],
-    );
-  }
-}
-
-class _FlowRow extends StatelessWidget {
-  const _FlowRow({
-    required this.index,
-    required this.flowDefId,
-    required this.behavior,
-    required this.flowDefs,
-    required this.triggerCtrl,
-    required this.windowCtrl,
-    required this.onFlowChanged,
-    required this.onBehaviorChanged,
-    required this.onRemove,
-  });
-
-  final int index;
-  final String flowDefId;
-  final String behavior;
-  final List<Map<String, dynamic>> flowDefs;
-  final TextEditingController triggerCtrl;
-  final TextEditingController windowCtrl;
-  final ValueChanged<String?> onFlowChanged;
-  final ValueChanged<String?> onBehaviorChanged;
-  final VoidCallback onRemove;
-
-  @override
-  Widget build(BuildContext context) {
-    final needsOffset = behavior == 'scheduled' || behavior == 'proactive';
-    final needsWindow = behavior == 'scheduled';
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        border: Border.all(color: AppColors.ctBorder),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: _FlowSelector(
-                  value: flowDefs.any((f) => f['id'] == flowDefId)
-                      ? flowDefId
-                      : null,
-                  flowDefs: flowDefs,
-                  onChanged: onFlowChanged,
-                ),
-              ),
-              const SizedBox(width: 8),
-              _Dropdown<String>(
-                value: behavior,
-                items: const [
-                  DropdownMenuItem(
-                      value: 'scheduled', child: Text('scheduled')),
-                  DropdownMenuItem(
-                      value: 'permissive', child: Text('permissive')),
-                  DropdownMenuItem(
-                      value: 'proactive', child: Text('proactive')),
-                ],
-                onChanged: onBehaviorChanged,
-              ),
-              IconButton(
-                icon: const Icon(Icons.close,
-                    size: 16, color: AppColors.ctDanger),
-                onPressed: onRemove,
-              ),
-            ],
-          ),
-          if (needsOffset) ...[
-            const SizedBox(height: 6),
-            TextField(
-              controller: triggerCtrl,
-              keyboardType: const TextInputType.numberWithOptions(
-                  signed: true),
-              style: AppFonts.geist(
-                  fontSize: 12, color: AppColors.ctText),
-              decoration: const InputDecoration(
-                labelText: 'trigger_offset (min, puede ser negativo)',
-                isDense: true,
-              ),
-            ),
-          ],
-          if (needsWindow) ...[
-            const SizedBox(height: 6),
-            TextField(
-              controller: windowCtrl,
-              keyboardType: TextInputType.number,
-              style: AppFonts.geist(
-                  fontSize: 12, color: AppColors.ctText),
-              decoration: const InputDecoration(
-                labelText: 'completion_window (horas)',
-                isDense: true,
-              ),
-            ),
-          ],
         ],
       ),
     );
