@@ -3,8 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart';
-import 'package:omni_datetime_picker/omni_datetime_picker.dart';
 import 'package:calendar_view/calendar_view.dart';
+import '../../shared/widgets/app_date_time_picker.dart';
 
 import '../../core/api/assignments_api.dart';
 import '../../core/api/catalogs_api.dart';
@@ -60,7 +60,10 @@ String _weekRangeLabel(DateTime monday) {
 
 final _dateFmt = DateFormat('d MMM', 'es_MX');
 final _timeFmt = DateFormat('HH:mm');
-final _dtFmt = DateFormat('dd/MM/yyyy HH:mm');
+String _formatDt(DateTime dt) {
+  final local = dt.toLocal();
+  return '${_dateFmt.format(local)} ${local.year} · ${_timeFmt.format(local)}';
+}
 
 String _formatWindow(String? raw) {
   final (lo, hi) = _parseScope(raw);
@@ -1397,29 +1400,38 @@ class _AssignmentsSchedulerState extends State<_AssignmentsScheduler> {
       if (id.isNotEmpty) legendOps[id] = a['operator_name'] as String? ?? id;
     }
 
-    return Column(
-      children: [
-        if (legendOps.isNotEmpty)
-          _SchedulerLegend(
-            operatorNames: legendOps,
-            operatorColors: _operatorColors,
-          ),
-        Expanded(
-          child: WeekView<Map<String, dynamic>>(
-            controller: _eventController,
-            initialDay: widget.currentMonday,
-            startHour: 6,
-            endHour: 22,
-            startDay: WeekDays.monday,
-            onEventTap: (events, _) {
-              if (events.isNotEmpty) {
-                final a = events.first.event;
-                if (a != null) widget.onAssignmentTap(a);
-              }
-            },
-          ),
+    return Theme(
+      data: Theme.of(context).copyWith(
+        primaryColor: AppColors.ctTeal,
+        colorScheme: Theme.of(context).colorScheme.copyWith(
+          primary: AppColors.ctTeal,
+          onPrimary: Colors.white,
         ),
-      ],
+      ),
+      child: Column(
+        children: [
+          if (legendOps.isNotEmpty)
+            _SchedulerLegend(
+              operatorNames: legendOps,
+              operatorColors: _operatorColors,
+            ),
+          Expanded(
+            child: WeekView<Map<String, dynamic>>(
+              controller: _eventController,
+              initialDay: widget.currentMonday,
+              startHour: 6,
+              endHour: 22,
+              startDay: WeekDays.monday,
+              onEventTap: (events, _) {
+                if (events.isNotEmpty) {
+                  final a = events.first.event;
+                  if (a != null) widget.onAssignmentTap(a);
+                }
+              },
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1549,7 +1561,9 @@ class _NewAssignmentDialogState extends State<_NewAssignmentDialog> {
           await CatalogsApi.listCatalogs(tenantId: widget.tenantId);
       final flows = await FlowsApi.listFlows();
       if (mounted) setState(() { _catalogs = catalogs; _flowDefs = flows; });
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('Error loading api data: $e');
+    }
   }
 
   @override
@@ -1662,6 +1676,8 @@ class _NewAssignmentDialogState extends State<_NewAssignmentDialog> {
       setState(() { _step = 1; _error = null; });
     } else if (_step == 1) {
       setState(() { _step = 2; _error = null; });
+    } else if (_step == 2) {
+      setState(() { _step = 3; _error = null; });
     } else {
       _submit();
     }
@@ -1706,7 +1722,7 @@ class _NewAssignmentDialogState extends State<_NewAssignmentDialog> {
                 Row(
                   children: [
                     _PrimaryButton(
-                      label: _step == 2
+                      label: _step == 3
                           ? (_saving ? 'Guardando…' : 'Confirmar')
                           : 'Siguiente',
                       onTap: _saving ? null : details.onStepContinue,
@@ -1739,12 +1755,20 @@ class _NewAssignmentDialogState extends State<_NewAssignmentDialog> {
               content: _buildStep2(),
             ),
             Step(
-              title: Text('Flows y confirmar',
+              title: Text('Flows',
                   style: AppFonts.geist(
                       fontSize: 13, fontWeight: FontWeight.w500)),
               isActive: _step >= 2,
-              state: StepState.indexed,
+              state: _step > 2 ? StepState.complete : StepState.indexed,
               content: _buildStep3(),
+            ),
+            Step(
+              title: Text('Confirmación',
+                  style: AppFonts.geist(
+                      fontSize: 13, fontWeight: FontWeight.w500)),
+              isActive: _step >= 3,
+              state: StepState.indexed,
+              content: _buildStep4(),
             ),
           ],
         ),
@@ -1805,7 +1829,9 @@ class _NewAssignmentDialogState extends State<_NewAssignmentDialog> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         ...List.generate(_resCatalogSlugs.length, (i) => _ResourceRow(
+              key: ValueKey('res_$i'),
               index: i,
+              tenantId: widget.tenantId,
               catalogSlug: _resCatalogSlugs[i],
               catalogs: _catalogs,
               itemIdCtrl: _resItemIdCtrls[i],
@@ -1836,16 +1862,17 @@ class _NewAssignmentDialogState extends State<_NewAssignmentDialog> {
   }
 
   Widget _buildStep3() {
-    final opName = widget.operators
-            .where((o) => o['id'] == _selectedOperatorId)
-            .map((o) => o['display_name'] as String? ?? '')
-            .firstOrNull ??
-        _selectedOperatorId ??
-        '—';
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (_flowDefIds.isEmpty)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              'Sin flows — el assignment se crea sin trigger automático',
+              style: AppFonts.geist(fontSize: 12, color: AppColors.ctText2),
+            ),
+          ),
         ...List.generate(_flowDefIds.length, (i) => _FlowRow(
               index: i,
               flowDefId: _flowDefIds[i],
@@ -1876,7 +1903,22 @@ class _NewAssignmentDialogState extends State<_NewAssignmentDialog> {
             ],
           ),
         ),
-        const SizedBox(height: 20),
+      ],
+    );
+  }
+
+  Widget _buildStep4() {
+    final opName = widget.operators
+            .where((o) => o['id'] == _selectedOperatorId)
+            .map((o) =>
+                o['display_name'] as String? ?? o['name'] as String? ?? '')
+            .firstOrNull ??
+        _selectedOperatorId ??
+        '—';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
@@ -1903,12 +1945,42 @@ class _NewAssignmentDialogState extends State<_NewAssignmentDialog> {
                       : null,
                 ),
               ),
-              _SummaryRow(
-                  label: 'Activos',
-                  value: '${_resCatalogSlugs.length}'),
-              _SummaryRow(
-                  label: 'Flows',
-                  value: '${_flowDefIds.length}'),
+              if (_resCatalogSlugs.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Text('Activos',
+                    style: AppFonts.geist(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.ctText2)),
+                ...List.generate(_resCatalogSlugs.length, (i) => _SummaryRow(
+                      label: _resCatalogSlugs[i],
+                      value: _resItemIdCtrls[i].text.trim().isEmpty
+                          ? '—'
+                          : _resItemIdCtrls[i].text.trim(),
+                    )),
+              ],
+              if (_flowDefIds.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Text('Flows',
+                    style: AppFonts.geist(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.ctText2)),
+                ...List.generate(_flowDefIds.length, (i) {
+                  final flowLabel = _flowDefs
+                          .where((f) => f['id'] == _flowDefIds[i])
+                          .map((f) =>
+                              f['slug'] as String? ??
+                              f['name'] as String? ??
+                              _flowDefIds[i])
+                          .firstOrNull ??
+                      _flowDefIds[i];
+                  return _SummaryRow(
+                    label: flowLabel,
+                    value: _flowBehaviors[i],
+                  );
+                }),
+              ],
             ],
           ),
         ),
@@ -1919,9 +1991,11 @@ class _NewAssignmentDialogState extends State<_NewAssignmentDialog> {
 
 // ── Dialog sub-widgets ────────────────────────────────────────────────────────
 
-class _ResourceRow extends StatelessWidget {
+class _ResourceRow extends StatefulWidget {
   const _ResourceRow({
+    super.key,
     required this.index,
+    required this.tenantId,
     required this.catalogSlug,
     required this.catalogs,
     required this.itemIdCtrl,
@@ -1931,6 +2005,7 @@ class _ResourceRow extends StatelessWidget {
   });
 
   final int index;
+  final String tenantId;
   final String catalogSlug;
   final List<Map<String, dynamic>> catalogs;
   final TextEditingController itemIdCtrl;
@@ -1939,7 +2014,52 @@ class _ResourceRow extends StatelessWidget {
   final VoidCallback onRemove;
 
   @override
+  State<_ResourceRow> createState() => _ResourceRowState();
+}
+
+class _ResourceRowState extends State<_ResourceRow> {
+  bool _loadingItems = false;
+  List<Map<String, dynamic>> _items = [];
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.catalogSlug.isNotEmpty) _loadItems();
+  }
+
+  @override
+  void didUpdateWidget(_ResourceRow old) {
+    super.didUpdateWidget(old);
+    if (old.catalogSlug != widget.catalogSlug) {
+      _items = [];
+      widget.itemIdCtrl.clear();
+      if (widget.catalogSlug.isNotEmpty) _loadItems();
+    }
+  }
+
+  Future<void> _loadItems() async {
+    final catalog = widget.catalogs.firstWhere(
+      (c) => c['slug'] == widget.catalogSlug,
+      orElse: () => <String, dynamic>{},
+    );
+    final catalogId = catalog['id'] as String?;
+    if (catalogId == null || catalogId.isEmpty) return;
+    setState(() => _loadingItems = true);
+    try {
+      final items = await CatalogsApi.listItems(
+        tenantId: widget.tenantId,
+        catalogId: catalogId,
+      );
+      if (mounted) setState(() { _items = items; _loadingItems = false; });
+    } catch (e) {
+      if (mounted) setState(() => _loadingItems = false);
+      debugPrint('Error loading catalog items: $e');
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final catalogSelected = widget.catalogSlug.isNotEmpty;
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(10),
@@ -1953,16 +2073,16 @@ class _ResourceRow extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: catalogs.isEmpty
+                child: widget.catalogs.isEmpty
                     ? Text('Cargando catálogos…',
                         style: AppFonts.geist(
                             fontSize: 12, color: AppColors.ctText2))
                     : _Dropdown<String>(
-                        value: catalogs.any(
-                                (c) => c['slug'] == catalogSlug)
-                            ? catalogSlug
-                            : (catalogs.first['slug'] as String? ?? ''),
-                        items: catalogs
+                        value: widget.catalogs.any(
+                                (c) => c['slug'] == widget.catalogSlug)
+                            ? widget.catalogSlug
+                            : (widget.catalogs.first['slug'] as String? ?? ''),
+                        items: widget.catalogs
                             .map((c) => DropdownMenuItem(
                                   value: c['slug'] as String? ?? '',
                                   child: Text(
@@ -1973,43 +2093,80 @@ class _ResourceRow extends StatelessWidget {
                                   ),
                                 ))
                             .toList(),
-                        onChanged: onCatalogChanged,
+                        onChanged: widget.onCatalogChanged,
                       ),
               ),
               IconButton(
                 icon: const Icon(Icons.close,
                     size: 16, color: AppColors.ctDanger),
-                onPressed: onRemove,
+                onPressed: widget.onRemove,
               ),
             ],
           ),
           const SizedBox(height: 6),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: itemIdCtrl,
+          if (_loadingItems)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: AppColors.ctTeal,
+                ),
+              ),
+            )
+          else if (!catalogSelected)
+            TextField(
+              enabled: false,
+              style: AppFonts.geist(fontSize: 12, color: AppColors.ctText2),
+              decoration: const InputDecoration(
+                hintText: 'Selecciona un catálogo primero',
+                isDense: true,
+              ),
+            )
+          else
+            Autocomplete<Map<String, dynamic>>(
+              displayStringForOption: (item) =>
+                  item['name'] as String? ??
+                  item['id'] as String? ??
+                  item.toString(),
+              optionsBuilder: (textEditingValue) {
+                if (textEditingValue.text.isEmpty) return _items;
+                final q = textEditingValue.text.toLowerCase();
+                return _items.where((item) {
+                  final name =
+                      (item['name'] as String? ?? '').toLowerCase();
+                  final id =
+                      (item['id'] as String? ?? '').toLowerCase();
+                  return name.contains(q) || id.contains(q);
+                });
+              },
+              onSelected: (item) {
+                widget.itemIdCtrl.text = item['id'] as String? ?? '';
+              },
+              fieldViewBuilder:
+                  (context, fieldCtrl, focusNode, onFieldSubmitted) {
+                return TextField(
+                  controller: fieldCtrl,
+                  focusNode: focusNode,
                   style: AppFonts.geist(
                       fontSize: 12, color: AppColors.ctText),
                   decoration: const InputDecoration(
-                    labelText: 'asset_item_id',
+                    labelText: 'Buscar activo',
                     isDense: true,
                   ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: TextField(
-                  controller: typeCtrl,
-                  style: AppFonts.geist(
-                      fontSize: 12, color: AppColors.ctText),
-                  decoration: const InputDecoration(
-                    labelText: 'resource_type (opc.)',
-                    isDense: true,
-                  ),
-                ),
-              ),
-            ],
+                );
+              },
+            ),
+          const SizedBox(height: 6),
+          TextField(
+            controller: widget.typeCtrl,
+            style: AppFonts.geist(fontSize: 12, color: AppColors.ctText),
+            decoration: const InputDecoration(
+              labelText: 'resource_type (opc.)',
+              isDense: true,
+            ),
           ),
         ],
       ),
@@ -2152,13 +2309,8 @@ class _DateTimePickerBtn extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () async {
-        final picked = await showOmniDateTimePicker(
-          context: context,
-          initialDate: value ?? DateTime.now(),
-          firstDate: DateTime(2020),
-          lastDate: DateTime(2030),
-          is24HourMode: true,
-        );
+        final picked =
+            await AppDateTimePicker.show(context, initial: value);
         if (picked != null) onChanged(picked);
       },
       child: Container(
@@ -2181,7 +2333,7 @@ class _DateTimePickerBtn extends StatelessWidget {
                     : AppColors.ctText2),
             const SizedBox(width: 8),
             Text(
-              value != null ? _dtFmt.format(value!) : hint,
+              value != null ? _formatDt(value!) : hint,
               style: AppFonts.geist(
                   fontSize: 13,
                   color: value != null
