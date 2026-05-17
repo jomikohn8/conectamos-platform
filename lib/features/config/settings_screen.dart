@@ -11,10 +11,11 @@ import '../../core/theme/app_theme.dart';
 import '../../shared/widgets/page_header.dart';
 import 'role_permissions_panel.dart';
 import '../settings/operator_fields_screen.dart';
+import 'operator_roles_screen.dart';
 
 // ── Enum de secciones ─────────────────────────────────────────────────────────
 
-enum _Section { general, billing, users, communication, permissions, operatorFields }
+enum _Section { general, billing, users, communication, permissions, roles, operatorFields }
 
 // ── Pantalla principal ────────────────────────────────────────────────────────
 
@@ -31,6 +32,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final canManageSettings = hasPermission(ref, 'settings', 'manage');
+    final canViewRoles      = hasPermission(ref, 'operator_roles', 'view');
 
     final items = [
       (section: _Section.general,       label: 'Información general', icon: Icons.business_outlined),
@@ -38,9 +40,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       (section: _Section.users,         label: 'Usuarios',            icon: Icons.group_outlined),
       (section: _Section.communication, label: 'Comunicación',        icon: Icons.chat_bubble_outline_rounded),
       if (canManageSettings)
-        (section: _Section.permissions, label: 'Permisos',            icon: Icons.security_outlined),
+        (section: _Section.permissions,    label: 'Permisos',            icon: Icons.security_outlined),
+      if (canViewRoles)
+        (section: _Section.roles,          label: 'Roles',               icon: Icons.badge_outlined),
       if (canManageSettings)
-        (section: _Section.operatorFields, label: 'Operador',         icon: Icons.dashboard_customize),
+        (section: _Section.operatorFields, label: 'Operador',            icon: Icons.dashboard_customize),
     ];
 
     // Reset to general if active tab was removed (e.g., permissions lost)
@@ -186,6 +190,9 @@ class _SectionPanel extends StatelessWidget {
     if (active == _Section.permissions) {
       return const _PermissionsSection();
     }
+    if (active == _Section.roles) {
+      return const OperatorRolesScreen();
+    }
     if (active == _Section.operatorFields) {
       return const OperatorFieldsBody();
     }
@@ -201,6 +208,8 @@ class _SectionPanel extends StatelessWidget {
       case _Section.communication:
         content = const _CommunicationSection();
       case _Section.permissions:
+        content = const SizedBox.shrink(); // handled above
+      case _Section.roles:
         content = const SizedBox.shrink(); // handled above
       case _Section.operatorFields:
         content = const SizedBox.shrink(); // handled above

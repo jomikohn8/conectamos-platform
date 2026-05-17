@@ -842,15 +842,6 @@ class _Sidebar extends ConsumerWidget {
                               collapsed: collapsed,
                               navigationShell: navigationShell,
                             ),
-                            if (!collapsed && hasPermission(ref, 'operator_roles', 'view'))
-                              _SubItemTile(
-                                sub: _ExpandableSubItem(
-                                  icon: Icons.badge_outlined,
-                                  label: 'Roles',
-                                  route: '/operators/roles',
-                                  currentRoute: currentRoute,
-                                ),
-                              ),
                           ],
                         ],
                         // ── Próximamente (comentado) ──────────────────────
