@@ -19,6 +19,7 @@ import '../../features/config/operators_screen.dart';
 import '../../features/config/settings_screen.dart';
 import '../../features/settings/operator_fields_screen.dart';
 import '../../features/config/ai_workers_screen.dart';
+import '../../features/config/worker_detail_screen.dart';
 import '../../features/config/workflows_screen.dart';
 import '../../features/assignments/assignments_screen.dart';
 import '../../features/assignments/assignment_detail_screen.dart';
@@ -37,8 +38,6 @@ import '../../shared/widgets/app_shell.dart';
 // Mapa de ruta → permiso requerido
 const _kRoutePermissions = {
   '/operators':    'operators.view',
-  '/flows':        'flows.view',
-  '/channels':     'settings.view',
   '/connections':  'settings.view',
   '/settings':     'settings.view',
   '/workers':      'settings.manage',
@@ -218,51 +217,31 @@ final routerProvider = Provider<GoRouter>((ref) {
               pageBuilder: (c, s) => const NoTransitionPage(child: EscalacionesScreen()),
             ),
           ]),
-          // Branch 8 — Flows
-          StatefulShellBranch(routes: [
-            GoRoute(
-              path: '/flows',
-              pageBuilder: (c, s) => const NoTransitionPage(child: WorkflowsScreen()),
-              routes: [
-                GoRoute(
-                  path: ':flowId',
-                  pageBuilder: (c, s) => NoTransitionPage(
-                    child: FlowDetailScreen(flowId: s.pathParameters['flowId'] ?? ''),
-                  ),
-                ),
-              ],
-            ),
-          ]),
-          // Branch 9 — Workers
+          // Branch 8 — Workers
           StatefulShellBranch(routes: [
             GoRoute(
               path: '/workers',
               pageBuilder: (c, s) => const NoTransitionPage(child: AiWorkersScreen()),
-            ),
-          ]),
-          // Branch 10 — Channels
-          StatefulShellBranch(routes: [
-            GoRoute(
-              path: '/channels',
-              pageBuilder: (c, s) => const NoTransitionPage(child: ChannelsScreen()),
               routes: [
                 GoRoute(
-                  path: ':channelId',
+                  path: ':workerId',
                   pageBuilder: (c, s) => NoTransitionPage(
-                    child: ChannelDetailScreen(channelId: s.pathParameters['channelId'] ?? ''),
+                    child: WorkerDetailScreen(
+                      workerId: s.pathParameters['workerId'] ?? '',
+                    ),
                   ),
                 ),
               ],
             ),
           ]),
-          // Branch 11 — Connections
+          // Branch 9 — Connections
           StatefulShellBranch(routes: [
             GoRoute(
               path: '/connections',
               pageBuilder: (c, s) => const NoTransitionPage(child: ConnectionsScreen()),
             ),
           ]),
-          // Branch 12 — Settings
+          // Branch 10 — Settings
           StatefulShellBranch(routes: [
             GoRoute(
               path: '/settings',
@@ -275,7 +254,7 @@ final routerProvider = Provider<GoRouter>((ref) {
               ],
             ),
           ]),
-          // Branch 13 — Catalogs
+          // Branch 11 — Catalogs
           StatefulShellBranch(routes: [
             GoRoute(
               path: '/catalogs',
@@ -295,7 +274,7 @@ final routerProvider = Provider<GoRouter>((ref) {
               ],
             ),
           ]),
-          // Branch 14 — Assignments
+          // Branch 12 — Assignments
           StatefulShellBranch(routes: [
             GoRoute(
               path: '/assignments',
@@ -313,6 +292,27 @@ final routerProvider = Provider<GoRouter>((ref) {
             ),
           ]),
         ],
+      ),
+      // Standalone routes — accessible without shell (deep links)
+      GoRoute(
+        path: '/flows',
+        pageBuilder: (c, s) => const NoTransitionPage(child: WorkflowsScreen()),
+      ),
+      GoRoute(
+        path: '/flows/:flowId',
+        pageBuilder: (c, s) => NoTransitionPage(
+          child: FlowDetailScreen(flowId: s.pathParameters['flowId'] ?? ''),
+        ),
+      ),
+      GoRoute(
+        path: '/channels',
+        pageBuilder: (c, s) => const NoTransitionPage(child: ChannelsScreen()),
+      ),
+      GoRoute(
+        path: '/channels/:channelId',
+        pageBuilder: (c, s) => NoTransitionPage(
+          child: ChannelDetailScreen(channelId: s.pathParameters['channelId'] ?? ''),
+        ),
       ),
     ],
     errorBuilder: (context, state) => Scaffold(

@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/api/ai_workers_api.dart';
 import '../../core/providers/permissions_provider.dart';
@@ -202,6 +203,10 @@ class _AiWorkersScreenState extends ConsumerState<AiWorkersScreen> {
                               workers: _myWorkers,
                               onToggle: _toggleActive,
                               onRename: _openRename,
+                              onTap: (worker) {
+                                final id = worker['id'] as String? ?? '';
+                                if (id.isNotEmpty) context.go('/workers/$id');
+                              },
                               canManage: canManage,
                             ),
                     ),
@@ -246,11 +251,13 @@ class _WorkersBody extends StatelessWidget {
     required this.workers,
     required this.onToggle,
     required this.onRename,
+    required this.onTap,
     this.canManage = true,
   });
   final List<Map<String, dynamic>> workers;
   final void Function(Map<String, dynamic>) onToggle;
   final void Function(Map<String, dynamic>) onRename;
+  final void Function(Map<String, dynamic>) onTap;
   final bool canManage;
 
   static const _headerStyle = TextStyle(
@@ -300,6 +307,7 @@ class _WorkersBody extends StatelessWidget {
                   worker: entry.value,
                   onToggle: canManage ? () => onToggle(entry.value) : null,
                   onRename: canManage ? () => onRename(entry.value) : null,
+                  onTap: () => onTap(entry.value),
                 ),
                 if (!isLast)
                   const Divider(height: 1, color: AppColors.ctBorder),
@@ -319,10 +327,12 @@ class _WorkerRow extends StatefulWidget {
     required this.worker,
     this.onToggle,
     this.onRename,
+    this.onTap,
   });
   final Map<String, dynamic> worker;
   final VoidCallback? onToggle;
   final VoidCallback? onRename;
+  final VoidCallback? onTap;
 
   @override
   State<_WorkerRow> createState() => _WorkerRowState();
@@ -345,7 +355,12 @@ class _WorkerRowState extends State<_WorkerRow> {
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit:  (_) => setState(() => _hovered = false),
-      child: AnimatedContainer(
+      cursor: widget.onTap != null
+          ? SystemMouseCursors.click
+          : MouseCursor.defer,
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
         duration: const Duration(milliseconds: 100),
         color: _hovered ? AppColors.ctBg : AppColors.ctSurface,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -466,6 +481,7 @@ class _WorkerRowState extends State<_WorkerRow> {
             ),
           ],
         ),
+      ),
       ),
     );
   }

@@ -103,12 +103,10 @@ const _kRouteBranchIndex = {
   '/executions':    5,
   '/tareas':        6,
   '/escalaciones':  7,
-  '/flows':         8,
-  '/workers':       9,
-  '/channels':      10,
-  '/connections':   11,
-  '/settings':      12,
-  '/catalogs':      13,
+  '/workers':       8,
+  '/connections':   9,
+  '/settings':      10,
+  '/catalogs':      11,
 };
 
 // ── TOPBAR ────────────────────────────────────────────────────────────────────
@@ -800,15 +798,7 @@ class _Sidebar extends ConsumerWidget {
                             collapsed: collapsed,
                             navigationShell: navigationShell,
                           ),
-                        if (hasPermission(ref, 'flows', 'view'))
-                          _NavItem(
-                            icon: Icons.account_tree_outlined,
-                            label: 'Creación de flujos',
-                            route: '/flows',
-                            currentRoute: currentRoute,
-                            collapsed: collapsed,
-                            navigationShell: navigationShell,
-                          ),
+
                         if (hasPermission(ref, 'catalogs', 'view'))
                           _NavItem(
                             icon: Icons.folder_copy_outlined,
@@ -826,38 +816,25 @@ class _Sidebar extends ConsumerWidget {
                             label: 'Configuración',
                             collapsed: collapsed,
                           ),
-                          if (hasPermission(ref, 'settings', 'view'))
+                          if (hasPermission(ref, 'operators', 'view'))
                             _NavItem(
-                              icon: Icons.router_rounded,
-                              label: 'Canales',
-                              route: '/channels',
+                              icon: Icons.people_outline_rounded,
+                              label: 'Operadores',
+                              route: '/operators',
                               currentRoute: currentRoute,
                               collapsed: collapsed,
                               navigationShell: navigationShell,
                             ),
-                          if (hasPermission(ref, 'operators', 'view'))
-                            _ExpandableNavItem(
-                              icon: Icons.people_outline_rounded,
-                              label: 'Operadores',
-                              currentRoute: currentRoute,
-                              collapsed: collapsed,
-                              children: [
-                                _ExpandableSubItem(
-                                  icon: Icons.people_outline_rounded,
-                                  label: 'Operadores',
-                                  route: '/operators',
-                                  currentRoute: currentRoute,
-                                ),
-                                if (hasPermission(ref, 'operator_roles', 'view'))
-                                  _ExpandableSubItem(
-                                    icon: Icons.badge_outlined,
-                                    label: 'Roles',
-                                    route: '/operators/roles',
-                                    currentRoute: currentRoute,
-                                  ),
-                              ],
-                            ),
                           if (hasPermission(ref, 'settings', 'view')) ...[
+                            if (hasPermission(ref, 'operator_roles', 'view'))
+                              _NavItem(
+                                icon: Icons.badge_outlined,
+                                label: 'Roles',
+                                route: '/operators/roles',
+                                currentRoute: currentRoute,
+                                collapsed: collapsed,
+                                navigationShell: navigationShell,
+                              ),
                             _NavItem(
                               icon: Icons.cable_outlined,
                               label: 'Conexiones',

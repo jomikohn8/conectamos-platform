@@ -58,7 +58,8 @@ String _dioError(Object e) {
 // ── Screen ────────────────────────────────────────────────────────────────────
 
 class ChannelsScreen extends ConsumerStatefulWidget {
-  const ChannelsScreen({super.key});
+  const ChannelsScreen({super.key, this.tenantWorkerId});
+  final String? tenantWorkerId;
 
   @override
   ConsumerState<ChannelsScreen> createState() => _ChannelsScreenState();
@@ -85,8 +86,15 @@ class _ChannelsScreenState extends ConsumerState<ChannelsScreen> {
         AiWorkersApi.listWorkers(),
       ]);
       if (!mounted) return;
+      final allChannels = results[0];
       setState(() {
-        _channels  = results[0];
+        _channels  = widget.tenantWorkerId != null
+            ? allChannels
+                .where((c) =>
+                    (c['tenant_worker_id'] as String?) ==
+                    widget.tenantWorkerId)
+                .toList()
+            : allChannels;
         _workers   = results[1];
         _loading   = false;
       });

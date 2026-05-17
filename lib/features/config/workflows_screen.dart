@@ -72,7 +72,8 @@ String _slugify(String input) {
 // ── Screen ────────────────────────────────────────────────────────────────────
 
 class WorkflowsScreen extends ConsumerStatefulWidget {
-  const WorkflowsScreen({super.key});
+  const WorkflowsScreen({super.key, this.tenantWorkerId});
+  final String? tenantWorkerId;
 
   @override
   ConsumerState<WorkflowsScreen> createState() => _WorkflowsScreenState();
@@ -95,7 +96,9 @@ class _WorkflowsScreenState extends ConsumerState<WorkflowsScreen> {
     setState(() { _loading = true; _error = null; });
     try {
       final results = await Future.wait([
-        FlowsApi.listFlows(),
+        widget.tenantWorkerId != null
+            ? FlowsApi.getFlowsByWorker(tenantWorkerId: widget.tenantWorkerId!)
+            : FlowsApi.listFlows(),
         AiWorkersApi.listWorkers(),
       ]);
       if (!mounted) return;
@@ -164,6 +167,7 @@ class _WorkflowsScreenState extends ConsumerState<WorkflowsScreen> {
         flow: flow,
         workers: _workers,
         onSaved: _fetchAll,
+        preselectedWorkerId: widget.tenantWorkerId,
       ),
     );
   }
@@ -633,10 +637,12 @@ class _FlowFormDialog extends StatefulWidget {
     required this.workers,
     required this.onSaved,
     this.flow,
+    this.preselectedWorkerId,
   });
   final Map<String, dynamic>? flow;
   final List<Map<String, dynamic>> workers;
   final Future<void> Function() onSaved;
+  final String? preselectedWorkerId;
 
   @override
   State<_FlowFormDialog> createState() => _FlowFormDialogState();
@@ -661,7 +667,9 @@ class _FlowFormDialogState extends State<_FlowFormDialog> {
       _nameCtrl.text = widget.flow!['name'] as String? ?? '';
       _descCtrl.text = widget.flow!['description'] as String? ?? '';
     }
-    if (widget.workers.isNotEmpty) {
+    if (widget.preselectedWorkerId != null) {
+      _selectedWorkerId = widget.preselectedWorkerId;
+    } else if (widget.workers.isNotEmpty) {
       _selectedWorkerId = widget.workers.first['id'] as String?;
     }
     _nameCtrl.addListener(_onNameChanged);
