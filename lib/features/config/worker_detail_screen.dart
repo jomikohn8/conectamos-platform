@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/api/ai_workers_api.dart';
 import '../../core/theme/app_theme.dart';
+import '../../shared/widgets/app_button.dart';
 import 'channels_screen.dart';
 import 'workflows_screen.dart';
 
@@ -86,11 +87,9 @@ class _WorkerDetailScreenState extends ConsumerState<WorkerDetailScreen>
             )
           : Text(
               _workerName,
-              style: const TextStyle(
+              style: AppTextStyles.pageTitle.copyWith(
                 fontFamily: 'Geist',
-                fontSize: 15,
                 fontWeight: FontWeight.w600,
-                color: AppColors.ctText,
               ),
             ),
       bottom: TabBar(
@@ -98,15 +97,8 @@ class _WorkerDetailScreenState extends ConsumerState<WorkerDetailScreen>
         labelColor: AppColors.ctTeal,
         unselectedLabelColor: AppColors.ctText2,
         indicatorColor: AppColors.ctTeal,
-        labelStyle: const TextStyle(
-          fontFamily: 'Geist',
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-        ),
-        unselectedLabelStyle: const TextStyle(
-          fontFamily: 'Geist',
-          fontSize: 12,
-        ),
+        labelStyle: AppTextStyles.formLabel,
+        unselectedLabelStyle: AppTextStyles.navItem,
         tabs: const [
           Tab(text: 'FLUJOS'),
           Tab(text: 'CANALES'),
@@ -130,13 +122,14 @@ class _WorkerDetailScreenState extends ConsumerState<WorkerDetailScreen>
               const SizedBox(height: 12),
               Text(
                 _error!,
-                style: const TextStyle(
-                  fontFamily: 'Geist',
-                  color: AppColors.ctText2,
-                ),
+                style: AppTextStyles.body.copyWith(color: AppColors.ctText2),
               ),
               const SizedBox(height: 16),
-              TextButton(onPressed: _load, child: const Text('Reintentar')),
+              AppButton(
+                variant: AppButtonVariant.ghost,
+                label: 'Reintentar',
+                onPressed: _load,
+              ),
             ],
           ),
         ),
