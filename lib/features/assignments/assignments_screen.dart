@@ -108,10 +108,8 @@ String _resourceLabel(Map<String, dynamic> r) {
 }
 
 String _flowLabel(Map<String, dynamic> f) {
-  // TODO: backend debe incluir flow_name en assignment_flows response
   final rawId = f['flow_definition_id'] as String? ?? '';
   final name = f['flow_name'] as String? ??
-      f['flow_slug'] as String? ??
       (rawId.length > 8 ? '${rawId.substring(0, 8)}…' : rawId.isNotEmpty ? rawId : '—');
   final behavior = f['behavior'] as String? ?? '';
   return behavior.isNotEmpty ? '$name ($behavior)' : name;
