@@ -153,27 +153,15 @@ class _Topbar extends ConsumerWidget {
 
           // [C] Wordmark
           RichText(
-            text: const TextSpan(
+            text: TextSpan(
               children: [
                 TextSpan(
                   text: 'Conectam',
-                  style: TextStyle(
-                    fontFamily: 'Geist',
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.ctNavy,
-                    letterSpacing: -0.26,
-                  ),
+                  style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w700, color: AppColors.ctNavy, letterSpacing: -0.26),
                 ),
                 TextSpan(
                   text: 'OS',
-                  style: TextStyle(
-                    fontFamily: 'Geist',
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.ctTealText,
-                    letterSpacing: -0.26,
-                  ),
+                  style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w700, color: AppColors.ctTealText, letterSpacing: -0.26),
                 ),
               ],
             ),
@@ -241,15 +229,10 @@ class _TenantSelector extends ConsumerWidget {
                 Expanded(
                   child: Text(
                     t.displayName,
-                    style: TextStyle(
-                      fontFamily: 'Geist',
+                    style: AppTextStyles.bodySmall.copyWith(
                       fontSize: 12,
-                      fontWeight: t.id == active?.id
-                          ? FontWeight.w600
-                          : FontWeight.w400,
-                      color: t.id == active?.id
-                          ? AppColors.ctTeal
-                          : AppColors.ctText,
+                      fontWeight: t.id == active?.id ? FontWeight.w600 : FontWeight.w400,
+                      color: t.id == active?.id ? AppColors.ctTeal : AppColors.ctText,
                     ),
                   ),
                 ),
@@ -288,13 +271,7 @@ class _TenantSelector extends ConsumerWidget {
         children: [
           Text(
             name,
-            style: const TextStyle(
-              fontFamily: 'Geist',
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: AppColors.ctText,
-              letterSpacing: -0.11,
-            ),
+            style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.w600, color: AppColors.ctText, letterSpacing: -0.11),
           ),
           if (hasMultiple) ...[
             const SizedBox(width: 4),
@@ -415,12 +392,7 @@ class _StatusChip extends StatelessWidget {
           const SizedBox(width: 4),
           Text(
             label,
-            style: TextStyle(
-              fontFamily: 'Geist',
-              fontSize: 10,
-              fontWeight: FontWeight.w600,
-              color: textColor,
-            ),
+            style: AppTextStyles.kpiLabel.copyWith(color: textColor),
           ),
         ],
       ),
@@ -535,11 +507,7 @@ class _UserMenu extends ConsumerWidget {
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             child: Text(
               email,
-              style: const TextStyle(
-                fontFamily: 'Geist',
-                fontSize: 12,
-                color: AppColors.ctText2,
-              ),
+              style: AppTextStyles.bodySmall.copyWith(fontSize: 12),
             ),
           ),
           const PopupMenuDivider(height: 1),
@@ -580,13 +548,7 @@ class _UserMenu extends ConsumerWidget {
                   child: Text(
                     email,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontFamily: 'Geist',
-                      fontSize: 11,
-                      fontWeight: FontWeight.w400,
-                      color: AppColors.ctText2,
-                      letterSpacing: -0.11,
-                    ),
+                    style: AppTextStyles.bodySmall.copyWith(letterSpacing: -0.11),
                   ),
                 ),
                 const SizedBox(width: 6),
@@ -602,12 +564,7 @@ class _UserMenu extends ConsumerWidget {
                 alignment: Alignment.center,
                 child: Text(
                   initial,
-                  style: const TextStyle(
-                    fontFamily: 'Geist',
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.ctTealText,
-                  ),
+                  style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.w700, color: AppColors.ctTealText),
                 ),
               ),
             ],
@@ -665,12 +622,7 @@ class _MenuItemTileState extends State<_MenuItemTile> {
             const SizedBox(width: 10),
             Text(
               widget.label,
-              style: TextStyle(
-                fontFamily: 'Geist',
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-                color: widget.color,
-              ),
+              style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w500, color: widget.color),
             ),
           ],
         ),
@@ -957,11 +909,7 @@ class _NavItemState extends State<_NavItem> {
           color: AppColors.ctNavy,
           borderRadius: BorderRadius.circular(6),
         ),
-        textStyle: const TextStyle(
-          fontFamily: 'Geist',
-          fontSize: 12,
-          color: Colors.white,
-        ),
+        textStyle: AppTextStyles.bodySmall.copyWith(fontSize: 12, color: Colors.white),
         child: content,
       );
     }
@@ -1050,8 +998,7 @@ class _NavItemState extends State<_NavItem> {
           Expanded(
             child: Text(
               widget.label,
-              style: TextStyle(
-                fontFamily: 'Geist',
+              style: AppTextStyles.bodySmall.copyWith(
                 fontSize: 12,
                 fontWeight: _isActive ? FontWeight.w600 : FontWeight.w400,
                 color: _isActive
@@ -1077,12 +1024,7 @@ class _NavItemState extends State<_NavItem> {
               alignment: Alignment.center,
               child: Text(
                 badgeCount > 99 ? '99+' : '$badgeCount',
-                style: const TextStyle(
-                  fontFamily: 'Geist',
-                  fontSize: 9,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.ctNavy,
-                ),
+                style: AppTextStyles.navSectionLabel.copyWith(color: AppColors.ctNavy),
               ),
             ),
           ],
@@ -1181,9 +1123,7 @@ class _ExpandableNavItemState extends State<_ExpandableNavItem> {
           color: AppColors.ctNavy,
           borderRadius: BorderRadius.circular(6),
         ),
-        textStyle: const TextStyle(
-          fontFamily: 'Geist', fontSize: 12, color: Colors.white,
-        ),
+        textStyle: AppTextStyles.bodySmall.copyWith(fontSize: 12, color: Colors.white),
         child: Container(
           margin: const EdgeInsets.symmetric(vertical: 1, horizontal: 6),
           width: 36, height: 32,
@@ -1237,11 +1177,9 @@ class _ExpandableNavItemState extends State<_ExpandableNavItem> {
                   const SizedBox(width: 9),
                   Expanded(
                     child: Text(widget.label,
-                        style: TextStyle(
-                          fontFamily: 'Geist',
+                        style: AppTextStyles.bodySmall.copyWith(
                           fontSize: 12,
-                          fontWeight: _anyChildActive
-                              ? FontWeight.w600 : FontWeight.w400,
+                          fontWeight: _anyChildActive ? FontWeight.w600 : FontWeight.w400,
                           color: _anyChildActive
                               ? AppColors.ctTeal
                               : _hovered
@@ -1318,9 +1256,7 @@ class _SubItemTileState extends State<_SubItemTile> {
               const SizedBox(width: 9),
               Expanded(
                 child: Text(widget.sub.label,
-                    style: TextStyle(
-                      fontFamily: 'Geist',
-                      fontSize: 11,
+                    style: AppTextStyles.bodySmall.copyWith(
                       fontWeight: active ? FontWeight.w600 : FontWeight.w400,
                       color: active
                           ? AppColors.ctTeal

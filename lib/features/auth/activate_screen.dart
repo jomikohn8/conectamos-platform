@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/api/api_client.dart';
+import '../../core/theme/text_styles.dart';
 import 'auth_shared.dart';
 
 class ActivateScreen extends StatefulWidget {
@@ -121,7 +122,7 @@ class _ActivateScreenState extends State<ActivateScreen> {
             padding: const EdgeInsets.all(32),
             child: Text(
               'Error de renderizado:\n$_renderFallbackMsg',
-              style: const TextStyle(color: Colors.white, fontSize: 13),
+              style: AppTextStyles.body.copyWith(color: Colors.white),
               textAlign: TextAlign.center,
             ),
           ),

@@ -8,6 +8,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/config.dart';
+import '../../core/theme/colors.dart';
+import '../../core/theme/text_styles.dart';
 import 'auth_shared.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -136,15 +138,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
               ),
               const SizedBox(width: 10),
-              const Text(
+              Text(
                 'Conectamos Platform',
-                style: TextStyle(
-                  fontFamily: 'Onest',
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF59E0CC),
-                  letterSpacing: -0.1,
-                ),
+                style: AppTextStyles.cardTitle.copyWith(color: AppColors.ctTeal, letterSpacing: -0.1),
               ),
             ],
           ),
@@ -152,8 +148,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
           // Hero title — line 1 white, line 2 teal
           RichText(
-            text: const TextSpan(
-              style: TextStyle(
+            text: TextSpan(
+              style: const TextStyle(
                 fontFamily: 'Onest',
                 fontSize: 50,
                 fontWeight: FontWeight.w700,
@@ -163,11 +159,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               children: [
                 TextSpan(
                   text: 'Tu operación en\ntiempo real,\n',
-                  style: TextStyle(color: Colors.white),
+                  style: AppTextStyles.body.copyWith(color: Colors.white),
                 ),
                 TextSpan(
                   text: 'en un solo lugar.',
-                  style: TextStyle(color: Color(0xFF59E0CC)),
+                  style: AppTextStyles.body.copyWith(color: AppColors.ctTeal),
                 ),
               ],
             ),
@@ -177,7 +173,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           // Subtitle
           Text(
             'Conecta las herramientas que ya usas, detecta fallas antes de que escalen y gestiona toda tu operación sin cambiar la forma en que trabaja tu equipo.',
-            style: TextStyle(
+            style: AppTextStyles.pageTitle.copyWith(
               fontFamily: 'Geist',
               fontSize: 17,
               color: Colors.white.withValues(alpha: 0.72),
@@ -576,28 +572,19 @@ class _NotifCard extends StatelessWidget {
                     children: [
                       Text(
                         meta,
-                        style: TextStyle(
-                          fontFamily: 'Geist',
-                          fontSize: 11,
+                        style: AppTextStyles.bodySmall.copyWith(
                           color: Colors.white.withValues(alpha: 0.55),
                         ),
                       ),
                       const SizedBox(height: 3),
                       Text(
                         title,
-                        style: const TextStyle(
-                          fontFamily: 'Onest',
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                          letterSpacing: -0.1,
-                        ),
+                        style: AppTextStyles.cardTitle.copyWith(fontSize: 14, color: Colors.white, letterSpacing: -0.1),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         desc,
-                        style: TextStyle(
-                          fontFamily: 'Geist',
+                        style: AppTextStyles.bodySmall.copyWith(
                           fontSize: 12,
                           color: Colors.white.withValues(alpha: 0.70),
                           letterSpacing: -0.1,

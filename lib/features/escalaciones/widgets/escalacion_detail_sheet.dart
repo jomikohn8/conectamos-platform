@@ -7,6 +7,7 @@ import '../../../core/providers/escalaciones_provider.dart';
 import '../../../core/providers/permissions_provider.dart';
 import '../../../core/providers/tenant_provider.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/app_button.dart';
 import 'escalacion_list_tile.dart';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -150,12 +151,7 @@ class _EscalacionDetailSheetState
         builder: (ctx, setDs) => AlertDialog(
           title: const Text(
             'Asignar escalación',
-            style: TextStyle(
-              fontFamily: 'Onest',
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: AppColors.ctText,
-            ),
+            style: AppTextStyles.pageTitle,
           ),
           content: SizedBox(
             width: 320,
@@ -177,7 +173,7 @@ class _EscalacionDetailSheetState
                   value: id,
                   child: Text(
                     name,
-                    style: const TextStyle(fontFamily: 'Geist', fontSize: 13),
+                    style: AppTextStyles.body,
                   ),
                 );
               }).toList(),
@@ -185,19 +181,18 @@ class _EscalacionDetailSheetState
             ),
           ),
           actions: [
-            TextButton(
+            AppButton(
+              label: 'Cancelar',
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancelar'),
+              variant: AppButtonVariant.ghost,
+              size: AppButtonSize.sm,
             ),
-            ElevatedButton(
-              onPressed: selectedUserId != null
-                  ? () => Navigator.pop(ctx, true)
-                  : null,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.ctTeal,
-                foregroundColor: AppColors.ctNavy,
-              ),
-              child: const Text('Asignar'),
+            AppButton(
+              label: 'Asignar',
+              onPressed: selectedUserId != null ? () => Navigator.pop(ctx, true) : () {},
+              isDisabled: selectedUserId == null,
+              variant: AppButtonVariant.teal,
+              size: AppButtonSize.sm,
             ),
           ],
         ),
@@ -233,29 +228,24 @@ class _EscalacionDetailSheetState
       builder: (ctx) => AlertDialog(
         title: const Text(
           'Reabrir escalación',
-          style: TextStyle(
-            fontFamily: 'Onest',
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: AppColors.ctText,
-          ),
+          style: AppTextStyles.pageTitle,
         ),
         content: const Text(
           '¿Confirmas que deseas reabrir esta escalación?',
-          style: TextStyle(fontFamily: 'Geist', fontSize: 13),
+          style: AppTextStyles.body,
         ),
         actions: [
-          TextButton(
+          AppButton(
+            label: 'Cancelar',
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar'),
+            variant: AppButtonVariant.ghost,
+            size: AppButtonSize.sm,
           ),
-          ElevatedButton(
+          AppButton(
+            label: 'Reabrir',
             onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.ctWarn,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Reabrir'),
+            variant: AppButtonVariant.primary,
+            size: AppButtonSize.sm,
           ),
         ],
       ),
@@ -333,12 +323,7 @@ class _EscalacionDetailSheetState
           Expanded(
             child: Text(
               'Escalación',
-              style: const TextStyle(
-                fontFamily: 'Onest',
-                fontSize: 15,
-                fontWeight: FontWeight.bold,
-                color: AppColors.ctText,
-              ),
+              style: AppTextStyles.pageTitle.copyWith(fontWeight: FontWeight.bold),
             ),
           ),
           EscalacionStatusChip(status: status),
@@ -446,11 +431,7 @@ class _EscalacionDetailSheetState
                           ? const Icon(Icons.check, size: 11, color: Colors.white)
                           : Text(
                               '${i + 1}',
-                              style: const TextStyle(
-                                fontFamily: 'Geist',
-                                fontSize: 10,
-                                color: AppColors.ctText3,
-                              ),
+                              style: AppTextStyles.caption,
                             ),
                     ),
                     if (!isLast)
@@ -475,32 +456,20 @@ class _EscalacionDetailSheetState
                     children: [
                       Text(
                         step.label,
-                        style: TextStyle(
-                          fontFamily: 'Geist',
-                          fontSize: 13,
+                        style: AppTextStyles.body.copyWith(
                           fontWeight: FontWeight.w600,
-                          color: step.done
-                              ? AppColors.ctText
-                              : AppColors.ctText3,
+                          color: step.done ? AppColors.ctText : AppColors.ctText3,
                         ),
                       ),
                       if (step.date != null && step.date!.isNotEmpty)
                         Text(
                           _timeAgo(step.date),
-                          style: const TextStyle(
-                            fontFamily: 'Geist',
-                            fontSize: 11,
-                            color: AppColors.ctText3,
-                          ),
+                          style: AppTextStyles.bodySmall.copyWith(color: AppColors.ctText3),
                         ),
                       if (step.subtitle != null && step.subtitle!.isNotEmpty)
                         Text(
                           step.subtitle!,
-                          style: const TextStyle(
-                            fontFamily: 'Geist',
-                            fontSize: 11,
-                            color: AppColors.ctText2,
-                          ),
+                          style: AppTextStyles.bodySmall,
                         ),
                     ],
                   ),
@@ -530,13 +499,9 @@ class _EscalacionDetailSheetState
             ),
           )
         else if (_triggerMessages.isEmpty)
-          const Text(
+          Text(
             'Sin mensajes disparadores.',
-            style: TextStyle(
-              fontFamily: 'Geist',
-              fontSize: 12,
-              color: AppColors.ctText3,
-            ),
+            style: AppTextStyles.bodySmall.copyWith(fontSize: 12, color: AppColors.ctText3),
           )
         else
           ..._triggerMessages.map((msg) => _MessageBubble(msg: msg)),
@@ -561,11 +526,7 @@ class _EscalacionDetailSheetState
           ),
           child: Text(
             notes?.isNotEmpty == true ? notes! : '—',
-            style: const TextStyle(
-              fontFamily: 'Geist',
-              fontSize: 13,
-              color: AppColors.ctOkText,
-            ),
+            style: AppTextStyles.body.copyWith(color: AppColors.ctOkText),
           ),
         ),
       ],
@@ -588,29 +549,32 @@ class _EscalacionDetailSheetState
     final buttons = <Widget>[];
 
     if (status == 'open') {
-      buttons.add(_ActionButton(
+      buttons.add(AppButton(
         label: 'Asignar',
-        icon: Icons.person_add_outlined,
-        color: AppColors.ctTeal,
-        onTap: _showAssignDialog,
+        onPressed: _showAssignDialog,
+        variant: AppButtonVariant.teal,
+        size: AppButtonSize.sm,
+        prefixIcon: const Icon(Icons.person_add_outlined, size: 14),
       ));
     }
 
     if (status == 'assigned') {
-      buttons.add(_ActionButton(
+      buttons.add(AppButton(
         label: 'Resolver',
-        icon: Icons.check_circle_outline_rounded,
-        color: AppColors.ctOk,
-        onTap: _showResolveDialog,
+        onPressed: _showResolveDialog,
+        variant: AppButtonVariant.teal,
+        size: AppButtonSize.sm,
+        prefixIcon: const Icon(Icons.check_circle_outline_rounded, size: 14),
       ));
     }
 
     if (status == 'resolved') {
-      buttons.add(_ActionButton(
+      buttons.add(AppButton(
         label: 'Reabrir',
-        icon: Icons.refresh_rounded,
-        color: AppColors.ctWarn,
-        onTap: _showReopenDialog,
+        onPressed: _showReopenDialog,
+        variant: AppButtonVariant.primary,
+        size: AppButtonSize.sm,
+        prefixIcon: const Icon(Icons.refresh_rounded, size: 14),
       ));
     }
 
@@ -642,13 +606,7 @@ class _EscalacionDetailSheetState
   Widget _sectionLabel(String label) {
     return Text(
       label,
-      style: const TextStyle(
-        fontFamily: 'Geist',
-        fontSize: 10,
-        fontWeight: FontWeight.w600,
-        color: AppColors.ctText3,
-        letterSpacing: 0.8,
-      ),
+      style: AppTextStyles.caption.copyWith(fontWeight: FontWeight.w600, color: AppColors.ctText3, letterSpacing: 0.8),
     );
   }
 
@@ -660,12 +618,7 @@ class _EscalacionDetailSheetState
   }) {
     final valueWidget = Text(
       value,
-      style: TextStyle(
-        fontFamily: 'Geist',
-        fontSize: 13,
-        fontWeight: FontWeight.w600,
-        color: valueColor ?? AppColors.ctText,
-      ),
+      style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w600, color: valueColor ?? AppColors.ctText),
     );
 
     return Padding(
@@ -674,11 +627,7 @@ class _EscalacionDetailSheetState
         children: [
           Text(
             label,
-            style: const TextStyle(
-              fontFamily: 'Geist',
-              fontSize: 13,
-              color: AppColors.ctText2,
-            ),
+            style: AppTextStyles.body.copyWith(color: AppColors.ctText2),
           ),
           const Spacer(),
           tooltip != null
@@ -738,66 +687,19 @@ class _MessageBubble extends StatelessWidget {
             if (fromName.isNotEmpty)
               Text(
                 fromName,
-                style: const TextStyle(
-                  fontFamily: 'Geist',
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.ctTealDark,
-                ),
+                style: AppTextStyles.caption.copyWith(fontWeight: FontWeight.w600, color: AppColors.ctTealDark),
               ),
             Text(
               body,
-              style: const TextStyle(
-                fontFamily: 'Geist',
-                fontSize: 12,
-                color: AppColors.ctText,
-              ),
+              style: AppTextStyles.bodySmall.copyWith(fontSize: 12, color: AppColors.ctText),
             ),
             const SizedBox(height: 2),
             Text(
               _timeAgo(receivedAt),
-              style: const TextStyle(
-                fontFamily: 'Geist',
-                fontSize: 10,
-                color: AppColors.ctText3,
-              ),
+              style: AppTextStyles.caption,
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _ActionButton extends StatelessWidget {
-  const _ActionButton({
-    required this.label,
-    required this.icon,
-    required this.color,
-    required this.onTap,
-  });
-  final String   label;
-  final IconData icon;
-  final Color    color;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return ElevatedButton.icon(
-      icon: Icon(icon, size: 16),
-      label: Text(label),
-      onPressed: onTap,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: color,
-        foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        textStyle: const TextStyle(
-          fontFamily: 'Geist',
-          fontSize: 13,
-          fontWeight: FontWeight.w600,
-        ),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        elevation: 0,
       ),
     );
   }
@@ -827,12 +729,7 @@ class _ResolveDialogState extends State<_ResolveDialog> {
     return AlertDialog(
       title: const Text(
         'Resolver escalación',
-        style: TextStyle(
-          fontFamily: 'Onest',
-          fontSize: 16,
-          fontWeight: FontWeight.bold,
-          color: AppColors.ctText,
-        ),
+        style: AppTextStyles.pageTitle,
       ),
       content: SizedBox(
         width: 320,
@@ -840,7 +737,7 @@ class _ResolveDialogState extends State<_ResolveDialog> {
           controller: _ctrl,
           onChanged: widget.onNotesChanged,
           maxLines: 4,
-          style: const TextStyle(fontFamily: 'Geist', fontSize: 13),
+          style: AppTextStyles.body,
           decoration: const InputDecoration(
             hintText: 'Notas de resolución (opcional)',
             filled: true,
@@ -849,17 +746,17 @@ class _ResolveDialogState extends State<_ResolveDialog> {
         ),
       ),
       actions: [
-        TextButton(
+        AppButton(
+          label: 'Cancelar',
           onPressed: () => Navigator.pop(context, false),
-          child: const Text('Cancelar'),
+          variant: AppButtonVariant.ghost,
+          size: AppButtonSize.sm,
         ),
-        ElevatedButton(
+        AppButton(
+          label: 'Resolver',
           onPressed: () => Navigator.pop(context, true),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.ctOk,
-            foregroundColor: Colors.white,
-          ),
-          child: const Text('Resolver'),
+          variant: AppButtonVariant.teal,
+          size: AppButtonSize.sm,
         ),
       ],
     );

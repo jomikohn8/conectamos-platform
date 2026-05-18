@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/api/operator_fields_api.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/app_button.dart';
 
 // ── Field type config ──────────────────────────────────────────────────────────
 
@@ -183,12 +184,7 @@ class _OperatorFieldFormDialogState extends State<OperatorFieldFormDialog> {
               child: Row(
                 children: [
                   Text(title,
-                      style: const TextStyle(
-                        fontFamily: 'Geist',
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.ctText,
-                      )),
+                      style: AppTextStyles.pageTitle.copyWith(fontFamily: 'Geist', fontWeight: FontWeight.w600)),
                   const Spacer(),
                   IconButton(
                     icon: const Icon(Icons.close, size: 18,
@@ -223,10 +219,7 @@ class _OperatorFieldFormDialogState extends State<OperatorFieldFormDialog> {
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(_bannerError!,
-                                style: const TextStyle(
-                                    fontFamily: 'Geist',
-                                    fontSize: 13,
-                                    color: AppColors.ctRedText)),
+                                style: AppTextStyles.body.copyWith(color: AppColors.ctRedText)),
                           ),
                         ]),
                       ),
@@ -258,10 +251,7 @@ class _OperatorFieldFormDialogState extends State<OperatorFieldFormDialog> {
                         contentPadding: const EdgeInsets.symmetric(
                             horizontal: 12, vertical: 10),
                       ),
-                      style: const TextStyle(
-                          fontFamily: 'Geist',
-                          fontSize: 14,
-                          color: AppColors.ctText),
+                      style: AppTextStyles.body.copyWith(fontSize: 14),
                       onChanged: (_) {
                         if (_labelError != null) {
                           setState(() => _labelError = null);
@@ -292,19 +282,13 @@ class _OperatorFieldFormDialogState extends State<OperatorFieldFormDialog> {
                                   color: AppColors.ctText2),
                               const SizedBox(width: 6),
                               Text(_typeLabel(_selectedType),
-                                  style: const TextStyle(
-                                      fontFamily: 'Geist',
-                                      fontSize: 13,
-                                      color: AppColors.ctText2)),
+                                  style: AppTextStyles.body.copyWith(color: AppColors.ctText2)),
                             ],
                           ),
                         ),
                         const SizedBox(width: 8),
-                        const Text('El tipo no se puede cambiar',
-                            style: TextStyle(
-                                fontFamily: 'Geist',
-                                fontSize: 11,
-                                color: AppColors.ctText3)),
+                        Text('El tipo no se puede cambiar',
+                            style: AppTextStyles.bodySmall.copyWith(color: AppColors.ctText3)),
                       ]),
                       const SizedBox(height: 8),
                       // field_key read-only
@@ -314,17 +298,11 @@ class _OperatorFieldFormDialogState extends State<OperatorFieldFormDialog> {
                           const _FieldLabel('Clave: '),
                           Text(
                             widget.field!['field_key'] as String,
-                            style: const TextStyle(
-                                fontFamily: 'Geist',
-                                fontSize: 12,
-                                color: AppColors.ctText3),
+                            style: AppTextStyles.bodySmall.copyWith(fontSize: 12, color: AppColors.ctText3),
                           ),
                           const SizedBox(width: 6),
-                          const Text('(no se puede cambiar)',
-                              style: TextStyle(
-                                  fontFamily: 'Geist',
-                                  fontSize: 11,
-                                  color: AppColors.ctText3)),
+                          Text('(no se puede cambiar)',
+                              style: AppTextStyles.bodySmall.copyWith(color: AppColors.ctText3)),
                         ]),
                       ],
                     ] else ...[
@@ -348,10 +326,7 @@ class _OperatorFieldFormDialogState extends State<OperatorFieldFormDialog> {
                               horizontal: 12, vertical: 10),
                         ),
                         dropdownColor: AppColors.ctSurface,
-                        style: const TextStyle(
-                            fontFamily: 'Geist',
-                            fontSize: 14,
-                            color: AppColors.ctText),
+                        style: AppTextStyles.body.copyWith(fontSize: 14),
                         items: _kFieldTypes
                             .map((t) => DropdownMenuItem(
                                   value: t.key,
@@ -373,23 +348,15 @@ class _OperatorFieldFormDialogState extends State<OperatorFieldFormDialog> {
                     // Required switch
                     Row(
                       children: [
-                        const Expanded(
+                        Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text('Requerido',
-                                  style: TextStyle(
-                                    fontFamily: 'Geist',
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w500,
-                                    color: AppColors.ctText,
-                                  )),
+                                  style: AppTextStyles.body.copyWith(fontSize: 14, fontWeight: FontWeight.w500)),
                               Text(
                                 'El operador debe completar este campo',
-                                style: TextStyle(
-                                    fontFamily: 'Geist',
-                                    fontSize: 12,
-                                    color: AppColors.ctText2),
+                                style: AppTextStyles.bodySmall.copyWith(fontSize: 12),
                               ),
                             ],
                           ),
@@ -408,19 +375,11 @@ class _OperatorFieldFormDialogState extends State<OperatorFieldFormDialog> {
                       const Divider(color: AppColors.ctBorder),
                       const SizedBox(height: 12),
                       Row(children: [
-                        const Text('Opciones',
-                            style: TextStyle(
-                              fontFamily: 'Geist',
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.ctText,
-                            )),
+                        Text('Opciones',
+                            style: AppTextStyles.body.copyWith(fontSize: 14, fontWeight: FontWeight.w600)),
                         const SizedBox(width: 6),
                         Text('(mínimo 2)',
-                            style: const TextStyle(
-                                fontFamily: 'Geist',
-                                fontSize: 12,
-                                color: AppColors.ctText3)),
+                            style: AppTextStyles.bodySmall.copyWith(fontSize: 12, color: AppColors.ctText3)),
                       ]),
                       const SizedBox(height: 8),
                       if (_options.isNotEmpty) ...[
@@ -438,9 +397,7 @@ class _OperatorFieldFormDialogState extends State<OperatorFieldFormDialog> {
                                       borderRadius: BorderRadius.circular(6),
                                     ),
                                     child: Text(e.value,
-                                        style: const TextStyle(
-                                            fontFamily: 'Geist',
-                                            fontSize: 13)),
+                                        style: AppTextStyles.body),
                                   ),
                                 ),
                                 const SizedBox(width: 6),
@@ -478,32 +435,16 @@ class _OperatorFieldFormDialogState extends State<OperatorFieldFormDialog> {
                                   horizontal: 12, vertical: 8),
                               errorText: _optionsError,
                             ),
-                            style: const TextStyle(
-                                fontFamily: 'Geist',
-                                fontSize: 13),
+                            style: AppTextStyles.body,
                             onSubmitted: (_) => _addOption(),
                           ),
                         ),
                         const SizedBox(width: 8),
-                        SizedBox(
-                          height: 38,
-                          child: TextButton(
-                            style: TextButton.styleFrom(
-                              backgroundColor: AppColors.ctTealLight,
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 12),
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8)),
-                            ),
-                            onPressed: _addOption,
-                            child: const Text('Agregar',
-                                style: TextStyle(
-                                  fontFamily: 'Geist',
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColors.ctTealDark,
-                                )),
-                          ),
+                        AppButton(
+                          label: 'Agregar',
+                          onPressed: _addOption,
+                          variant: AppButtonVariant.ghost,
+                          size: AppButtonSize.sm,
                         ),
                       ]),
                     ],
@@ -522,42 +463,20 @@ class _OperatorFieldFormDialogState extends State<OperatorFieldFormDialog> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  TextButton(
-                    onPressed:
-                        _saving ? null : () => Navigator.pop(context),
-                    child: const Text('Cancelar',
-                        style: TextStyle(
-                            fontFamily: 'Geist',
-                            color: AppColors.ctText2)),
+                  AppButton(
+                    label: 'Cancelar',
+                    onPressed: () => Navigator.pop(context),
+                    variant: AppButtonVariant.ghost,
+                    size: AppButtonSize.sm,
+                    isDisabled: _saving,
                   ),
                   const SizedBox(width: 10),
-                  SizedBox(
-                    height: 36,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.ctTeal,
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        padding:
-                            const EdgeInsets.symmetric(horizontal: 20),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8)),
-                        textStyle: const TextStyle(
-                          fontFamily: 'Geist',
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      onPressed: _saving ? null : _save,
-                      child: _saving
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white))
-                          : Text(widget.isEdit ? 'Guardar cambios' : 'Crear campo'),
-                    ),
+                  AppButton(
+                    label: widget.isEdit ? 'Guardar cambios' : 'Crear campo',
+                    onPressed: _save,
+                    variant: AppButtonVariant.teal,
+                    size: AppButtonSize.sm,
+                    isLoading: _saving,
                   ),
                 ],
               ),

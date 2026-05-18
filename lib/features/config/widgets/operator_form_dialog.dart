@@ -13,7 +13,9 @@ import '../../../core/api/operator_fields_api.dart';
 import '../../../core/api/operator_roles_api.dart';
 import '../../../core/api/operators_api.dart';
 import '../../../core/theme/colors.dart';
+import '../../../core/theme/text_styles.dart';
 import '../../../core/utils/identity_config.dart';
+import '../../../shared/widgets/app_button.dart';
 import '../../../core/utils/phone_normalizer.dart';
 import 'nationality_identity_widget.dart';
 import 'phone_field_widget.dart';
@@ -480,11 +482,8 @@ class _OperatorFormDialogState extends ConsumerState<OperatorFormDialog> {
         final current = _customFieldValues[key] as String?;
         input = DropdownButtonFormField<String>(
           initialValue: choices.contains(current) ? current : null,
-          hint: const Text('Seleccionar',
-              style: TextStyle(
-                  fontFamily: 'Geist',
-                  fontSize: 13,
-                  color: AppColors.ctText3)),
+          hint: Text('Seleccionar',
+              style: AppTextStyles.body.copyWith(color: AppColors.ctText3)),
           decoration: InputDecoration(
             filled: true,
             fillColor: AppColors.ctSurface2,
@@ -508,21 +507,17 @@ class _OperatorFormDialogState extends ConsumerState<OperatorFormDialog> {
             ),
             errorText: _fieldErrors[errorKey],
             errorStyle:
-                const TextStyle(fontFamily: 'Geist', fontSize: 11),
+                AppTextStyles.bodySmall,
           ),
           items: choices
               .map((c) => DropdownMenuItem(
                     value: c,
                     child: Text(c,
-                        style: const TextStyle(
-                            fontFamily: 'Geist',
-                            fontSize: 13,
-                            color: AppColors.ctText)),
+                        style: AppTextStyles.body),
                   ))
               .toList(),
           onChanged: (v) => setState(() => _customFieldValues[key] = v),
-          style: const TextStyle(
-              fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText),
+          style: AppTextStyles.body,
           dropdownColor: AppColors.ctSurface,
         );
       case 'date':
@@ -559,16 +554,10 @@ class _OperatorFormDialogState extends ConsumerState<OperatorFormDialog> {
                 child: TextField(
                   controller: ctrl,
                   readOnly: true,
-                  style: const TextStyle(
-                      fontFamily: 'Geist',
-                      fontSize: 13,
-                      color: AppColors.ctText),
+                  style: AppTextStyles.body,
                   decoration: InputDecoration(
                     hintText: 'dd/mm/aaaa',
-                    hintStyle: const TextStyle(
-                        fontFamily: 'Geist',
-                        fontSize: 13,
-                        color: AppColors.ctText3),
+                    hintStyle: AppTextStyles.body.copyWith(color: AppColors.ctText3),
                     filled: true,
                     fillColor: AppColors.ctSurface2,
                     contentPadding: const EdgeInsets.symmetric(
@@ -598,10 +587,7 @@ class _OperatorFormDialogState extends ConsumerState<OperatorFormDialog> {
             if (_fieldErrors.containsKey(errorKey)) ...[
               const SizedBox(height: 3),
               Text(_fieldErrors[errorKey]!,
-                  style: const TextStyle(
-                      fontFamily: 'Geist',
-                      fontSize: 11,
-                      color: AppColors.ctDanger)),
+                  style: AppTextStyles.bodySmall.copyWith(color: AppColors.ctDanger)),
             ],
           ],
         );
@@ -654,10 +640,7 @@ class _OperatorFormDialogState extends ConsumerState<OperatorFormDialog> {
             if (_fieldErrors.containsKey(errorKey)) ...[
               const SizedBox(height: 4),
               Text(_fieldErrors[errorKey]!,
-                  style: const TextStyle(
-                      fontFamily: 'Geist',
-                      fontSize: 11,
-                      color: AppColors.ctDanger)),
+                  style: AppTextStyles.bodySmall.copyWith(color: AppColors.ctDanger)),
             ],
           ],
         );
@@ -684,10 +667,7 @@ class _OperatorFormDialogState extends ConsumerState<OperatorFormDialog> {
                     const SizedBox(width: 6),
                     const Expanded(
                       child: Text('Documento subido',
-                          style: TextStyle(
-                              fontFamily: 'Geist',
-                              fontSize: 12,
-                              color: AppColors.ctText2)),
+                          style: AppTextStyles.navItem),
                     ),
                     GestureDetector(
                       onTap: () => setState(
@@ -700,44 +680,25 @@ class _OperatorFormDialogState extends ConsumerState<OperatorFormDialog> {
               ),
               const SizedBox(height: 8),
             ],
-            SizedBox(
-              height: 36,
-              child: uploading
-                  ? const Center(
-                      child: SizedBox(
-                        width: 18,
-                        height: 18,
-                        child:
-                            CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                    )
-                  : OutlinedButton.icon(
-                      onPressed: () =>
-                          _pickCustomFile(key, isPhoto: false),
-                      icon: const Icon(Icons.upload_file_outlined,
-                          size: 16),
-                      label: Text(
-                          hasDoc
-                              ? 'Cambiar documento'
-                              : 'Subir documento',
-                          style: const TextStyle(
-                              fontFamily: 'Geist', fontSize: 12)),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.ctText2,
-                        side: const BorderSide(
-                            color: AppColors.ctBorder2),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8)),
-                      ),
+            uploading
+                ? const Center(
+                    child: SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
                     ),
-            ),
+                  )
+                : AppButton(
+                    label: hasDoc ? 'Cambiar documento' : 'Subir documento',
+                    onPressed: () => _pickCustomFile(key, isPhoto: false),
+                    variant: AppButtonVariant.outline,
+                    size: AppButtonSize.sm,
+                    prefixIcon: const Icon(Icons.upload_file_outlined, size: 16),
+                  ),
             if (_fieldErrors.containsKey(errorKey)) ...[
               const SizedBox(height: 4),
               Text(_fieldErrors[errorKey]!,
-                  style: const TextStyle(
-                      fontFamily: 'Geist',
-                      fontSize: 11,
-                      color: AppColors.ctDanger)),
+                  style: AppTextStyles.bodySmall.copyWith(color: AppColors.ctDanger)),
             ],
           ],
         );
@@ -1021,8 +982,7 @@ class _OperatorFormDialogState extends ConsumerState<OperatorFormDialog> {
               widget.isEdit
                   ? 'Operador actualizado.'
                   : 'Operador creado. Mensaje de bienvenida enviado.',
-              style:
-                  const TextStyle(fontFamily: 'Geist', fontSize: 13),
+              style: AppTextStyles.body,
             ),
             backgroundColor: AppColors.ctNavy,
             duration: const Duration(seconds: 3),
@@ -1167,12 +1127,7 @@ class _OperatorFormDialogState extends ConsumerState<OperatorFormDialog> {
                       widget.isEdit
                           ? 'Editar operador'
                           : 'Agregar operador',
-                      style: const TextStyle(
-                        fontFamily: 'Geist',
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.ctText,
-                      ),
+                      style: AppTextStyles.body.copyWith(fontSize: 15, fontWeight: FontWeight.w700),
                     ),
                   ),
                   GestureDetector(
@@ -1217,11 +1172,7 @@ class _OperatorFormDialogState extends ConsumerState<OperatorFormDialog> {
                             Expanded(
                               child: Text(
                                 _errorMsg!,
-                                style: const TextStyle(
-                                  fontFamily: 'Geist',
-                                  fontSize: 12,
-                                  color: AppColors.ctRedText,
-                                ),
+                                style: AppTextStyles.navItem.copyWith(color: AppColors.ctRedText),
                               ),
                             ),
                           ],
@@ -1279,12 +1230,7 @@ class _OperatorFormDialogState extends ConsumerState<OperatorFormDialog> {
                                             builder: (context, child) =>
                                                 Text(
                                               _initials(_nameCtrl.text),
-                                              style: const TextStyle(
-                                                fontFamily: 'Onest',
-                                                fontSize: 18,
-                                                fontWeight: FontWeight.w700,
-                                                color: Colors.white,
-                                              ),
+                                              style: AppTextStyles.kpiValue.copyWith(fontSize: 18, color: Colors.white),
                                             ),
                                           )
                                         : null,
@@ -1310,11 +1256,7 @@ class _OperatorFormDialogState extends ConsumerState<OperatorFormDialog> {
                         const SizedBox(height: 6),
                         Text(
                           _fieldErrors['profile_picture']!,
-                          style: const TextStyle(
-                            fontFamily: 'Geist',
-                            fontSize: 11,
-                            color: AppColors.ctDanger,
-                          ),
+                          style: AppTextStyles.bodySmall.copyWith(color: AppColors.ctDanger),
                         ),
                       ],
                         ],
@@ -1394,10 +1336,7 @@ class _OperatorFormDialogState extends ConsumerState<OperatorFormDialog> {
                             const SizedBox(width: 4),
                             Text(
                               _secondaryExpanded ? 'Colapsar' : 'Expandir',
-                              style: const TextStyle(
-                                  fontFamily: 'Geist',
-                                  fontSize: 11,
-                                  color: AppColors.ctText2),
+                              style: AppTextStyles.bodySmall,
                             ),
                           ],
                         ),
@@ -1458,22 +1397,15 @@ class _OperatorFormDialogState extends ConsumerState<OperatorFormDialog> {
                                     : AppColors.ctBorder),
                           ),
                           errorText: _fieldErrors['role'],
-                          errorStyle: const TextStyle(
-                              fontFamily: 'Geist', fontSize: 11),
+                          errorStyle: AppTextStyles.bodySmall,
                         ),
-                        hint: const Text('Sin rol asignado',
-                            style: TextStyle(
-                                fontFamily: 'Geist',
-                                fontSize: 13,
-                                color: AppColors.ctText2)),
+                        hint: Text('Sin rol asignado',
+                            style: AppTextStyles.pageSubtitle),
                         items: [
-                          const DropdownMenuItem<String>(
+                          DropdownMenuItem<String>(
                             value: null,
                             child: Text('Sin rol asignado',
-                                style: TextStyle(
-                                    fontFamily: 'Geist',
-                                    fontSize: 13,
-                                    color: AppColors.ctText2)),
+                                style: AppTextStyles.pageSubtitle),
                           ),
                           ..._availableRoles.map((role) {
                             final id = role['id'] as String? ?? '';
@@ -1488,17 +1420,9 @@ class _OperatorFormDialogState extends ConsumerState<OperatorFormDialog> {
                                     CrossAxisAlignment.start,
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Text(label,
-                                      style: const TextStyle(
-                                          fontFamily: 'Geist',
-                                          fontSize: 13,
-                                          color: AppColors.ctText)),
+                                  Text(label, style: AppTextStyles.body),
                                   if (slug.isNotEmpty)
-                                    Text(slug,
-                                        style: const TextStyle(
-                                            fontFamily: 'Geist',
-                                            fontSize: 11,
-                                            color: AppColors.ctText2)),
+                                    Text(slug, style: AppTextStyles.bodySmall),
                                 ],
                               ),
                             );
@@ -1540,12 +1464,9 @@ class _OperatorFormDialogState extends ConsumerState<OperatorFormDialog> {
                             border: Border.all(color: AppColors.ctBorder),
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          child: const Text(
+                          child: Text(
                             'No hay flujos disponibles en este tenant.',
-                            style: TextStyle(
-                                fontFamily: 'Geist',
-                                fontSize: 12,
-                                color: AppColors.ctText2),
+                            style: AppTextStyles.navItem,
                           ),
                         )
                       else
@@ -1581,11 +1502,7 @@ class _OperatorFormDialogState extends ConsumerState<OperatorFormDialog> {
                                     visualDensity: VisualDensity.compact,
                                     title: Text(
                                       name,
-                                      style: const TextStyle(
-                                        fontFamily: 'Geist',
-                                        fontSize: 12,
-                                        color: AppColors.ctText,
-                                      ),
+                                      style: AppTextStyles.navItem.copyWith(color: AppColors.ctText),
                                     ),
                                   );
                                 }),
@@ -1614,11 +1531,7 @@ class _OperatorFormDialogState extends ConsumerState<OperatorFormDialog> {
                             Expanded(
                               child: Text(
                                 _telegramCtrl.text,
-                                style: const TextStyle(
-                                  fontFamily: 'Geist',
-                                  fontSize: 13,
-                                  color: AppColors.ctText,
-                                ),
+                                style: AppTextStyles.body,
                               ),
                             ),
                             const Icon(Icons.check_circle_rounded,
@@ -1660,16 +1573,12 @@ class _OperatorFormDialogState extends ConsumerState<OperatorFormDialog> {
                               CrossAxisAlignment.start,
                           children: [
                             if (isExpired)
-                              const Padding(
+                              Padding(
                                 padding:
-                                    EdgeInsets.only(bottom: 6),
+                                    const EdgeInsets.only(bottom: 6),
                                 child: Text(
                                   'Invitación expirada',
-                                  style: TextStyle(
-                                    fontFamily: 'Geist',
-                                    fontSize: 11,
-                                    color: AppColors.ctDanger,
-                                  ),
+                                  style: AppTextStyles.bodySmall.copyWith(color: AppColors.ctDanger),
                                 ),
                               )
                             else if (isPendingActive)
@@ -1678,50 +1587,16 @@ class _OperatorFormDialogState extends ConsumerState<OperatorFormDialog> {
                                     bottom: 6),
                                 child: Text(
                                   'Invitación enviada · expira ${_formatTelegramExpiry(_telegramLinkExpiresAt!)}',
-                                  style: const TextStyle(
-                                    fontFamily: 'Geist',
-                                    fontSize: 11,
-                                    color: AppColors.ctText2,
-                                  ),
+                                  style: AppTextStyles.bodySmall,
                                 ),
                               ),
-                            SizedBox(
-                              width: double.infinity,
-                              height: 36,
-                              child: _sendingInvite
-                                  ? const Center(
-                                      child: SizedBox(
-                                        width: 18,
-                                        height: 18,
-                                        child:
-                                            CircularProgressIndicator(
-                                                strokeWidth: 2),
-                                      ),
-                                    )
-                                  : OutlinedButton.icon(
-                                      onPressed: _sendInvite,
-                                      icon: const Icon(
-                                          Icons.telegram,
-                                          size: 16),
-                                      label: Text(btnLabel,
-                                          style: const TextStyle(
-                                              fontFamily: 'Geist',
-                                              fontSize: 13)),
-                                      style:
-                                          OutlinedButton.styleFrom(
-                                        foregroundColor:
-                                            const Color(0xFF229ED9),
-                                        side: const BorderSide(
-                                            color:
-                                                Color(0xFF229ED9)),
-                                        shape:
-                                            RoundedRectangleBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(
-                                                  8),
-                                        ),
-                                      ),
-                                    ),
+                            AppButton(
+                              label: btnLabel,
+                              onPressed: _sendInvite,
+                              variant: AppButtonVariant.outline,
+                              size: AppButtonSize.sm,
+                              isLoading: _sendingInvite,
+                              prefixIcon: const Icon(Icons.telegram, size: 16),
                             ),
                           ],
                         );
@@ -1734,10 +1609,7 @@ class _OperatorFormDialogState extends ConsumerState<OperatorFormDialog> {
                                 const EdgeInsets.only(bottom: 4),
                             child: Text(
                               r,
-                              style: const TextStyle(
-                                  fontFamily: 'Geist',
-                                  fontSize: 11,
-                                  color: AppColors.ctText2),
+                              style: AppTextStyles.bodySmall,
                             ),
                           ),
                         ),
@@ -1779,29 +1651,20 @@ class _OperatorFormDialogState extends ConsumerState<OperatorFormDialog> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  _FormGhostButton(
+                  AppButton(
                     label: 'Cancelar',
-                    onTap: () => Navigator.pop(context),
+                    onPressed: () => Navigator.pop(context),
+                    variant: AppButtonVariant.outline,
+                    size: AppButtonSize.sm,
                   ),
                   const SizedBox(width: 10),
-                  if (_saving)
-                    const SizedBox(
-                      width: 120,
-                      height: 36,
-                      child: Center(
-                        child: SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2),
-                        ),
-                      ),
-                    )
-                  else
-                    _FormPrimaryButton(
-                      label: 'Guardar operador',
-                      onTap: _save,
-                    ),
+                  AppButton(
+                    label: 'Guardar operador',
+                    onPressed: _save,
+                    variant: AppButtonVariant.teal,
+                    size: AppButtonSize.sm,
+                    isLoading: _saving,
+                  ),
                 ],
               ),
             ),
@@ -1822,13 +1685,7 @@ class _SectionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       label,
-      style: const TextStyle(
-        fontFamily: 'Onest',
-        fontSize: 13,
-        fontWeight: FontWeight.w600,
-        color: AppColors.ctText,
-        letterSpacing: 0.1,
-      ),
+      style: AppTextStyles.cardTitle.copyWith(letterSpacing: 0.1),
     );
   }
 }
@@ -1841,12 +1698,7 @@ class _FieldLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       text,
-      style: const TextStyle(
-        fontFamily: 'Geist',
-        fontSize: 13,
-        fontWeight: FontWeight.w500,
-        color: AppColors.ctText,
-      ),
+      style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w500),
     );
   }
 }
@@ -1872,18 +1724,10 @@ class _FormField extends StatelessWidget {
         TextField(
           controller: controller,
           keyboardType: keyboardType,
-          style: const TextStyle(
-            fontFamily: 'Geist',
-            fontSize: 13,
-            color: AppColors.ctText,
-          ),
+          style: AppTextStyles.body,
           decoration: InputDecoration(
             hintText: placeholder,
-            hintStyle: const TextStyle(
-              fontFamily: 'Geist',
-              fontSize: 13,
-              color: AppColors.ctText3,
-            ),
+            hintStyle: AppTextStyles.body.copyWith(color: AppColors.ctText3),
             filled: true,
             fillColor: AppColors.ctSurface2,
             contentPadding: const EdgeInsets.symmetric(
@@ -1919,11 +1763,7 @@ class _FormField extends StatelessWidget {
           const SizedBox(height: 3),
           Text(
             errorText!,
-            style: const TextStyle(
-              fontFamily: 'Geist',
-              fontSize: 11,
-              color: AppColors.ctDanger,
-            ),
+            style: AppTextStyles.bodySmall.copyWith(color: AppColors.ctDanger),
           ),
         ],
       ],
@@ -1931,92 +1771,3 @@ class _FormField extends StatelessWidget {
   }
 }
 
-class _FormPrimaryButton extends StatefulWidget {
-  const _FormPrimaryButton({required this.label, required this.onTap});
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  State<_FormPrimaryButton> createState() => _FormPrimaryButtonState();
-}
-
-class _FormPrimaryButtonState extends State<_FormPrimaryButton> {
-  bool _hovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          padding:
-              const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          decoration: BoxDecoration(
-            color:
-                _hovered ? AppColors.ctTealDark : AppColors.ctTeal,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Text(
-            widget.label,
-            style: const TextStyle(
-              fontFamily: 'Geist',
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: AppColors.ctNavy,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _FormGhostButton extends StatefulWidget {
-  const _FormGhostButton({required this.label, required this.onTap});
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  State<_FormGhostButton> createState() => _FormGhostButtonState();
-}
-
-class _FormGhostButtonState extends State<_FormGhostButton> {
-  bool _hovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          padding:
-              const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            color: _hovered
-                ? AppColors.ctSurface2
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: AppColors.ctBorder2),
-          ),
-          child: Text(
-            widget.label,
-            style: const TextStyle(
-              fontFamily: 'Geist',
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: AppColors.ctText2,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
