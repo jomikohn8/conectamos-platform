@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../shared/widgets/app_button.dart';
 
 // ── Pantalla ──────────────────────────────────────────────────────────────────
 
@@ -40,7 +41,7 @@ class _ActionBar extends StatelessWidget {
         border: Border(bottom: BorderSide(color: AppColors.ctBorder)),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 22),
-      child: const Row(
+      child: Row(
         children: [
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -48,21 +49,12 @@ class _ActionBar extends StatelessWidget {
             children: [
               Text(
                 'Credenciales Meta',
-                style: TextStyle(
-                  fontFamily: 'Geist',
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.ctText,
-                ),
+                style: AppTextStyles.pageTitle.copyWith(fontFamily: 'Geist'),
               ),
-              SizedBox(height: 1),
+              const SizedBox(height: 1),
               Text(
                 'Conecta tu cuenta de Meta Business para usar WhatsApp API',
-                style: TextStyle(
-                  fontFamily: 'Geist',
-                  fontSize: 11,
-                  color: AppColors.ctText2,
-                ),
+                style: AppTextStyles.bodySmall,
               ),
             ],
           ),
@@ -106,14 +98,9 @@ class _StatusCard extends StatelessWidget {
           // Header
           Row(
             children: [
-              const Text(
+              Text(
                 'Cuenta de Meta Business',
-                style: TextStyle(
-                  fontFamily: 'Geist',
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.ctText,
-                ),
+                style: AppTextStyles.body.copyWith(fontSize: 14, fontWeight: FontWeight.w700),
               ),
               const SizedBox(width: 10),
               _Badge(
@@ -136,21 +123,17 @@ class _StatusCard extends StatelessWidget {
                 color: AppColors.ctOk.withValues(alpha: 0.2),
               ),
             ),
-            child: const Row(
+            child: Row(
               children: [
-                Icon(
+                const Icon(
                   Icons.check_circle_rounded,
                   size: 16,
                   color: AppColors.ctOk,
                 ),
-                SizedBox(width: 8),
+                const SizedBox(width: 8),
                 Text(
                   'Tu cuenta de Meta Business está activa y verificada',
-                  style: TextStyle(
-                    fontFamily: 'Geist',
-                    fontSize: 13,
-                    color: AppColors.ctOkText,
-                  ),
+                  style: AppTextStyles.body.copyWith(color: AppColors.ctOkText),
                 ),
               ],
             ),
@@ -248,13 +231,7 @@ class _StatusCard extends StatelessWidget {
 class _PhoneNumbersTable extends StatelessWidget {
   const _PhoneNumbersTable();
 
-  static const _headerStyle = TextStyle(
-    fontFamily: 'Geist',
-    fontSize: 10,
-    fontWeight: FontWeight.w600,
-    color: AppColors.ctText2,
-    letterSpacing: 0.4,
-  );
+  static TextStyle get _headerStyle => AppTextStyles.kpiLabel.copyWith(letterSpacing: 0.4);
 
   @override
   Widget build(BuildContext context) {
@@ -265,20 +242,17 @@ class _PhoneNumbersTable extends StatelessWidget {
           // Card header
           Row(
             children: [
-              const Expanded(
+              Expanded(
                 child: Text(
                   'Números de WhatsApp',
-                  style: TextStyle(
-                    fontFamily: 'Geist',
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.ctText,
-                  ),
+                  style: AppTextStyles.body.copyWith(fontSize: 14, fontWeight: FontWeight.w700),
                 ),
               ),
-              _PrimaryButton(
+              AppButton(
                 label: '+ Agregar número',
-                onTap: () {},
+                variant: AppButtonVariant.teal,
+                size: AppButtonSize.sm,
+                onPressed: () {},
               ),
             ],
           ),
@@ -304,7 +278,7 @@ class _PhoneNumbersTable extends StatelessWidget {
                       topRight: Radius.circular(7),
                     ),
                   ),
-                  child: const Row(
+                  child: Row(
                     children: [
                       Expanded(flex: 2, child: Text('NÚMERO', style: _headerStyle)),
                       Expanded(flex: 3, child: Text('NOMBRE DEL PERFIL', style: _headerStyle)),
@@ -391,12 +365,7 @@ class _PhoneRowState extends State<_PhoneRow> {
               flex: 2,
               child: Text(
                 widget.number,
-                style: const TextStyle(
-                  fontFamily: 'Geist',
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.ctText,
-                ),
+                style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w500),
               ),
             ),
             // Nombre del perfil
@@ -404,11 +373,7 @@ class _PhoneRowState extends State<_PhoneRow> {
               flex: 3,
               child: Text(
                 widget.profile,
-                style: const TextStyle(
-                  fontFamily: 'Geist',
-                  fontSize: 13,
-                  color: AppColors.ctText,
-                ),
+                style: AppTextStyles.body,
                 overflow: TextOverflow.ellipsis,
               ),
             ),
@@ -474,16 +439,13 @@ class _TokenCardState extends State<_TokenCard> {
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: const Row(
+        content: Row(
           children: [
-            Icon(Icons.check_rounded, size: 15, color: Colors.white),
-            SizedBox(width: 8),
+            const Icon(Icons.check_rounded, size: 15, color: Colors.white),
+            const SizedBox(width: 8),
             Text(
               'Token copiado',
-              style: TextStyle(
-                fontFamily: 'Geist',
-                fontSize: 13,
-              ),
+              style: AppTextStyles.body,
             ),
           ],
         ),
@@ -507,15 +469,10 @@ class _TokenCardState extends State<_TokenCard> {
           // Header
           Row(
             children: [
-              const Expanded(
+              Expanded(
                 child: Text(
                   'Token de acceso',
-                  style: TextStyle(
-                    fontFamily: 'Geist',
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.ctText,
-                  ),
+                  style: AppTextStyles.body.copyWith(fontSize: 14, fontWeight: FontWeight.w700),
                 ),
               ),
               _Badge(
@@ -528,14 +485,9 @@ class _TokenCardState extends State<_TokenCard> {
           const SizedBox(height: 16),
 
           // Label
-          const Text(
+          Text(
             'Token activo',
-            style: TextStyle(
-              fontFamily: 'Geist',
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
-              color: AppColors.ctText2,
-            ),
+            style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.w500),
           ),
           const SizedBox(height: 6),
 
@@ -587,24 +539,19 @@ class _TokenCardState extends State<_TokenCard> {
               color: AppColors.ctSurface2,
               borderRadius: BorderRadius.circular(8),
             ),
-            child: const Row(
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(
+                const Icon(
                   Icons.info_outline_rounded,
                   size: 14,
                   color: AppColors.ctText3,
                 ),
-                SizedBox(width: 8),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     'El token se usa para autenticar las llamadas a la API de WhatsApp Business. Mantenlo seguro.',
-                    style: TextStyle(
-                      fontFamily: 'Geist',
-                      fontSize: 11,
-                      color: AppColors.ctText2,
-                      height: 1.5,
-                    ),
+                    style: AppTextStyles.bodySmall.copyWith(height: 1.5),
                   ),
                 ),
               ],
@@ -657,12 +604,7 @@ class _Badge extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: TextStyle(
-          fontFamily: 'Geist',
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-          color: textColor,
-        ),
+        style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.w600, color: textColor),
       ),
     );
   }
@@ -685,68 +627,15 @@ class _DataField extends StatelessWidget {
       children: [
         Text(
           label,
-          style: const TextStyle(
-            fontFamily: 'Geist',
-            fontSize: 11,
-            fontWeight: FontWeight.w500,
-            color: AppColors.ctText2,
-          ),
+          style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.w500),
         ),
         const SizedBox(height: 4),
         valueWidget ??
             Text(
               value!,
-              style: const TextStyle(
-                fontFamily: 'Geist',
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-                color: AppColors.ctText,
-              ),
+              style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w500),
             ),
       ],
-    );
-  }
-}
-
-class _PrimaryButton extends StatefulWidget {
-  const _PrimaryButton({required this.label, required this.onTap});
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  State<_PrimaryButton> createState() => _PrimaryButtonState();
-}
-
-class _PrimaryButtonState extends State<_PrimaryButton> {
-  bool _hovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          padding:
-              const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          decoration: BoxDecoration(
-            color: _hovered ? AppColors.ctTealDark : AppColors.ctTeal,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Text(
-            widget.label,
-            style: const TextStyle(
-              fontFamily: 'Geist',
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: AppColors.ctNavy,
-            ),
-          ),
-        ),
-      ),
     );
   }
 }
@@ -789,12 +678,7 @@ class _GhostButtonState extends State<_GhostButton> {
               ],
               Text(
                 widget.label,
-                style: const TextStyle(
-                  fontFamily: 'Geist',
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.ctText2,
-                ),
+                style: AppTextStyles.bodySmall.copyWith(fontSize: 12, fontWeight: FontWeight.w500),
               ),
             ],
           ),
@@ -850,14 +734,7 @@ class _DangerGhostButtonState extends State<_DangerGhostButton> {
               const SizedBox(width: 6),
               Text(
                 widget.label,
-                style: TextStyle(
-                  fontFamily: 'Geist',
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: _hovered
-                      ? AppColors.ctDanger
-                      : AppColors.ctText2,
-                ),
+                style: AppTextStyles.bodySmall.copyWith(fontSize: 12, fontWeight: FontWeight.w500, color: _hovered ? AppColors.ctDanger : AppColors.ctText2),
               ),
             ],
           ),
@@ -902,12 +779,7 @@ class _TableGhostButtonState extends State<_TableGhostButton> {
           ),
           child: Text(
             widget.label,
-            style: const TextStyle(
-              fontFamily: 'Geist',
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
-              color: AppColors.ctText2,
-            ),
+            style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.w500),
           ),
         ),
       ),

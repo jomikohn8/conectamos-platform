@@ -9,6 +9,7 @@ import '../../core/api/operators_api.dart';
 import '../../core/api/templates_api.dart';
 import '../../core/providers/tenant_provider.dart';
 import '../../core/theme/app_theme.dart';
+import '../../shared/widgets/app_button.dart';
 import 'template_create_dialog.dart';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -146,8 +147,7 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen>
   void _showError(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(msg,
-            style: const TextStyle(fontFamily: 'Geist', fontSize: 13)),
+        content: Text(msg, style: AppTextStyles.body),
         backgroundColor: AppColors.ctDanger,
         duration: const Duration(seconds: 3),
       ),
@@ -157,8 +157,7 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen>
   void _showSuccess(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(msg,
-            style: const TextStyle(fontFamily: 'Geist', fontSize: 13)),
+        content: Text(msg, style: AppTextStyles.body),
         backgroundColor: AppColors.ctOk,
         duration: const Duration(seconds: 2),
       ),
@@ -215,12 +214,7 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen>
                     children: [
                       Text(
                         ch['display_name'] as String? ?? widget.channelId,
-                        style: const TextStyle(
-                          fontFamily: 'Geist',
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.ctText,
-                        ),
+                        style: AppTextStyles.body.copyWith(fontSize: 16, fontWeight: FontWeight.w700),
                       ),
                       const SizedBox(height: 4),
                       Row(
@@ -238,11 +232,19 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen>
                     ? const SizedBox(
                         width: 20, height: 20,
                         child: CircularProgressIndicator(strokeWidth: 2))
-                    : _OutlineButton(
-                        label: isActive ? 'Desactivar' : 'Activar',
-                        danger: isActive,
-                        onTap: _toggleActive,
-                      ),
+                    : isActive
+                        ? AppButton(
+                            label: 'Desactivar',
+                            onPressed: _toggleActive,
+                            variant: AppButtonVariant.danger,
+                            size: AppButtonSize.sm,
+                          )
+                        : AppButton(
+                            label: 'Activar',
+                            onPressed: _toggleActive,
+                            variant: AppButtonVariant.outline,
+                            size: AppButtonSize.sm,
+                          ),
               ],
             ),
           ),
@@ -257,16 +259,8 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen>
                   controller: _tabCtrl,
                   isScrollable: true,
                   tabAlignment: TabAlignment.start,
-                  labelStyle: const TextStyle(
-                    fontFamily: 'Geist',
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  unselectedLabelStyle: const TextStyle(
-                    fontFamily: 'Geist',
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                  ),
+                  labelStyle: AppTextStyles.body.copyWith(fontWeight: FontWeight.w600),
+                  unselectedLabelStyle: AppTextStyles.body.copyWith(fontWeight: FontWeight.w500),
                   labelColor: AppColors.ctTeal,
                   unselectedLabelColor: AppColors.ctText2,
                   indicatorColor: AppColors.ctTeal,
@@ -334,12 +328,7 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen>
       ),
       title: Text(
         name,
-        style: const TextStyle(
-          fontFamily: 'Geist',
-          fontSize: 15,
-          fontWeight: FontWeight.w600,
-          color: AppColors.ctText,
-        ),
+        style: AppTextStyles.body.copyWith(fontSize: 15, fontWeight: FontWeight.w600),
       ),
       bottom: const PreferredSize(
         preferredSize: Size.fromHeight(1),
@@ -455,10 +444,12 @@ class _InfoTabState extends State<_InfoTab> {
                 const SizedBox(height: 20),
                 Align(
                   alignment: Alignment.centerRight,
-                  child: _PrimaryButton(
+                  child: AppButton(
                     label: 'Guardar cambios',
-                    loading: _saving,
-                    onTap: _save,
+                    onPressed: _save,
+                    variant: AppButtonVariant.teal,
+                    size: AppButtonSize.sm,
+                    isLoading: _saving,
                   ),
                 ),
               ],
@@ -649,14 +640,9 @@ class _CredentialsTabState extends State<_CredentialsTab> {
                     color: AppColors.ctTealLight,
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: const Text(
+                  child: Text(
                     'Requiere certificación Tech Provider',
-                    style: TextStyle(
-                      fontFamily: 'Geist',
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.ctTealDark,
-                    ),
+                    style: AppTextStyles.kpiLabel.copyWith(color: AppColors.ctTealDark),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -685,25 +671,15 @@ class _CredentialsTabState extends State<_CredentialsTab> {
                               ),
                             ),
                             alignment: Alignment.center,
-                            child: const Text(
+                            child: Text(
                               'f',
-                              style: TextStyle(
-                                fontFamily: 'Geist',
-                                fontSize: 20,
-                                fontWeight: FontWeight.w900,
-                                color: Colors.white,
-                              ),
+                              style: AppTextStyles.body.copyWith(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.white),
                             ),
                           ),
                           const SizedBox(width: 12),
-                          const Text(
+                          Text(
                             'Conectar con WhatsApp Business',
-                            style: TextStyle(
-                              fontFamily: 'Geist',
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
-                            ),
+                            style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w600, color: Colors.white),
                           ),
                           const SizedBox(width: 16),
                         ],
@@ -736,15 +712,10 @@ class _CredentialsTabState extends State<_CredentialsTab> {
                       children: [
                         const Icon(Icons.warning_amber_rounded, size: 16, color: AppColors.ctWarnText),
                         const SizedBox(width: 8),
-                        const Expanded(
+                        Expanded(
                           child: Text(
                             'Este canal tiene historial. Para cambiar el número o WABA, desactiva este canal y crea uno nuevo.',
-                            style: TextStyle(
-                              fontFamily: 'Geist',
-                              fontSize: 12.5,
-                              color: AppColors.ctWarnText,
-                              height: 1.4,
-                            ),
+                            style: AppTextStyles.body.copyWith(fontSize: 12.5, color: AppColors.ctWarnText, height: 1.4),
                           ),
                         ),
                       ],
@@ -816,19 +787,21 @@ class _CredentialsTabState extends State<_CredentialsTab> {
                         ? Container(
                             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
                             decoration: BoxDecoration(color: AppColors.ctTeal, borderRadius: BorderRadius.circular(8)),
-                            child: const Row(
+                            child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.ctNavy)),
-                                SizedBox(width: 8),
-                                Text('Verificando...', style: TextStyle(fontFamily: 'Geist', fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.ctNavy)),
+                                const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.ctNavy)),
+                                const SizedBox(width: 8),
+                                Text('Verificando...', style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w600, color: AppColors.ctNavy)),
                               ],
                             ),
                           )
-                        : _PrimaryButton(
+                        : AppButton(
                             label: 'Guardar credenciales',
-                            loading: _saving,
-                            onTap: _saveCredentials,
+                            onPressed: _saveCredentials,
+                            variant: AppButtonVariant.teal,
+                            size: AppButtonSize.sm,
+                            isLoading: _saving,
                           ),
                   ),
                   if (_verifyError != null) ...[
@@ -836,7 +809,7 @@ class _CredentialsTabState extends State<_CredentialsTab> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(color: AppColors.ctRedBg, borderRadius: BorderRadius.circular(8)),
-                      child: Text(_verifyError!, style: const TextStyle(fontFamily: 'Geist', fontSize: 12, color: AppColors.ctRedText)),
+                      child: Text(_verifyError!, style: AppTextStyles.bodySmall.copyWith(color: AppColors.ctRedText)),
                     ),
                   ],
                 ],
@@ -931,9 +904,9 @@ class _TemplatesTabState extends State<_TemplatesTab> {
           ),
           child: Row(
             children: [
-              _TealButton(
+              AppButton(
                 label: '+ Nueva plantilla',
-                onTap: () async {
+                onPressed: () async {
                   final created = await showDialog<bool>(
                     context: context,
                     barrierDismissible: true,
@@ -944,6 +917,8 @@ class _TemplatesTabState extends State<_TemplatesTab> {
                   );
                   if (created == true) _fetchTemplates();
                 },
+                variant: AppButtonVariant.teal,
+                size: AppButtonSize.sm,
               ),
               const SizedBox(width: 12),
               Text(
@@ -956,10 +931,11 @@ class _TemplatesTabState extends State<_TemplatesTab> {
                       width: 18,
                       height: 18,
                       child: CircularProgressIndicator(strokeWidth: 2))
-                  : _OutlineButton(
+                  : AppButton(
                       label: 'Sincronizar con Meta',
-                      danger: false,
-                      onTap: _sync,
+                      onPressed: _sync,
+                      variant: AppButtonVariant.outline,
+                      size: AppButtonSize.sm,
                     ),
             ],
           ),
@@ -998,12 +974,7 @@ class _TemplatesTabState extends State<_TemplatesTab> {
                                   children: [
                                     Text(
                                       t['name'] as String? ?? '—',
-                                      style: const TextStyle(
-                                        fontFamily: 'Geist',
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w600,
-                                        color: AppColors.ctText,
-                                      ),
+                                      style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w600),
                                     ),
                                     if ((t['body_text'] as String?) != null)
                                       Padding(
@@ -1012,11 +983,7 @@ class _TemplatesTabState extends State<_TemplatesTab> {
                                           t['body_text'] as String,
                                           maxLines: 2,
                                           overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(
-                                            fontFamily: 'Geist',
-                                            fontSize: 12,
-                                            color: AppColors.ctText2,
-                                          ),
+                                          style: AppTextStyles.bodySmall,
                                         ),
                                       ),
                                   ],
@@ -1035,12 +1002,7 @@ class _TemplatesTabState extends State<_TemplatesTab> {
                                     ),
                                     child: Text(
                                       style.label,
-                                      style: TextStyle(
-                                        fontFamily: 'Geist',
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w600,
-                                        color: style.fg,
-                                      ),
+                                      style: AppTextStyles.badge.copyWith(color: style.fg),
                                     ),
                                   ),
                                   if ((t['language'] as String?) != null)
@@ -1147,13 +1109,9 @@ class _WelcomeTabState extends State<_WelcomeTab> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Se envía automáticamente cuando un usuario escribe por primera vez.',
-              style: TextStyle(
-                fontFamily: 'Geist',
-                fontSize: 12,
-                color: AppColors.ctText2,
-              ),
+              style: AppTextStyles.bodySmall,
             ),
             const SizedBox(height: 16),
             if (_selectedId == null && _approved.isNotEmpty) ...[
@@ -1164,14 +1122,14 @@ class _WelcomeTabState extends State<_WelcomeTab> {
                   borderRadius: BorderRadius.circular(7),
                   border: Border.all(color: const Color(0xFFFCD34D)),
                 ),
-                child: const Row(
+                child: Row(
                   children: [
-                    Icon(Icons.info_outline, size: 14, color: Color(0xFF92400E)),
-                    SizedBox(width: 8),
+                    const Icon(Icons.info_outline, size: 14, color: Color(0xFF92400E)),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         'No hay plantilla de bienvenida configurada.',
-                        style: TextStyle(fontFamily: 'Geist', fontSize: 12, color: Color(0xFF92400E)),
+                        style: AppTextStyles.bodySmall.copyWith(color: const Color(0xFF92400E)),
                       ),
                     ),
                   ],
@@ -1198,13 +1156,9 @@ class _WelcomeTabState extends State<_WelcomeTab> {
                   child: DropdownButton<String>(
                     value: _selectedId,
                     isExpanded: true,
-                    hint: const Text(
+                    hint: Text(
                       'Selecciona una plantilla',
-                      style: TextStyle(
-                        fontFamily: 'Geist',
-                        fontSize: 13,
-                        color: AppColors.ctText2,
-                      ),
+                      style: AppTextStyles.body.copyWith(color: AppColors.ctText2),
                     ),
                     items: [
                       for (final t in _approved)
@@ -1244,10 +1198,13 @@ class _WelcomeTabState extends State<_WelcomeTab> {
             const SizedBox(height: 20),
             Align(
               alignment: Alignment.centerRight,
-              child: _PrimaryButton(
+              child: AppButton(
                 label: 'Guardar',
-                loading: _saving,
-                onTap: _selectedId != null ? _save : null,
+                onPressed: _save,
+                variant: AppButtonVariant.teal,
+                size: AppButtonSize.sm,
+                isLoading: _saving,
+                isDisabled: _selectedId == null,
               ),
             ),
           ],
@@ -1285,12 +1242,7 @@ class _SectionCard extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
-                    fontFamily: 'Geist',
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.ctText,
-                  ),
+                  style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w700),
                 ),
               ],
             ),
@@ -1314,12 +1266,7 @@ class _FieldLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       label,
-      style: const TextStyle(
-        fontFamily: 'Geist',
-        fontSize: 12,
-        fontWeight: FontWeight.w600,
-        color: AppColors.ctText2,
-      ),
+      style: AppTextStyles.formLabel.copyWith(color: AppColors.ctText2),
     );
   }
 }
@@ -1344,14 +1291,10 @@ class _StyledTextField extends StatelessWidget {
       controller: controller,
       obscureText: obscure,
       enabled: enabled,
-      style: TextStyle(
-          fontFamily: 'Geist',
-          fontSize: 13,
-          color: enabled ? AppColors.ctText : AppColors.ctText3),
+      style: AppTextStyles.body.copyWith(color: enabled ? AppColors.ctText : AppColors.ctText3),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: const TextStyle(
-            fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText3),
+        hintStyle: AppTextStyles.body.copyWith(color: AppColors.ctText3),
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         filled: true,
@@ -1435,10 +1378,9 @@ class _WorkerDropdown extends StatelessWidget {
         child: DropdownButton<String>(
           value: workers.any((w) => w['id'].toString() == value) ? value : null,
           isExpanded: true,
-          hint: const Text(
+          hint: Text(
             'Sin worker asignado',
-            style: TextStyle(
-                fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText2),
+            style: AppTextStyles.body.copyWith(color: AppColors.ctText2),
           ),
           items: [
             for (final w in workers)
@@ -1476,12 +1418,7 @@ class _OperatorRow extends StatelessWidget {
             backgroundColor: AppColors.ctTealLight,
             child: Text(
               name.isNotEmpty ? name[0].toUpperCase() : '?',
-              style: const TextStyle(
-                fontFamily: 'Geist',
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: AppColors.ctTealDark,
-              ),
+              style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.w700, color: AppColors.ctTealDark),
             ),
           ),
           const SizedBox(width: 10),
@@ -1514,12 +1451,7 @@ class _TypeChip extends StatelessWidget {
       ),
       child: Text(
         cfg.label,
-        style: TextStyle(
-          fontFamily: 'Geist',
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-          color: cfg.fg,
-        ),
+        style: AppTextStyles.badge.copyWith(color: cfg.fg),
       ),
     );
   }
@@ -1539,168 +1471,7 @@ class _StatusChip extends StatelessWidget {
       ),
       child: Text(
         isActive ? 'Activo' : 'Inactivo',
-        style: TextStyle(
-          fontFamily: 'Geist',
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-          color: isActive ? AppColors.ctOkText : AppColors.ctText2,
-        ),
-      ),
-    );
-  }
-}
-
-class _PrimaryButton extends StatefulWidget {
-  const _PrimaryButton({
-    required this.label,
-    required this.loading,
-    required this.onTap,
-  });
-  final String label;
-  final bool loading;
-  final VoidCallback? onTap;
-
-  @override
-  State<_PrimaryButton> createState() => _PrimaryButtonState();
-}
-
-class _PrimaryButtonState extends State<_PrimaryButton> {
-  bool _hovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final enabled = widget.onTap != null && !widget.loading;
-    return MouseRegion(
-      cursor: enabled
-          ? SystemMouseCursors.click
-          : SystemMouseCursors.forbidden,
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: GestureDetector(
-        onTap: enabled ? widget.onTap : null,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
-          decoration: BoxDecoration(
-            color: enabled
-                ? (_hovered ? AppColors.ctTealDark : AppColors.ctTeal)
-                : AppColors.ctBorder,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: widget.loading
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(
-                      strokeWidth: 2, color: Colors.white))
-              : Text(
-                  widget.label,
-                  style: TextStyle(
-                    fontFamily: 'Geist',
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color:
-                        enabled ? AppColors.ctNavy : AppColors.ctText2,
-                  ),
-                ),
-        ),
-      ),
-    );
-  }
-}
-
-class _OutlineButton extends StatefulWidget {
-  const _OutlineButton({
-    required this.label,
-    required this.danger,
-    required this.onTap,
-  });
-  final String label;
-  final bool danger;
-  final VoidCallback? onTap;
-
-  @override
-  State<_OutlineButton> createState() => _OutlineButtonState();
-}
-
-class _OutlineButtonState extends State<_OutlineButton> {
-  bool _hovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final borderColor =
-        widget.danger ? AppColors.ctDanger : AppColors.ctBorder2;
-    final textColor = widget.danger ? AppColors.ctDanger : AppColors.ctText2;
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-          decoration: BoxDecoration(
-            color: _hovered
-                ? (widget.danger ? AppColors.ctRedBg : AppColors.ctSurface2)
-                : AppColors.ctSurface,
-            border: Border.all(color: borderColor),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Text(
-            widget.label,
-            style: TextStyle(
-              fontFamily: 'Geist',
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: textColor,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ── Botón primario teal ────────────────────────────────────────────────────────
-
-class _TealButton extends StatefulWidget {
-  const _TealButton({required this.label, required this.onTap});
-  final String label;
-  final VoidCallback? onTap;
-
-  @override
-  State<_TealButton> createState() => _TealButtonState();
-}
-
-class _TealButtonState extends State<_TealButton> {
-  bool _hovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit:  (_) => setState(() => _hovered = false),
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-          decoration: BoxDecoration(
-            color: _hovered ? AppColors.ctTealDark : AppColors.ctTeal,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Text(
-            widget.label,
-            style: const TextStyle(
-              fontFamily: 'Geist',
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: Colors.white,
-            ),
-          ),
-        ),
+        style: AppTextStyles.badge.copyWith(color: isActive ? AppColors.ctOkText : AppColors.ctText2),
       ),
     );
   }
