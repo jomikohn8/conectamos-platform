@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../../../core/theme/colors.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/identity_config.dart';
 import 'phone_field_widget.dart' show CountryPickerDialog, countryFlag;
 
@@ -143,14 +143,9 @@ class _NationalityIdentityWidgetState
       mainAxisSize: MainAxisSize.min,
       children: [
         // Nationality selector
-        const Text(
+        Text(
           'Nacionalidad',
-          style: TextStyle(
-            fontFamily: 'Geist',
-            fontSize: 13,
-            fontWeight: FontWeight.w500,
-            color: AppColors.ctText,
-          ),
+          style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w500),
         ),
         const SizedBox(height: 6),
         GestureDetector(
@@ -169,7 +164,7 @@ class _NationalityIdentityWidgetState
                 children: [
                   if (_iso.isNotEmpty && _iso != 'OTHER') ...[
                     Text(countryFlag(_iso),
-                        style: const TextStyle(fontSize: 18)),
+                        style: AppTextStyles.body.copyWith(fontSize: 18)),
                     const SizedBox(width: 8),
                   ],
                   Expanded(
@@ -180,9 +175,7 @@ class _NationalityIdentityWidgetState
                                   .firstWhere((c) => c.$1 == _iso,
                                       orElse: () => (_iso, _iso))
                                   .$2),
-                      style: TextStyle(
-                        fontFamily: 'Geist',
-                        fontSize: 13,
+                      style: AppTextStyles.body.copyWith(
                         color: _iso.isEmpty
                             ? AppColors.ctText3
                             : AppColors.ctText,
@@ -202,12 +195,7 @@ class _NationalityIdentityWidgetState
           const SizedBox(height: 14),
           Text(
             _idLabel,
-            style: const TextStyle(
-              fontFamily: 'Geist',
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-              color: AppColors.ctText,
-            ),
+            style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w500),
           ),
           const SizedBox(height: 6),
           TextField(
@@ -220,18 +208,10 @@ class _NationalityIdentityWidgetState
                   RegExp(r'[A-Za-z0-9\-]')),
             ],
             onEditingComplete: _validateId,
-            style: const TextStyle(
-              fontFamily: 'Geist',
-              fontSize: 13,
-              color: AppColors.ctText,
-            ),
+            style: AppTextStyles.body,
             decoration: InputDecoration(
               hintText: _idHint,
-              hintStyle: const TextStyle(
-                fontFamily: 'Geist',
-                fontSize: 13,
-                color: AppColors.ctText3,
-              ),
+              hintStyle: AppTextStyles.body.copyWith(color: AppColors.ctText3),
               counterText: '',
               filled: true,
               fillColor: AppColors.ctSurface2,
@@ -268,11 +248,7 @@ class _NationalityIdentityWidgetState
             const SizedBox(height: 3),
             Text(
               _idError!,
-              style: const TextStyle(
-                fontFamily: 'Geist',
-                fontSize: 11,
-                color: AppColors.ctDanger,
-              ),
+              style: AppTextStyles.bodySmall.copyWith(color: AppColors.ctDanger),
             ),
           ],
         ],
@@ -288,11 +264,7 @@ class _NationalityIdentityWidgetState
               Expanded(
                 child: Text(
                   'Sin identificador no se pueden detectar duplicados',
-                  style: const TextStyle(
-                    fontFamily: 'Geist',
-                    fontSize: 11,
-                    color: AppColors.ctText2,
-                  ),
+                  style: AppTextStyles.bodySmall,
                 ),
               ),
             ],

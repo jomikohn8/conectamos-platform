@@ -11,6 +11,7 @@ import '../../core/constants/field_types.dart';
 import '../../core/providers/permissions_provider.dart';
 import '../../core/providers/tenant_provider.dart';
 import '../../core/theme/app_theme.dart';
+import '../../shared/widgets/app_button.dart';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -318,20 +319,21 @@ class _FlowDetailScreenState extends ConsumerState<FlowDetailScreen>
           style: AppTextStyles.body.copyWith(color: AppColors.ctText2),
         ),
         actions: [
-          TextButton(
+          AppButton(
+            label: 'Cancelar',
+            variant: AppButtonVariant.ghost,
+            size: AppButtonSize.sm,
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar'),
           ),
-          TextButton(
+          AppButton(
+            label: 'Eliminar',
+            variant: AppButtonVariant.danger,
+            size: AppButtonSize.sm,
             onPressed: () {
               Navigator.pop(ctx);
               setState(() => _fields.removeAt(index));
               _save(silent: true);
             },
-            child: Text(
-              'Eliminar',
-              style: AppTextStyles.body.copyWith(color: AppColors.ctDanger),
-            ),
           ),
         ],
       ),
@@ -374,16 +376,17 @@ class _FlowDetailScreenState extends ConsumerState<FlowDetailScreen>
           style: AppTextStyles.body.copyWith(color: AppColors.ctText2),
         ),
         actions: [
-          TextButton(
+          AppButton(
+            label: 'Cancelar',
+            variant: AppButtonVariant.ghost,
+            size: AppButtonSize.sm,
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancelar'),
           ),
-          TextButton(
+          AppButton(
+            label: 'Eliminar',
+            variant: AppButtonVariant.danger,
+            size: AppButtonSize.sm,
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(
-              'Eliminar',
-              style: AppTextStyles.body.copyWith(color: AppColors.ctDanger),
-            ),
           ),
         ],
       ),
@@ -436,7 +439,7 @@ class _FlowDetailScreenState extends ConsumerState<FlowDetailScreen>
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 16),
-              TextButton(onPressed: _load, child: const Text('Reintentar')),
+              AppButton(label: 'Reintentar', variant: AppButtonVariant.ghost, size: AppButtonSize.sm, onPressed: _load),
             ],
           ),
         ),
@@ -565,15 +568,12 @@ class _FlowDetailScreenState extends ConsumerState<FlowDetailScreen>
             ),
           )
         else
-          TextButton(
-            onPressed: _loading ? null : _save,
-            child: Text(
-              'Guardar',
-              style: AppTextStyles.body.copyWith(
-                fontWeight: FontWeight.w600,
-                color: AppColors.ctTeal,
-              ),
-            ),
+          AppButton(
+            label: 'Guardar',
+            variant: AppButtonVariant.ghost,
+            size: AppButtonSize.sm,
+            isDisabled: _loading,
+            onPressed: _save,
           ),
       ],
       bottom: TabBar(
@@ -792,25 +792,12 @@ class _InfoTabState extends State<_InfoTab> {
           if (widget.canManage) ...[
             const Divider(color: AppColors.ctBorder),
             const SizedBox(height: 16),
-            OutlinedButton.icon(
+            AppButton(
+              label: 'Eliminar flujo',
+              variant: AppButtonVariant.danger,
+              size: AppButtonSize.sm,
+              prefixIcon: const Icon(Icons.delete_outline, size: 14, color: Colors.white),
               onPressed: widget.onDelete,
-              icon: const Icon(Icons.delete_outline,
-                  size: 16, color: Color(0xFFE24C4B)),
-              label: Text(
-                'Eliminar flujo',
-                style: AppTextStyles.body.copyWith(
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.ctDanger,
-                ),
-              ),
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: Color(0xFFE24C4B)),
-                backgroundColor: Colors.transparent,
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 16, vertical: 10),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8)),
-              ),
             ),
             const SizedBox(height: 8),
           ],
@@ -855,16 +842,11 @@ class _CamposTab extends StatelessWidget {
                 ),
                 const Spacer(),
                 if (canManage)
-                  TextButton.icon(
+                  AppButton(
+                    label: '+ Agregar campo',
+                    variant: AppButtonVariant.ghost,
+                    size: AppButtonSize.sm,
                     onPressed: onAddField,
-                    icon: const Icon(Icons.add, size: 16),
-                    label: const Text(
-                      '+ Agregar campo',
-                      style: AppTextStyles.formLabel,
-                    ),
-                    style: TextButton.styleFrom(
-                      foregroundColor: AppColors.ctTeal,
-                    ),
                   ),
               ],
             ),
@@ -2770,14 +2752,11 @@ class _AlCerrarTabState extends State<_AlCerrarTab> {
               ),
               const Spacer(),
               if (widget.canManage)
-                TextButton(
+                AppButton(
+                  label: '+ Agregar acción',
+                  variant: AppButtonVariant.ghost,
+                  size: AppButtonSize.sm,
                   onPressed: () => _openActionDialog(null),
-                  style: TextButton.styleFrom(
-                      foregroundColor: AppColors.ctTeal),
-                  child: const Text(
-                    '+ Agregar acción',
-                    style: AppTextStyles.formLabel,
-                  ),
                 ),
             ],
           ),
@@ -3329,7 +3308,11 @@ class _ActionDialogState extends State<_ActionDialog> {
                       'Mapeo de columnas',
                       style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w500),
                     ),
-                    TextButton.icon(
+                    AppButton(
+                      label: '+ Agregar columna',
+                      variant: AppButtonVariant.ghost,
+                      size: AppButtonSize.sm,
+                      prefixIcon: const Icon(Icons.add, size: 14, color: AppColors.ctTeal),
                       onPressed: () => setState(() {
                         _columnMappingRows.add((
                           TextEditingController(),
@@ -3337,17 +3320,6 @@ class _ActionDialogState extends State<_ActionDialog> {
                         ));
                         _columnMappingKeys.add(null);
                       }),
-                      icon: const Icon(Icons.add, size: 14,
-                          color: AppColors.ctTeal),
-                      label: Text(
-                        '+ Agregar columna',
-                        style: AppTextStyles.bodySmall.copyWith(fontSize: 12, color: AppColors.ctTeal),
-                      ),
-                      style: TextButton.styleFrom(
-                        padding: EdgeInsets.zero,
-                        minimumSize: Size.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
                     ),
                   ],
                 ),
@@ -3981,14 +3953,11 @@ class _PrecondicionesTabState extends State<_PrecondicionesTab> {
               ),
               const Spacer(),
               if (widget.canManage)
-                TextButton(
+                AppButton(
+                  label: '+ Agregar regla',
+                  variant: AppButtonVariant.ghost,
+                  size: AppButtonSize.sm,
                   onPressed: () => _openRuleDialog(null),
-                  style:
-                      TextButton.styleFrom(foregroundColor: AppColors.ctTeal),
-                  child: const Text(
-                    '+ Agregar regla',
-                    style: AppTextStyles.formLabel,
-                  ),
                 ),
             ],
           ),

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/providers/permissions_provider.dart';
 import '../../core/theme/app_theme.dart';
+import '../../shared/widgets/app_button.dart';
 
 // ── Grupos de permisos para la UI ─────────────────────────────────────────────
 
@@ -133,12 +134,7 @@ class _PanelHeader extends StatelessWidget {
             decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(20)),
             child: Text(
               roleName,
-              style: TextStyle(
-                fontFamily: 'Geist',
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                color: fg,
-              ),
+              style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.w700, color: fg),
             ),
           ),
           if (roleName.toLowerCase() == 'admin') ...[
@@ -203,7 +199,7 @@ class _EditableBody extends ConsumerWidget {
     if (state.error != null) {
       return Padding(
         padding: const EdgeInsets.all(16),
-        child: Text(state.error!, style: const TextStyle(fontFamily: 'Geist', fontSize: 12, color: AppColors.ctDanger)),
+        child: Text(state.error!, style: AppTextStyles.bodySmall.copyWith(fontSize: 12, color: AppColors.ctDanger)),
       );
     }
 
@@ -249,13 +245,7 @@ class _PermGroup extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
           child: Text(
             label.toUpperCase(),
-            style: const TextStyle(
-              fontFamily: 'Geist',
-              fontSize: 9,
-              fontWeight: FontWeight.w700,
-              color: AppColors.ctText3,
-              letterSpacing: 0.6,
-            ),
+            style: AppTextStyles.navSectionLabel.copyWith(color: AppColors.ctText3, letterSpacing: 0.6),
           ),
         ),
         child,
@@ -290,11 +280,7 @@ class _PermRow extends StatelessWidget {
       visualDensity:    VisualDensity.compact,
       title: Text(
         label,
-        style: TextStyle(
-          fontFamily: 'Geist',
-          fontSize: 12,
-          color: disabled ? AppColors.ctText3 : AppColors.ctText,
-        ),
+        style: AppTextStyles.bodySmall.copyWith(fontSize: 12, color: disabled ? AppColors.ctText3 : AppColors.ctText),
       ),
     );
   }
@@ -318,28 +304,14 @@ class _SaveFooter extends ConsumerWidget {
 
     return Padding(
       padding: const EdgeInsets.all(12),
-      child: SizedBox(
-        width: double.infinity,
-        height: 32,
-        child: ElevatedButton(
-          onPressed: canSave ? onSave : null,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.ctTeal,
-            disabledBackgroundColor: AppColors.ctSurface2,
-            foregroundColor: Colors.white,
-            disabledForegroundColor: AppColors.ctText3,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(7)),
-            elevation: 0,
-            textStyle: const TextStyle(fontFamily: 'Geist', fontSize: 12, fontWeight: FontWeight.w600),
-          ),
-          child: saving
-              ? const SizedBox(
-                  width: 14,
-                  height: 14,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                )
-              : const Text('Guardar cambios'),
-        ),
+      child: AppButton(
+        label: 'Guardar cambios',
+        onPressed: onSave,
+        isDisabled: !canSave,
+        isLoading: saving,
+        variant: AppButtonVariant.teal,
+        size: AppButtonSize.sm,
+        expand: true,
       ),
     );
   }

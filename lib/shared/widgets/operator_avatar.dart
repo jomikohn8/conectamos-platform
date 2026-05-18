@@ -52,8 +52,7 @@ class OperatorAvatar extends StatelessWidget {
       alignment: Alignment.center,
       child: Text(
         initials,
-        style: TextStyle(
-          fontFamily: 'Geist',
+        style: AppTextStyles.bodySmall.copyWith(
           fontSize: size * 0.35,
           fontWeight: FontWeight.w600,
           color: AppColors.ctTealText,

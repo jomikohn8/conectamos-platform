@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/app_button.dart';
 
 // ── Action type maps (extend as needed) ───────────────────────────────────────
 
@@ -151,8 +152,7 @@ class ExecutionMetadataSidebar extends StatelessWidget {
                   label: 'Execution ID',
                   copyText: exec['id'] as String?,
                   value: Text(execId,
-                      style: const TextStyle(
-                          fontFamily: 'Geist',
+                      style: AppTextStyles.bodySmall.copyWith(
                           fontSize: 12,
                           color: AppColors.ctNavy,
                           letterSpacing: -0.005)),
@@ -228,19 +228,14 @@ class ExecutionMetadataSidebar extends StatelessWidget {
           // ── Flujo definido ────────────────────────────────────────────────
           _SideCard(
             title: 'Flujo definido',
-            action: TextButton.icon(
+            action: AppButton(
+              label: 'Editor',
               onPressed: () {
                 if (flowSlug.isNotEmpty) context.go('/flows/$flowSlug');
               },
-              icon: const Icon(Icons.arrow_outward_rounded, size: 12),
-              label: const Text('Editor'),
-              style: TextButton.styleFrom(
-                foregroundColor: AppColors.ctTeal,
-                textStyle:
-                    AppFonts.geist(fontSize: 12, fontWeight: FontWeight.w600),
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                minimumSize: Size.zero,
-              ),
+              prefixIcon: const Icon(Icons.arrow_outward_rounded, size: 12),
+              variant: AppButtonVariant.ghost,
+              size: AppButtonSize.sm,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -430,8 +425,7 @@ class ExecutionMetadataSidebar extends StatelessWidget {
                                   const SizedBox(width: 8),
                                   Expanded(
                                     child: Text(label,
-                                        style: const TextStyle(
-                                            fontFamily: 'Geist',
+                                        style: AppTextStyles.bodySmall.copyWith(
                                             fontSize: 12,
                                             color: AppColors.ctNavy)),
                                   ),

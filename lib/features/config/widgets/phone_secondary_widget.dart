@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../../core/theme/colors.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/phone_normalizer.dart';
 import 'phone_field_widget.dart';
 
@@ -123,16 +123,15 @@ class _PhoneSecondaryWidgetState extends State<PhoneSecondaryWidget> {
                   border: Border.all(color: AppColors.ctBorder2),
                 ),
                 alignment: Alignment.center,
-                child: const Row(
+                child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.add_rounded,
+                    const Icon(Icons.add_rounded,
                         size: 14, color: AppColors.ctTeal),
-                    SizedBox(width: 6),
+                    const SizedBox(width: 6),
                     Text(
                       'Agregar teléfono secundario',
-                      style: TextStyle(
-                        fontFamily: 'Geist',
+                      style: AppTextStyles.bodySmall.copyWith(
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
                         color: AppColors.ctTeal,
@@ -186,16 +185,10 @@ class _EntryCardState extends State<_EntryCard> {
                   controller: entry.labelCtrl,
                   maxLength: 30,
                   onChanged: (_) => widget.onChanged(),
-                  style: const TextStyle(
-                      fontFamily: 'Geist',
-                      fontSize: 12,
-                      color: AppColors.ctText),
-                  decoration: const InputDecoration(
+                  style: AppTextStyles.bodySmall.copyWith(fontSize: 12, color: AppColors.ctText),
+                  decoration: InputDecoration(
                     hintText: 'Etiqueta (ej: Trabajo)',
-                    hintStyle: TextStyle(
-                        fontFamily: 'Geist',
-                        fontSize: 12,
-                        color: AppColors.ctText3),
+                    hintStyle: AppTextStyles.bodySmall.copyWith(fontSize: 12, color: AppColors.ctText3),
                     counterText: '',
                     isDense: true,
                     contentPadding: EdgeInsets.symmetric(
@@ -230,13 +223,9 @@ class _EntryCardState extends State<_EntryCard> {
           // Channel selector
           Row(
             children: [
-              const Text(
+              Text(
                 'Canal:',
-                style: TextStyle(
-                  fontFamily: 'Geist',
-                  fontSize: 12,
-                  color: AppColors.ctText2,
-                ),
+                style: AppTextStyles.bodySmall.copyWith(fontSize: 12),
               ),
               const SizedBox(width: 8),
               ..._kChannelOptions.map((ch) {
@@ -265,13 +254,9 @@ class _EntryCardState extends State<_EntryCard> {
                       ),
                       child: Text(
                         _kChannelLabels[ch] ?? ch,
-                        style: TextStyle(
-                          fontFamily: 'Geist',
-                          fontSize: 11,
+                        style: AppTextStyles.bodySmall.copyWith(
                           fontWeight: FontWeight.w500,
-                          color: selected
-                              ? AppColors.ctTealDark
-                              : AppColors.ctText2,
+                          color: selected ? AppColors.ctTealDark : AppColors.ctText2,
                         ),
                       ),
                     ),

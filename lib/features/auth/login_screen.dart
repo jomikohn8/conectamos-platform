@@ -159,11 +159,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               children: [
                 TextSpan(
                   text: 'Tu operación en\ntiempo real,\n',
-                  style: AppTextStyles.body.copyWith(color: Colors.white),
+                  style: const TextStyle(color: Colors.white),
                 ),
                 TextSpan(
                   text: 'en un solo lugar.',
-                  style: AppTextStyles.body.copyWith(color: AppColors.ctTeal),
+                  style: const TextStyle(color: AppColors.ctTeal),
                 ),
               ],
             ),

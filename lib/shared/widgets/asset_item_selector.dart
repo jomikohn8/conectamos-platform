@@ -125,12 +125,7 @@ class _AssetItemSelectorState extends State<AssetItemSelector> {
             Expanded(
               child: Text(
                 _selectedDisplayText ?? _selectedItemId!,
-                style: const TextStyle(
-                  fontFamily: 'Geist',
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.ctText,
-                ),
+                style: AppTextStyles.bodySmall.copyWith(fontSize: 12, fontWeight: FontWeight.w500, color: AppColors.ctText),
                 overflow: TextOverflow.ellipsis,
               ),
             ),
@@ -160,18 +155,10 @@ class _AssetItemSelectorState extends State<AssetItemSelector> {
               Expanded(
                 child: TextField(
                   controller: _searchCtrl,
-                  style: const TextStyle(
-                    fontFamily: 'Geist',
-                    fontSize: 13,
-                    color: AppColors.ctText,
-                  ),
-                  decoration: const InputDecoration(
+                  style: AppTextStyles.body,
+                  decoration: InputDecoration(
                     hintText: 'Buscar item del catálogo…',
-                    hintStyle: TextStyle(
-                      fontFamily: 'Geist',
-                      fontSize: 13,
-                      color: AppColors.ctText3,
-                    ),
+                    hintStyle: AppTextStyles.body.copyWith(color: AppColors.ctText3),
                     border: InputBorder.none,
                     isDense: true,
                     contentPadding: EdgeInsets.symmetric(vertical: 8),
@@ -223,11 +210,7 @@ class _AssetItemSelectorState extends State<AssetItemSelector> {
                       _searchCtrl.text.length > 2
                           ? 'Sin resultados'
                           : 'Escribe para buscar…',
-                      style: const TextStyle(
-                        fontFamily: 'Geist',
-                        fontSize: 12,
-                        color: AppColors.ctText3,
-                      ),
+                      style: AppTextStyles.bodySmall.copyWith(fontSize: 12, color: AppColors.ctText3),
                     ),
                   )
                 : ListView.builder(
@@ -252,11 +235,7 @@ class _AssetItemSelectorState extends State<AssetItemSelector> {
                               horizontal: 12, vertical: 9),
                           child: Text(
                             displayText,
-                            style: const TextStyle(
-                              fontFamily: 'Geist',
-                              fontSize: 13,
-                              color: AppColors.ctText,
-                            ),
+                            style: AppTextStyles.body,
                           ),
                         ),
                       );

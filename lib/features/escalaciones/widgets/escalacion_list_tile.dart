@@ -45,12 +45,7 @@ class EscalacionStatusChip extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: TextStyle(
-          fontFamily: 'Geist',
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-          color: fg,
-        ),
+        style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.w600, color: fg),
       ),
     );
   }
@@ -116,12 +111,7 @@ class EscalacionListTile extends StatelessWidget {
                         Flexible(
                           child: Text(
                             _operatorName(),
-                            style: const TextStyle(
-                              fontFamily: 'Onest',
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.ctText,
-                            ),
+                            style: AppTextStyles.cardTitle.copyWith(fontSize: 14, fontWeight: FontWeight.bold),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
@@ -141,23 +131,15 @@ class EscalacionListTile extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       reason,
-                      style: const TextStyle(
-                        fontFamily: 'Geist',
-                        fontSize: 12,
-                        color: AppColors.ctText2,
-                      ),
+                      style: AppTextStyles.bodySmall.copyWith(fontSize: 12),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
                     Text(
                       hasAssignee ? _assignedToName() : 'Sin asignar',
-                      style: TextStyle(
-                        fontFamily: 'Geist',
-                        fontSize: 11,
-                        color: hasAssignee
-                            ? AppColors.ctText2
-                            : AppColors.ctText3,
+                      style: AppTextStyles.bodySmall.copyWith(
+                        color: hasAssignee ? AppColors.ctText2 : AppColors.ctText3,
                       ),
                     ),
                   ],
@@ -173,11 +155,7 @@ class EscalacionListTile extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     _timeAgo(openedAt),
-                    style: const TextStyle(
-                      fontFamily: 'Geist',
-                      fontSize: 11,
-                      color: AppColors.ctText3,
-                    ),
+                    style: AppTextStyles.bodySmall.copyWith(color: AppColors.ctText3),
                   ),
                 ],
               ),

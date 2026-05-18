@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart' show LatLng;
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/app_button.dart';
 import '../../conversations/widgets/media_preview_dialog.dart';
 
 // ── Public widget ────────────────────────────────────────────────────────────
@@ -149,11 +150,10 @@ class _FieldHeader extends StatelessWidget {
                 children: [
                   Text(_typeLabel(type),
                       style: AppFonts.geist(fontSize: 11, color: const Color(0xFF94A3B8))),
-                  const Text(' · ',
-                      style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+                  Text(' · ',
+                      style: AppFonts.geist(fontSize: 11, color: const Color(0xFF94A3B8))),
                   Text(slug,
-                      style: const TextStyle(
-                          fontFamily: 'Geist', fontSize: 10, color: Color(0xFF94A3B8))),
+                      style: AppFonts.geist(fontSize: 10, color: const Color(0xFF94A3B8))),
                 ],
               ),
             ],
@@ -817,8 +817,7 @@ class _PhotoThumb extends StatelessWidget {
                     borderRadius: BorderRadius.circular(99),
                   ),
                   child: Text(num,
-                      style: const TextStyle(
-                          fontFamily: 'Geist',
+                      style: AppFonts.geist(
                           fontSize: 10,
                           fontWeight: FontWeight.w600,
                           color: Colors.white,
@@ -840,8 +839,7 @@ class _PhotoThumb extends StatelessWidget {
                   alignment: Alignment.bottomLeft,
                   padding: const EdgeInsets.all(8),
                   child: Text('Evidencia',
-                      style: const TextStyle(
-                          fontFamily: 'Geist',
+                      style: AppFonts.geist(
                           fontSize: 10,
                           fontWeight: FontWeight.w500,
                           color: Colors.white,
@@ -963,31 +961,24 @@ class _LocationMap extends StatelessWidget {
                     const SizedBox(height: 3),
                     Text(
                         '${lat.toStringAsFixed(5)}, ${lng.toStringAsFixed(5)}',
-                        style: const TextStyle(
-                            fontFamily: 'Geist',
+                        style: AppFonts.geist(
                             fontSize: 11,
-                            color: Color(0xFF475569),
+                            color: const Color(0xFF475569),
                             letterSpacing: -0.005)),
                   ],
                 ),
               ),
               const SizedBox(width: 8),
-              TextButton.icon(
+              AppButton(
+                label: 'Abrir',
                 onPressed: () async {
                   final uri = Uri.parse(
                       'https://www.google.com/maps?q=$lat,$lng');
                   await launchUrl(uri, mode: LaunchMode.externalApplication);
                 },
-                icon: const Icon(Icons.open_in_new_rounded, size: 11),
-                label: const Text('Abrir'),
-                style: TextButton.styleFrom(
-                  foregroundColor: AppColors.ctText2,
-                  textStyle:
-                      AppFonts.geist(fontSize: 11, fontWeight: FontWeight.w500),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  minimumSize: Size.zero,
-                ),
+                prefixIcon: const Icon(Icons.open_in_new_rounded, size: 11),
+                variant: AppButtonVariant.ghost,
+                size: AppButtonSize.sm,
               ),
             ],
           ),
@@ -1155,13 +1146,9 @@ class _MediaErrorSlot extends StatelessWidget {
             size: 22,
           ),
           const SizedBox(height: 6),
-          const Text(
+          Text(
             'No se pudo cargar',
-            style: TextStyle(
-              fontFamily: 'Geist',
-              fontSize: 11,
-              color: AppColors.ctText3,
-            ),
+            style: AppFonts.geist(fontSize: 11, color: AppColors.ctText3),
           ),
           const SizedBox(height: 6),
           GestureDetector(
@@ -1171,15 +1158,13 @@ class _MediaErrorSlot extends StatelessWidget {
                 await launchUrl(uri, mode: LaunchMode.externalApplication);
               }
             },
-            child: const Text(
+            child: Text(
               'Abrir en navegador',
-              style: TextStyle(
-                fontFamily: 'Geist',
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: AppColors.ctTeal,
-                decoration: TextDecoration.underline,
-              ),
+              style: AppFonts.geist(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.ctTeal)
+                  .copyWith(decoration: TextDecoration.underline),
             ),
           ),
         ],
@@ -1214,23 +1199,21 @@ class _CapturedRawSlot extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Capturado · no se puede visualizar',
-                  style: TextStyle(
-                    fontFamily: 'Geist',
+                  style: AppFonts.geist(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFFD97706),
+                    color: const Color(0xFFD97706),
                   ),
                 ),
                 if (rawValue != null) ...[
                   const SizedBox(height: 2),
                   Text(
                     rawValue!,
-                    style: const TextStyle(
-                      fontFamily: 'Geist',
+                    style: AppFonts.geist(
                       fontSize: 11,
-                      color: Color(0xFF92400E),
+                      color: const Color(0xFF92400E),
                     ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,

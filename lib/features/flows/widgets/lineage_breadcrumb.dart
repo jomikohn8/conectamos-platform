@@ -248,16 +248,11 @@ class _ParentChip extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text('VINO DE',
-                      style: TextStyle(
-                        fontFamily: 'Geist',
-                        fontSize: 9,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.08,
+                      style: AppTextStyles.navSectionLabel.copyWith(
                         color: fg.withValues(alpha: 0.65),
                       )),
                   Text(flowName,
-                      style: const TextStyle(
-                        fontFamily: 'Geist',
+                      style: AppTextStyles.bodySmall.copyWith(
                         fontSize: 11.5,
                         fontWeight: FontWeight.w600,
                         color: fg,
@@ -271,9 +266,7 @@ class _ParentChip extends StatelessWidget {
               if (shortId.isNotEmpty) ...[
                 const SizedBox(width: 4),
                 Text(shortId,
-                    style: TextStyle(
-                      fontFamily: 'Geist',
-                      fontSize: 10,
+                    style: AppTextStyles.caption.copyWith(
                       color: const Color(0xFF6366F1).withValues(alpha: 0.7),
                     )),
               ],
@@ -322,16 +315,11 @@ class _CurrentChip extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text('ESTA EJECUCIÓN',
-                    style: TextStyle(
-                      fontFamily: 'Geist',
-                      fontSize: 9,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.08,
+                    style: AppTextStyles.navSectionLabel.copyWith(
                       color: AppColors.ctTeal.withValues(alpha: 0.7),
                     )),
                 Text(flowName,
-                    style: const TextStyle(
-                      fontFamily: 'Geist',
+                    style: AppTextStyles.bodySmall.copyWith(
                       fontSize: 11.5,
                       fontWeight: FontWeight.w600,
                       color: Colors.white,
@@ -393,16 +381,11 @@ class _ChildChip extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text('DETONÓ',
-                      style: TextStyle(
-                        fontFamily: 'Geist',
-                        fontSize: 9,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.08,
+                      style: AppTextStyles.navSectionLabel.copyWith(
                         color: fg.withValues(alpha: 0.65),
                       )),
                   Text(flowName,
-                      style: const TextStyle(
-                        fontFamily: 'Geist',
+                      style: AppTextStyles.bodySmall.copyWith(
                         fontSize: 11.5,
                         fontWeight: FontWeight.w600,
                         color: fg,
@@ -416,9 +399,7 @@ class _ChildChip extends StatelessWidget {
               if (shortId.isNotEmpty) ...[
                 const SizedBox(width: 4),
                 Text(shortId,
-                    style: TextStyle(
-                      fontFamily: 'Geist',
-                      fontSize: 10,
+                    style: AppTextStyles.caption.copyWith(
                       color: fg.withValues(alpha: 0.7),
                     )),
               ],

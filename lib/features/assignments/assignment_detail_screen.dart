@@ -7,6 +7,7 @@ import '../../core/api/assignments_api.dart';
 import '../../core/providers/permissions_provider.dart';
 import '../../core/providers/tenant_provider.dart';
 import '../../core/theme/app_theme.dart';
+import '../../shared/widgets/app_button.dart';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -150,9 +151,7 @@ class _AssignmentDetailScreenState
                           style: AppFonts.geist(
                               fontSize: 13, color: AppColors.ctDanger)),
                       const SizedBox(height: 12),
-                      TextButton(
-                          onPressed: _load,
-                          child: const Text('Reintentar')),
+                      AppButton(label: 'Reintentar', variant: AppButtonVariant.ghost, size: AppButtonSize.sm, onPressed: _load),
                     ],
                   ),
                 )
