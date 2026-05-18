@@ -12,6 +12,7 @@ import 'package:intl/intl.dart';
 
 import '../../core/api/flows_api.dart';
 import '../../core/theme/app_theme.dart';
+import '../../shared/widgets/app_button.dart';
 import 'dashboard_providers.dart';
 
 // ── Providers ─────────────────────────────────────────────────────────────────
@@ -108,19 +109,14 @@ class _ActionBar extends ConsumerWidget {
       padding: const EdgeInsets.symmetric(horizontal: 22),
       child: Row(
         children: [
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
                   'Dashboard',
-                  style: TextStyle(
-                    fontFamily: 'Geist',
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.ctText,
-                  ),
+                  style: AppTextStyles.pageTitle.copyWith(fontFamily: 'Geist'),
                 ),
                 SizedBox(height: 1),
                 Text(
@@ -135,11 +131,7 @@ class _ActionBar extends ConsumerWidget {
             const SizedBox(width: 8),
             Text(
               filter['label'] as String? ?? filter['key'] as String? ?? '',
-              style: const TextStyle(
-                fontFamily: 'Geist',
-                fontSize: 12,
-                color: AppColors.ctText2,
-              ),
+              style: AppTextStyles.bodySmall.copyWith(fontSize: 12),
             ),
             const SizedBox(width: 6),
             _MetaFilterField(
@@ -219,12 +211,7 @@ class _DateRangeButton extends StatelessWidget {
             const SizedBox(width: 6),
             Text(
               _label,
-              style: const TextStyle(
-                fontFamily: 'Geist',
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: AppColors.ctText2,
-              ),
+              style: AppTextStyles.bodySmall.copyWith(fontSize: 12, fontWeight: FontWeight.w500),
             ),
             if (range != null) ...[
               const SizedBox(width: 6),
@@ -293,14 +280,10 @@ class _MetaFilterFieldState extends ConsumerState<_MetaFilterField> {
       height: 32,
       child: TextField(
         controller: _ctrl,
-        style: const TextStyle(
-          fontFamily: 'Geist', fontSize: 12, color: AppColors.ctText,
-        ),
+        style: AppTextStyles.bodySmall.copyWith(fontSize: 12, color: AppColors.ctText),
         decoration: InputDecoration(
           hintText: 'Filtrar...',
-          hintStyle: const TextStyle(
-            fontFamily: 'Geist', fontSize: 12, color: AppColors.ctText3,
-          ),
+          hintStyle: AppTextStyles.bodySmall.copyWith(fontSize: 12, color: AppColors.ctText3),
           isDense: true,
           contentPadding:
               const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -328,57 +311,6 @@ class _MetaFilterFieldState extends ConsumerState<_MetaFilterField> {
 }
 
 // ── Ghost button (reservado para uso futuro) ──────────────────────────────────
-
-class _GhostButton extends StatefulWidget {
-  const _GhostButton({
-    required this.label,
-    required this.onTap,
-  });
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  State<_GhostButton> createState() => _GhostButtonState();
-}
-
-class _GhostButtonState extends State<_GhostButton> {
-  bool _hovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-          decoration: BoxDecoration(
-            color: _hovered ? AppColors.ctSurface2 : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: AppColors.ctBorder2),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                widget.label,
-                style: const TextStyle(
-                  fontFamily: 'Geist',
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.ctText2,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 // ── Cuerpo principal ──────────────────────────────────────────────────────────
 
@@ -423,14 +355,9 @@ class _EmptyView extends StatelessWidget {
         children: [
           const Icon(Icons.dashboard_outlined, size: 48, color: AppColors.ctText2),
           const SizedBox(height: 16),
-          const Text(
+          Text(
             'Sin dashboard configurado',
-            style: TextStyle(
-              fontFamily: 'Geist',
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
-              color: AppColors.ctText,
-            ),
+            style: AppTextStyles.pageTitle.copyWith(fontFamily: 'Geist', fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 6),
           Text(
@@ -591,12 +518,7 @@ class _ConfiguredView extends ConsumerWidget {
             children: [
               Text(
                 dashboard['name'] as String? ?? 'Dashboard',
-                style: const TextStyle(
-                  fontFamily: 'Geist',
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.ctText,
-                ),
+                style: AppTextStyles.kpiValue.copyWith(fontFamily: 'Geist', fontSize: 20),
               ),
               const SizedBox(height: 20),
               ...rows,
@@ -674,13 +596,7 @@ class _DashCard extends StatelessWidget {
         children: [
           Text(
             title,
-            style: const TextStyle(
-              fontFamily: 'Geist',
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: AppColors.ctText2,
-              letterSpacing: 0.5,
-            ),
+            style: AppTextStyles.bodySmall.copyWith(fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 0.5),
           ),
           if (subtitle != null) ...[
             const SizedBox(height: 2),
@@ -736,23 +652,14 @@ class _KpiCardWidget extends StatelessWidget {
         children: [
           Text(
             displayValue,
-            style: TextStyle(
-              fontFamily: 'Geist',
-              fontSize: 40,
-              fontWeight: FontWeight.w700,
-              color: color,
-            ),
+            style: AppTextStyles.kpiValue.copyWith(fontFamily: 'Geist', fontSize: 40, color: color),
           ),
           const SizedBox(width: 10),
           Padding(
             padding: const EdgeInsets.only(bottom: 6),
             child: Text(
               label,
-              style: const TextStyle(
-                fontFamily: 'Geist',
-                fontSize: 13,
-                color: AppColors.ctText2,
-              ),
+              style: AppTextStyles.body.copyWith(color: AppColors.ctText2),
             ),
           ),
         ],
@@ -807,21 +714,14 @@ class _FlowActionButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final label = config['label'] as String? ?? title;
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton.icon(
-        onPressed: null, // Sprint siguiente: disparar flow
-        icon: const Icon(Icons.play_arrow_rounded),
-        label: Text(label),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.ctTeal,
-          foregroundColor: AppColors.ctNavy,
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
-        ),
-      ),
+    // Sprint siguiente: disparar flow
+    return AppButton(
+      label: label,
+      variant: AppButtonVariant.teal,
+      expand: true,
+      isDisabled: true,
+      prefixIcon: const Icon(Icons.play_arrow_rounded, size: 16, color: AppColors.ctNavy),
+      onPressed: () {},
     );
   }
 }
@@ -906,21 +806,12 @@ class _RecentActivityWidget extends StatelessWidget {
                       children: [
                         Text(
                           operatorName,
-                          style: const TextStyle(
-                            fontFamily: 'Geist',
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                            color: AppColors.ctText,
-                          ),
+                          style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w500),
                         ),
                         const SizedBox(height: 2),
                         Text(
                           'Orden #$orderNumber',
-                          style: const TextStyle(
-                            fontFamily: 'Geist',
-                            fontSize: 11,
-                            color: AppColors.ctText2,
-                          ),
+                          style: AppTextStyles.bodySmall,
                         ),
                       ],
                     ),
@@ -930,20 +821,11 @@ class _RecentActivityWidget extends StatelessWidget {
                     children: [
                       Text(
                         isDelivery ? 'Entregado' : 'Fallido',
-                        style: TextStyle(
-                          fontFamily: 'Geist',
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: isDelivery ? AppColors.ctOk : AppColors.ctDanger,
-                        ),
+                        style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.w600, color: isDelivery ? AppColors.ctOk : AppColors.ctDanger),
                       ),
                       Text(
                         _formatTime(completedAt),
-                        style: const TextStyle(
-                          fontFamily: 'Geist',
-                          fontSize: 11,
-                          color: AppColors.ctText2,
-                        ),
+                        style: AppTextStyles.bodySmall,
                       ),
                     ],
                   ),
@@ -1084,26 +966,14 @@ class _BarChartWidgetState extends State<_BarChartWidget> {
                       Expanded(
                         child: Text(
                           label,
-                          style: TextStyle(
-                            fontFamily: 'Geist',
-                            fontSize: isSelected ? 12 : 11,
-                            fontWeight: isSelected
-                                ? FontWeight.w600
-                                : FontWeight.w400,
-                            color: AppColors.ctText,
-                          ),
+                          style: AppTextStyles.bodySmall.copyWith(fontSize: isSelected ? 12 : 11, fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400, color: AppColors.ctText),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       const SizedBox(width: 4),
                       Text(
                         '$pct%',
-                        style: TextStyle(
-                          fontFamily: 'Geist',
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: _colors[i % _colors.length],
-                        ),
+                        style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.w600, color: _colors[i % _colors.length]),
                       ),
                     ],
                   ),
@@ -1173,7 +1043,7 @@ class _OperatorRankingWidget extends StatelessWidget {
               children: [
                 SizedBox(
                   width: 32,
-                  child: Text(medal, style: const TextStyle(fontSize: 14)),
+                  child: Text(medal, style: AppTextStyles.body.copyWith(fontSize: 14)),
                 ),
                 Expanded(
                   child: Column(
@@ -1181,12 +1051,7 @@ class _OperatorRankingWidget extends StatelessWidget {
                     children: [
                       Text(
                         name,
-                        style: const TextStyle(
-                          fontFamily: 'Geist',
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.ctText,
-                        ),
+                        style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w500),
                         overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 2),
@@ -1208,20 +1073,11 @@ class _OperatorRankingWidget extends StatelessWidget {
                   children: [
                     Text(
                       '${rate.toInt()}%',
-                      style: TextStyle(
-                        fontFamily: 'Geist',
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: color,
-                      ),
+                      style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.w700, color: color),
                     ),
                     Text(
                       '$numerator/$total',
-                      style: const TextStyle(
-                        fontFamily: 'Geist',
-                        fontSize: 11,
-                        color: AppColors.ctText2,
-                      ),
+                      style: AppTextStyles.bodySmall,
                     ),
                   ],
                 ),
@@ -1399,9 +1255,7 @@ class _DataTableWidget extends ConsumerWidget {
           child: Center(
             child: Text(
               e.toString(),
-              style: const TextStyle(
-                fontFamily: 'Geist', fontSize: 12, color: AppColors.ctDanger,
-              ),
+              style: AppTextStyles.bodySmall.copyWith(fontSize: 12, color: AppColors.ctDanger),
             ),
           ),
         ),
@@ -1412,14 +1266,12 @@ class _DataTableWidget extends ConsumerWidget {
               .cast<Map<String, dynamic>>();
 
           if (columns.isEmpty || rows.isEmpty) {
-            return const Padding(
-              padding: EdgeInsets.symmetric(vertical: 24),
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 24),
               child: Center(
                 child: Text(
                   'Sin resultados',
-                  style: TextStyle(
-                    fontFamily: 'Geist', fontSize: 12, color: AppColors.ctText2,
-                  ),
+                  style: AppTextStyles.bodySmall.copyWith(fontSize: 12),
                 ),
               ),
             );
@@ -1433,19 +1285,12 @@ class _DataTableWidget extends ConsumerWidget {
             children: [
               Align(
                 alignment: Alignment.topRight,
-                child: OutlinedButton.icon(
+                child: AppButton(
+                  label: 'Descargar Excel',
+                  variant: AppButtonVariant.outline,
+                  size: AppButtonSize.sm,
+                  prefixIcon: const Icon(Icons.download_rounded, size: 14, color: AppColors.ctInk700),
                   onPressed: () => _downloadXlsx(columns, rows, title),
-                  icon: const Icon(Icons.download_rounded, size: 14),
-                  label: const Text('Descargar Excel'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.ctText2,
-                    side: const BorderSide(color: AppColors.ctBorder2),
-                    textStyle: const TextStyle(
-                      fontFamily: 'Geist', fontSize: 12,
-                    ),
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    visualDensity: VisualDensity.compact,
-                  ),
                 ),
               ),
               const SizedBox(height: 8),
@@ -1460,15 +1305,8 @@ class _DataTableWidget extends ConsumerWidget {
                       dataRowMinHeight: 32,
                       dataRowMaxHeight: 32,
                       columnSpacing: 16,
-                      headingTextStyle: const TextStyle(
-                        fontFamily: 'Geist',
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.ctText,
-                      ),
-                      dataTextStyle: const TextStyle(
-                        fontFamily: 'Geist', fontSize: 11, color: AppColors.ctText,
-                      ),
+                      headingTextStyle: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.w700, color: AppColors.ctText),
+                      dataTextStyle: AppTextStyles.bodySmall.copyWith(color: AppColors.ctText),
                       columns: columns.map((col) {
                         final label =
                             col['label'] as String? ?? col['key'] as String? ?? '';
@@ -1552,13 +1390,9 @@ class _ComingSoonChip extends StatelessWidget {
         color: AppColors.ctSurface2,
         borderRadius: BorderRadius.circular(6),
       ),
-      child: const Text(
+      child: Text(
         'Datos en tiempo real — próximo sprint',
-        style: TextStyle(
-          fontFamily: 'Geist',
-          fontSize: 12,
-          color: AppColors.ctText2,
-        ),
+        style: AppTextStyles.bodySmall.copyWith(fontSize: 12),
       ),
     );
   }

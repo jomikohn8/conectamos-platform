@@ -8,6 +8,7 @@ import '../../core/api/flows_api.dart';
 import '../../core/providers/permissions_provider.dart';
 import '../../core/providers/tenant_provider.dart';
 import '../../core/theme/app_theme.dart';
+import '../../shared/widgets/app_button.dart';
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
@@ -136,12 +137,7 @@ class _FlowIntegrationsScreenState
       builder: (ctx) => AlertDialog(
         title: Text(
           'Copia tu $label ahora',
-          style: const TextStyle(
-            fontFamily: 'Geist',
-            fontWeight: FontWeight.w600,
-            fontSize: 15,
-            color: AppColors.ctText,
-          ),
+          style: AppTextStyles.pageTitle.copyWith(fontFamily: 'Geist', fontWeight: FontWeight.w600),
         ),
         content: SizedBox(
           width: 480,
@@ -157,11 +153,7 @@ class _FlowIntegrationsScreenState
                   Expanded(
                     child: Text(
                       'Esta es la única vez que verás esta clave. Guárdala en un lugar seguro.',
-                      style: const TextStyle(
-                        fontFamily: 'Geist',
-                        fontSize: 13,
-                        color: AppColors.ctDanger,
-                      ),
+                      style: AppTextStyles.body.copyWith(color: AppColors.ctDanger),
                     ),
                   ),
                 ],
@@ -169,12 +161,7 @@ class _FlowIntegrationsScreenState
               const SizedBox(height: 16),
               Text(
                 label,
-                style: const TextStyle(
-                  fontFamily: 'Geist',
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.ctText2,
-                ),
+                style: AppTextStyles.bodySmall.copyWith(fontSize: 12, fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 6),
               _SecretBox(secret: secret),
@@ -182,14 +169,11 @@ class _FlowIntegrationsScreenState
           ),
         ),
         actions: [
-          ElevatedButton(
+          AppButton(
+            label: 'Entendido',
+            variant: AppButtonVariant.teal,
+            size: AppButtonSize.sm,
             onPressed: () => ctx.pop(),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.ctTeal,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Entendido',
-                style: TextStyle(fontFamily: 'Geist', fontSize: 13)),
           ),
         ],
       ),
@@ -223,18 +207,13 @@ class _FlowIntegrationsScreenState
         ),
         actions: [
           if (canManage)
-            TextButton.icon(
-              onPressed: _loading ? null : _openCreateDialog,
-              icon: const Icon(Icons.add, color: AppColors.ctTeal, size: 18),
-              label: const Text(
-                'Nueva',
-                style: TextStyle(
-                  fontFamily: 'Geist',
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.ctTeal,
-                ),
-              ),
+            AppButton(
+              label: 'Nueva',
+              variant: AppButtonVariant.ghost,
+              size: AppButtonSize.sm,
+              isDisabled: _loading,
+              prefixIcon: const Icon(Icons.add, size: 14, color: AppColors.ctTeal),
+              onPressed: _openCreateDialog,
             ),
         ],
       ),
@@ -255,14 +234,11 @@ class _FlowIntegrationsScreenState
             const SizedBox(height: 12),
             Text(
               _error!,
-              style: const TextStyle(
-                fontFamily: 'Geist',
-                color: AppColors.ctText2,
-              ),
+              style: AppTextStyles.body.copyWith(color: AppColors.ctText2),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
-            TextButton(onPressed: _load, child: const Text('Reintentar')),
+            AppButton(label: 'Reintentar', variant: AppButtonVariant.ghost, size: AppButtonSize.sm, onPressed: _load),
           ],
         ),
       );
@@ -291,16 +267,12 @@ class _FlowIntegrationsScreenState
             ),
             if (canManage) ...[
               const SizedBox(height: 20),
-              ElevatedButton.icon(
+              AppButton(
+                label: 'Nueva integración',
+                variant: AppButtonVariant.teal,
+                size: AppButtonSize.sm,
+                prefixIcon: const Icon(Icons.add, size: 14, color: AppColors.ctNavy),
                 onPressed: _openCreateDialog,
-                icon: const Icon(Icons.add, size: 16),
-                label: const Text('Nueva integración'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.ctTeal,
-                  foregroundColor: Colors.white,
-                  textStyle: AppFonts.geist(
-                      fontSize: 13, fontWeight: FontWeight.w600),
-                ),
               ),
             ],
           ],
@@ -458,33 +430,26 @@ class _IntegrationCard extends StatelessWidget {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text(
+        title: Text(
           'Eliminar integración',
-          style: TextStyle(
-              fontFamily: 'Geist',
-              fontWeight: FontWeight.w600,
-              fontSize: 15,
-              color: AppColors.ctText),
+          style: AppTextStyles.pageTitle.copyWith(fontFamily: 'Geist', fontWeight: FontWeight.w600),
         ),
-        content: const Text(
+        content: Text(
           '¿Estás seguro? Esta acción no se puede deshacer.',
-          style: TextStyle(
-              fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText2),
+          style: AppTextStyles.body.copyWith(color: AppColors.ctText2),
         ),
         actions: [
-          TextButton(
+          AppButton(
+            label: 'Cancelar',
+            variant: AppButtonVariant.ghost,
+            size: AppButtonSize.sm,
             onPressed: () => ctx.pop(),
-            child: const Text('Cancelar'),
           ),
-          TextButton(
-            onPressed: () {
-              ctx.pop();
-              onDelete();
-            },
-            child: const Text(
-              'Eliminar',
-              style: TextStyle(color: AppColors.ctDanger),
-            ),
+          AppButton(
+            label: 'Eliminar',
+            variant: AppButtonVariant.danger,
+            size: AppButtonSize.sm,
+            onPressed: () { ctx.pop(); onDelete(); },
           ),
         ],
       ),
@@ -571,14 +536,9 @@ class _CreateIntegrationDialogState extends State<_CreateIntegrationDialog> {
     final nameValid = _nameCtrl.text.trim().isNotEmpty;
 
     return AlertDialog(
-      title: const Text(
+      title: Text(
         'Nueva integración',
-        style: TextStyle(
-          fontFamily: 'Geist',
-          fontWeight: FontWeight.w600,
-          fontSize: 15,
-          color: AppColors.ctText,
-        ),
+        style: AppTextStyles.pageTitle.copyWith(fontFamily: 'Geist', fontWeight: FontWeight.w600),
       ),
       content: SizedBox(
         width: 400,
@@ -586,13 +546,9 @@ class _CreateIntegrationDialogState extends State<_CreateIntegrationDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Nombre',
-              style: TextStyle(
-                  fontFamily: 'Geist',
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.ctText2),
+              style: AppTextStyles.bodySmall.copyWith(fontSize: 12, fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 6),
             TextField(
@@ -613,13 +569,9 @@ class _CreateIntegrationDialogState extends State<_CreateIntegrationDialog> {
               ),
             ),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'Tipo',
-              style: TextStyle(
-                  fontFamily: 'Geist',
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.ctText2),
+              style: AppTextStyles.bodySmall.copyWith(fontSize: 12, fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 6),
             Container(
@@ -646,13 +598,9 @@ class _CreateIntegrationDialogState extends State<_CreateIntegrationDialog> {
             ),
             if (needsUrl) ...[
               const SizedBox(height: 14),
-              const Text(
+              Text(
                 'URL del endpoint',
-                style: TextStyle(
-                    fontFamily: 'Geist',
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.ctText2),
+                style: AppTextStyles.bodySmall.copyWith(fontSize: 12, fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 6),
               TextField(
@@ -685,24 +633,18 @@ class _CreateIntegrationDialogState extends State<_CreateIntegrationDialog> {
                   onChanged: (v) => setState(() => _includeAncestors = v),
                 ),
                 const SizedBox(width: 8),
-                const Text(
+                Text(
                   'Incluir flujos anteriores',
-                  style: TextStyle(
-                      fontFamily: 'Geist',
-                      fontSize: 13,
-                      color: AppColors.ctText),
+                  style: AppTextStyles.body,
                 ),
               ],
             ),
             const SizedBox(height: 10),
             Row(
               children: [
-                const Text(
+                Text(
                   'Límite por minuto:',
-                  style: TextStyle(
-                      fontFamily: 'Geist',
-                      fontSize: 13,
-                      color: AppColors.ctText),
+                  style: AppTextStyles.body,
                 ),
                 const SizedBox(width: 12),
                 SizedBox(
@@ -739,35 +681,27 @@ class _CreateIntegrationDialogState extends State<_CreateIntegrationDialog> {
               const SizedBox(height: 12),
               Text(
                 _error!,
-                style: const TextStyle(
-                    fontFamily: 'Geist',
-                    fontSize: 12,
-                    color: AppColors.ctDanger),
+                style: AppTextStyles.bodySmall.copyWith(fontSize: 12, color: AppColors.ctDanger),
               ),
             ],
           ],
         ),
       ),
       actions: [
-        TextButton(
-          onPressed: _saving ? null : () => Navigator.of(context).pop(),
-          child: const Text('Cancelar'),
+        AppButton(
+          label: 'Cancelar',
+          variant: AppButtonVariant.ghost,
+          size: AppButtonSize.sm,
+          isDisabled: _saving,
+          onPressed: () => Navigator.of(context).pop(),
         ),
-        ElevatedButton(
-          onPressed: (_saving || !nameValid) ? null : _submit,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.ctTeal,
-            foregroundColor: Colors.white,
-          ),
-          child: _saving
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(
-                      strokeWidth: 2, color: Colors.white),
-                )
-              : const Text('Crear',
-                  style: TextStyle(fontFamily: 'Geist', fontSize: 13)),
+        AppButton(
+          label: 'Crear',
+          variant: AppButtonVariant.teal,
+          size: AppButtonSize.sm,
+          isLoading: _saving,
+          isDisabled: !nameValid,
+          onPressed: _submit,
         ),
       ],
     );
@@ -801,11 +735,7 @@ class _SecretBoxState extends State<_SecretBox> {
           Expanded(
             child: SelectableText(
               widget.secret,
-              style: const TextStyle(
-                fontFamily: 'Geist',
-                fontSize: 13,
-                color: AppColors.ctText,
-              ),
+              style: AppTextStyles.body,
             ),
           ),
           const SizedBox(width: 8),
@@ -881,12 +811,7 @@ class _StatusChip extends StatelessWidget {
       ),
       child: Text(
         active ? 'Activo' : 'Inactivo',
-        style: TextStyle(
-          fontFamily: 'Geist',
-          fontSize: 10,
-          fontWeight: FontWeight.w600,
-          color: active ? AppColors.ctOkText : AppColors.ctText3,
-        ),
+        style: AppTextStyles.caption.copyWith(fontWeight: FontWeight.w600, color: active ? AppColors.ctOkText : AppColors.ctText3),
       ),
     );
   }
@@ -990,14 +915,9 @@ class _EditEndpointDialogState extends State<_EditEndpointDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text(
+      title: Text(
         'Editar URL del endpoint',
-        style: TextStyle(
-          fontFamily: 'Geist',
-          fontWeight: FontWeight.w600,
-          fontSize: 15,
-          color: AppColors.ctText,
-        ),
+        style: AppTextStyles.pageTitle.copyWith(fontFamily: 'Geist', fontWeight: FontWeight.w600),
       ),
       content: SizedBox(
         width: 400,
@@ -1005,14 +925,9 @@ class _EditEndpointDialogState extends State<_EditEndpointDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'URL del endpoint',
-              style: TextStyle(
-                fontFamily: 'Geist',
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: AppColors.ctText2,
-              ),
+              style: AppTextStyles.bodySmall.copyWith(fontSize: 12, fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 6),
             TextField(
@@ -1039,36 +954,26 @@ class _EditEndpointDialogState extends State<_EditEndpointDialog> {
               const SizedBox(height: 8),
               Text(
                 _error!,
-                style: const TextStyle(
-                  fontFamily: 'Geist',
-                  fontSize: 12,
-                  color: AppColors.ctDanger,
-                ),
+                style: AppTextStyles.bodySmall.copyWith(fontSize: 12, color: AppColors.ctDanger),
               ),
             ],
           ],
         ),
       ),
       actions: [
-        TextButton(
-          onPressed: _saving ? null : () => Navigator.of(context).pop(),
-          child: const Text('Cancelar'),
+        AppButton(
+          label: 'Cancelar',
+          variant: AppButtonVariant.ghost,
+          size: AppButtonSize.sm,
+          isDisabled: _saving,
+          onPressed: () => Navigator.of(context).pop(),
         ),
-        ElevatedButton(
-          onPressed: _saving ? null : _submit,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.ctTeal,
-            foregroundColor: Colors.white,
-          ),
-          child: _saving
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(
-                      strokeWidth: 2, color: Colors.white),
-                )
-              : const Text('Guardar',
-                  style: TextStyle(fontFamily: 'Geist', fontSize: 13)),
+        AppButton(
+          label: 'Guardar',
+          variant: AppButtonVariant.teal,
+          size: AppButtonSize.sm,
+          isLoading: _saving,
+          onPressed: _submit,
         ),
       ],
     );
