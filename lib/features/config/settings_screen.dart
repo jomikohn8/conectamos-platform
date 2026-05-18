@@ -8,6 +8,7 @@ import '../../core/api/iam_api.dart';
 import '../../core/providers/permissions_provider.dart';
 import '../../core/providers/tenant_provider.dart';
 import '../../core/theme/app_theme.dart';
+import '../../shared/widgets/app_button.dart';
 import '../../shared/widgets/page_header.dart';
 import 'role_permissions_panel.dart';
 import '../settings/operator_fields_screen.dart';
@@ -62,7 +63,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           decoration: const BoxDecoration(
             color: AppColors.ctSurface,
             border: Border(
-              right: BorderSide(color: Color(0xFFE5E7EB)),
+              right: BorderSide(color: AppColors.ctBorder),
             ),
           ),
           padding: const EdgeInsets.only(top: 20),
@@ -125,11 +126,11 @@ class _NavItemState extends State<_NavItem> {
     final FontWeight weight;
 
     if (widget.active) {
-      bg        = const Color(0xFFCCFBF1);
+      bg        = AppColors.ctTealLight;
       textColor = AppColors.ctTeal;
       weight    = FontWeight.w700;
     } else if (_hovered) {
-      bg        = const Color(0xFFF9FAFB);
+      bg        = AppColors.ctBg;
       textColor = AppColors.ctText2;
       weight    = FontWeight.w500;
     } else {
@@ -163,12 +164,7 @@ class _NavItemState extends State<_NavItem> {
               Expanded(
                 child: Text(
                   widget.label,
-                  style: TextStyle(
-                    fontFamily: 'Geist',
-                    fontSize: 13,
-                    fontWeight: weight,
-                    color: textColor,
-                  ),
+                  style: AppTextStyles.body.copyWith(fontWeight: weight, color: textColor),
                 ),
               ),
             ],
@@ -263,23 +259,14 @@ class _PermissionsSection extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'Gestión de permisos por rol',
-                    style: TextStyle(
-                      fontFamily: 'Onest',
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.ctText,
-                    ),
+                    style: AppTextStyles.pageTitle.copyWith(fontSize: 16),
                   ),
                   const SizedBox(height: 4),
                   const Text(
                     'Define qué puede hacer cada rol en tu organización. Los cambios del rol admin no pueden modificarse.',
-                    style: TextStyle(
-                      fontFamily: 'Geist',
-                      fontSize: 12,
-                      color: AppColors.ctText2,
-                    ),
+                    style: AppTextStyles.navItem,
                   ),
                   const SizedBox(height: 20),
                 ],
@@ -575,12 +562,7 @@ class _BillingCardState extends ConsumerState<_BillingCard> {
                   children: [
                     const Text(
                       '¿Requiere CFDI?',
-                      style: TextStyle(
-                        fontFamily: 'Geist',
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.ctText,
-                      ),
+                      style: AppTextStyles.formLabel,
                     ),
                     const SizedBox(height: 2),
                     Text(
@@ -667,20 +649,15 @@ class _UsersCard extends ConsumerWidget {
         children: [
           Row(
             children: [
-              const Expanded(
+              Expanded(
                 child: Text(
                   'Usuarios',
-                  style: TextStyle(
-                    fontFamily: 'Geist',
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.ctText,
-                  ),
+                  style: AppTextStyles.body.copyWith(fontSize: 14, fontWeight: FontWeight.w700),
                 ),
               ),
-              _SmallButton(
+              AppButton(
                 label: '+ Invitar usuario',
-                onTap: () => showDialog(
+                onPressed: () => showDialog(
                   context: context,
                   builder: (_) => _InviteUserDialog(
                     tenantId: tenantId,
@@ -688,6 +665,8 @@ class _UsersCard extends ConsumerWidget {
                         ref.invalidate(_usersListProvider(tenantId)),
                   ),
                 ),
+                variant: AppButtonVariant.teal,
+                size: AppButtonSize.sm,
               ),
             ],
           ),
@@ -707,17 +686,12 @@ class _UsersCard extends ConsumerWidget {
                   isError: true,
                 ),
                 const SizedBox(height: 8),
-                TextButton(
+                AppButton(
+                  label: 'Reintentar',
                   onPressed: () =>
                       ref.invalidate(_usersListProvider(tenantId)),
-                  child: const Text(
-                    'Reintentar',
-                    style: TextStyle(
-                      fontFamily: 'Geist',
-                      fontSize: 12,
-                      color: AppColors.ctTeal,
-                    ),
-                  ),
+                  variant: AppButtonVariant.ghost,
+                  size: AppButtonSize.sm,
                 ),
               ],
             ),
@@ -726,11 +700,7 @@ class _UsersCard extends ConsumerWidget {
                     padding: EdgeInsets.symmetric(vertical: 8),
                     child: Text(
                       'No hay usuarios registrados en este tenant.',
-                      style: TextStyle(
-                        fontFamily: 'Geist',
-                        fontSize: 13,
-                        color: AppColors.ctText2,
-                      ),
+                      style: AppTextStyles.pageSubtitle,
                     ),
                   )
                 : _UsersTable(
@@ -761,13 +731,7 @@ class _UsersTable extends StatelessWidget {
   final Map<String, String> roleMap;
   final VoidCallback onRefresh;
 
-  static const _h = TextStyle(
-    fontFamily: 'Geist',
-    fontSize: 10,
-    fontWeight: FontWeight.w600,
-    color: AppColors.ctText2,
-    letterSpacing: 0.4,
-  );
+  static TextStyle get _h => AppTextStyles.kpiLabel.copyWith(letterSpacing: 0.4);
 
   @override
   Widget build(BuildContext context) {
@@ -788,13 +752,13 @@ class _UsersTable extends StatelessWidget {
                 topRight: Radius.circular(7),
               ),
             ),
-            child: const Row(
+            child: Row(
               children: [
                 Expanded(flex: 3, child: Text('USUARIO', style: _h)),
                 Expanded(flex: 2, child: Text('TELÉFONO', style: _h)),
                 Expanded(flex: 2, child: Text('ROL', style: _h)),
                 Expanded(flex: 2, child: Text('STATUS', style: _h)),
-                SizedBox(width: 36),
+                const SizedBox(width: 36),
               ],
             ),
           ),
@@ -916,8 +880,7 @@ class _UserRowState extends ConsumerState<_UserRow> {
       await IamApi.resetPassword(email);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Enlace enviado a $email',
-              style: const TextStyle(fontFamily: 'Geist', fontSize: 13)),
+          content: Text('Enlace enviado a $email', style: AppTextStyles.body),
           backgroundColor: AppColors.ctNavy,
           behavior: SnackBarBehavior.floating,
           shape:
@@ -939,33 +902,26 @@ class _UserRowState extends ConsumerState<_UserRow> {
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: const Text(
+        title: Text(
           'Enviar reset de contraseña',
-          style: TextStyle(
-              fontFamily: 'Geist', fontSize: 15, fontWeight: FontWeight.w700),
+          style: AppTextStyles.body.copyWith(fontSize: 15, fontWeight: FontWeight.w700),
         ),
         content: Text(
           '¿Enviar enlace de recuperación de contraseña a $email?',
-          style: const TextStyle(
-              fontFamily: 'Geist', fontSize: 13, color: Color(0xFF6B7280)),
+          style: AppTextStyles.pageSubtitle,
         ),
         actions: [
-          TextButton(
+          AppButton(
+            label: 'Cancelar',
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancelar',
-                style: TextStyle(
-                    fontFamily: 'Geist',
-                    fontSize: 13,
-                    color: AppColors.ctText2)),
+            variant: AppButtonVariant.outline,
+            size: AppButtonSize.sm,
           ),
-          TextButton(
+          AppButton(
+            label: 'Enviar',
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Enviar',
-                style: TextStyle(
-                    fontFamily: 'Geist',
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.ctTeal)),
+            variant: AppButtonVariant.teal,
+            size: AppButtonSize.sm,
           ),
         ],
       ),
@@ -1032,12 +988,9 @@ class _UserRowState extends ConsumerState<_UserRow> {
                     ),
                   Text(
                     _email,
-                    style: TextStyle(
-                      fontFamily: 'Geist',
+                    style: AppTextStyles.body.copyWith(
                       fontSize: _name.isNotEmpty ? 11 : 13,
-                      color: _name.isNotEmpty
-                          ? AppColors.ctText2
-                          : AppColors.ctText,
+                      color: _name.isNotEmpty ? AppColors.ctText2 : AppColors.ctText,
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -1050,11 +1003,7 @@ class _UserRowState extends ConsumerState<_UserRow> {
               flex: 2,
               child: Text(
                 _phone.isNotEmpty ? _phone : '—',
-                style: const TextStyle(
-                  fontFamily: 'Geist',
-                  fontSize: 12,
-                  color: AppColors.ctText2,
-                ),
+                style: AppTextStyles.navItem,
               ),
             ),
 
@@ -1100,48 +1049,41 @@ class _UserRowState extends ConsumerState<_UserRow> {
                           items.add(const PopupMenuItem(
                             value: 'edit',
                             child: Text('Editar',
-                                style: TextStyle(
-                                    fontFamily: 'Geist', fontSize: 13)),
+                                style: AppTextStyles.body),
                           ));
                           if (canManageUsers) {
                             items.add(const PopupMenuItem(
                               value: 'role',
                               child: Text('Cambiar rol',
-                                  style: TextStyle(
-                                      fontFamily: 'Geist', fontSize: 13)),
+                                  style: AppTextStyles.body),
                             ));
                             items.add(const PopupMenuItem(
                               value: 'password_reset',
                               child: Text('Enviar reset de contraseña',
-                                  style: TextStyle(
-                                      fontFamily: 'Geist', fontSize: 13)),
+                                  style: AppTextStyles.body),
                             ));
                             items.add(const PopupMenuItem(
                               value: 'suspend',
                               child: Text('Suspender',
-                                  style: TextStyle(
-                                      fontFamily: 'Geist', fontSize: 13)),
+                                  style: AppTextStyles.body),
                             ));
                           }
                         } else if (_status == 'suspended') {
                           items.add(const PopupMenuItem(
                             value: 'edit',
                             child: Text('Editar',
-                                style: TextStyle(
-                                    fontFamily: 'Geist', fontSize: 13)),
+                                style: AppTextStyles.body),
                           ));
                           if (canManageUsers) {
                             items.add(const PopupMenuItem(
                               value: 'role',
                               child: Text('Cambiar rol',
-                                  style: TextStyle(
-                                      fontFamily: 'Geist', fontSize: 13)),
+                                  style: AppTextStyles.body),
                             ));
                             items.add(const PopupMenuItem(
                               value: 'reactivate',
                               child: Text('Reactivar',
-                                  style: TextStyle(
-                                      fontFamily: 'Geist', fontSize: 13)),
+                                  style: AppTextStyles.body),
                             ));
                           }
                         } else if (_status == 'invited') {
@@ -1149,8 +1091,7 @@ class _UserRowState extends ConsumerState<_UserRow> {
                             items.add(const PopupMenuItem(
                               value: 'resend',
                               child: Text('Reenviar invitación',
-                                  style: TextStyle(
-                                      fontFamily: 'Geist', fontSize: 13)),
+                                  style: AppTextStyles.body),
                             ));
                           }
                         }
@@ -1158,8 +1099,7 @@ class _UserRowState extends ConsumerState<_UserRow> {
                           items.add(const PopupMenuItem(
                             value: 'channels',
                             child: Text('Gestionar canales',
-                                style: TextStyle(
-                                    fontFamily: 'Geist', fontSize: 13)),
+                                style: AppTextStyles.body),
                           ));
                         }
                         return items;
@@ -1208,12 +1148,7 @@ class _RoleBadge extends StatelessWidget {
       ),
       child: Text(
         role,
-        style: const TextStyle(
-          fontFamily: 'Geist',
-          fontSize: 11,
-          fontWeight: FontWeight.w500,
-          color: AppColors.ctText2,
-        ),
+        style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.w500),
       ),
     );
   }
@@ -1230,8 +1165,8 @@ class _StatusBadge extends StatelessWidget {
     final String label;
 
     if (status == 'invited') {
-      bg        = const Color(0xFFFEF3C7);
-      textColor = const Color(0xFF92400E);
+      bg        = AppColors.ctWarnBg;
+      textColor = AppColors.ctWarnText;
       label     = 'Invitado';
     } else if (status == 'suspended') {
       bg        = AppColors.ctRedBg;
@@ -1251,12 +1186,7 @@ class _StatusBadge extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: TextStyle(
-          fontFamily: 'Geist',
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-          color: textColor,
-        ),
+        style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.w600, color: textColor),
       ),
     );
   }
@@ -1343,14 +1273,9 @@ class _EditUserDialogState extends State<_EditUserDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'Editar usuario',
-                style: TextStyle(
-                  fontFamily: 'Geist',
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.ctText,
-                ),
+                style: AppTextStyles.body.copyWith(fontSize: 15, fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 20),
               _Field(
@@ -1372,15 +1297,19 @@ class _EditUserDialogState extends State<_EditUserDialog> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  _OutlineButton(
+                  AppButton(
                     label: 'Cancelar',
-                    onTap: () => Navigator.pop(context),
+                    onPressed: () => Navigator.pop(context),
+                    variant: AppButtonVariant.outline,
+                    size: AppButtonSize.sm,
                   ),
                   const SizedBox(width: 10),
-                  _PrimaryButton(
+                  AppButton(
                     label: 'Guardar',
-                    loading: _saving,
-                    onTap: _saving ? null : _save,
+                    onPressed: _save,
+                    variant: AppButtonVariant.teal,
+                    size: AppButtonSize.sm,
+                    isLoading: _saving,
                   ),
                 ],
               ),
@@ -1471,14 +1400,9 @@ class _ChangeRoleDialogState extends ConsumerState<_ChangeRoleDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'Cambiar rol',
-                style: TextStyle(
-                  fontFamily: 'Geist',
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.ctText,
-                ),
+                style: AppTextStyles.body.copyWith(fontSize: 15, fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 16),
               if (_rolesLoading)
@@ -1505,11 +1429,7 @@ class _ChangeRoleDialogState extends ConsumerState<_ChangeRoleDialog> {
                           : null,
                       isExpanded: true,
                       isDense: true,
-                      style: const TextStyle(
-                        fontFamily: 'Geist',
-                        fontSize: 13,
-                        color: AppColors.ctText,
-                      ),
+                      style: AppTextStyles.body,
                       icon: const Icon(
                         Icons.keyboard_arrow_down_rounded,
                         size: 16,
@@ -1537,15 +1457,20 @@ class _ChangeRoleDialogState extends ConsumerState<_ChangeRoleDialog> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  _OutlineButton(
+                  AppButton(
                     label: 'Cancelar',
-                    onTap: () => Navigator.pop(context),
+                    onPressed: () => Navigator.pop(context),
+                    variant: AppButtonVariant.outline,
+                    size: AppButtonSize.sm,
                   ),
                   const SizedBox(width: 10),
-                  _PrimaryButton(
+                  AppButton(
                     label: 'Guardar',
-                    loading: _saving,
-                    onTap: (_saving || _rolesLoading) ? null : _save,
+                    onPressed: _save,
+                    variant: AppButtonVariant.teal,
+                    size: AppButtonSize.sm,
+                    isLoading: _saving,
+                    isDisabled: _rolesLoading,
                   ),
                 ],
               ),
@@ -1688,14 +1613,9 @@ class _InviteUserDialogState extends ConsumerState<_InviteUserDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'Invitar usuario',
-                style: TextStyle(
-                  fontFamily: 'Geist',
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.ctText,
-                ),
+                style: AppTextStyles.body.copyWith(fontSize: 15, fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 20),
               _Field(
@@ -1715,12 +1635,7 @@ class _InviteUserDialogState extends ConsumerState<_InviteUserDialog> {
                   children: [
                     const Text(
                       'Teléfono',
-                      style: TextStyle(
-                        fontFamily: 'Geist',
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.ctText,
-                      ),
+                      style: AppTextStyles.formLabel,
                     ),
                     const SizedBox(height: 6),
                     TextField(
@@ -1736,24 +1651,12 @@ class _InviteUserDialogState extends ConsumerState<_InviteUserDialog> {
                           setState(() => _phoneError = null);
                         }
                       },
-                      style: const TextStyle(
-                        fontFamily: 'Geist',
-                        fontSize: 13,
-                        color: AppColors.ctText,
-                      ),
+                      style: AppTextStyles.body,
                       decoration: InputDecoration(
                         hintText: '+52 55 1234 5678',
-                        hintStyle: const TextStyle(
-                          fontFamily: 'Geist',
-                          fontSize: 13,
-                          color: AppColors.ctText3,
-                        ),
+                        hintStyle: AppTextStyles.body.copyWith(color: AppColors.ctText3),
                         errorText: _phoneError,
-                        errorStyle: const TextStyle(
-                          fontFamily: 'Geist',
-                          fontSize: 11,
-                          color: AppColors.ctDanger,
-                        ),
+                        errorStyle: AppTextStyles.bodySmall.copyWith(color: AppColors.ctDanger),
                         filled: true,
                         fillColor: AppColors.ctSurface2,
                         contentPadding: const EdgeInsets.symmetric(
@@ -1790,12 +1693,7 @@ class _InviteUserDialogState extends ConsumerState<_InviteUserDialog> {
               const SizedBox(height: 12),
               const Text(
                 'Rol',
-                style: TextStyle(
-                  fontFamily: 'Geist',
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.ctText,
-                ),
+                style: AppTextStyles.formLabel,
               ),
               const SizedBox(height: 6),
               _rolesLoading
@@ -1828,11 +1726,7 @@ class _InviteUserDialogState extends ConsumerState<_InviteUserDialog> {
                               : null,
                           isExpanded: true,
                           isDense: true,
-                          style: const TextStyle(
-                            fontFamily: 'Geist',
-                            fontSize: 13,
-                            color: AppColors.ctText,
-                          ),
+                          style: AppTextStyles.body,
                           icon: const Icon(
                             Icons.keyboard_arrow_down_rounded,
                             size: 16,
@@ -1860,15 +1754,19 @@ class _InviteUserDialogState extends ConsumerState<_InviteUserDialog> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  _OutlineButton(
+                  AppButton(
                     label: 'Cancelar',
-                    onTap: () => Navigator.pop(context),
+                    onPressed: () => Navigator.pop(context),
+                    variant: AppButtonVariant.outline,
+                    size: AppButtonSize.sm,
                   ),
                   const SizedBox(width: 10),
-                  _PrimaryButton(
+                  AppButton(
                     label: 'Enviar invitación',
-                    loading: _sending,
-                    onTap: _sending ? null : _send,
+                    onPressed: _send,
+                    variant: AppButtonVariant.teal,
+                    size: AppButtonSize.sm,
+                    isLoading: _sending,
                   ),
                 ],
               ),
@@ -1965,8 +1863,7 @@ class _ManageChannelsDialogState extends State<_ManageChannelsDialog> {
       });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error: $e',
-              style: const TextStyle(fontFamily: 'Geist', fontSize: 13)),
+          content: Text('Error: $e', style: AppTextStyles.body),
           backgroundColor: AppColors.ctNavy,
           behavior: SnackBarBehavior.floating,
           shape:
@@ -2007,21 +1904,12 @@ class _ManageChannelsDialogState extends State<_ManageChannelsDialog> {
             children: [
               Text(
                 'Canales de ${widget.userName}',
-                style: const TextStyle(
-                  fontFamily: 'Geist',
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.ctText,
-                ),
+                style: AppTextStyles.body.copyWith(fontSize: 15, fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 4),
               const Text(
                 'Este usuario solo verá los canales seleccionados',
-                style: TextStyle(
-                  fontFamily: 'Geist',
-                  fontSize: 12,
-                  color: AppColors.ctText2,
-                ),
+                style: AppTextStyles.navItem,
               ),
               const SizedBox(height: 16),
               if (_loading)
@@ -2036,11 +1924,7 @@ class _ManageChannelsDialogState extends State<_ManageChannelsDialog> {
                   padding: EdgeInsets.symmetric(vertical: 8),
                   child: Text(
                     'No hay canales activos en este tenant.',
-                    style: TextStyle(
-                      fontFamily: 'Geist',
-                      fontSize: 13,
-                      color: AppColors.ctText2,
-                    ),
+                    style: AppTextStyles.pageSubtitle,
                   ),
                 )
               else
@@ -2084,11 +1968,7 @@ class _ManageChannelsDialogState extends State<_ManageChannelsDialog> {
                               ),
                         title: Text(
                           name,
-                          style: const TextStyle(
-                            fontFamily: 'Geist',
-                            fontSize: 13,
-                            color: AppColors.ctText,
-                          ),
+                          style: AppTextStyles.body,
                         ),
                       );
                     },
@@ -2105,19 +1985,17 @@ class _ManageChannelsDialogState extends State<_ManageChannelsDialog> {
                 ),
                 child: const Text(
                   'El usuario verá solo los operadores y conversaciones de los canales asignados',
-                  style: TextStyle(
-                    fontFamily: 'Geist',
-                    fontSize: 11,
-                    color: AppColors.ctText2,
-                  ),
+                  style: AppTextStyles.bodySmall,
                 ),
               ),
               const SizedBox(height: 16),
               Align(
                 alignment: Alignment.centerRight,
-                child: _OutlineButton(
+                child: AppButton(
                   label: 'Cerrar',
-                  onTap: () => Navigator.pop(context),
+                  onPressed: () => Navigator.pop(context),
+                  variant: AppButtonVariant.outline,
+                  size: AppButtonSize.sm,
                 ),
               ),
             ],
@@ -2195,14 +2073,9 @@ class _CommunicationSectionState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Configuración de mensajes',
-            style: TextStyle(
-              fontFamily: 'Geist',
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              color: AppColors.ctText,
-            ),
+            style: AppTextStyles.body.copyWith(fontSize: 14, fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 20),
           if (_loading)
@@ -2220,25 +2093,16 @@ class _CommunicationSectionState
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Mostrar nombre del usuario en mensajes salientes',
-                        style: TextStyle(
-                          fontFamily: 'Geist',
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.ctText,
-                        ),
+                        style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w600),
                       ),
                       const SizedBox(height: 3),
                       Text(
                         _showSupervisorName
                             ? 'El nombre del supervisor aparecerá antes del mensaje'
                             : 'Los mensajes se envían sin identificar al supervisor',
-                        style: const TextStyle(
-                          fontFamily: 'Geist',
-                          fontSize: 11,
-                          color: AppColors.ctText2,
-                        ),
+                        style: AppTextStyles.bodySmall,
                       ),
                     ],
                   ),
@@ -2262,15 +2126,9 @@ class _CommunicationSectionState
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'Vista previa',
-                    style: TextStyle(
-                      fontFamily: 'Geist',
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.ctText2,
-                      letterSpacing: 0.3,
-                    ),
+                    style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.w600, letterSpacing: 0.3),
                   ),
                   const SizedBox(height: 10),
                   Align(
@@ -2292,22 +2150,14 @@ class _CommunicationSectionState
                         _showSupervisorName
                             ? 'Pedro: Buenos días, ¿cómo van con la ruta?'
                             : 'Buenos días, ¿cómo van con la ruta?',
-                        style: const TextStyle(
-                          fontFamily: 'Geist',
-                          fontSize: 13,
-                          color: Color(0xFF111827),
-                        ),
+                        style: AppTextStyles.body,
                       ),
                     ),
                   ),
                   const SizedBox(height: 10),
                   const Text(
                     'Así verán tus operadores los mensajes enviados desde la plataforma',
-                    style: TextStyle(
-                      fontFamily: 'Geist',
-                      fontSize: 11,
-                      color: AppColors.ctText2,
-                    ),
+                    style: AppTextStyles.bodySmall,
                   ),
                 ],
               ),
@@ -2354,12 +2204,7 @@ class _SectionCard extends StatelessWidget {
         children: [
           Text(
             title,
-            style: const TextStyle(
-              fontFamily: 'Geist',
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              color: AppColors.ctText,
-            ),
+            style: AppTextStyles.body.copyWith(fontSize: 14, fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 16),
           if (loading)
@@ -2382,7 +2227,14 @@ class _SectionCard extends StatelessWidget {
             ],
             Align(
               alignment: Alignment.centerRight,
-              child: _PrimaryButton(label: 'Guardar', loading: saving, onTap: onSave),
+              child: AppButton(
+                label: 'Guardar',
+                onPressed: onSave ?? () {},
+                variant: AppButtonVariant.teal,
+                size: AppButtonSize.sm,
+                isLoading: saving,
+                isDisabled: onSave == null,
+              ),
             ),
           ],
         ],
@@ -2430,20 +2282,15 @@ class _Field extends StatelessWidget {
       children: [
         Text(
           label,
-          style: const TextStyle(
-            fontFamily: 'Geist',
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: AppColors.ctText,
-          ),
+          style: AppTextStyles.formLabel,
         ),
         const SizedBox(height: 6),
         TextField(
           controller: ctrl,
-          style: const TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText),
+          style: AppTextStyles.body,
           decoration: InputDecoration(
             hintText: placeholder,
-            hintStyle: const TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText3),
+            hintStyle: AppTextStyles.body.copyWith(color: AppColors.ctText3),
             filled: true,
             fillColor: AppColors.ctSurface2,
             contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -2494,7 +2341,7 @@ class _FeedbackBanner extends StatelessWidget {
           Expanded(
             child: Text(
               message,
-              style: TextStyle(fontFamily: 'Geist', fontSize: 13, color: textColor),
+              style: AppTextStyles.body.copyWith(color: textColor),
             ),
           ),
         ],
@@ -2503,142 +2350,11 @@ class _FeedbackBanner extends StatelessWidget {
   }
 }
 
-class _PrimaryButton extends StatefulWidget {
-  const _PrimaryButton({required this.label, required this.onTap, this.loading = false});
-  final String label;
-  final VoidCallback? onTap;
-  final bool loading;
-
-  @override
-  State<_PrimaryButton> createState() => _PrimaryButtonState();
-}
-
-class _PrimaryButtonState extends State<_PrimaryButton> {
-  bool _hovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit:  (_) => setState(() => _hovered = false),
-      cursor: widget.onTap != null ? SystemMouseCursors.click : SystemMouseCursors.basic,
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          decoration: BoxDecoration(
-            color: widget.onTap == null
-                ? AppColors.ctTeal.withValues(alpha: 0.5)
-                : _hovered ? AppColors.ctTealDark : AppColors.ctTeal,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: widget.loading
-              ? const SizedBox(
-                  width: 16, height: 16,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.ctNavy),
-                  ),
-                )
-              : Text(
-                  widget.label,
-                  style: const TextStyle(
-                    fontFamily: 'Geist', fontSize: 13,
-                    fontWeight: FontWeight.w600, color: AppColors.ctNavy,
-                  ),
-                ),
-        ),
-      ),
-    );
-  }
-}
-
-class _OutlineButton extends StatefulWidget {
-  const _OutlineButton({required this.label, required this.onTap});
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  State<_OutlineButton> createState() => _OutlineButtonState();
-}
-
-class _OutlineButtonState extends State<_OutlineButton> {
-  bool _hovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit:  (_) => setState(() => _hovered = false),
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-          decoration: BoxDecoration(
-            color: _hovered ? AppColors.ctSurface2 : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: AppColors.ctBorder2),
-          ),
-          child: Text(
-            widget.label,
-            style: const TextStyle(
-              fontFamily: 'Geist', fontSize: 13,
-              fontWeight: FontWeight.w500, color: AppColors.ctText2,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SmallButton extends StatefulWidget {
-  const _SmallButton({required this.label, required this.onTap});
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  State<_SmallButton> createState() => _SmallButtonState();
-}
-
-class _SmallButtonState extends State<_SmallButton> {
-  bool _hovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit:  (_) => setState(() => _hovered = false),
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-          decoration: BoxDecoration(
-            color: _hovered ? AppColors.ctTealDark : AppColors.ctTeal,
-            borderRadius: BorderRadius.circular(7),
-          ),
-          child: Text(
-            widget.label,
-            style: const TextStyle(
-              fontFamily: 'Geist', fontSize: 12,
-              fontWeight: FontWeight.w600, color: AppColors.ctNavy,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 // ── Helper global ─────────────────────────────────────────────────────────────
 
 SnackBar _errorSnack(String msg) => SnackBar(
-      content: Text(msg, style: const TextStyle(fontFamily: 'Geist', fontSize: 13)),
+      content: Text(msg, style: AppTextStyles.body),
       backgroundColor: AppColors.ctNavy,
       behavior: SnackBarBehavior.floating,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
