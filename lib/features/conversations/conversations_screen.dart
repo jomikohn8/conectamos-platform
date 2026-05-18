@@ -30,6 +30,7 @@ import '../../core/api/supabase_read_receipts.dart';
 import '../../core/providers/permissions_provider.dart';
 import '../../core/providers/tenant_provider.dart';
 import '../../core/theme/app_theme.dart';
+import '../../shared/widgets/app_button.dart';
 import '../../shared/widgets/screen_header.dart';
 import 'widgets/media_preview_dialog.dart';
 
@@ -101,86 +102,6 @@ void _showBroadcastModal(
       );
     },
   );
-}
-
-class _ActionBarGhostButton extends StatefulWidget {
-  const _ActionBarGhostButton({required this.label, required this.onTap});
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  State<_ActionBarGhostButton> createState() => _ActionBarGhostButtonState();
-}
-
-class _ActionBarGhostButtonState extends State<_ActionBarGhostButton> {
-  bool _hovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-          decoration: BoxDecoration(
-            color: _hovered ? AppColors.ctSurface2 : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: AppColors.ctBorder2),
-          ),
-          child: Text(
-            widget.label,
-            style: const TextStyle(
-              fontFamily: 'Geist',
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: AppColors.ctText,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _PrimaryButton extends StatefulWidget {
-  const _PrimaryButton({required this.label, required this.onTap});
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  State<_PrimaryButton> createState() => _PrimaryButtonState();
-}
-
-class _PrimaryButtonState extends State<_PrimaryButton> {
-  bool _hovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-          decoration: BoxDecoration(
-            color: _hovered ? AppColors.ctTealDark : AppColors.ctTeal,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Text(
-            widget.label,
-            style: AppTextStyles.formLabel.copyWith(color: AppColors.ctNavy),
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 // ── Cuerpo con tabs ───────────────────────────────────────────────────────────
@@ -330,21 +251,25 @@ class _ConversationsBodyState extends ConsumerState<_ConversationsBody> {
             children: [
               _TabBar(selectedIndex: tab),
               const Spacer(),
-              _ActionBarGhostButton(
+              AppButton(
                 label: '📢  Broadcast a todos',
-                onTap: () {
+                onPressed: () {
                   final channelId   = ref.read(selectedChannelIdProvider)   ?? '';
                   final channelType = ref.read(selectedChannelTypeProvider) ?? 'whatsapp';
                   _showBroadcastModal(context, channelId, channelType);
                 },
+                variant: AppButtonVariant.ghost,
+                size: AppButtonSize.sm,
               ),
               const SizedBox(width: 8),
-              _PrimaryButton(
+              AppButton(
                 label: '+ Nuevo mensaje',
-                onTap: () => showDialog(
+                onPressed: () => showDialog(
                   context: context,
                   builder: (_) => const _NewMessageDialog(),
                 ),
+                variant: AppButtonVariant.teal,
+                size: AppButtonSize.sm,
               ),
             ],
           ),
@@ -438,13 +363,7 @@ class _TabPill extends StatelessWidget {
           ),
           child: Text(
             label,
-            style: TextStyle(
-              fontFamily: 'Geist',
-              fontSize: 13,
-              fontWeight:
-                  selected ? FontWeight.w600 : FontWeight.w500,
-              color: selected ? AppColors.ctText : AppColors.ctText2,
-            ),
+            style: AppTextStyles.body.copyWith(fontWeight: selected ? FontWeight.w600 : FontWeight.w500, color: selected ? AppColors.ctText : AppColors.ctText2),
           ),
         ),
       ),
@@ -472,8 +391,7 @@ Widget _platformIcon(String? channelType) {
     alignment: Alignment.center,
     child: Text(
       label,
-      style: const TextStyle(
-          color: Colors.white, fontSize: 9, fontWeight: FontWeight.w700),
+      style: AppTextStyles.caption.copyWith(fontSize: 9, fontWeight: FontWeight.w700, color: Colors.white),
     ),
   );
 }
@@ -531,15 +449,7 @@ class _ChannelSelectorBar extends StatelessWidget {
                     const SizedBox(width: 6),
                     Text(
                       label,
-                      style: TextStyle(
-                        fontFamily: 'Geist',
-                        fontSize: 12,
-                        fontWeight:
-                            isSelected ? FontWeight.w600 : FontWeight.w500,
-                        color: isSelected
-                            ? AppColors.ctText
-                            : AppColors.ctText2,
-                      ),
+                      style: AppTextStyles.navItem.copyWith(fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500, color: isSelected ? AppColors.ctText : AppColors.ctText2),
                     ),
                     if (chId != null && (channelUnread[chId] ?? 0) > 0) ...[
                       const SizedBox(width: 5),
@@ -694,12 +604,7 @@ class _OriginBadge extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: TextStyle(
-          fontFamily: 'Geist',
-          fontSize: 9,
-          fontWeight: FontWeight.w600,
-          color: fg,
-        ),
+        style: AppTextStyles.caption.copyWith(fontSize: 9, fontWeight: FontWeight.w600, color: fg),
       ),
     );
   }
@@ -789,12 +694,7 @@ class _OperatorAvatar extends StatelessWidget {
       alignment: Alignment.center,
       child: Text(
         initials,
-        style: TextStyle(
-          fontFamily: 'Geist',
-          fontSize: size * 0.35,
-          fontWeight: FontWeight.w600,
-          color: AppColors.ctTealText,
-        ),
+        style: AppTextStyles.body.copyWith(fontSize: size * 0.35, fontWeight: FontWeight.w600, color: AppColors.ctTealText),
       ),
     );
   }
@@ -981,18 +881,10 @@ class _ConvoListState extends ConsumerState<_ConvoList> {
       padding: const EdgeInsets.fromLTRB(10, 0, 10, 8),
       child: TextField(
         onChanged: (v) => setState(() => _search = v),
-        style: const TextStyle(
-          fontFamily: 'Geist',
-          fontSize: 13,
-          color: AppColors.ctText,
-        ),
+        style: AppTextStyles.body,
         decoration: InputDecoration(
           hintText: 'Buscar conversación…',
-          hintStyle: const TextStyle(
-            fontFamily: 'Geist',
-            fontSize: 13,
-            color: AppColors.ctText3,
-          ),
+          hintStyle: AppTextStyles.body.copyWith(color: AppColors.ctText3),
           prefixIcon: const Icon(
             Icons.search_rounded,
             size: 16,
@@ -1086,15 +978,11 @@ class _ConvoListState extends ConsumerState<_ConvoList> {
               child: Center(child: CircularProgressIndicator()),
             )
           else if (_conversations.isEmpty)
-            const Expanded(
+            Expanded(
               child: Center(
                 child: Text(
                   'Sin conversaciones',
-                  style: TextStyle(
-                    fontFamily: 'Geist',
-                    fontSize: 12,
-                    color: AppColors.ctText3,
-                  ),
+                  style: AppTextStyles.navItem.copyWith(color: AppColors.ctText3),
                   textAlign: TextAlign.center,
                 ),
               ),
@@ -1203,11 +1091,7 @@ class _ArchivedEntryButton extends StatelessWidget {
             const SizedBox(width: 4),
             Text(
               '$count archivada${count == 1 ? '' : 's'}',
-              style: const TextStyle(
-                fontFamily: 'Geist',
-                fontSize: 12,
-                color: AppColors.ctText3,
-              ),
+              style: AppTextStyles.navItem.copyWith(color: AppColors.ctText3),
             ),
           ],
         ),
@@ -1280,31 +1164,27 @@ class _ArchivedPanelState extends ConsumerState<_ArchivedPanel> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.ctSurface,
-        title: const Text(
+        title: Text(
           '¿Eliminar conversación?',
-          style: TextStyle(
-            fontFamily: 'Onest', fontSize: 15,
-            fontWeight: FontWeight.w600, color: AppColors.ctText,
-          ),
+          style: AppTextStyles.cardTitle.copyWith(fontSize: 15),
         ),
         content: Text(
           'Se eliminarán permanentemente todos los mensajes de "$name" '
           'en este canal. Esta acción no se puede deshacer.',
-          style: const TextStyle(
-            fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText2,
-          ),
+          style: AppTextStyles.pageSubtitle,
         ),
         actions: [
-          TextButton(
+          AppButton(
+            label: 'Cancelar',
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar'),
+            variant: AppButtonVariant.ghost,
+            size: AppButtonSize.sm,
           ),
-          TextButton(
+          AppButton(
+            label: 'Continuar',
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text(
-              'Continuar',
-              style: TextStyle(color: AppColors.ctDanger),
-            ),
+            variant: AppButtonVariant.danger,
+            size: AppButtonSize.sm,
           ),
         ],
       ),
@@ -1315,31 +1195,27 @@ class _ArchivedPanelState extends ConsumerState<_ArchivedPanel> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.ctSurface,
-        title: const Text(
+        title: Text(
           'Confirmar eliminación definitiva',
-          style: TextStyle(
-            fontFamily: 'Onest', fontSize: 15,
-            fontWeight: FontWeight.w600, color: AppColors.ctText,
-          ),
+          style: AppTextStyles.cardTitle.copyWith(fontSize: 15),
         ),
         content: Text(
           '¿Seguro que deseas eliminar todos los mensajes de "$name"? '
           'Esta operación es irreversible.',
-          style: const TextStyle(
-            fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText2,
-          ),
+          style: AppTextStyles.pageSubtitle,
         ),
         actions: [
-          TextButton(
+          AppButton(
+            label: 'Cancelar',
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar'),
+            variant: AppButtonVariant.ghost,
+            size: AppButtonSize.sm,
           ),
-          TextButton(
+          AppButton(
+            label: 'Eliminar definitivamente',
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text(
-              'Eliminar definitivamente',
-              style: TextStyle(color: AppColors.ctDanger),
-            ),
+            variant: AppButtonVariant.danger,
+            size: AppButtonSize.sm,
           ),
         ],
       ),
@@ -1395,19 +1271,13 @@ class _ArchivedPanelState extends ConsumerState<_ArchivedPanel> {
                     Expanded(
                       child: Text(
                         name,
-                        style: const TextStyle(
-                          fontFamily: 'Geist', fontSize: 12,
-                          fontWeight: FontWeight.w600, color: AppColors.ctText,
-                        ),
+                        style: AppTextStyles.formLabel,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     Text(
                       _formatTime(at),
-                      style: const TextStyle(
-                        fontFamily: 'Geist', fontSize: 10,
-                        color: AppColors.ctText3,
-                      ),
+                      style: AppTextStyles.caption,
                     ),
                   ],
                 ),
@@ -1415,10 +1285,7 @@ class _ArchivedPanelState extends ConsumerState<_ArchivedPanel> {
                   const SizedBox(height: 1),
                   Text(
                     body,
-                    style: const TextStyle(
-                      fontFamily: 'Geist', fontSize: 11,
-                      color: AppColors.ctText3,
-                    ),
+                    style: AppTextStyles.bodySmall.copyWith(color: AppColors.ctText3),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -1470,12 +1337,7 @@ class _ArchivedAction extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
         child: Text(
           label,
-          style: TextStyle(
-            fontFamily: 'Geist',
-            fontSize: 11,
-            color: color,
-            fontWeight: FontWeight.w500,
-          ),
+          style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.w500, color: color),
         ),
       ),
     );
@@ -1527,14 +1389,10 @@ class _AssignOperatorDialogState extends State<_AssignOperatorDialog> {
               child: TextField(
                 autofocus: true,
                 onChanged: (v) => setState(() => _search = v),
-                style: const TextStyle(
-                  fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText,
-                ),
+                style: AppTextStyles.body,
                 decoration: InputDecoration(
                   hintText: 'Buscar operador…',
-                  hintStyle: const TextStyle(
-                    fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText3,
-                  ),
+                  hintStyle: AppTextStyles.body.copyWith(color: AppColors.ctText3),
                   prefixIcon: const Icon(
                     Icons.search_rounded, size: 16, color: AppColors.ctText3,
                   ),
@@ -1562,15 +1420,11 @@ class _AssignOperatorDialogState extends State<_AssignOperatorDialog> {
             ConstrainedBox(
               constraints: const BoxConstraints(maxHeight: 280),
               child: filtered.isEmpty
-                  ? const Padding(
-                      padding: EdgeInsets.all(24),
+                  ? Padding(
+                      padding: const EdgeInsets.all(24),
                       child: Text(
                         'Sin operadores',
-                        style: TextStyle(
-                          fontFamily: 'Geist',
-                          fontSize: 13,
-                          color: AppColors.ctText3,
-                        ),
+                        style: AppTextStyles.body.copyWith(color: AppColors.ctText3),
                       ),
                     )
                   : ListView.builder(
@@ -1584,11 +1438,7 @@ class _AssignOperatorDialogState extends State<_AssignOperatorDialog> {
                           dense: true,
                           title: Text(
                             name,
-                            style: const TextStyle(
-                              fontFamily: 'Geist',
-                              fontSize: 13,
-                              color: AppColors.ctText,
-                            ),
+                            style: AppTextStyles.body,
                           ),
                           onTap: () => Navigator.pop(context, id),
                         );
@@ -1600,9 +1450,11 @@ class _AssignOperatorDialogState extends State<_AssignOperatorDialog> {
               alignment: Alignment.centerRight,
               child: Padding(
                 padding: const EdgeInsets.all(8),
-                child: TextButton(
+                child: AppButton(
+                  label: 'Cancelar',
                   onPressed: () => Navigator.pop(context),
-                  child: const Text('Cancelar'),
+                  variant: AppButtonVariant.ghost,
+                  size: AppButtonSize.sm,
                 ),
               ),
             ),
@@ -1706,14 +1558,7 @@ class _ApiConvoItemState extends State<_ApiConvoItem> {
                         Expanded(
                           child: Text(
                             widget.name,
-                            style: TextStyle(
-                              fontFamily: 'Geist',
-                              fontSize: 12,
-                              fontWeight: widget.isSelected
-                                  ? FontWeight.w600
-                                  : FontWeight.w500,
-                              color: AppColors.ctText,
-                            ),
+                            style: AppTextStyles.navItem.copyWith(fontWeight: widget.isSelected ? FontWeight.w600 : FontWeight.w500, color: AppColors.ctText),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
@@ -1764,12 +1609,7 @@ class _ApiConvoItemState extends State<_ApiConvoItem> {
                               widget.unreadCount > 99
                                   ? '99+'
                                   : '${widget.unreadCount}',
-                              style: const TextStyle(
-                                fontFamily: 'Geist',
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.ctNavy,
-                              ),
+                              style: AppTextStyles.caption.copyWith(fontWeight: FontWeight.w700, color: AppColors.ctNavy),
                               textAlign: TextAlign.center,
                             ),
                           )
@@ -2434,14 +2274,14 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
       child: IgnorePointer(
         child: Container(
           color: AppColors.ctTeal.withValues(alpha: 0.2),
-          child: const Column(
+          child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.arrow_downward_rounded, size: 52, color: AppColors.ctTeal),
-              SizedBox(height: 12),
+              const Icon(Icons.arrow_downward_rounded, size: 52, color: AppColors.ctTeal),
+              const SizedBox(height: 12),
               Text(
                 'Suelta para adjuntar',
-                style: TextStyle(fontFamily: 'Geist', fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.ctTeal),
+                style: AppTextStyles.body.copyWith(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.ctTeal),
               ),
             ],
           ),
@@ -2922,17 +2762,12 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
                       style: AppTextStyles.body.copyWith(color: AppColors.ctText3),
                     ),
                     const SizedBox(height: 16),
-                    OutlinedButton.icon(
+                    AppButton(
+                      label: 'Reintentar',
                       onPressed: () => _subscribeToMessages(chatId),
-                      icon: const Icon(Icons.refresh_rounded, size: 16),
-                      label: const Text('Reintentar',
-                          style: TextStyle(fontFamily: 'Geist', fontSize: 13)),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.ctTeal,
-                        side: const BorderSide(color: AppColors.ctTeal),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8)),
-                      ),
+                      variant: AppButtonVariant.outline,
+                      size: AppButtonSize.sm,
+                      prefixIcon: const Icon(Icons.refresh_rounded, size: 14, color: AppColors.ctTeal),
                     ),
                   ],
                 ),
@@ -3042,14 +2877,10 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
                 const Icon(Icons.timer_outlined,
                     size: 18, color: AppColors.ctWarnText),
                 const SizedBox(width: 10),
-                const Expanded(
+                Expanded(
                   child: Text(
                     'Ventana de 24h cerrada. Solo puedes enviar mensajes con plantilla aprobada.',
-                    style: TextStyle(
-                      fontFamily: 'Geist',
-                      fontSize: 12,
-                      color: AppColors.ctWarnText,
-                    ),
+                    style: AppTextStyles.navItem.copyWith(color: AppColors.ctWarnText),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -3066,14 +2897,9 @@ class _ChatPanelState extends ConsumerState<_ChatPanel>
                       color: AppColors.ctWarnText,
                       borderRadius: BorderRadius.circular(6),
                     ),
-                    child: const Text(
+                    child: Text(
                       'Usar plantilla →',
-                      style: TextStyle(
-                        fontFamily: 'Geist',
-                        fontSize: 11,
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                      ),
+                      style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.w600, color: Colors.white),
                     ),
                   ),
                 ),
@@ -3199,11 +3025,7 @@ class _InterveneButtonState extends State<_InterveneButton> {
         color: AppColors.ctNavy,
         borderRadius: BorderRadius.circular(6),
       ),
-      textStyle: const TextStyle(
-        color: Colors.white,
-        fontSize: 11,
-        fontFamily: 'Geist',
-      ),
+      textStyle: AppTextStyles.bodySmall.copyWith(color: Colors.white),
       child: MouseRegion(
         onEnter: (_) => setState(() => _hovered = true),
         onExit: (_) => setState(() => _hovered = false),
@@ -3225,12 +3047,7 @@ class _InterveneButtonState extends State<_InterveneButton> {
                 const SizedBox(width: 6),
                 Text(
                   label,
-                  style: TextStyle(
-                    fontFamily: 'Geist',
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: iconColor,
-                  ),
+                  style: AppTextStyles.navItem.copyWith(fontWeight: FontWeight.w600, color: iconColor),
                 ),
               ],
             ),
@@ -3294,12 +3111,7 @@ class _ApiChatHeader extends StatelessWidget {
                         name,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontFamily: 'Geist',
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.ctText,
-                        ),
+                        style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w600),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -3315,14 +3127,7 @@ class _ApiChatHeader extends StatelessWidget {
                         ),
                         child: Text(
                           windowOpen! ? 'Ventana abierta' : 'Ventana cerrada',
-                          style: TextStyle(
-                            fontFamily: 'Geist',
-                            fontSize: 10,
-                            fontWeight: FontWeight.w500,
-                            color: windowOpen!
-                                ? AppColors.ctOkText
-                                : AppColors.ctText3,
-                          ),
+                          style: AppTextStyles.caption.copyWith(fontWeight: FontWeight.w500, color: windowOpen! ? AppColors.ctOkText : AppColors.ctText3),
                         ),
                       ),
                   ],
@@ -3573,11 +3378,7 @@ class _ApiMessageBubbleState extends State<_ApiMessageBubble> {
           const SizedBox(height: 2),
           Text(
             preview,
-            style: const TextStyle(
-              fontFamily: 'Geist',
-              fontSize: 11,
-              color: Color(0xFF667781),
-            ),
+            style: AppTextStyles.bodySmall.copyWith(color: const Color(0xFF667781)),
           ),
         ],
       ),
@@ -3613,7 +3414,7 @@ class _ApiMessageBubbleState extends State<_ApiMessageBubble> {
                     entry.value > 1
                         ? '${entry.key} ${entry.value}'
                         : entry.key,
-                    style: const TextStyle(fontSize: 12),
+                    style: AppTextStyles.body.copyWith(fontSize: 12),
                   ),
                 ))
             .toList(),
@@ -3623,8 +3424,7 @@ class _ApiMessageBubbleState extends State<_ApiMessageBubble> {
 
   Widget _fallback(String label) => Text(
         label,
-        style: const TextStyle(
-            fontFamily: 'Geist', fontSize: 13, color: Color(0xFF667781)),
+        style: AppTextStyles.body.copyWith(color: const Color(0xFF667781)),
       );
 
   Future<void> _openUrl(String url) async {
@@ -3718,12 +3518,7 @@ class _ApiMessageBubbleState extends State<_ApiMessageBubble> {
             padding: const EdgeInsets.only(top: 4),
             child: Text(
               caption,
-              style: const TextStyle(
-                fontFamily: 'Geist',
-                fontSize: 13,
-                color: Color(0xFF111B21),
-                height: 1.4,
-              ),
+              style: AppTextStyles.body.copyWith(color: const Color(0xFF111B21), height: 1.4),
             ),
           ),
       ],
@@ -3801,12 +3596,7 @@ class _ApiMessageBubbleState extends State<_ApiMessageBubble> {
             padding: const EdgeInsets.only(top: 4),
             child: Text(
               caption,
-              style: const TextStyle(
-                fontFamily: 'Geist',
-                fontSize: 13,
-                color: Color(0xFF111B21),
-                height: 1.4,
-              ),
+              style: AppTextStyles.body.copyWith(color: const Color(0xFF111B21), height: 1.4),
             ),
           ),
       ],
@@ -3830,19 +3620,14 @@ class _ApiMessageBubbleState extends State<_ApiMessageBubble> {
             const SizedBox(width: 8),
             Flexible(
               child: Text(fileName,
-                  style: const TextStyle(
-                      fontFamily: 'Geist', fontSize: 12, color: Color(0xFF111B21)),
+                  style: AppTextStyles.navItem.copyWith(color: const Color(0xFF111B21)),
                   overflow: TextOverflow.ellipsis),
             ),
             const SizedBox(width: 8),
             GestureDetector(
               onTap: () => _openUrl(mUrl),
-              child: const Text('Abrir',
-                  style: TextStyle(
-                      fontFamily: 'Geist',
-                      fontSize: 12,
-                      color: Color(0xFF53BDEB),
-                      fontWeight: FontWeight.w600)),
+              child: Text('Abrir',
+                  style: AppTextStyles.navItem.copyWith(fontWeight: FontWeight.w600, color: const Color(0xFF53BDEB))),
             ),
           ],
         ),
@@ -3851,12 +3636,7 @@ class _ApiMessageBubbleState extends State<_ApiMessageBubble> {
             padding: const EdgeInsets.only(top: 4),
             child: Text(
               caption,
-              style: const TextStyle(
-                fontFamily: 'Geist',
-                fontSize: 13,
-                color: Color(0xFF111B21),
-                height: 1.4,
-              ),
+              style: AppTextStyles.body.copyWith(color: const Color(0xFF111B21), height: 1.4),
             ),
           ),
       ],
@@ -3899,11 +3679,7 @@ class _ApiMessageBubbleState extends State<_ApiMessageBubble> {
             const SizedBox(width: 6),
             Flexible(
               child: Text(locName,
-                  style: const TextStyle(
-                      fontFamily: 'Geist',
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF111B21))),
+                  style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w600, color: const Color(0xFF111B21))),
             ),
           ],
         ),
@@ -3911,8 +3687,7 @@ class _ApiMessageBubbleState extends State<_ApiMessageBubble> {
           Padding(
             padding: const EdgeInsets.only(top: 2, left: 24),
             child: Text('$lat, $lng',
-                style: const TextStyle(
-                    fontFamily: 'Geist', fontSize: 11, color: Color(0xFF667781))),
+                style: AppTextStyles.bodySmall.copyWith(color: const Color(0xFF667781))),
           ),
         const SizedBox(height: 6),
         GestureDetector(
@@ -3923,12 +3698,8 @@ class _ApiMessageBubbleState extends State<_ApiMessageBubble> {
               color: const Color(0xFF53BDEB).withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(6),
             ),
-            child: const Text('Ver en mapa',
-                style: TextStyle(
-                    fontFamily: 'Geist',
-                    fontSize: 12,
-                    color: Color(0xFF53BDEB),
-                    fontWeight: FontWeight.w600)),
+            child: Text('Ver en mapa',
+                style: AppTextStyles.navItem.copyWith(fontWeight: FontWeight.w600, color: const Color(0xFF53BDEB))),
           ),
         ),
       ],
@@ -3938,11 +3709,7 @@ class _ApiMessageBubbleState extends State<_ApiMessageBubble> {
   Widget _buildTextContent({Color textColor = const Color(0xFF111B21)}) {
     return Text(
       widget.body,
-      style: TextStyle(
-          fontFamily: 'Geist',
-          fontSize: 13,
-          color: textColor,
-          height: 1.4),
+      style: AppTextStyles.body.copyWith(color: textColor, height: 1.4),
     );
   }
 
@@ -4024,12 +3791,7 @@ class _ApiMessageBubbleState extends State<_ApiMessageBubble> {
                 children: [
                   Text(
                     widget.senderName,
-                    style: TextStyle(
-                      fontFamily: 'Geist',
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      color: widget.senderNameColor ?? timeColor,
-                    ),
+                    style: AppTextStyles.caption.copyWith(fontWeight: FontWeight.w600, color: widget.senderNameColor ?? timeColor),
                   ),
                   if (widget.senderBadge != null) ...[
                     const SizedBox(width: 4),
@@ -4057,11 +3819,7 @@ class _ApiMessageBubbleState extends State<_ApiMessageBubble> {
                 children: [
                   Text(
                     widget.time,
-                    style: TextStyle(
-                      fontFamily: 'Geist',
-                      fontSize: 10,
-                      color: timeColor,
-                    ),
+                    style: AppTextStyles.caption.copyWith(color: timeColor),
                   ),
                   const SizedBox(width: 4),
                   _statusIcon(),
@@ -4070,11 +3828,7 @@ class _ApiMessageBubbleState extends State<_ApiMessageBubble> {
             else
               Text(
                 widget.time,
-                style: TextStyle(
-                  fontFamily: 'Geist',
-                  fontSize: 10,
-                  color: timeColor,
-                ),
+                style: AppTextStyles.caption.copyWith(color: timeColor),
               ),
           ],
         ],
@@ -4251,7 +4005,7 @@ class _EmojiPickerSheet extends StatelessWidget {
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(e,
-                            style: const TextStyle(fontSize: 26)),
+                            style: AppTextStyles.body.copyWith(fontSize: 26)),
                       ),
                     ))
                 .toList(),
@@ -4262,21 +4016,17 @@ class _EmojiPickerSheet extends StatelessWidget {
             InkWell(
               onTap: onReply,
               borderRadius: BorderRadius.circular(8),
-              child: const Padding(
+              child: Padding(
                 padding:
-                    EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 child: Row(
                   children: [
-                    Icon(Icons.reply_rounded,
+                    const Icon(Icons.reply_rounded,
                         size: 18, color: AppColors.ctText2),
-                    SizedBox(width: 10),
+                    const SizedBox(width: 10),
                     Text(
                       'Responder',
-                      style: TextStyle(
-                        fontFamily: 'Geist',
-                        fontSize: 14,
-                        color: AppColors.ctText,
-                      ),
+                      style: AppTextStyles.body.copyWith(fontSize: 14),
                     ),
                   ],
                 ),
@@ -4399,10 +4149,7 @@ class _ChatInputState extends State<_ChatInput>
           Icon(icon, size: 18, color: color),
           const SizedBox(width: 10),
           Text(label,
-              style: const TextStyle(
-                  fontFamily: 'Geist',
-                  fontSize: 13,
-                  color: AppColors.ctNavy)),
+              style: AppTextStyles.body.copyWith(color: AppColors.ctNavy)),
         ],
       ),
     );
@@ -4443,33 +4190,20 @@ class _ChatInputState extends State<_ChatInput>
             Expanded(
               child: Text(
                 'Grabando… ${_formatDuration(widget.recordingSeconds)}',
-                style: const TextStyle(
-                  fontFamily: 'Geist',
-                  fontSize: 13,
-                  color: AppColors.ctText,
-                ),
+                style: AppTextStyles.body,
               ),
             ),
-            FilledButton.icon(
-              onPressed: (_stoppingRec || widget.onStop == null)
-                  ? null
-                  : () async {
-                      setState(() => _stoppingRec = true);
-                      await widget.onStop!();
-                      if (mounted) setState(() => _stoppingRec = false);
-                    },
-              style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.ctTeal),
-              icon: const Icon(Icons.stop_rounded,
-                  size: 16, color: AppColors.ctNavy),
-              label: const Text(
-                'Detener',
-                style: TextStyle(
-                    fontFamily: 'Geist',
-                    fontSize: 13,
-                    color: AppColors.ctNavy,
-                    fontWeight: FontWeight.w600),
-              ),
+            AppButton(
+              label: 'Detener',
+              onPressed: () async {
+                setState(() => _stoppingRec = true);
+                await widget.onStop!();
+                if (mounted) setState(() => _stoppingRec = false);
+              },
+              variant: AppButtonVariant.teal,
+              size: AppButtonSize.sm,
+              prefixIcon: const Icon(Icons.stop_rounded, size: 14, color: AppColors.ctNavy),
+              isDisabled: _stoppingRec || widget.onStop == null,
             ),
           ],
         ),
@@ -4534,20 +4268,12 @@ class _ChatInputState extends State<_ChatInput>
                   focusNode: _focusNode,
                   minLines: 1,
                   maxLines: 5,
-                  style: const TextStyle(
-                    fontFamily: 'Geist',
-                    fontSize: 13,
-                    color: AppColors.ctText,
-                  ),
+                  style: AppTextStyles.body,
                   enabled: widget.enabled && !widget.sending,
                   onChanged: widget.enabled ? _onChanged : null,
                   decoration: InputDecoration(
                     hintText: widget.hintText ?? 'Escribe un mensaje…',
-                    hintStyle: const TextStyle(
-                      fontFamily: 'Geist',
-                      fontSize: 13,
-                      color: AppColors.ctText3,
-                    ),
+                    hintStyle: AppTextStyles.body.copyWith(color: AppColors.ctText3),
                     filled: true,
                     fillColor: AppColors.ctSurface2,
                     contentPadding: const EdgeInsets.symmetric(
@@ -5097,11 +4823,9 @@ class _FeedFiltersState extends State<_FeedFilters> {
       child: Row(
         children: [
           // Date range picker
-          _GhostButton(
+          AppButton(
             label: _dateLabel(),
-            icon: Icons.date_range_rounded,
-            active: widget.dateRange != null || widget.fromTime != null,
-            onTap: () async {
+            onPressed: () async {
               final result = await showDialog<
                   ({
                     DateTimeRange? range,
@@ -5118,6 +4842,9 @@ class _FeedFiltersState extends State<_FeedFilters> {
               if (result == null) return;
               widget.onDateRange(result.range, result.fromTime, result.toTime);
             },
+            variant: AppButtonVariant.ghost,
+            size: AppButtonSize.sm,
+            prefixIcon: const Icon(Icons.date_range_rounded, size: 13),
           ),
           const SizedBox(width: 8),
           _FilterDropdown(
@@ -5155,18 +4882,10 @@ class _FeedFiltersState extends State<_FeedFilters> {
               height: 30,
               child: TextField(
                 controller: _keywordCtrl,
-                style: const TextStyle(
-                  fontFamily: 'Geist',
-                  fontSize: 12,
-                  color: AppColors.ctText,
-                ),
+                style: AppTextStyles.navItem.copyWith(color: AppColors.ctText),
                 decoration: InputDecoration(
                   hintText: 'Buscar…',
-                  hintStyle: const TextStyle(
-                    fontFamily: 'Geist',
-                    fontSize: 12,
-                    color: AppColors.ctText3,
-                  ),
+                  hintStyle: AppTextStyles.navItem.copyWith(color: AppColors.ctText3),
                   prefixIcon: const Icon(
                     Icons.search_rounded,
                     size: 14,
@@ -5371,12 +5090,7 @@ class _FeedMessagesState extends State<_FeedMessages> {
             const SizedBox(height: 12),
             Text(
               widget.hasActiveFilters ? 'Sin resultados' : 'Sin mensajes',
-              style: const TextStyle(
-                fontFamily: 'Geist',
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: AppColors.ctNavy,
-              ),
+              style: AppTextStyles.body.copyWith(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.ctNavy),
             ),
             const SizedBox(height: 4),
             Text(
@@ -5423,16 +5137,12 @@ class _FeedMessagesState extends State<_FeedMessages> {
               padding: const EdgeInsets.symmetric(vertical: 16),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
-                children: const [
-                  Icon(Icons.history, size: 14, color: AppColors.ctText3),
-                  SizedBox(width: 6),
+                children: [
+                  const Icon(Icons.history, size: 14, color: AppColors.ctText3),
+                  const SizedBox(width: 6),
                   Text(
                     'Mostrando los últimos 200 mensajes',
-                    style: TextStyle(
-                      fontFamily: 'Geist',
-                      fontSize: 12,
-                      color: AppColors.ctText3,
-                    ),
+                    style: AppTextStyles.navItem.copyWith(color: AppColors.ctText3),
                   ),
                 ],
               ),
@@ -5520,8 +5230,7 @@ Widget _buildFeedBody(
     final mUrl = mediaUrl?.isNotEmpty == true ? mediaUrl! : null;
     if (mUrl == null) {
       return Text('[${messageType == 'sticker' ? 'Sticker' : 'Imagen'}]',
-          style: TextStyle(
-              fontFamily: 'Geist', fontSize: 13, color: effectiveTextColor));
+          style: AppTextStyles.body.copyWith(color: effectiveTextColor));
     }
     final maxW = messageType == 'sticker' ? 120.0 : 220.0;
     final maxH = messageType == 'sticker' ? 120.0 : 220.0;
@@ -5533,10 +5242,7 @@ Widget _buildFeedBody(
         height: maxH,
         fit: BoxFit.cover,
         errorBuilder: (context, e, s) => Text('[Imagen no disponible]',
-            style: TextStyle(
-                fontFamily: 'Geist',
-                fontSize: 13,
-                color: effectiveTextColor.withValues(alpha: 0.6))),
+            style: AppTextStyles.body.copyWith(color: effectiveTextColor.withValues(alpha: 0.6))),
       ),
     );
   }
@@ -5546,8 +5252,7 @@ Widget _buildFeedBody(
     final mUrl = mediaUrl?.isNotEmpty == true ? mediaUrl! : null;
     if (mUrl == null) {
       return Text('[Audio]',
-          style: TextStyle(
-              fontFamily: 'Geist', fontSize: 13, color: effectiveTextColor));
+          style: AppTextStyles.body.copyWith(color: effectiveTextColor));
     }
     final audioViewId = 'feed-audio-${mUrl.hashCode}';
     if (!_feedRegisteredMediaViews.contains(audioViewId)) {
@@ -5579,8 +5284,7 @@ Widget _buildFeedBody(
     final mUrl = mediaUrl?.isNotEmpty == true ? mediaUrl! : null;
     if (mUrl == null) {
       return Text('[Video]',
-          style: TextStyle(
-              fontFamily: 'Geist', fontSize: 13, color: effectiveTextColor));
+          style: AppTextStyles.body.copyWith(color: effectiveTextColor));
     }
     final videoViewId = 'feed-video-${mUrl.hashCode}';
     if (!_feedRegisteredMediaViews.contains(videoViewId)) {
@@ -5615,11 +5319,7 @@ Widget _buildFeedBody(
           Padding(
             padding: const EdgeInsets.only(top: 4),
             child: Text(caption,
-                style: TextStyle(
-                    fontFamily: 'Geist',
-                    fontSize: 13,
-                    color: effectiveTextColor,
-                    height: 1.4)),
+                style: AppTextStyles.body.copyWith(color: effectiveTextColor, height: 1.4)),
           ),
       ],
     );
@@ -5640,14 +5340,9 @@ Widget _buildFeedBody(
           Flexible(
             child: Text(
               fileName,
-              style: TextStyle(
-                  fontFamily: 'Geist',
-                  fontSize: 13,
-                  color: mUrl != null
-                      ? AppColors.ctInfo
-                      : effectiveTextColor,
-                  decoration:
-                      mUrl != null ? TextDecoration.underline : null),
+              style: AppTextStyles.body.copyWith(
+                  color: mUrl != null ? AppColors.ctInfo : effectiveTextColor,
+                  decoration: mUrl != null ? TextDecoration.underline : null),
             ),
           ),
         ],
@@ -5683,11 +5378,7 @@ Widget _buildFeedBody(
             Flexible(
               child: Text(
                 locName,
-                style: TextStyle(
-                    fontFamily: 'Geist',
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: effectiveTextColor),
+                style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w600, color: effectiveTextColor),
               ),
             ),
           ],
@@ -5697,10 +5388,7 @@ Widget _buildFeedBody(
             padding: const EdgeInsets.only(top: 2, left: 24),
             child: Text(
               '$lat, $lng',
-              style: TextStyle(
-                  fontFamily: 'Geist',
-                  fontSize: 11,
-                  color: effectiveTextColor.withValues(alpha: 0.6)),
+              style: AppTextStyles.bodySmall.copyWith(color: effectiveTextColor.withValues(alpha: 0.6)),
             ),
           ),
         const SizedBox(height: 6),
@@ -5713,13 +5401,9 @@ Widget _buildFeedBody(
               color: const Color(0xFF53BDEB).withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(6),
             ),
-            child: const Text(
+            child: Text(
               'Ver en mapa',
-              style: TextStyle(
-                  fontFamily: 'Geist',
-                  fontSize: 12,
-                  color: Color(0xFF53BDEB),
-                  fontWeight: FontWeight.w600),
+              style: AppTextStyles.navItem.copyWith(fontWeight: FontWeight.w600, color: const Color(0xFF53BDEB)),
             ),
           ),
         ),
@@ -5730,12 +5414,7 @@ Widget _buildFeedBody(
   // ── texto (fallback) ─────────────────────────────────────────────────────────
   return Text(
     body,
-    style: TextStyle(
-      fontSize: 13,
-      color: effectiveTextColor,
-      fontFamily: 'Geist',
-      height: 1.4,
-    ),
+    style: AppTextStyles.body.copyWith(color: effectiveTextColor, height: 1.4),
   );
 }
 
@@ -5784,12 +5463,7 @@ class _FeedInboundBubble extends StatelessWidget {
             alignment: Alignment.center,
             child: Text(
               _initials(name),
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
-                color: avatarTextColor,
-                fontFamily: 'Geist',
-              ),
+              style: AppTextStyles.caption.copyWith(fontWeight: FontWeight.w600, color: avatarTextColor),
             ),
           ),
           // Bubble
@@ -5991,11 +5665,7 @@ class _FeedOutboundBubble extends StatelessWidget {
                         children: [
                           Text(
                             time,
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: bubbleTextColor.withValues(alpha: 0.7),
-                              fontFamily: 'Geist',
-                            ),
+                            style: AppTextStyles.caption.copyWith(color: bubbleTextColor.withValues(alpha: 0.7)),
                           ),
                           const SizedBox(width: 3),
                           _statusIcon(bubbleTextColor),
@@ -6026,11 +5696,7 @@ class _FeedOutboundBubble extends StatelessWidget {
                     recipientName!.trim().split(RegExp(r'\s+')).take(2)
                         .map((w) => w.isNotEmpty ? w[0].toUpperCase() : '')
                         .join(),
-                    style: TextStyle(
-                      fontSize: 7,
-                      fontWeight: FontWeight.w700,
-                      color: _FeedMessages._avatarFg(recipientName!),
-                    ),
+                    style: AppTextStyles.caption.copyWith(fontSize: 7, fontWeight: FontWeight.w700, color: _FeedMessages._avatarFg(recipientName!)),
                   ),
                 ),
               ],
@@ -6043,79 +5709,6 @@ class _FeedOutboundBubble extends StatelessWidget {
 }
 
 // ── Ghost button ──────────────────────────────────────────────────────────────
-
-class _GhostButton extends StatefulWidget {
-  const _GhostButton({
-    required this.label,
-    required this.icon,
-    required this.onTap,
-    this.active = false,
-  });
-  final String label;
-  final IconData icon;
-  final VoidCallback? onTap;
-  final bool active;
-
-  @override
-  State<_GhostButton> createState() => _GhostButtonState();
-}
-
-class _GhostButtonState extends State<_GhostButton> {
-  bool _hovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final enabled = widget.onTap != null;
-    return MouseRegion(
-      onEnter: enabled ? (_) => setState(() => _hovered = true) : null,
-      onExit: enabled ? (_) => setState(() => _hovered = false) : null,
-      cursor:
-          enabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          height: 30,
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          decoration: BoxDecoration(
-            color: widget.active || _hovered
-                ? AppColors.ctSurface2
-                : AppColors.ctSurface,
-            borderRadius: BorderRadius.circular(7),
-            border: Border.all(
-              color: widget.active
-                  ? AppColors.ctTeal
-                  : AppColors.ctBorder2,
-            ),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                widget.icon,
-                size: 13,
-                color: widget.active
-                    ? AppColors.ctTeal
-                    : AppColors.ctText2,
-              ),
-              const SizedBox(width: 5),
-              Text(
-                widget.label,
-                style: TextStyle(
-                  fontFamily: 'Geist',
-                  fontSize: 12,
-                  color: widget.active
-                      ? AppColors.ctTeal
-                      : AppColors.ctText2,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 // ── Dropdown de filtro ────────────────────────────────────────────────────────
 
@@ -6145,11 +5738,7 @@ class _FilterDropdown extends StatelessWidget {
         child: DropdownButton<String>(
           value: value,
           isDense: true,
-          style: const TextStyle(
-            fontFamily: 'Geist',
-            fontSize: 12,
-            color: AppColors.ctText,
-          ),
+          style: AppTextStyles.navItem.copyWith(color: AppColors.ctText),
           icon: const Icon(
             Icons.keyboard_arrow_down_rounded,
             size: 14,
@@ -6241,14 +5830,9 @@ class _DateFilterModalState extends State<_DateFilterModal> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Title
-              const Text(
+              Text(
                 'Filtrar por fecha y hora',
-                style: TextStyle(
-                  fontFamily: 'Geist',
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.ctText,
-                ),
+                style: AppTextStyles.body.copyWith(fontSize: 14, fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 16),
 
@@ -6259,14 +5843,9 @@ class _DateFilterModalState extends State<_DateFilterModal> {
                   Expanded(
                     child: Column(
                       children: [
-                        const Text(
+                        Text(
                           'Desde',
-                          style: TextStyle(
-                            fontFamily: 'Geist',
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500,
-                            color: AppColors.ctText2,
-                          ),
+                          style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.w500),
                         ),
                         const SizedBox(height: 4),
                         SizedBox(
@@ -6294,14 +5873,9 @@ class _DateFilterModalState extends State<_DateFilterModal> {
                   Expanded(
                     child: Column(
                       children: [
-                        const Text(
+                        Text(
                           'Hasta',
-                          style: TextStyle(
-                            fontFamily: 'Geist',
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500,
-                            color: AppColors.ctText2,
-                          ),
+                          style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.w500),
                         ),
                         const SizedBox(height: 4),
                         SizedBox(
@@ -6326,7 +5900,8 @@ class _DateFilterModalState extends State<_DateFilterModal> {
               Row(
                 children: [
                   Expanded(
-                    child: OutlinedButton.icon(
+                    child: AppButton(
+                      label: _timeLabel(_fromTime, 'Hora desde'),
                       onPressed: () async {
                         final t = await showTimePicker(
                           context: context,
@@ -6336,20 +5911,16 @@ class _DateFilterModalState extends State<_DateFilterModal> {
                         );
                         if (t != null) setState(() => _fromTime = t);
                       },
-                      icon: const Icon(Icons.access_time_rounded,
-                          size: 14),
-                      label: Text(
-                        _timeLabel(_fromTime, 'Hora desde'),
-                        style: const TextStyle(
-                          fontFamily: 'Geist',
-                          fontSize: 12,
-                        ),
-                      ),
+                      variant: AppButtonVariant.outline,
+                      size: AppButtonSize.sm,
+                      prefixIcon: const Icon(Icons.access_time_rounded, size: 14, color: AppColors.ctInk700),
+                      expand: true,
                     ),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: OutlinedButton.icon(
+                    child: AppButton(
+                      label: _timeLabel(_toTime, 'Hora hasta'),
                       onPressed: () async {
                         final t = await showTimePicker(
                           context: context,
@@ -6359,15 +5930,10 @@ class _DateFilterModalState extends State<_DateFilterModal> {
                         );
                         if (t != null) setState(() => _toTime = t);
                       },
-                      icon: const Icon(Icons.access_time_rounded,
-                          size: 14),
-                      label: Text(
-                        _timeLabel(_toTime, 'Hora hasta'),
-                        style: const TextStyle(
-                          fontFamily: 'Geist',
-                          fontSize: 12,
-                        ),
-                      ),
+                      variant: AppButtonVariant.outline,
+                      size: AppButtonSize.sm,
+                      prefixIcon: const Icon(Icons.access_time_rounded, size: 14, color: AppColors.ctInk700),
+                      expand: true,
                     ),
                   ),
                 ],
@@ -6377,41 +5943,25 @@ class _DateFilterModalState extends State<_DateFilterModal> {
               // Actions
               Row(
                 children: [
-                  TextButton(
+                  AppButton(
+                    label: 'Limpiar',
                     onPressed: () => _pop(clear: true),
-                    child: const Text(
-                      'Limpiar',
-                      style: TextStyle(
-                        fontFamily: 'Geist',
-                        fontSize: 12,
-                        color: AppColors.ctText2,
-                      ),
-                    ),
+                    variant: AppButtonVariant.ghost,
+                    size: AppButtonSize.sm,
                   ),
                   const Spacer(),
-                  TextButton(
+                  AppButton(
+                    label: 'Cancelar',
                     onPressed: () => Navigator.of(context).pop(null),
-                    child: const Text(
-                      'Cancelar',
-                      style: TextStyle(
-                        fontFamily: 'Geist',
-                        fontSize: 12,
-                      ),
-                    ),
+                    variant: AppButtonVariant.ghost,
+                    size: AppButtonSize.sm,
                   ),
                   const SizedBox(width: 8),
-                  FilledButton(
+                  AppButton(
+                    label: 'Aplicar',
                     onPressed: () => _pop(clear: false),
-                    style: FilledButton.styleFrom(
-                        backgroundColor: AppColors.ctTeal),
-                    child: const Text(
-                      'Aplicar',
-                      style: TextStyle(
-                        fontFamily: 'Geist',
-                        fontSize: 12,
-                        color: AppColors.ctNavy,
-                      ),
-                    ),
+                    variant: AppButtonVariant.teal,
+                    size: AppButtonSize.sm,
                   ),
                 ],
               ),
@@ -6661,10 +6211,10 @@ class _NewMessageDialogState extends ConsumerState<_NewMessageDialog> {
           padding: const EdgeInsets.fromLTRB(20, 20, 12, 0),
           child: Row(
             children: [
-              const Expanded(
+              Expanded(
                 child: Text(
                   'Nuevo mensaje',
-                  style: TextStyle(fontFamily: 'Geist', fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.ctNavy),
+                  style: AppTextStyles.body.copyWith(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.ctNavy),
                 ),
               ),
               IconButton(
@@ -6683,10 +6233,10 @@ class _NewMessageDialogState extends ConsumerState<_NewMessageDialog> {
           child: TextField(
             controller: _searchCtrl,
             onChanged: (_) => setState(() {}),
-            style: const TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctNavy),
+            style: AppTextStyles.body.copyWith(color: AppColors.ctNavy),
             decoration: InputDecoration(
               hintText: 'Buscar por nombre o teléfono…',
-              hintStyle: const TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText3),
+              hintStyle: AppTextStyles.body.copyWith(color: AppColors.ctText3),
               prefixIcon: const Icon(Icons.search, size: 16, color: AppColors.ctText3),
               filled: true,
               fillColor: AppColors.ctSurface2,
@@ -6701,7 +6251,7 @@ class _NewMessageDialogState extends ConsumerState<_NewMessageDialog> {
           child: _loadingAll
               ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
               : _loadError != null
-                  ? Center(child: Text(_loadError!, style: const TextStyle(fontFamily: 'Geist', fontSize: 12, color: Colors.red)))
+                  ? Center(child: Text(_loadError!, style: AppTextStyles.navItem.copyWith(color: Colors.red)))
                   : ListView(
                       padding: const EdgeInsets.only(bottom: 12),
                       children: [
@@ -6768,10 +6318,10 @@ class _NewMessageDialogState extends ConsumerState<_NewMessageDialog> {
                 constraints: const BoxConstraints(),
               ),
               const SizedBox(width: 8),
-              const Expanded(
+              Expanded(
                 child: Text(
                   'Nuevo mensaje',
-                  style: TextStyle(fontFamily: 'Geist', fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.ctNavy),
+                  style: AppTextStyles.body.copyWith(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.ctNavy),
                 ),
               ),
               IconButton(
@@ -6797,14 +6347,14 @@ class _NewMessageDialogState extends ConsumerState<_NewMessageDialog> {
                   backgroundColor: AppColors.ctTeal.withValues(alpha: 0.15),
                   child: Text(
                     name.isNotEmpty ? name[0].toUpperCase() : '?',
-                    style: const TextStyle(fontFamily: 'Geist', fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.ctTeal),
+                    style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w600, color: AppColors.ctTeal),
                   ),
                 ),
                 const SizedBox(width: 10),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(name, style: const TextStyle(fontFamily: 'Geist', fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.ctNavy)),
+                    Text(name, style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w500, color: AppColors.ctNavy)),
                     if (phone.isNotEmpty)
                       Text(phone, style: AppTextStyles.bodySmall.copyWith(color: AppColors.ctText3)),
                   ],
@@ -6845,11 +6395,7 @@ class _NewMessageDialogState extends ConsumerState<_NewMessageDialog> {
                       _windowOpen
                           ? 'Ventana de 24h abierta — puedes enviar texto libre.'
                           : 'Ventana cerrada — solo puedes enviar plantillas aprobadas.',
-                      style: TextStyle(
-                        fontFamily: 'Geist',
-                        fontSize: 11,
-                        color: _windowOpen ? AppColors.ctOkText : AppColors.ctWarnText,
-                      ),
+                      style: AppTextStyles.bodySmall.copyWith(color: _windowOpen ? AppColors.ctOkText : AppColors.ctWarnText),
                     ),
                   ],
                 ),
@@ -6886,10 +6432,10 @@ class _NewMessageDialogState extends ConsumerState<_NewMessageDialog> {
               TextField(
                 controller: _msgCtrl,
                 maxLines: 4,
-                style: const TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctNavy),
+                style: AppTextStyles.body.copyWith(color: AppColors.ctNavy),
                 decoration: InputDecoration(
                   hintText: 'Escribe tu mensaje…',
-                  hintStyle: const TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText3),
+                  hintStyle: AppTextStyles.body.copyWith(color: AppColors.ctText3),
                   filled: true,
                   fillColor: AppColors.ctSurface2,
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
@@ -6910,7 +6456,7 @@ class _NewMessageDialogState extends ConsumerState<_NewMessageDialog> {
                 ),
                 child: Text(
                   _resolvePreview(tpl),
-                  style: const TextStyle(fontFamily: 'Geist', fontSize: 12, color: AppColors.ctNavy),
+                  style: AppTextStyles.navItem.copyWith(color: AppColors.ctNavy),
                 ),
               ),
             ],
@@ -6929,17 +6475,21 @@ class _NewMessageDialogState extends ConsumerState<_NewMessageDialog> {
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              TextButton(
-                onPressed: _sending ? null : () => Navigator.of(context).pop(),
-                child: const Text('Cancelar', style: TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText3)),
+              AppButton(
+                label: 'Cancelar',
+                onPressed: () => Navigator.of(context).pop(),
+                variant: AppButtonVariant.ghost,
+                size: AppButtonSize.sm,
+                isDisabled: _sending,
               ),
               const SizedBox(width: 8),
-              FilledButton(
-                onPressed: _sending || _checkingWindow ? null : _send,
-                style: FilledButton.styleFrom(backgroundColor: AppColors.ctTeal),
-                child: _sending
-                    ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : const Text('Enviar', style: TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctNavy, fontWeight: FontWeight.w600)),
+              AppButton(
+                label: 'Enviar',
+                onPressed: _send,
+                variant: AppButtonVariant.teal,
+                size: AppButtonSize.sm,
+                isLoading: _sending,
+                isDisabled: _checkingWindow,
               ),
             ],
           ),
@@ -6961,7 +6511,7 @@ class _NmSectionHeader extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
       child: Text(
         label,
-        style: const TextStyle(fontFamily: 'Geist', fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.ctText3, letterSpacing: 0.3),
+        style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.w600, color: AppColors.ctText3, letterSpacing: 0.3),
       ),
     );
   }
@@ -7004,7 +6554,7 @@ class _NmRecipientItemState extends State<_NmRecipientItem> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(widget.name, style: const TextStyle(fontFamily: 'Geist', fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.ctNavy)),
+                  Text(widget.name, style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w500, color: AppColors.ctNavy)),
                   if (widget.phone.isNotEmpty)
                     Text(widget.phone, style: AppTextStyles.bodySmall.copyWith(color: AppColors.ctText3)),
                 ],
@@ -7037,12 +6587,7 @@ class _NmToggleBtn extends StatelessWidget {
         ),
         child: Text(
           label,
-          style: TextStyle(
-            fontFamily: 'Geist',
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
-            color: active ? AppColors.ctNavy : AppColors.ctText3,
-          ),
+          style: AppTextStyles.navItem.copyWith(fontWeight: FontWeight.w500, color: active ? AppColors.ctNavy : AppColors.ctText3),
         ),
       ),
     );
@@ -7061,12 +6606,12 @@ class _NmTemplateDropdown extends StatelessWidget {
       return Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(color: AppColors.ctSurface2, borderRadius: BorderRadius.circular(8)),
-        child: const Text('No hay plantillas disponibles.', style: TextStyle(fontFamily: 'Geist', fontSize: 12, color: AppColors.ctText3)),
+        child: Text('No hay plantillas disponibles.', style: AppTextStyles.navItem.copyWith(color: AppColors.ctText3)),
       );
     }
     return DropdownButtonFormField<String>(
       initialValue: selectedId,
-      hint: const Text('Seleccionar plantilla…', style: TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText3)),
+      hint: Text('Seleccionar plantilla…', style: AppTextStyles.body.copyWith(color: AppColors.ctText3)),
       decoration: InputDecoration(
         filled: true,
         fillColor: AppColors.ctSurface2,
@@ -7080,7 +6625,7 @@ class _NmTemplateDropdown extends StatelessWidget {
       }).toList(),
       onChanged: onChanged,
       dropdownColor: AppColors.ctSurface,
-      style: const TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctNavy),
+      style: AppTextStyles.body.copyWith(color: AppColors.ctNavy),
     );
   }
 }
@@ -7159,9 +6704,9 @@ class _MediaPreviewDialogState extends State<_MediaPreviewDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'Vista previa',
-                style: TextStyle(fontFamily: 'Geist', fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.ctNavy),
+                style: AppTextStyles.body.copyWith(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.ctNavy),
               ),
               const SizedBox(height: 16),
               // Preview area
@@ -7221,7 +6766,7 @@ class _MediaPreviewDialogState extends State<_MediaPreviewDialog> {
                           children: [
                             Text(
                               widget.filename,
-                              style: const TextStyle(fontFamily: 'Geist', fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.ctNavy),
+                              style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w500, color: AppColors.ctNavy),
                               overflow: TextOverflow.ellipsis,
                             ),
                             Text(
@@ -7239,12 +6784,12 @@ class _MediaPreviewDialogState extends State<_MediaPreviewDialog> {
                 const SizedBox(height: 12),
                 TextField(
                   controller: _captionCtrl,
-                  style: const TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctNavy),
+                  style: AppTextStyles.body.copyWith(color: AppColors.ctNavy),
                   textInputAction: TextInputAction.send,
                   onSubmitted: (_) => _handleSend(),
                   decoration: InputDecoration(
                     hintText: 'Agregar caption…',
-                    hintStyle: const TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText3),
+                    hintStyle: AppTextStyles.body.copyWith(color: AppColors.ctText3),
                     filled: true,
                     fillColor: AppColors.ctSurface2,
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
@@ -7257,16 +6802,19 @@ class _MediaPreviewDialogState extends State<_MediaPreviewDialog> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  TextButton(
+                  AppButton(
+                    label: 'Cancelar',
                     onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('Cancelar', style: TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText3)),
+                    variant: AppButtonVariant.ghost,
+                    size: AppButtonSize.sm,
                   ),
                   const SizedBox(width: 8),
-                  FilledButton.icon(
+                  AppButton(
+                    label: 'Enviar',
                     onPressed: _handleSend,
-                    style: FilledButton.styleFrom(backgroundColor: AppColors.ctTeal),
-                    icon: const Icon(Icons.send_rounded, size: 16, color: AppColors.ctNavy),
-                    label: const Text('Enviar', style: TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctNavy, fontWeight: FontWeight.w600)),
+                    variant: AppButtonVariant.teal,
+                    size: AppButtonSize.sm,
+                    prefixIcon: const Icon(Icons.send_rounded, size: 14, color: AppColors.ctNavy),
                   ),
                 ],
               ),
@@ -7304,9 +6852,9 @@ class _LocationDialogState extends State<_LocationDialog> {
     return AlertDialog(
       backgroundColor: AppColors.ctSurface,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      title: const Text(
+      title: Text(
         'Enviar ubicación',
-        style: TextStyle(fontFamily: 'Geist', fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.ctNavy),
+        style: AppTextStyles.body.copyWith(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.ctNavy),
       ),
       content: SizedBox(
         width: 380,
@@ -7314,10 +6862,10 @@ class _LocationDialogState extends State<_LocationDialog> {
           controller: _urlCtrl,
           onChanged: (_) => setState(() {}),
           autofocus: true,
-          style: const TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctNavy),
+          style: AppTextStyles.body.copyWith(color: AppColors.ctNavy),
           decoration: InputDecoration(
             hintText: 'Pega una URL de Google Maps…',
-            hintStyle: const TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText3),
+            hintStyle: AppTextStyles.body.copyWith(color: AppColors.ctText3),
             prefixIcon: const Icon(Icons.location_on_rounded, size: 18, color: AppColors.ctText3),
             filled: true,
             fillColor: AppColors.ctSurface2,
@@ -7327,20 +6875,18 @@ class _LocationDialogState extends State<_LocationDialog> {
         ),
       ),
       actions: [
-        TextButton(
+        AppButton(
+          label: 'Cancelar',
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancelar', style: TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText3)),
+          variant: AppButtonVariant.ghost,
+          size: AppButtonSize.sm,
         ),
-        FilledButton(
-          onPressed: canSend ? () => widget.onSend(_urlCtrl.text.trim()) : null,
-          style: FilledButton.styleFrom(
-            backgroundColor: AppColors.ctTeal,
-            disabledBackgroundColor: AppColors.ctSurface2,
-          ),
-          child: const Text(
-            'Enviar',
-            style: TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.ctNavy, fontWeight: FontWeight.w600),
-          ),
+        AppButton(
+          label: 'Enviar',
+          onPressed: () => widget.onSend(_urlCtrl.text.trim()),
+          variant: AppButtonVariant.teal,
+          size: AppButtonSize.sm,
+          isDisabled: !canSend,
         ),
       ],
     );
