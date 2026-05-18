@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../core/theme/colors.dart';
+import '../../core/theme/text_styles.dart';
 
 // ── Background ────────────────────────────────────────────────────────────────
 
@@ -145,8 +146,7 @@ class _HelpLinkState extends State<_HelpLink> {
             const SizedBox(width: 6),
             Text(
               'Soporte',
-              style: TextStyle(
-                fontFamily: 'Geist', fontSize: 13,
+              style: AppTextStyles.body.copyWith(
                 color: _hovered ? Colors.white : Colors.white.withValues(alpha: 0.75),
                 letterSpacing: -0.1,
               ),
@@ -170,9 +170,8 @@ class AuthFooter extends StatelessWidget {
       child: Center(
         child: Text(
           'Built with ❤️ Powered by 🤖',
-          style: TextStyle(
+          style: AppTextStyles.body.copyWith(
             fontFamily: 'Onest',
-            fontSize: 13,
             fontWeight: FontWeight.w500,
             color: Colors.white.withValues(alpha: 0.65),
           ),
@@ -271,9 +270,8 @@ class AuthCardHead extends StatelessWidget {
         RichText(
           textAlign: TextAlign.center,
           text: TextSpan(
-            style: const TextStyle(
+            style: AppTextStyles.kpiValue.copyWith(
               fontFamily: 'Onest',
-              fontWeight: FontWeight.w700,
               fontSize: 22,
               height: 1.2,
               letterSpacing: -0.6,
@@ -381,9 +379,8 @@ class _AuthFieldState extends State<AuthField> {
       children: [
         Text(
           widget.label,
-          style: const TextStyle(
-            fontFamily: 'Geist',
-            fontSize: 12.5,
+          style: AppTextStyles.bodySmall.copyWith(
+            fontSize: 12,
             fontWeight: FontWeight.w600,
             color: AppColors.ctNavy,
           ),
@@ -418,8 +415,7 @@ class _AuthFieldState extends State<AuthField> {
                   autofocus: widget.autofocus,
                   textInputAction: widget.inputAction,
                   onSubmitted: widget.onSubmit != null ? (_) => widget.onSubmit!() : null,
-                  style: const TextStyle(
-                    fontFamily: 'Geist',
+                  style: AppTextStyles.body.copyWith(
                     fontSize: 14,
                     color: AppColors.ctNavy,
                     letterSpacing: -0.1,
@@ -564,10 +560,8 @@ class _AuthPrimaryButtonState extends State<AuthPrimaryButton> {
                   children: [
                     Text(
                       widget.label,
-                      style: const TextStyle(
+                      style: AppTextStyles.pageTitle.copyWith(
                         fontFamily: 'Geist',
-                        fontWeight: FontWeight.w700,
-                        fontSize: 15,
                         color: AppColors.ctNavy,
                         letterSpacing: -0.3,
                       ),
@@ -618,9 +612,7 @@ class AuthAlert extends StatelessWidget {
           Expanded(
             child: Text(
               message,
-              style: TextStyle(
-                fontFamily: 'Geist',
-                fontSize: 13,
+              style: AppTextStyles.body.copyWith(
                 letterSpacing: -0.1,
                 color: _isError ? const Color(0xFFB42E2D) : AppColors.ctTealText,
                 height: 1.4,
@@ -706,9 +698,8 @@ class _AuthSuccessBlockState extends State<AuthSuccessBlock>
         const SizedBox(height: 12),
         Text(
           widget.title,
-          style: const TextStyle(
+          style: AppTextStyles.kpiValue.copyWith(
             fontFamily: 'Onest',
-            fontWeight: FontWeight.w700,
             fontSize: 20,
             letterSpacing: -0.5,
             color: AppColors.ctNavy,
