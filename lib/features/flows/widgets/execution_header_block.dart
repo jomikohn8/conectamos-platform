@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/app_button.dart';
 import 'execution_export.dart';
 
 // ── Public widget ────────────────────────────────────────────────────────────
@@ -95,10 +96,8 @@ class ExecutionHeaderBlock extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(execId,
-                        style: const TextStyle(
-                          fontFamily: 'Geist',
-                          fontSize: 11,
-                          color: Color(0xFF94A3B8),
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: AppColors.ctText3,
                           letterSpacing: -0.005,
                         )),
                     const SizedBox(height: 4),
@@ -141,30 +140,23 @@ class ExecutionHeaderBlock extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   if (showAbandon) ...[
-                    TextButton.icon(
-                      onPressed: onAbandon,
-                      icon: const Icon(Icons.cancel_outlined,
-                          size: 14, color: Color(0xFFEF4444)),
-                      label: const Text('Abandonar',
-                          style: TextStyle(
-                              fontFamily: 'Geist',
-                              fontSize: 13,
-                              color: Color(0xFFEF4444))),
-                      style: TextButton.styleFrom(
-                        foregroundColor: const Color(0xFFEF4444),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 6),
-                        minimumSize: Size.zero,
-                      ),
+                    AppButton(
+                      label: 'Abandonar',
+                      onPressed: onAbandon ?? () {},
+                      variant: AppButtonVariant.danger,
+                      size: AppButtonSize.sm,
+                      prefixIcon: const Icon(Icons.cancel_outlined, size: 14, color: Colors.white),
                     ),
                     const SizedBox(width: 8),
                   ],
-                  _SmallButton(
+                  AppButton(
                     label: 'Ver definición',
-                    icon: Icons.open_in_new_rounded,
-                    onTap: () {
+                    onPressed: () {
                       if (flowId.isNotEmpty) context.go('/flows/$flowId');
                     },
+                    variant: AppButtonVariant.outline,
+                    size: AppButtonSize.sm,
+                    prefixIcon: const Icon(Icons.open_in_new_rounded, size: 13, color: AppColors.ctInk700),
                   ),
                   const SizedBox(width: 6),
                   _ExportMenuButton(exec: exec, flow: flow),
@@ -307,16 +299,11 @@ class _FailedBanner extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 10),
-          OutlinedButton(
+          AppButton(
+            label: 'Ver escalación',
             onPressed: () {},
-            style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.ctDanger,
-              side: const BorderSide(color: Color(0xFFFECACA)),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              minimumSize: Size.zero,
-              textStyle: AppFonts.geist(fontSize: 12, fontWeight: FontWeight.w600),
-            ),
-            child: const Text('Ver escalación'),
+            variant: AppButtonVariant.danger,
+            size: AppButtonSize.sm,
           ),
         ],
       ),
@@ -568,31 +555,6 @@ class _ChannelBadge extends StatelessWidget {
   }
 }
 
-class _SmallButton extends StatelessWidget {
-  const _SmallButton({required this.label, required this.icon, required this.onTap});
-  final String label;
-  final IconData icon;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return OutlinedButton.icon(
-      onPressed: onTap,
-      icon: Icon(icon, size: 13),
-      label: Text(label),
-      style: OutlinedButton.styleFrom(
-        foregroundColor: AppColors.ctText2,
-        side: const BorderSide(color: AppColors.ctBorder),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        minimumSize: Size.zero,
-        textStyle:
-            AppFonts.geist(fontSize: 12, fontWeight: FontWeight.w600),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      ),
-    );
-  }
-}
-
 class _ExportMenuButton extends StatelessWidget {
   const _ExportMenuButton({required this.exec, required this.flow});
   final Map<String, dynamic> exec;
@@ -642,20 +604,12 @@ class _ExportMenuButton extends StatelessWidget {
           ),
         ),
       ],
-      child: OutlinedButton.icon(
-        onPressed: null,
-        icon: const Icon(Icons.download_rounded, size: 13),
-        label: const Text('Exportar'),
-        style: OutlinedButton.styleFrom(
-          foregroundColor: AppColors.ctText2,
-          side: const BorderSide(color: AppColors.ctBorder),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          minimumSize: Size.zero,
-          textStyle:
-              AppFonts.geist(fontSize: 12, fontWeight: FontWeight.w600),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        ),
+      child: AppButton(
+        label: 'Exportar',
+        onPressed: () {},
+        variant: AppButtonVariant.outline,
+        size: AppButtonSize.sm,
+        prefixIcon: const Icon(Icons.download_rounded, size: 13, color: AppColors.ctInk700),
       ),
     );
   }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/theme/colors.dart';
+import '../../../core/theme/text_styles.dart';
 import '../../../core/utils/phone_normalizer.dart';
 
 // ── Country data ──────────────────────────────────────────────────────────────
@@ -124,11 +125,7 @@ class _PhoneFieldWidgetState extends State<PhoneFieldWidget> {
         if (widget.label != null) ...[
           Text(
             widget.label!,
-            style: const TextStyle(
-              fontFamily: 'Geist',
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-              color: AppColors.ctText,
+            style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w500,
             ),
           ),
           const SizedBox(height: 6),
@@ -158,15 +155,11 @@ class _PhoneFieldWidgetState extends State<PhoneFieldWidget> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(countryFlag(_iso),
-                          style: const TextStyle(fontSize: 18)),
+                          style: AppTextStyles.body.copyWith(fontSize: 18)),
                       const SizedBox(width: 6),
                       Text(
                         _dialCode,
-                        style: const TextStyle(
-                          fontFamily: 'Geist',
-                          fontSize: 13,
-                          color: AppColors.ctText,
-                        ),
+                        style: AppTextStyles.body,
                       ),
                       const SizedBox(width: 4),
                       const Icon(Icons.keyboard_arrow_down_rounded,
@@ -187,22 +180,14 @@ class _PhoneFieldWidgetState extends State<PhoneFieldWidget> {
                   FilteringTextInputFormatter.allow(
                       RegExp(r'[\d\s\-\(\)\+]')),
                 ],
-                style: const TextStyle(
-                  fontFamily: 'Geist',
-                  fontSize: 13,
-                  color: AppColors.ctText,
-                ),
+                style: AppTextStyles.body,
                 onEditingComplete: () => setState(() {
                   _localError =
                       PhoneNormalizer.validatePhone(_ctrl.text, _iso);
                 }),
                 decoration: InputDecoration(
                   hintText: 'Número local',
-                  hintStyle: const TextStyle(
-                    fontFamily: 'Geist',
-                    fontSize: 13,
-                    color: AppColors.ctText3,
-                  ),
+                  hintStyle: AppTextStyles.body.copyWith(color: AppColors.ctText3),
                   filled: true,
                   fillColor: AppColors.ctSurface2,
                   contentPadding: const EdgeInsets.symmetric(
@@ -241,22 +226,14 @@ class _PhoneFieldWidgetState extends State<PhoneFieldWidget> {
           const SizedBox(height: 3),
           Text(
             preview,
-            style: const TextStyle(
-              fontFamily: 'Geist',
-              fontSize: 11,
-              color: AppColors.ctText2,
-            ),
+            style: AppTextStyles.bodySmall,
           ),
         ],
         if (error != null) ...[
           const SizedBox(height: 3),
           Text(
             error,
-            style: const TextStyle(
-              fontFamily: 'Geist',
-              fontSize: 11,
-              color: AppColors.ctDanger,
-            ),
+            style: AppTextStyles.bodySmall.copyWith(color: AppColors.ctDanger),
           ),
         ],
       ],
@@ -312,16 +289,10 @@ class _CountryPickerDialogState extends State<CountryPickerDialog> {
               child: TextField(
                 autofocus: true,
                 onChanged: (v) => setState(() => _q = v),
-                style: const TextStyle(
-                    fontFamily: 'Geist',
-                    fontSize: 13,
-                    color: AppColors.ctText),
+                style: AppTextStyles.body,
                 decoration: InputDecoration(
                   hintText: 'Buscar país...',
-                  hintStyle: const TextStyle(
-                      fontFamily: 'Geist',
-                      fontSize: 13,
-                      color: AppColors.ctText3),
+                  hintStyle: AppTextStyles.body.copyWith(color: AppColors.ctText3),
                   prefixIcon: const Icon(Icons.search_rounded,
                       size: 16, color: AppColors.ctText3),
                   filled: true,
@@ -365,23 +336,17 @@ class _CountryPickerDialogState extends State<CountryPickerDialog> {
                       child: Row(
                         children: [
                           Text(countryFlag(c.$1),
-                              style: const TextStyle(fontSize: 18)),
+                              style: AppTextStyles.body.copyWith(fontSize: 18)),
                           const SizedBox(width: 10),
                           Expanded(
                             child: Text(
                               c.$2,
-                              style: const TextStyle(
-                                  fontFamily: 'Geist',
-                                  fontSize: 13,
-                                  color: AppColors.ctText),
+                              style: AppTextStyles.body,
                             ),
                           ),
                           Text(
                             c.$3,
-                            style: const TextStyle(
-                                fontFamily: 'Geist',
-                                fontSize: 12,
-                                color: AppColors.ctText2),
+                            style: AppTextStyles.bodySmall.copyWith(fontSize: 12),
                           ),
                         ],
                       ),
