@@ -14,6 +14,7 @@ import '../../core/providers/permissions_provider.dart';
 import '../../core/providers/tenant_provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/identity_config.dart';
+import '../../shared/widgets/app_button.dart';
 import 'widgets/operator_form_dialog.dart';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -163,22 +164,18 @@ class _OperatorDetailScreenState extends ConsumerState<OperatorDetailScreen>
           builder: (ctx) => AlertDialog(
             backgroundColor: AppColors.ctSurface,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            title: const Text('Telegram vinculado',
-                style: TextStyle(
-                    fontFamily: 'Geist',
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600)),
-            content: const Text(
+            title: Text('Telegram vinculado',
+                style: AppTextStyles.pageTitle.copyWith(fontFamily: 'Geist', fontSize: 16)),
+            content: Text(
               'Este operador tenía Telegram vinculado. Ha perdido acceso al bot.',
-              style: TextStyle(
-                  fontFamily: 'Geist', fontSize: 14, color: AppColors.ctText2),
+              style: AppTextStyles.body.copyWith(fontSize: 14, color: AppColors.ctText2),
             ),
             actions: [
-              TextButton(
+              AppButton(
+                label: 'Entendido',
+                variant: AppButtonVariant.ghost,
+                size: AppButtonSize.sm,
                 onPressed: () => Navigator.pop(ctx),
-                child: const Text('Entendido',
-                    style: TextStyle(
-                        fontFamily: 'Geist', color: AppColors.ctText2)),
               ),
             ],
           ),
@@ -260,11 +257,14 @@ class _OperatorDetailScreenState extends ConsumerState<OperatorDetailScreen>
                   size: 48, color: AppColors.ctDanger),
               const SizedBox(height: 12),
               Text(_error ?? 'No se encontró el operador',
-                  style: const TextStyle(
-                      fontFamily: 'Geist', color: AppColors.ctText2)),
+                  style: AppTextStyles.body.copyWith(color: AppColors.ctText2)),
               const SizedBox(height: 16),
-              TextButton(
-                  onPressed: _load, child: const Text('Reintentar')),
+              AppButton(
+                label: 'Reintentar',
+                variant: AppButtonVariant.ghost,
+                size: AppButtonSize.sm,
+                onPressed: _load,
+              ),
             ],
           ),
         ),
@@ -364,12 +364,7 @@ class _OperatorDetailScreenState extends ConsumerState<OperatorDetailScreen>
         onPressed: () => context.go('/operators'),
       ),
       title: Text(name,
-          style: const TextStyle(
-            fontFamily: 'Geist',
-            fontSize: 15,
-            fontWeight: FontWeight.w600,
-            color: AppColors.ctText,
-          )),
+          style: AppTextStyles.pageTitle.copyWith(fontFamily: 'Geist', fontWeight: FontWeight.w600)),
       actions: [
         ?trailing,
       ],
@@ -378,10 +373,8 @@ class _OperatorDetailScreenState extends ConsumerState<OperatorDetailScreen>
         labelColor: AppColors.ctTeal,
         unselectedLabelColor: AppColors.ctText2,
         indicatorColor: AppColors.ctTeal,
-        labelStyle: const TextStyle(
-            fontFamily: 'Geist', fontSize: 12, fontWeight: FontWeight.w600),
-        unselectedLabelStyle:
-            const TextStyle(fontFamily: 'Geist', fontSize: 12),
+        labelStyle: AppTextStyles.formLabel,
+        unselectedLabelStyle: AppTextStyles.navItem,
         tabs: const [
           Tab(text: 'DATOS'),
           Tab(text: 'FLUJOS'),
@@ -434,12 +427,7 @@ class _OperatorHeader extends StatelessWidget {
                   alignment: Alignment.center,
                   child: Text(
                     _initials(name),
-                    style: const TextStyle(
-                      fontFamily: 'Geist',
-                      fontSize: 24,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.ctTealDark,
-                    ),
+                    style: AppTextStyles.kpiValue.copyWith(fontFamily: 'Geist', fontSize: 24, color: AppColors.ctTealDark),
                   ),
                 ),
           const SizedBox(width: 20),
@@ -451,12 +439,7 @@ class _OperatorHeader extends StatelessWidget {
                   children: [
                     Flexible(
                       child: Text(name,
-                          style: const TextStyle(
-                            fontFamily: 'Geist',
-                            fontSize: 20,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.ctText,
-                          ),
+                          style: AppTextStyles.kpiValue.copyWith(fontFamily: 'Geist', fontSize: 20),
                           overflow: TextOverflow.ellipsis),
                     ),
                     const SizedBox(width: 10),
@@ -716,12 +699,7 @@ class _DatosTabState extends ConsumerState<_DatosTab> {
                       size: 14, color: Color(0xFF0088CC)),
                   const SizedBox(width: 5),
                   Text(tgChatId,
-                      style: const TextStyle(
-                        fontFamily: 'Geist',
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                        color: Color(0xFF0088CC),
-                      )),
+                      style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w500, color: const Color(0xFF0088CC))),
                 ],
               ),
             ),
@@ -809,16 +787,12 @@ class _DatosTabState extends ConsumerState<_DatosTab> {
                 : null,
             isExpanded: true,
             underline: Container(height: 1, color: AppColors.ctBorder),
-            style: const TextStyle(
-                fontFamily: 'Geist', fontSize: 13, color: AppColors.ctText),
+            style: AppTextStyles.body,
             items: [
-              const DropdownMenuItem<String?>(
+              DropdownMenuItem<String?>(
                 value: null,
                 child: Text('Sin rol',
-                    style: TextStyle(
-                        fontFamily: 'Geist',
-                        fontSize: 13,
-                        color: AppColors.ctText3)),
+                    style: AppTextStyles.body.copyWith(color: AppColors.ctText3)),
               ),
               ..._availableRoles.map((role) {
                 final id = role['id'] as String? ?? '';
@@ -827,11 +801,7 @@ class _DatosTabState extends ConsumerState<_DatosTab> {
                     id;
                 return DropdownMenuItem<String?>(
                   value: id,
-                  child: Text(label,
-                      style: const TextStyle(
-                          fontFamily: 'Geist',
-                          fontSize: 13,
-                          color: AppColors.ctText)),
+                  child: Text(label, style: AppTextStyles.body),
                 );
               }),
             ],
@@ -944,12 +914,7 @@ class _ChannelTypeOrderList extends StatelessWidget {
                 alignment: Alignment.center,
                 child: Text(
                   '${i + 1}',
-                  style: TextStyle(
-                    fontFamily:  'Geist',
-                    fontSize:    11,
-                    fontWeight:  FontWeight.w700,
-                    color:       color,
-                  ),
+                  style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.w700, color: color),
                 ),
               ),
               const SizedBox(width: 10),
@@ -960,12 +925,7 @@ class _ChannelTypeOrderList extends StatelessWidget {
               Expanded(
                 child: Text(
                   _label(type),
-                  style: TextStyle(
-                    fontFamily:  'Geist',
-                    fontSize:    13,
-                    fontWeight:  FontWeight.w600,
-                    color:       enabled ? AppColors.ctText : AppColors.ctText3,
-                  ),
+                  style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w600, color: enabled ? AppColors.ctText : AppColors.ctText3),
                 ),
               ),
               // ↑ ↓ arrows
@@ -1040,18 +1000,15 @@ class _FlujosTab extends StatelessWidget {
     }).toList();
 
     if (flows.isEmpty) {
-      return const Center(
+      return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.account_tree_outlined,
+            const Icon(Icons.account_tree_outlined,
                 size: 48, color: AppColors.ctText3),
-            SizedBox(height: 12),
+            const SizedBox(height: 12),
             Text('Sin flujos asignados',
-                style: TextStyle(
-                    fontFamily: 'Geist',
-                    fontSize: 14,
-                    color: AppColors.ctText2)),
+                style: AppTextStyles.body.copyWith(fontSize: 14, color: AppColors.ctText2)),
           ],
         ),
       );
@@ -1163,12 +1120,7 @@ class _FlowCardState extends State<_FlowCard> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(name,
-                    style: const TextStyle(
-                      fontFamily: 'Geist',
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.ctText,
-                    )),
+                    style: AppTextStyles.body.copyWith(fontSize: 14, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 2),
                 Text(
                   isTelegram
@@ -1247,23 +1199,19 @@ class _PermisosTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
+    return Center(
       child: Padding(
-        padding: EdgeInsets.all(40),
+        padding: const EdgeInsets.all(40),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.lock_outline, size: 56, color: AppColors.ctText3),
-            SizedBox(height: 16),
+            const Icon(Icons.lock_outline, size: 56, color: AppColors.ctText3),
+            const SizedBox(height: 16),
             Text(
               'La asignación de permisos individuales por operador '
               'estará disponible próximamente',
               textAlign: TextAlign.center,
-              style: TextStyle(
-                fontFamily: 'Geist',
-                fontSize: 15,
-                color: AppColors.ctText2,
-              ),
+              style: AppTextStyles.pageTitle.copyWith(fontFamily: 'Geist', color: AppColors.ctText2),
             ),
           ],
         ),
@@ -1322,23 +1270,17 @@ class _HistorialTabState extends State<_HistorialTab> {
 
     final sessions = _sessions ?? [];
     if (sessions.isEmpty) {
-      return const Center(
+      return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.history, size: 56, color: AppColors.ctText3),
-            SizedBox(height: 16),
+            const Icon(Icons.history, size: 56, color: AppColors.ctText3),
+            const SizedBox(height: 16),
             Text('Sin actividad registrada',
-                style: TextStyle(
-                    fontFamily: 'Geist',
-                    fontSize: 15,
-                    color: AppColors.ctText2)),
-            SizedBox(height: 6),
+                style: AppTextStyles.pageTitle.copyWith(fontFamily: 'Geist', color: AppColors.ctText2)),
+            const SizedBox(height: 6),
             Text('El historial de sesiones estará disponible próximamente',
-                style: TextStyle(
-                    fontFamily: 'Geist',
-                    fontSize: 12,
-                    color: AppColors.ctText3)),
+                style: AppTextStyles.bodySmall.copyWith(fontSize: 12, color: AppColors.ctText3)),
           ],
         ),
       );
@@ -1360,10 +1302,7 @@ class _HistorialTabState extends State<_HistorialTab> {
         return ExpansionTile(
           tilePadding: EdgeInsets.zero,
           title: Text(flowName,
-              style: const TextStyle(
-                  fontFamily: 'Geist',
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600)),
+              style: AppTextStyles.body.copyWith(fontSize: 14, fontWeight: FontWeight.w600)),
           subtitle: Text(_fmtDate(startedAt),
               style: AppTextStyles.navItem),
           trailing: Container(
@@ -1395,13 +1334,10 @@ class _SessionFields extends StatelessWidget {
         session['fields'] as Map<String, dynamic>? ??
         {};
     if (fields.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.only(bottom: 12, left: 16),
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 12, left: 16),
         child: Text('Sin campos capturados',
-            style: TextStyle(
-                fontFamily: 'Geist',
-                fontSize: 12,
-                color: AppColors.ctText3)),
+            style: AppTextStyles.bodySmall.copyWith(fontSize: 12, color: AppColors.ctText3)),
       );
     }
     return Padding(
@@ -1456,14 +1392,9 @@ void _openDocumentViewer(BuildContext context, String url) {
               ),
               child: Row(
                 children: [
-                  const Expanded(
+                  Expanded(
                     child: Text('Documento',
-                        style: TextStyle(
-                          fontFamily: 'Geist',
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.ctText,
-                        )),
+                        style: AppTextStyles.pageTitle.copyWith(fontFamily: 'Geist', fontWeight: FontWeight.w600)),
                   ),
                   IconButton(
                     icon: const Icon(Icons.close,
@@ -1505,14 +1436,12 @@ void _openDocumentViewer(BuildContext context, String url) {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  TextButton.icon(
+                  AppButton(
+                    label: 'Descargar',
+                    variant: AppButtonVariant.outline,
+                    size: AppButtonSize.sm,
+                    prefixIcon: const Icon(Icons.download_outlined, size: 14, color: AppColors.ctInk700),
                     onPressed: () => html.window.open(url, '_blank'),
-                    icon: const Icon(Icons.download_outlined, size: 16),
-                    label: const Text('Descargar',
-                        style: TextStyle(
-                            fontFamily: 'Geist', fontSize: 13)),
-                    style: TextButton.styleFrom(
-                        foregroundColor: AppColors.ctText2),
                   ),
                 ],
               ),
@@ -1570,15 +1499,13 @@ class _CustomFieldReadRow extends StatelessWidget {
 
     final Widget valueWidget;
     if (value == null) {
-      valueWidget = const Text('—',
-          style: TextStyle(
-              fontFamily: 'Geist', fontSize: 14, color: AppColors.ctText));
+      valueWidget = Text('—',
+          style: AppTextStyles.body.copyWith(fontSize: 14));
     } else if (type == 'boolean') {
       final boolVal =
           value == true || value == 'true' || value == 1;
       valueWidget = Text(boolVal ? 'Sí' : 'No',
-          style: const TextStyle(
-              fontFamily: 'Geist', fontSize: 14, color: AppColors.ctText));
+          style: AppTextStyles.body.copyWith(fontSize: 14));
     } else if (type == 'photo') {
       final url = value.toString();
       valueWidget = ClipRRect(
@@ -1610,19 +1537,14 @@ class _CustomFieldReadRow extends StatelessWidget {
               borderRadius: BorderRadius.circular(20),
               border: Border.all(color: AppColors.ctBorder2),
             ),
-            child: const Row(
+            child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.insert_drive_file_outlined,
+                const Icon(Icons.insert_drive_file_outlined,
                     size: 14, color: AppColors.ctTeal),
-                SizedBox(width: 6),
+                const SizedBox(width: 6),
                 Text('Ver documento',
-                    style: TextStyle(
-                      fontFamily: 'Geist',
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      color: AppColors.ctTeal,
-                    )),
+                    style: AppTextStyles.bodySmall.copyWith(fontSize: 12, fontWeight: FontWeight.w500, color: AppColors.ctTeal)),
               ],
             ),
           ),
@@ -1630,8 +1552,7 @@ class _CustomFieldReadRow extends StatelessWidget {
       );
     } else {
       valueWidget = Text(value.toString(),
-          style: const TextStyle(
-              fontFamily: 'Geist', fontSize: 14, color: AppColors.ctText));
+          style: AppTextStyles.body.copyWith(fontSize: 14));
     }
 
     return Padding(
@@ -1669,16 +1590,9 @@ class _ConfirmDialog extends StatelessWidget {
       shape:
           RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       title: Text(title,
-          style: const TextStyle(
-              fontFamily: 'Geist',
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: AppColors.ctText)),
+          style: AppTextStyles.pageTitle.copyWith(fontFamily: 'Geist', fontSize: 16)),
       content: Text(body,
-          style: const TextStyle(
-              fontFamily: 'Geist',
-              fontSize: 14,
-              color: AppColors.ctText2)),
+          style: AppTextStyles.body.copyWith(fontSize: 14, color: AppColors.ctText2)),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context, false),
@@ -1723,8 +1637,7 @@ class _MenuItem extends StatelessWidget {
         Icon(icon, size: 18, color: color),
         const SizedBox(width: 10),
         Text(label,
-            style: TextStyle(
-                fontFamily: 'Geist', fontSize: 14, color: color)),
+            style: AppTextStyles.body.copyWith(fontSize: 14, color: color)),
       ],
     );
   }
@@ -1738,13 +1651,7 @@ class _SectionTitle extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       text.toUpperCase(),
-      style: const TextStyle(
-        fontFamily: 'Geist',
-        fontSize: 10,
-        fontWeight: FontWeight.w600,
-        letterSpacing: 0.6,
-        color: AppColors.ctText2,
-      ),
+      style: AppTextStyles.kpiLabel.copyWith(letterSpacing: 0.6),
     );
   }
 }
@@ -1774,10 +1681,7 @@ class _FieldRow extends StatelessWidget {
           _FieldLabel(label),
           const SizedBox(height: 2),
           Text(value,
-              style: const TextStyle(
-                  fontFamily: 'Geist',
-                  fontSize: 14,
-                  color: AppColors.ctText)),
+              style: AppTextStyles.body.copyWith(fontSize: 14)),
         ],
       ),
     );

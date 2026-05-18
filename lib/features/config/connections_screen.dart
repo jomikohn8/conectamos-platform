@@ -15,6 +15,7 @@ import '../../core/api/flows_api.dart';
 import '../../core/api/ai_workers_api.dart';
 import '../../core/providers/tenant_provider.dart';
 import '../../core/theme/app_theme.dart';
+import '../../shared/widgets/app_button.dart';
 import '../../shared/widgets/app_shell.dart';
 
 // ─── Design tokens locales ────────────────────────────────────────────────────
@@ -1271,9 +1272,11 @@ class _EmptyCatalogsState extends StatelessWidget {
                   color: AppColors.ctText2),
             ),
             const SizedBox(height: 8),
-            TextButton(
+            AppButton(
+              label: 'Crear catálogo',
+              variant: AppButtonVariant.ghost,
+              size: AppButtonSize.sm,
               onPressed: () => context.go('/catalogs'),
-              child: const Text('Crear catálogo'),
             ),
           ],
         ),
@@ -1372,15 +1375,12 @@ class _CatalogTile extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 12),
-          TextButton(
-            onPressed: slug.isNotEmpty ? () => context.go('/catalogs/$slug') : null,
-            style: TextButton.styleFrom(
-              foregroundColor: AppColors.ctTeal,
-              textStyle: AppFonts.geist(
-                  fontSize: 12, fontWeight: FontWeight.w600),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            ),
-            child: const Text('Ver'),
+          AppButton(
+            label: 'Ver',
+            variant: AppButtonVariant.ghost,
+            size: AppButtonSize.sm,
+            isDisabled: slug.isEmpty,
+            onPressed: () => context.go('/catalogs/$slug'),
           ),
         ],
       ),
@@ -1948,16 +1948,21 @@ class _OAuthDialogState extends State<_OAuthDialog> {
                 const SizedBox(height: 20),
                 Row(
                   children: [
-                    Expanded(
-                      child: _GhostButton(label: 'Cancelar', onTap: widget.onCancel),
-                    ),
+                    Expanded(child: AppButton(
+                      label: 'Cancelar',
+                      variant: AppButtonVariant.outline,
+                      size: AppButtonSize.sm,
+                      expand: true,
+                      onPressed: widget.onCancel,
+                    )),
                     const SizedBox(width: 12),
-                    Expanded(
-                      child: _PrimaryButton(
-                        label: 'Autorizar con ${widget.item.name}',
-                        onTap: _authorize,
-                      ),
-                    ),
+                    Expanded(child: AppButton(
+                      label: 'Autorizar con ${widget.item.name}',
+                      variant: AppButtonVariant.teal,
+                      size: AppButtonSize.sm,
+                      expand: true,
+                      onPressed: _authorize,
+                    )),
                   ],
                 ),
                 const SizedBox(height: 16),
@@ -2132,7 +2137,7 @@ class _ManageDrawer extends StatelessWidget {
                               ),
                             ),
                             const SizedBox(width: 10),
-                            _PrimaryButton(label: 'Reautorizar', onTap: onClose, small: true),
+                            AppButton(label: 'Reautorizar', variant: AppButtonVariant.teal, size: AppButtonSize.sm, onPressed: onClose),
                           ],
                         ),
                       ),
@@ -2196,22 +2201,28 @@ class _ManageDrawer extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  _GhostButton(
-                    icon: Icons.sync_rounded,
+                  AppButton(
                     label: 'Sincronizar',
-                    onTap: () {},
+                    variant: AppButtonVariant.outline,
+                    size: AppButtonSize.sm,
+                    prefixIcon: const Icon(Icons.sync_rounded, size: 14, color: AppColors.ctInk700),
+                    onPressed: () {},
                   ),
                   const SizedBox(width: 8),
-                  _GhostButton(
-                    icon: Icons.open_in_new_rounded,
+                  AppButton(
                     label: 'Avanzado',
-                    onTap: () {},
+                    variant: AppButtonVariant.outline,
+                    size: AppButtonSize.sm,
+                    prefixIcon: const Icon(Icons.open_in_new_rounded, size: 14, color: AppColors.ctInk700),
+                    onPressed: () {},
                   ),
                   const Spacer(),
-                  _DangerButton(
-                    icon: Icons.delete_outline_rounded,
+                  AppButton(
                     label: 'Desconectar',
-                    onTap: () => onDisconnect(item),
+                    variant: AppButtonVariant.danger,
+                    size: AppButtonSize.sm,
+                    prefixIcon: const Icon(Icons.delete_outline_rounded, size: 14, color: Colors.white),
+                    onPressed: () => onDisconnect(item),
                   ),
                 ],
               ),
@@ -2291,149 +2302,6 @@ class _ActivityRow extends StatelessWidget {
           ),
           Expanded(child: Text(text, style: AppFonts.geist(fontSize: 13, color: AppColors.ctText2))),
         ],
-      ),
-    );
-  }
-}
-
-// ─── Botones compartidos ──────────────────────────────────────────────────────
-
-class _PrimaryButton extends StatefulWidget {
-  const _PrimaryButton({required this.label, required this.onTap, this.small = false});
-  final String label;
-  final VoidCallback onTap;
-  final bool small;
-
-  @override
-  State<_PrimaryButton> createState() => _PrimaryButtonState();
-}
-
-class _PrimaryButtonState extends State<_PrimaryButton> {
-  bool _hovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          padding: widget.small
-              ? const EdgeInsets.symmetric(horizontal: 12, vertical: 6)
-              : const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          decoration: BoxDecoration(
-            color: _hovered ? AppColors.ctTealDark : AppColors.ctTeal,
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Text(
-            widget.label,
-            style: AppFonts.geist(
-              fontSize: widget.small ? 12 : 13,
-              fontWeight: FontWeight.w600,
-              color: AppColors.ctNavy,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _GhostButton extends StatefulWidget {
-  const _GhostButton({required this.label, required this.onTap, this.icon});
-  final String label;
-  final VoidCallback onTap;
-  final IconData? icon;
-
-  @override
-  State<_GhostButton> createState() => _GhostButtonState();
-}
-
-class _GhostButtonState extends State<_GhostButton> {
-  bool _hovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-          decoration: BoxDecoration(
-            color: _hovered ? AppColors.ctSurface2 : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: _hovered ? AppColors.ctBorder2 : AppColors.ctBorder),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (widget.icon != null) ...[
-                Icon(widget.icon, size: 14, color: AppColors.ctText2),
-                const SizedBox(width: 6),
-              ],
-              Text(
-                widget.label,
-                style: AppFonts.geist(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.ctText),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _DangerButton extends StatefulWidget {
-  const _DangerButton({required this.label, required this.onTap, this.icon});
-  final String label;
-  final VoidCallback onTap;
-  final IconData? icon;
-
-  @override
-  State<_DangerButton> createState() => _DangerButtonState();
-}
-
-class _DangerButtonState extends State<_DangerButton> {
-  bool _hovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-          decoration: BoxDecoration(
-            color: _hovered ? AppColors.ctRedBg : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: _hovered ? AppColors.ctDanger.withValues(alpha: 0.4) : AppColors.ctBorder),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (widget.icon != null) ...[
-                Icon(widget.icon, size: 14, color: AppColors.ctDanger),
-                const SizedBox(width: 6),
-              ],
-              Text(
-                widget.label,
-                style: AppFonts.geist(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.ctDanger),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }
@@ -2550,37 +2418,26 @@ class _IntegrationsManagementSheetState
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text(
-          'Eliminar integración',
-          style: TextStyle(
-            fontFamily: 'Geist',
-            fontWeight: FontWeight.w600,
-            fontSize: 15,
-            color: AppColors.ctText,
-          ),
-        ),
+        title: Text('Eliminar integración', style: AppTextStyles.pageTitle),
         content: Text(
           '¿Eliminar "$name"? Esta acción no se puede deshacer.',
-          style: const TextStyle(
-            fontFamily: 'Geist',
-            fontSize: 13,
-            color: AppColors.ctText2,
-          ),
+          style: AppTextStyles.body.copyWith(color: AppColors.ctText2),
         ),
         actions: [
-          TextButton(
+          AppButton(
+            label: 'Cancelar',
+            variant: AppButtonVariant.outline,
+            size: AppButtonSize.sm,
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Cancelar'),
           ),
-          TextButton(
+          AppButton(
+            label: 'Eliminar',
+            variant: AppButtonVariant.danger,
+            size: AppButtonSize.sm,
             onPressed: () {
               Navigator.of(ctx).pop();
               _delete(id);
             },
-            child: const Text(
-              'Eliminar',
-              style: TextStyle(color: AppColors.ctDanger),
-            ),
           ),
         ],
       ),
@@ -2619,15 +2476,7 @@ class _IntegrationsManagementSheetState
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        title: Text(
-          'Copia tu $label ahora',
-          style: const TextStyle(
-            fontFamily: 'Geist',
-            fontWeight: FontWeight.w600,
-            fontSize: 15,
-            color: AppColors.ctText,
-          ),
-        ),
+        title: Text('Copia tu $label ahora', style: AppTextStyles.pageTitle),
         content: SizedBox(
           width: 480,
           child: Column(
@@ -2639,42 +2488,26 @@ class _IntegrationsManagementSheetState
                   const Icon(Icons.warning_amber_rounded,
                       color: AppColors.ctDanger, size: 16),
                   const SizedBox(width: 6),
-                  const Expanded(
+                  Expanded(
                     child: Text(
                       'Esta es la única vez que verás esta clave. Guárdala en un lugar seguro.',
-                      style: TextStyle(
-                        fontFamily: 'Geist',
-                        fontSize: 13,
-                        color: AppColors.ctDanger,
-                      ),
+                      style: AppTextStyles.body.copyWith(color: AppColors.ctDanger),
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: 16),
-              Text(
-                label,
-                style: const TextStyle(
-                  fontFamily: 'Geist',
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.ctText2,
-                ),
-              ),
+              Text(label, style: AppTextStyles.formLabel),
               const SizedBox(height: 6),
               _SecretBox(secret: secret),
             ],
           ),
         ),
         actions: [
-          ElevatedButton(
+          AppButton(
+            label: 'Entendido',
+            variant: AppButtonVariant.teal,
             onPressed: () => Navigator.of(ctx).pop(),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.ctTeal,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Entendido',
-                style: TextStyle(fontFamily: 'Geist', fontSize: 13)),
           ),
         ],
       ),
@@ -2732,18 +2565,13 @@ class _IntegrationsManagementSheetState
                     ],
                   ),
                 ),
-                TextButton.icon(
-                    onPressed: _openCreate,
-                    icon: const Icon(Icons.add_rounded, size: 16, color: _teal400),
-                    label: Text(
-                      'Nueva',
-                      style: AppFonts.geist(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: _teal400,
-                      ),
-                    ),
-                  ),
+                AppButton(
+                  label: 'Nueva',
+                  variant: AppButtonVariant.ghost,
+                  size: AppButtonSize.sm,
+                  prefixIcon: const Icon(Icons.add_rounded, size: 16, color: _teal400),
+                  onPressed: _openCreate,
+                ),
               ],
             ),
           ),
@@ -2766,9 +2594,11 @@ class _IntegrationsManagementSheetState
                               textAlign: TextAlign.center,
                             ),
                             const SizedBox(height: 12),
-                            TextButton(
+                            AppButton(
+                              label: 'Reintentar',
+                              variant: AppButtonVariant.ghost,
+                              size: AppButtonSize.sm,
                               onPressed: _load,
-                              child: const Text('Reintentar'),
                             ),
                           ],
                         ),
@@ -2796,17 +2626,11 @@ class _IntegrationsManagementSheetState
                                       fontSize: 13, color: AppColors.ctText3),
                                 ),
                                 const SizedBox(height: 20),
-                                ElevatedButton.icon(
+                                AppButton(
+                                  label: 'Nueva integración',
+                                  variant: AppButtonVariant.teal,
+                                  prefixIcon: const Icon(Icons.add, size: 16),
                                   onPressed: _openCreate,
-                                  icon: const Icon(Icons.add, size: 16),
-                                  label: const Text('Nueva integración'),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: AppColors.ctTeal,
-                                    foregroundColor: Colors.white,
-                                    textStyle: AppFonts.geist(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w600),
-                                  ),
                                 ),
                               ],
                             ),
@@ -2865,10 +2689,7 @@ class _IntegrationsManagementSheetState
                                                 ),
                                                 child: Text(
                                                   isActive ? 'Activo' : 'Inactivo',
-                                                  style: TextStyle(
-                                                    fontFamily: 'Geist',
-                                                    fontSize: 10,
-                                                    fontWeight: FontWeight.w600,
+                                                  style: AppTextStyles.badge.copyWith(
                                                     color: isActive
                                                         ? AppColors.ctOkText
                                                         : AppColors.ctText3,
@@ -3017,15 +2838,7 @@ class _CreateTenantIntegrationDialogState
         nameValid && _workerId != null && !_workersLoading && !_saving;
 
     return AlertDialog(
-      title: const Text(
-        'Nueva integración',
-        style: TextStyle(
-          fontFamily: 'Geist',
-          fontWeight: FontWeight.w600,
-          fontSize: 15,
-          color: AppColors.ctText,
-        ),
-      ),
+      title: Text('Nueva integración', style: AppTextStyles.pageTitle),
       content: SizedBox(
         width: 400,
         child: Column(
@@ -3033,15 +2846,7 @@ class _CreateTenantIntegrationDialogState
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Name
-            const Text(
-              'Nombre',
-              style: TextStyle(
-                fontFamily: 'Geist',
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: AppColors.ctText2,
-              ),
-            ),
+            Text('Nombre', style: AppTextStyles.formLabel),
             const SizedBox(height: 6),
             TextField(
               controller: _nameCtrl,
@@ -3065,15 +2870,7 @@ class _CreateTenantIntegrationDialogState
             ),
             const SizedBox(height: 16),
             // Type
-            const Text(
-              'Tipo',
-              style: TextStyle(
-                fontFamily: 'Geist',
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: AppColors.ctText2,
-              ),
-            ),
+            Text('Tipo', style: AppTextStyles.formLabel),
             const SizedBox(height: 6),
             Container(
               decoration: BoxDecoration(
@@ -3098,15 +2895,7 @@ class _CreateTenantIntegrationDialogState
             ),
             const SizedBox(height: 16),
             // Worker
-            const Text(
-              'Worker',
-              style: TextStyle(
-                fontFamily: 'Geist',
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: AppColors.ctText2,
-              ),
-            ),
+            Text('Worker', style: AppTextStyles.formLabel),
             const SizedBox(height: 6),
             _workersLoading
                 ? const SizedBox(
@@ -3156,15 +2945,7 @@ class _CreateTenantIntegrationDialogState
                       ),
             if (needsUrl) ...[
               const SizedBox(height: 14),
-              const Text(
-                'URL del endpoint',
-                style: TextStyle(
-                  fontFamily: 'Geist',
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.ctText2,
-                ),
-              ),
+              Text('URL del endpoint', style: AppTextStyles.formLabel),
               const SizedBox(height: 6),
               TextField(
                 controller: _urlCtrl,
@@ -3229,36 +3010,27 @@ class _CreateTenantIntegrationDialogState
               const SizedBox(height: 12),
               Text(
                 _error!,
-                style: const TextStyle(
-                  fontFamily: 'Geist',
-                  fontSize: 12,
-                  color: AppColors.ctDanger,
-                ),
+                style: AppTextStyles.bodySmall.copyWith(color: AppColors.ctDanger),
               ),
             ],
           ],
         ),
       ),
       actions: [
-        TextButton(
-          onPressed: _saving ? null : () => Navigator.of(context).pop(),
-          child: const Text('Cancelar'),
+        AppButton(
+          label: 'Cancelar',
+          variant: AppButtonVariant.outline,
+          size: AppButtonSize.sm,
+          isDisabled: _saving,
+          onPressed: () => Navigator.of(context).pop(),
         ),
-        ElevatedButton(
-          onPressed: canSubmit ? _submit : null,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.ctTeal,
-            foregroundColor: Colors.white,
-          ),
-          child: _saving
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(
-                      strokeWidth: 2, color: Colors.white),
-                )
-              : const Text('Crear',
-                  style: TextStyle(fontFamily: 'Geist', fontSize: 13)),
+        AppButton(
+          label: 'Crear',
+          variant: AppButtonVariant.teal,
+          size: AppButtonSize.sm,
+          isLoading: _saving,
+          isDisabled: !canSubmit,
+          onPressed: _submit,
         ),
       ],
     );
