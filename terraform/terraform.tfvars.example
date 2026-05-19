@@ -1,0 +1,3 @@
+# Copiar a terraform.tfvars (gitignoreado) antes del primer apply.
+
+aws_profile = "conectamos-ai"   # solo para apply local; dejar vacío o no poner en CI

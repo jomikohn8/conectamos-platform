@@ -1,0 +1,17 @@
+terraform {
+  cloud {
+    organization = "CONECTAMOSAI"
+    workspaces {
+      tags = ["platform-frontend"]
+    }
+  }
+
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
+
+  required_version = ">= 1.0"
+}
