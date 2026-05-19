@@ -72,6 +72,8 @@ class _WorkerDetailScreenState extends ConsumerState<WorkerDetailScreen>
 
   Widget _buildAvatar() {
     final avatarUrl = _worker?['icon_url'] as String?;
+    debugPrint('Worker data: $_worker');
+    debugPrint('Avatar URL: $avatarUrl');
     if (avatarUrl != null) {
       return Image.network(
         avatarUrl,
