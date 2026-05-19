@@ -336,6 +336,16 @@ class FlowsApi {
         list.whereType<Map>().map((e) => Map<String, dynamic>.from(e)));
   }
 
+  static Future<List<Map<String, dynamic>>> getPreconditionTypes() async {
+    final response = await ApiClient.instance.get(
+      '/api/v1/flows/precondition-types',
+    );
+    final raw = response.data;
+    final list = raw is Map ? (raw['types'] ?? []) : raw;
+    return List<Map<String, dynamic>>.from(
+        (list as List).whereType<Map>().map((e) => Map<String, dynamic>.from(e)));
+  }
+
   static Future<Map<String, dynamic>> getDashboardCharts(
     String dashboardSlug, {
     String? dateRangeStart,

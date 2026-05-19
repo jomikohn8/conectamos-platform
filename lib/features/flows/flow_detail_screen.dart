@@ -3837,14 +3837,6 @@ class _GhostButton extends StatelessWidget {
 
 // ── Precondiciones ────────────────────────────────────────────────────────────
 
-const _kPreconditionTypes = [
-  ('no_active_execution',          'Sin ejecución activa'),
-  ('requires_active_execution',    'Requiere ejecución activa'),
-  ('no_concurrent_execution',      'Sin ejecución concurrente'),
-  ('field_unique_in_window',       'Campo único en ventana de tiempo'),
-  ('operator_role_in',             'Requiere rol de operador'),
-  ('requires_completed_sibling',   'Requiere flow completado'),
-];
 
 class _PrecondicionesTab extends StatefulWidget {
   const _PrecondicionesTab({
@@ -3864,11 +3856,13 @@ class _PrecondicionesTab extends StatefulWidget {
 
 class _PrecondicionesTabState extends State<_PrecondicionesTab> {
   late List<Map<String, dynamic>> _rules;
+  List<Map<String, dynamic>> _availableTypes = [];
 
   @override
   void initState() {
     super.initState();
     _rules = List.from(widget.rules);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadTypes());
   }
 
   @override
@@ -3879,9 +3873,18 @@ class _PrecondicionesTabState extends State<_PrecondicionesTab> {
     }
   }
 
+  Future<void> _loadTypes() async {
+    try {
+      final types = await FlowsApi.getPreconditionTypes();
+      if (mounted) setState(() => _availableTypes = types);
+    } catch (_) {
+      // silently ignore — dialog shows "Cargando tipos..." if list stays empty
+    }
+  }
+
   String _typeLabel(String type) {
-    for (final (slug, label) in _kPreconditionTypes) {
-      if (slug == type) return label;
+    for (final t in _availableTypes) {
+      if (t['type'] == type) return t['label'] as String? ?? type;
     }
     return type;
   }
@@ -3892,6 +3895,7 @@ class _PrecondicionesTabState extends State<_PrecondicionesTab> {
       builder: (_) => _AddRuleDialog(
         rule: rule,
         availableRoles: widget.availableRoles,
+        types: _availableTypes,
         onSaved: (updated) {
           setState(() {
             if (rule != null) {
@@ -4118,10 +4122,12 @@ class _AddRuleDialog extends StatefulWidget {
   const _AddRuleDialog({
     required this.rule,
     required this.availableRoles,
+    required this.types,
     required this.onSaved,
   });
   final Map<String, dynamic>? rule;
   final List<Map<String, dynamic>> availableRoles;
+  final List<Map<String, dynamic>> types;
   final ValueChanged<Map<String, dynamic>> onSaved;
 
   @override
@@ -4130,44 +4136,46 @@ class _AddRuleDialog extends StatefulWidget {
 
 class _AddRuleDialogState extends State<_AddRuleDialog> {
   String? _type;
-  final _slugCtrl = TextEditingController();
-  String _scope = 'operator';
-  String _window = '24h';
-  final _fieldCtrl = TextEditingController();
-  List<String> _selectedRoleIds = [];
   final _messageCtrl = TextEditingController();
-  String? _selectedSiblingSlug;
-  List<Map<String, dynamic>> _availableFlows = [];
-  bool _loadingFlows = false;
-  String _windowType = 'calendar_day';
-  final _windowDurationCtrl = TextEditingController();
   String _action = 'block';
   bool _escalate = false;
   final _escalationReasonCtrl = TextEditingController();
 
-  bool get _isEdit => widget.rule != null;
-  bool get _hasSlugScope =>
-      _type == 'no_active_execution' || _type == 'requires_active_execution';
-  bool get _hasConcurrentScope => _type == 'no_concurrent_execution';
-  bool get _isFieldUnique => _type == 'field_unique_in_window';
-  bool get _isRoleIn => _type == 'operator_role_in';
-  bool get _isSiblingFlow => _type == 'requires_completed_sibling';
+  // Dynamic per-type field state
+  final Map<String, TextEditingController> _textCtrls = {};
+  final Map<String, String?> _selectVals = {};
+  final Map<String, bool> _boolVals = {};
 
-  static const _scopeOptions = [
-    ('operator', 'Operador'),
-    ('operator+day', 'Operador + día'),
-  ];
-  static const _scopeConcurrentOptions = [
-    ('operator', 'Operador'),
-  ];
-  static const _scopeFieldOptions = [
-    ('tenant+day', 'Tenant + día'),
-  ];
-  static const _windowOptions = [
-    ('24h', '24 horas'),
-    ('48h', '48 horas'),
-    ('7d', '7 días'),
-  ];
+  bool get _isEdit => widget.rule != null;
+
+  List<Map<String, dynamic>> _fieldsForType(String? type) {
+    if (type == null) return [];
+    final match = widget.types.where((t) => t['type'] == type).firstOrNull;
+    if (match == null) return [];
+    return List<Map<String, dynamic>>.from(
+        ((match['fields'] as List?) ?? []).whereType<Map>().map((e) => Map<String, dynamic>.from(e)));
+  }
+
+  void _initFields(String type, Map<String, dynamic> params) {
+    for (final c in _textCtrls.values) { c.dispose(); }
+    _textCtrls.clear();
+    _selectVals.clear();
+    _boolVals.clear();
+    for (final field in _fieldsForType(type)) {
+      final key = field['key'] as String? ?? '';
+      if (key.isEmpty) continue;
+      final fieldType = field['type'] as String? ?? 'text';
+      final existing = params[key];
+      switch (fieldType) {
+        case 'text':
+          _textCtrls[key] = TextEditingController(text: existing?.toString() ?? '');
+        case 'select':
+          _selectVals[key] = existing?.toString();
+        case 'bool':
+          _boolVals[key] = (existing as bool?) ?? false;
+      }
+    }
+  }
 
   @override
   void initState() {
@@ -4176,65 +4184,28 @@ class _AddRuleDialogState extends State<_AddRuleDialog> {
     if (rule != null) {
       _type = rule['type'] as String?;
       _messageCtrl.text = rule['message'] as String? ?? '';
-      final config = ((rule['params'] ?? rule['config']) as Map?)?.cast<String, dynamic>() ?? {};
-      _slugCtrl.text = config['slug'] as String? ?? '';
-      _scope = config['scope'] as String? ?? 'operator';
-      _window = config['window'] as String? ?? '24h';
-      _fieldCtrl.text = config['field'] as String? ?? '';
-      _selectedRoleIds =
-          List<String>.from((config['role_ids'] as List? ?? []).map((e) => e.toString()));
-      _selectedSiblingSlug = config['sibling_slug'] as String?;
-      _windowType = config['window_type'] as String? ?? 'calendar_day';
-      _windowDurationCtrl.text = config['window'] as String? ?? '';
       _action = rule['action'] as String? ?? 'block';
       _escalate = rule['escalate'] as bool? ?? false;
       _escalationReasonCtrl.text = rule['escalation_reason'] as String? ?? '';
-      if (_type == 'requires_completed_sibling') _loadFlows();
+      final params = ((rule['params'] ?? rule['config']) as Map?)?.cast<String, dynamic>() ?? {};
+      if (_type != null) _initFields(_type!, params);
     }
   }
 
   @override
   void dispose() {
-    _slugCtrl.dispose();
-    _fieldCtrl.dispose();
+    for (final c in _textCtrls.values) { c.dispose(); }
     _messageCtrl.dispose();
-    _windowDurationCtrl.dispose();
     _escalationReasonCtrl.dispose();
     super.dispose();
   }
 
-  Future<void> _loadFlows() async {
-    if (_loadingFlows) return;
-    setState(() => _loadingFlows = true);
-    try {
-      final flows = await FlowsApi.listFlows();
-      if (mounted) setState(() { _availableFlows = flows; _loadingFlows = false; });
-    } catch (_) {
-      if (mounted) setState(() => _loadingFlows = false);
-    }
-  }
-
   Map<String, dynamic> _buildConfig() {
-    if (_hasSlugScope || _hasConcurrentScope) {
-      return {'slug': _slugCtrl.text.trim(), 'scope': _scope};
-    } else if (_isFieldUnique) {
-      return {
-        'field': _fieldCtrl.text.trim(),
-        'scope': _scope,
-        'window': _window,
-      };
-    } else if (_isRoleIn) {
-      return {'role_ids': List<String>.from(_selectedRoleIds)};
-    } else if (_isSiblingFlow) {
-      return {
-        'sibling_slug': _selectedSiblingSlug ?? '',
-        'window_type': _windowType,
-        'timezone': 'America/Mexico_City',
-        if (_windowType == 'rolling' && _windowDurationCtrl.text.trim().isNotEmpty)
-          'window': _windowDurationCtrl.text.trim(),
-      };
-    }
-    return {};
+    final config = <String, dynamic>{};
+    for (final e in _textCtrls.entries) { config[e.key] = e.value.text.trim(); }
+    for (final e in _selectVals.entries) { config[e.key] = e.value; }
+    for (final e in _boolVals.entries) { config[e.key] = e.value; }
+    return config;
   }
 
   void _submit() {
@@ -4273,6 +4244,65 @@ class _AddRuleDialogState extends State<_AddRuleDialog> {
             const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       );
 
+  List<Widget> _renderDynamicFields() {
+    if (_type == null) return [];
+    final fields = _fieldsForType(_type!);
+    if (fields.isEmpty) return [];
+    final widgets = <Widget>[];
+    for (final field in fields) {
+      final key = field['key'] as String? ?? '';
+      if (key.isEmpty) continue;
+      final label = field['label'] as String? ?? key;
+      final fieldType = field['type'] as String? ?? 'text';
+      final rawOptions = field['options'] as List? ?? [];
+      final options = rawOptions
+          .whereType<Map>()
+          .map((o) => Map<String, dynamic>.from(o))
+          .toList();
+      widgets.add(const SizedBox(height: 16));
+      switch (fieldType) {
+        case 'text':
+          widgets
+            ..add(Text(label,
+                style: AppTextStyles.formLabel.copyWith(color: AppColors.ctText2)))
+            ..add(const SizedBox(height: 6))
+            ..add(TextField(
+              controller: _textCtrls[key] ??= TextEditingController(),
+              style: AppTextStyles.body,
+              decoration: _inputDecoration,
+            ));
+        case 'select':
+          widgets
+            ..add(Text(label,
+                style: AppTextStyles.formLabel.copyWith(color: AppColors.ctText2)))
+            ..add(const SizedBox(height: 6))
+            ..add(DropdownButtonFormField<String>(
+              value: _selectVals[key],
+              decoration: _inputDecoration,
+              hint: Text('Seleccionar',
+                  style: AppTextStyles.body.copyWith(color: AppColors.ctText3)),
+              items: options
+                  .map((o) => DropdownMenuItem(
+                        value: o['value'] as String? ?? '',
+                        child: Text(o['label'] as String? ?? '',
+                            style: AppTextStyles.body),
+                      ))
+                  .toList(),
+              onChanged: (val) => setState(() => _selectVals[key] = val),
+            ));
+        case 'bool':
+          widgets.add(SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(label, style: AppTextStyles.body),
+            value: _boolVals[key] ?? false,
+            activeThumbColor: AppColors.ctTeal,
+            onChanged: (val) => setState(() => _boolVals[key] = val),
+          ));
+      }
+    }
+    return widgets;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Dialog(
@@ -4300,247 +4330,34 @@ class _AddRuleDialogState extends State<_AddRuleDialog> {
               Text('Tipo de regla',
                   style: AppTextStyles.formLabel.copyWith(color: AppColors.ctText2)),
               const SizedBox(height: 6),
-              DropdownButtonFormField<String>(
-                value: _type,
-                decoration: _inputDecoration,
-                hint: Text('Seleccionar tipo',
-                    style: AppTextStyles.body.copyWith(color: AppColors.ctText3)),
-                items: _kPreconditionTypes
-                    .map((t) => DropdownMenuItem(
-                          value: t.$1,
-                          child: Text(t.$2,
-                              style: AppTextStyles.body),
-                        ))
-                    .toList(),
-                onChanged: (val) => setState(() {
-                  _type = val;
-                  if (val == 'no_concurrent_execution') _scope = 'operator';
-                  if (val == 'field_unique_in_window') _scope = 'tenant+day';
-                  if (val == 'no_active_execution' ||
-                      val == 'requires_active_execution') {
-                    if (_scope != 'operator' && _scope != 'operator+day') {
-                      _scope = 'operator';
-                    }
-                  }
-                  if (val == 'requires_completed_sibling') {
-                    _windowType = 'calendar_day';
-                    _selectedSiblingSlug = null;
-                    _loadFlows();
-                  }
-                }),
-              ),
-
-              if (_type != null) ...[
-                const SizedBox(height: 16),
-
-                // Slug + scope (no_active, requires_active, no_concurrent)
-                if (_hasSlugScope || _hasConcurrentScope) ...[
-                  Text('Slug del flow',
-                      style: AppTextStyles.formLabel.copyWith(color: AppColors.ctText2)),
-                  const SizedBox(height: 6),
-                  TextField(
-                    controller: _slugCtrl,
-                    style: AppTextStyles.body,
-                    decoration: _inputDecoration.copyWith(
-                        hintText: 'ej: turno-matutino',
-                        hintStyle: AppTextStyles.body.copyWith(color: AppColors.ctText3)),
-                  ),
-                  const SizedBox(height: 16),
-                  Text('Alcance',
-                      style: AppTextStyles.formLabel.copyWith(color: AppColors.ctText2)),
-                  const SizedBox(height: 6),
-                  DropdownButtonFormField<String>(
-                    value: _scope,
-                    decoration: _inputDecoration,
-                    items: (_hasConcurrentScope
-                            ? _scopeConcurrentOptions
-                            : _scopeOptions)
-                        .map((o) => DropdownMenuItem(
-                              value: o.$1,
-                              child: Text(o.$2,
-                                  style: AppTextStyles.body),
-                            ))
-                        .toList(),
-                    onChanged: (val) =>
-                        setState(() => _scope = val ?? _scope),
-                  ),
-                ],
-
-                // Field + scope + window (field_unique_in_window)
-                if (_isFieldUnique) ...[
-                  Text('Campo (field_key)',
-                      style: AppTextStyles.formLabel.copyWith(color: AppColors.ctText2)),
-                  const SizedBox(height: 6),
-                  TextField(
-                    controller: _fieldCtrl,
-                    style: AppTextStyles.body,
-                    decoration: _inputDecoration.copyWith(
-                        hintText: 'ej: numero_pedido',
-                        hintStyle: AppTextStyles.body.copyWith(color: AppColors.ctText3)),
-                  ),
-                  const SizedBox(height: 16),
-                  Text('Alcance',
-                      style: AppTextStyles.formLabel.copyWith(color: AppColors.ctText2)),
-                  const SizedBox(height: 6),
-                  DropdownButtonFormField<String>(
-                    value: _scope,
-                    decoration: _inputDecoration,
-                    items: _scopeFieldOptions
-                        .map((o) => DropdownMenuItem(
-                              value: o.$1,
-                              child: Text(o.$2,
-                                  style: AppTextStyles.body),
-                            ))
-                        .toList(),
-                    onChanged: (val) =>
-                        setState(() => _scope = val ?? _scope),
-                  ),
-                  const SizedBox(height: 16),
-                  Text('Ventana de tiempo',
-                      style: AppTextStyles.formLabel.copyWith(color: AppColors.ctText2)),
-                  const SizedBox(height: 6),
-                  DropdownButtonFormField<String>(
-                    value: _window,
-                    decoration: _inputDecoration,
-                    items: _windowOptions
-                        .map((o) => DropdownMenuItem(
-                              value: o.$1,
-                              child: Text(o.$2,
-                                  style: AppTextStyles.body),
-                            ))
-                        .toList(),
-                    onChanged: (val) =>
-                        setState(() => _window = val ?? _window),
-                  ),
-                ],
-
-                // Roles (operator_role_in)
-                if (_isRoleIn) ...[
-                  Text('Roles requeridos',
-                      style: AppTextStyles.formLabel.copyWith(color: AppColors.ctText2)),
-                  const SizedBox(height: 6),
-                  if (widget.availableRoles.isEmpty)
-                    Text('No hay roles disponibles',
-                        style: AppTextStyles.bodySmall.copyWith(fontSize: 12, color: AppColors.ctText3))
-                  else
-                    ...widget.availableRoles.map((role) {
-                      final id = role['id'] as String? ?? '';
-                      final name = role['label'] as String? ?? role['name'] as String? ?? id;
-                      return CheckboxListTile(
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                        value: _selectedRoleIds.contains(id),
-                        activeColor: AppColors.ctTeal,
-                        title: Text(name,
-                            style: AppTextStyles.body),
-                        onChanged: (val) => setState(() {
-                          if (val == true) {
-                            if (!_selectedRoleIds.contains(id)) {
-                              _selectedRoleIds.add(id);
-                            }
-                          } else {
-                            _selectedRoleIds.remove(id);
-                          }
-                        }),
-                      );
-                    }),
-                ],
-
-                // Sibling slug + window type (requires_completed_sibling)
-                if (_isSiblingFlow) ...[
-                  Text('Flow prerequisito',
-                      style: AppTextStyles.formLabel.copyWith(color: AppColors.ctText2)),
-                  const SizedBox(height: 6),
-                  if (_loadingFlows)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 12),
-                      child: Center(
-                        child: SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: AppColors.ctTeal),
-                        ),
-                      ),
+              widget.types.isEmpty
+                  ? Text(
+                      'Cargando tipos...',
+                      style: AppTextStyles.body.copyWith(color: AppColors.ctText3),
                     )
-                  else
-                    DropdownButtonFormField<String>(
-                      value: _availableFlows.any((f) =>
-                              (f['slug'] as String?) == _selectedSiblingSlug)
-                          ? _selectedSiblingSlug
-                          : null,
+                  : DropdownButtonFormField<String>(
+                      value: _type,
                       decoration: _inputDecoration,
-                      hint: Text('Seleccionar flow',
+                      hint: Text('Seleccionar tipo',
                           style: AppTextStyles.body.copyWith(color: AppColors.ctText3)),
-                      items: [
-                        ..._availableFlows.map((f) {
-                          final slug = f['slug'] as String? ?? '';
-                          final name = f['name'] as String? ?? slug;
-                          return DropdownMenuItem<String>(
-                            value: slug,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(name,
+                      items: widget.types
+                          .map((t) => DropdownMenuItem(
+                                value: t['type'] as String? ?? '',
+                                child: Text(t['label'] as String? ?? '',
                                     style: AppTextStyles.body),
-                                Text(slug,
-                                    style: AppTextStyles.bodySmall),
-                              ],
-                            ),
-                          );
-                        }),
-                        if (_selectedSiblingSlug != null &&
-                            _selectedSiblingSlug!.isNotEmpty &&
-                            !_availableFlows.any((f) =>
-                                (f['slug'] as String?) == _selectedSiblingSlug))
-                          DropdownMenuItem<String>(
-                            value: _selectedSiblingSlug,
-                            enabled: false,
-                            child: Text(
-                              '$_selectedSiblingSlug (no encontrado)',
-                              style: AppTextStyles.body.copyWith(color: AppColors.ctText2),
-                            ),
-                          ),
-                      ],
-                      onChanged: (val) =>
-                          setState(() => _selectedSiblingSlug = val),
+                              ))
+                          .toList(),
+                      onChanged: (val) {
+                        if (val == null) return;
+                        setState(() {
+                          _type = val;
+                          _initFields(val, {});
+                        });
+                      },
                     ),
-                  const SizedBox(height: 16),
-                  Text('Tipo de ventana',
-                      style: AppTextStyles.formLabel.copyWith(color: AppColors.ctText2)),
-                  const SizedBox(height: 6),
-                  DropdownButtonFormField<String>(
-                    value: _windowType,
-                    decoration: _inputDecoration,
-                    items: const [
-                      DropdownMenuItem(
-                          value: 'calendar_day',
-                          child: Text('Día calendario',
-                              style: AppTextStyles.body)),
-                      DropdownMenuItem(
-                          value: 'rolling',
-                          child: Text('Ventana móvil',
-                              style: AppTextStyles.body)),
-                    ],
-                    onChanged: (val) =>
-                        setState(() => _windowType = val ?? _windowType),
-                  ),
-                  if (_windowType == 'rolling') ...[
-                    const SizedBox(height: 16),
-                    Text('Duración de ventana',
-                        style: AppTextStyles.formLabel.copyWith(color: AppColors.ctText2)),
-                    const SizedBox(height: 6),
-                    TextField(
-                      controller: _windowDurationCtrl,
-                      style: AppTextStyles.body,
-                      decoration: _inputDecoration.copyWith(
-                          hintText: 'ej: 24h, 7d',
-                          hintStyle: AppTextStyles.body.copyWith(color: AppColors.ctText3)),
-                    ),
-                  ],
-                ],
-              ],
+
+              // Campos dinámicos del tipo seleccionado
+              ..._renderDynamicFields(),
 
               const SizedBox(height: 16),
               Text('Mensaje al operador si falla',
