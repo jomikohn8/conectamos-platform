@@ -3877,8 +3877,8 @@ class _PrecondicionesTabState extends State<_PrecondicionesTab> {
     try {
       final types = await FlowsApi.getPreconditionTypes();
       if (mounted) setState(() => _availableTypes = types);
-    } catch (_) {
-      // silently ignore — dialog shows "Cargando tipos..." if list stays empty
+    } catch (e, st) {
+      print('[_loadTypes] error: $e\n$st');
     }
   }
 
