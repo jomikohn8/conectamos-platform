@@ -336,6 +336,14 @@ class FlowsApi {
         list.whereType<Map>().map((e) => Map<String, dynamic>.from(e)));
   }
 
+  static Future<List<Map<String, dynamic>>> getActionTypes() async {
+    final response = await ApiClient.instance.get('/flows/action-types');
+    final raw = response.data;
+    final list = raw is Map ? (raw['types'] ?? []) : raw;
+    return List<Map<String, dynamic>>.from(
+        (list as List).whereType<Map>().map((e) => Map<String, dynamic>.from(e)));
+  }
+
   static Future<List<Map<String, dynamic>>> getPreconditionTypes() async {
     try {
       final response = await ApiClient.instance.get(

@@ -2966,7 +2966,122 @@ class _ActionDialogState extends State<_ActionDialog> {
   String _conditionOp = '==';
   final _conditionValueCtrl = TextEditingController();
 
+  // dynamic action types
+  List<Map<String, dynamic>> _availableActionTypes = [];
+  final Map<String, TextEditingController> _dynTextCtrls = {};
+  final Map<String, String?> _dynSelectVals = {};
+  final Map<String, bool> _dynBoolVals = {};
+
   bool get _isEdit => widget.action != null;
+  bool get _isKnownType => const {
+        'open_flow',
+        'webhook_out',
+        'emit_event',
+        'google_sheets_append_row',
+      }.contains(_type);
+
+  List<Map<String, dynamic>> _fieldsForActionType(String type) {
+    final match = _availableActionTypes.where((t) => t['type'] == type).firstOrNull;
+    if (match == null) return [];
+    return List<Map<String, dynamic>>.from(
+        ((match['fields'] as List?) ?? []).whereType<Map>().map((e) => Map<String, dynamic>.from(e)));
+  }
+
+  void _initDynamicFields(String type, Map<String, dynamic> params) {
+    for (final c in _dynTextCtrls.values) { c.dispose(); }
+    _dynTextCtrls.clear();
+    _dynSelectVals.clear();
+    _dynBoolVals.clear();
+    for (final field in _fieldsForActionType(type)) {
+      final key = field['key'] as String? ?? '';
+      if (key.isEmpty) continue;
+      final fieldType = field['type'] as String? ?? 'text';
+      final existing = params[key];
+      switch (fieldType) {
+        case 'text':
+          _dynTextCtrls[key] = TextEditingController(text: existing?.toString() ?? '');
+        case 'select':
+          _dynSelectVals[key] = existing?.toString();
+        case 'bool':
+          _dynBoolVals[key] = (existing as bool?) ?? false;
+      }
+    }
+  }
+
+  Future<void> _loadActionTypes() async {
+    try {
+      final types = await FlowsApi.getActionTypes();
+      if (mounted) {
+        setState(() {
+          _availableActionTypes = types;
+          if (!_isKnownType && widget.action != null) {
+            _initDynamicFields(_type, Map<String, dynamic>.from(widget.action!));
+          }
+        });
+      }
+    } catch (e) {
+      print('[_loadActionTypes] error: $e');
+    }
+  }
+
+  List<Widget> _renderDynamicActionFields() {
+    final fields = _fieldsForActionType(_type);
+    if (fields.isEmpty) return [];
+    final widgets = <Widget>[];
+    for (final field in fields) {
+      final key = field['key'] as String? ?? '';
+      if (key.isEmpty) continue;
+      final label = field['label'] as String? ?? key;
+      final fieldType = field['type'] as String? ?? 'text';
+      final rawOptions = field['options'] as List? ?? [];
+      final options = rawOptions
+          .whereType<Map>()
+          .map((o) => Map<String, dynamic>.from(o))
+          .toList();
+      widgets.add(const SizedBox(height: 12));
+      switch (fieldType) {
+        case 'text':
+          widgets.add(_FormField(
+            label: label,
+            controller: _dynTextCtrls[key] ??= TextEditingController(),
+            placeholder: '',
+          ));
+        case 'select':
+          widgets
+            ..add(Text(label,
+                style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w500)))
+            ..add(const SizedBox(height: 6))
+            ..add(_DropdownContainer(
+              child: DropdownButton<String>(
+                value: _dynSelectVals[key],
+                isExpanded: true,
+                underline: const SizedBox.shrink(),
+                dropdownColor: AppColors.ctSurface,
+                hint: Text('Seleccionar',
+                    style: AppTextStyles.body.copyWith(color: AppColors.ctText3)),
+                items: options
+                    .map((o) => DropdownMenuItem(
+                          value: o['value'] as String? ?? '',
+                          child: Text(o['label'] as String? ?? '',
+                              style: AppTextStyles.body),
+                        ))
+                    .toList(),
+                onChanged: (v) => setState(() => _dynSelectVals[key] = v),
+              ),
+            ));
+        case 'bool':
+          widgets.add(SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(label, style: AppTextStyles.body),
+            value: _dynBoolVals[key] ?? false,
+            activeThumbColor: AppColors.ctTeal,
+            activeTrackColor: AppColors.ctTeal.withValues(alpha: 0.4),
+            onChanged: (v) => setState(() => _dynBoolVals[key] = v),
+          ));
+      }
+    }
+    return widgets;
+  }
 
   @override
   void initState() {
@@ -3014,6 +3129,7 @@ class _ActionDialogState extends State<_ActionDialog> {
       _columnMappingKeys.add(null);
     }
     _loadFlows();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadActionTypes());
   }
 
   Future<void> _loadFlows() async {
@@ -3053,6 +3169,7 @@ class _ActionDialogState extends State<_ActionDialog> {
       row.$2.dispose();
     }
     _conditionValueCtrl.dispose();
+    for (final c in _dynTextCtrls.values) { c.dispose(); }
     super.dispose();
   }
 
@@ -3128,6 +3245,11 @@ class _ActionDialogState extends State<_ActionDialog> {
         updated.remove('event_name');
         updated.remove('event_data');
         break;
+      default:
+        for (final e in _dynTextCtrls.entries) { updated[e.key] = e.value.text.trim(); }
+        for (final e in _dynSelectVals.entries) { updated[e.key] = e.value; }
+        for (final e in _dynBoolVals.entries) { updated[e.key] = e.value; }
+        break;
     }
     final cond = _buildConditionExpression();
     if (cond != null) {
@@ -3167,39 +3289,35 @@ class _ActionDialogState extends State<_ActionDialog> {
                 style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w500),
               ),
               const SizedBox(height: 6),
-              _DropdownContainer(
-                child: DropdownButton<String>(
-                  value: _type,
-                  isExpanded: true,
-                  underline: const SizedBox.shrink(),
-                  dropdownColor: AppColors.ctSurface,
-                  items: const [
-                    DropdownMenuItem(
-                      value: 'open_flow',
-                      child: Text('Abrir flujo',
-                          style: AppTextStyles.body),
+              _availableActionTypes.isEmpty
+                  ? Text('Cargando tipos...',
+                      style: AppTextStyles.body.copyWith(color: AppColors.ctText3))
+                  : _DropdownContainer(
+                      child: DropdownButton<String>(
+                        value: _availableActionTypes.any((t) => t['type'] == _type)
+                            ? _type
+                            : null,
+                        isExpanded: true,
+                        underline: const SizedBox.shrink(),
+                        dropdownColor: AppColors.ctSurface,
+                        hint: Text('Seleccionar tipo',
+                            style: AppTextStyles.body.copyWith(color: AppColors.ctText3)),
+                        items: _availableActionTypes
+                            .map((t) => DropdownMenuItem(
+                                  value: t['type'] as String? ?? '',
+                                  child: Text(t['label'] as String? ?? '',
+                                      style: AppTextStyles.body),
+                                ))
+                            .toList(),
+                        onChanged: (v) {
+                          if (v == null) return;
+                          setState(() {
+                            _type = v;
+                            if (!_isKnownType) _initDynamicFields(v, {});
+                          });
+                        },
+                      ),
                     ),
-                    DropdownMenuItem(
-                      value: 'webhook_out',
-                      child: Text('Webhook saliente',
-                          style: AppTextStyles.body),
-                    ),
-                    DropdownMenuItem(
-                      value: 'emit_event',
-                      child: Text('Emitir evento',
-                          style: AppTextStyles.body),
-                    ),
-                    DropdownMenuItem(
-                      value: 'google_sheets_append_row',
-                      child: Text('Google Sheets — Agregar fila',
-                          style: AppTextStyles.body),
-                    ),
-                  ],
-                  onChanged: (v) {
-                    if (v != null) setState(() => _type = v);
-                  },
-                ),
-              ),
               const SizedBox(height: 16),
 
               // Campos condicionales
@@ -3439,6 +3557,7 @@ class _ActionDialogState extends State<_ActionDialog> {
                   );
                 }),
               ],
+              if (!_isKnownType) ..._renderDynamicActionFields(),
 
               // ── Condición (opcional) ────────────────────────────────────────
               const SizedBox(height: 20),
