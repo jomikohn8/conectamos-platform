@@ -106,7 +106,6 @@ class _WorkerDetailScreenState extends ConsumerState<WorkerDetailScreen>
             dividerColor: Colors.transparent,
             labelStyle: AppTextStyles.formLabel,
             unselectedLabelStyle: AppTextStyles.navItem,
-            tabAlignment: TabAlignment.start,
             tabs: const [
               Tab(text: 'Flujos'),
               Tab(text: 'Canales'),
