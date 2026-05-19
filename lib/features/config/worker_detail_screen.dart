@@ -73,7 +73,16 @@ class _WorkerDetailScreenState extends ConsumerState<WorkerDetailScreen>
   Widget _buildAvatar() {
     final avatarUrl = _worker?['icon_url'] as String?;
     if (avatarUrl != null) {
-      return Image.network(avatarUrl, fit: BoxFit.cover, width: 40, height: 40);
+      return Image.network(
+        avatarUrl,
+        fit: BoxFit.cover,
+        width: 40,
+        height: 40,
+        errorBuilder: (context, error, stack) {
+          debugPrint('Avatar load error: $error');
+          return const Icon(Icons.smart_toy_rounded, size: 22, color: AppColors.ctText2);
+        },
+      );
     }
     return const Icon(Icons.smart_toy_rounded, size: 22, color: AppColors.ctText2);
   }
