@@ -4017,6 +4017,8 @@ class _RuleCard extends StatelessWidget {
     final message = rule['message'] as String? ?? '';
     final config = ((rule['params'] ?? rule['config']) as Map?)?.cast<String, dynamic>() ?? {};
     final isSibling = ruleType == 'requires_completed_sibling';
+    final action = rule['action'] as String? ?? 'block';
+    final escalate = rule['escalate'] as bool? ?? false;
     final siblingSlug = config['sibling_slug'] as String? ?? '';
     final windowType = config['window_type'] as String? ?? 'calendar_day';
     final bodyText = isSibling
@@ -4051,6 +4053,23 @@ class _RuleCard extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: action == 'allow' ? AppColors.ctOkBg : AppColors.ctRedBg,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                action == 'allow' ? 'allow' : 'block',
+                style: AppTextStyles.badge.copyWith(
+                    color: action == 'allow' ? AppColors.ctOkText : AppColors.ctRedText),
+              ),
+            ),
+            const SizedBox(width: 8),
+            if (escalate) ...[
+              const Icon(Icons.warning_amber_rounded, size: 14, color: AppColors.ctWarn),
+              const SizedBox(width: 8),
+            ],
             if (isSibling) ...[
               Container(
                 padding:
@@ -4122,6 +4141,9 @@ class _AddRuleDialogState extends State<_AddRuleDialog> {
   bool _loadingFlows = false;
   String _windowType = 'calendar_day';
   final _windowDurationCtrl = TextEditingController();
+  String _action = 'block';
+  bool _escalate = false;
+  final _escalationReasonCtrl = TextEditingController();
 
   bool get _isEdit => widget.rule != null;
   bool get _hasSlugScope =>
@@ -4164,6 +4186,9 @@ class _AddRuleDialogState extends State<_AddRuleDialog> {
       _selectedSiblingSlug = config['sibling_slug'] as String?;
       _windowType = config['window_type'] as String? ?? 'calendar_day';
       _windowDurationCtrl.text = config['window'] as String? ?? '';
+      _action = rule['action'] as String? ?? 'block';
+      _escalate = rule['escalate'] as bool? ?? false;
+      _escalationReasonCtrl.text = rule['escalation_reason'] as String? ?? '';
       if (_type == 'requires_completed_sibling') _loadFlows();
     }
   }
@@ -4174,6 +4199,7 @@ class _AddRuleDialogState extends State<_AddRuleDialog> {
     _fieldCtrl.dispose();
     _messageCtrl.dispose();
     _windowDurationCtrl.dispose();
+    _escalationReasonCtrl.dispose();
     super.dispose();
   }
 
@@ -4222,11 +4248,15 @@ class _AddRuleDialogState extends State<_AddRuleDialog> {
           const SnackBar(content: Text('El mensaje es requerido')));
       return;
     }
+    final escalationReason = _escalationReasonCtrl.text.trim();
     final updated = <String, dynamic>{
       'id': (_isEdit ? widget.rule!['id'] : null) ?? 'tmp_${DateTime.now().millisecondsSinceEpoch}',
       'type': _type,
       'params': _buildConfig(),
       'message': _messageCtrl.text.trim(),
+      'action': _action,
+      'escalate': _escalate,
+      'escalation_reason': (_escalate && escalationReason.isNotEmpty) ? escalationReason : null,
     };
     Navigator.of(context).pop();
     widget.onSaved(updated);
@@ -4525,6 +4555,41 @@ class _AddRuleDialogState extends State<_AddRuleDialog> {
                         'Ej: Ya iniciaste turno hoy. Espera mañana para iniciar de nuevo.',
                     hintStyle: AppTextStyles.body.copyWith(color: AppColors.ctText3)),
               ),
+
+              const SizedBox(height: 16),
+              Text('Acción si falla',
+                  style: AppTextStyles.formLabel.copyWith(color: AppColors.ctText2)),
+              const SizedBox(height: 6),
+              DropdownButtonFormField<String>(
+                value: _action,
+                decoration: _inputDecoration,
+                items: [
+                  DropdownMenuItem(value: 'block', child: Text('Bloquear', style: AppTextStyles.body)),
+                  DropdownMenuItem(value: 'allow', child: Text('Permitir', style: AppTextStyles.body)),
+                ],
+                onChanged: (val) => setState(() => _action = val ?? _action),
+              ),
+              const SizedBox(height: 8),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text('Escalar si falla', style: AppTextStyles.body),
+                value: _escalate,
+                activeThumbColor: AppColors.ctTeal,
+                onChanged: (val) => setState(() => _escalate = val),
+              ),
+              if (_escalate) ...[
+                const SizedBox(height: 8),
+                Text('Motivo de escalación',
+                    style: AppTextStyles.formLabel.copyWith(color: AppColors.ctText2)),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: _escalationReasonCtrl,
+                  style: AppTextStyles.body,
+                  decoration: _inputDecoration.copyWith(
+                      hintText: 'Opcional',
+                      hintStyle: AppTextStyles.body.copyWith(color: AppColors.ctText3)),
+                ),
+              ],
 
               const SizedBox(height: 24),
               Row(
