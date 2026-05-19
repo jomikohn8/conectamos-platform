@@ -78,8 +78,15 @@ class AppDetailHeader extends StatelessWidget implements PreferredSizeWidget {
 
   @override
   Size get preferredSize {
-    double h = 80;
-    if (_hasChips) h += 28;
+    // Desglose real del contenido:
+    // padding top: 20
+    // avatar/título: 40 (altura del avatar, que siempre es el elemento más alto)
+    // subtítulo: 18 (bodySmall ~14px + gap 1px + margen)
+    // padding bottom: 20
+    // border: 1
+    // base sin chips: 99
+    double h = 99;
+    if (_hasChips) h += 30;
     if (bottom != null) h += bottom!.preferredSize.height;
     return Size.fromHeight(h);
   }
