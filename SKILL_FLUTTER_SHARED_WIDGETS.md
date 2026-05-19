@@ -283,6 +283,202 @@ AppKpiCard(
 
 ---
 
+### 2.6 AppLoadingState · `lib/shared/widgets/app_loading_state.dart`
+
+Widget canónico para todos los estados de carga de la plataforma.
+Reemplaza: `CircularProgressIndicator(color: AppColors.ctTeal)` suelto en screens.
+
+```dart
+import '../../shared/widgets/app_loading_state.dart';
+
+// Pantalla completa
+AppLoadingState()
+
+// Con mensaje
+AppLoadingState(message: 'Cargando operadores...')
+
+// Inline dentro de sección
+AppLoadingState.inline()
+
+// Overlay sobre contenido
+AppLoadingState.overlay(message: 'Guardando...')
+```
+
+**Variantes:**
+
+| Variante | Cuándo usar |
+|---|---|
+| default | Estado de carga de pantalla completa |
+| `.inline()` | Carga dentro de una sección o card |
+| `.overlay()` | Carga sobre contenido existente — bloquea interacción |
+
+**PROHIBIDO usar en su lugar:**
+- `CircularProgressIndicator` directo en screens o widgets de feature
+- `Center(child: CircularProgressIndicator(...))` — reemplazar por `AppLoadingState()`
+
+---
+
+### 2.7 AppConfirmDialog · `lib/shared/widgets/app_confirm_dialog.dart`
+
+Dialog de confirmación estándar para todas las acciones que requieren confirmación del usuario.
+Reemplaza: `showDialog` ad-hoc con contenido inline en screens.
+
+```dart
+import '../../shared/widgets/app_confirm_dialog.dart';
+
+// Confirmación neutral
+final confirmed = await AppConfirmDialog.show(
+  context: context,
+  title: '¿Guardar cambios?',
+  body: 'Los cambios se aplicarán inmediatamente.',
+);
+if (confirmed == true) { ... }
+
+// Acción destructiva
+final confirmed = await AppConfirmDialog.show(
+  context: context,
+  title: '¿Eliminar operador?',
+  body: 'Esta acción no se puede deshacer.',
+  variant: AppConfirmDialogVariant.danger,
+  confirmLabel: 'Eliminar',
+);
+if (confirmed == true) { ... }
+
+// Con ícono
+final confirmed = await AppConfirmDialog.show(
+  context: context,
+  title: '¿Desactivar canal?',
+  body: 'El canal dejará de recibir mensajes.',
+  icon: const Icon(Icons.power_off_rounded, color: AppColors.ctDanger),
+  variant: AppConfirmDialogVariant.danger,
+  confirmLabel: 'Desactivar',
+);
+```
+
+**Variantes:**
+
+| Variante | Botón confirmar | Cuándo usar |
+|---|---|---|
+| `normal` (default) | AppButton primary | Confirmaciones neutras |
+| `danger` | AppButton danger | Acciones destructivas — eliminar, revocar, desactivar |
+
+**PROHIBIDO usar en su lugar:**
+- `showDialog` con contenido `AlertDialog` inline
+- Cualquier clase `_*Dialog` privada para confirmaciones simples
+
+---
+
+### 2.8 AppTextField · `lib/shared/widgets/app_text_field.dart`
+
+Widget canónico para todos los campos de texto de la plataforma.
+Reemplaza: `_StyledTextField`, `_WizardTextField`, `_ReadOnlyField`, `_DialogField`, `_FormField`.
+
+```dart
+import '../../shared/widgets/app_text_field.dart';
+
+// Campo básico
+AppTextField(
+  controller: _nameController,
+  hint: 'Nombre del operador',
+)
+
+// Con label
+AppTextField(
+  controller: _phoneController,
+  label: 'Teléfono',
+  hint: '+52 55 0000 0000',
+  keyboardType: TextInputType.phone,
+)
+
+// Con helper text
+AppTextField(
+  controller: _slugController,
+  label: 'Identificador',
+  hint: 'mi-flujo',
+  helperText: 'Solo letras minúsculas y guiones.',
+)
+
+// Con error
+AppTextField(
+  controller: _emailController,
+  label: 'Correo',
+  hint: 'usuario@empresa.com',
+  errorText: _emailError,
+)
+
+// Multiline
+AppTextField(
+  controller: _descController,
+  label: 'Descripción',
+  hint: 'Describe el flujo...',
+  maxLines: 4,
+)
+
+// Solo lectura
+AppTextField(
+  controller: TextEditingController(text: _tenant['id']),
+  hint: '',
+  readOnly: true,
+)
+
+// Con suffix widget
+AppTextField(
+  controller: _passController,
+  hint: 'Contraseña',
+  obscureText: _obscure,
+  suffix: IconButton(
+    icon: Icon(_obscure ? Icons.visibility_off : Icons.visibility),
+    onPressed: () => setState(() => _obscure = !_obscure),
+  ),
+)
+```
+
+**PROHIBIDO usar en su lugar:**
+- `TextField` o `TextFormField` directo en screens o widgets de feature
+- `AppFonts.geist()` para estilizar campos de texto — usar `AppTextStyles.*`
+- Cualquier clase `_*TextField`, `_*Field` privada
+
+---
+
+### 2.9 AppSearchBar · `lib/shared/widgets/app_search_bar.dart`
+
+Widget canónico para barras de búsqueda y filtro.
+Reemplaza: `_SearchField` y cualquier `TextField` con `prefixIcon` de lupa.
+
+```dart
+import '../../shared/widgets/app_search_bar.dart';
+
+// Uso básico
+AppSearchBar(
+  onChanged: (value) => setState(() => _query = value),
+)
+
+// Con hint personalizado
+AppSearchBar(
+  hint: 'Buscar por nombre o teléfono...',
+  onChanged: _filterOperators,
+)
+
+// Con controller externo (para limpiar desde fuera)
+AppSearchBar(
+  controller: _searchController,
+  hint: 'Buscar flujo...',
+  onChanged: _filterFlows,
+)
+```
+
+**Comportamiento:**
+- Ícono de lupa siempre visible a la izquierda
+- Botón de limpiar (×) aparece automáticamente cuando hay texto — desaparece al limpiar
+- Si no se provee `controller`, `AppSearchBar` gestiona el suyo internamente
+- Sin label, sin errorText, sin helperText — es exclusivamente para filtrado/búsqueda
+
+**PROHIBIDO usar en su lugar:**
+- `TextField` con `prefixIcon` de lupa inline en screens
+- `_SearchField` privado
+
+---
+
 ## 3. Tokens de diseño — reglas de uso
 
 ### Colores
@@ -444,6 +640,10 @@ No los repliques en código nuevo:
 | `AppTextStyles.btnPrimary` | Color `ctNavy` fijo — debería ser sin color | Pendiente corrección DS |
 | `lib/features/conversations/conversations_screen.dart` | 113 TextStyle inline, 14 botones ad-hoc | Pendiente migración |
 | `lib/features/flows/flow_detail_screen.dart` | 150 TextStyle inline, 18 botones ad-hoc | Pendiente migración |
+| `lib/features/` (generalizado) | 97 `CircularProgressIndicator` sueltos — pendiente migrar a `AppLoadingState` | Pendiente migración |
+| `lib/features/` (generalizado) | 64 `showDialog` ad-hoc — pendiente migrar a `AppConfirmDialog` | Pendiente migración |
+| `lib/features/` (generalizado) | 101 `TextField`/`TextFormField` sueltos — pendiente migrar a `AppTextField` | Pendiente migración |
+| `lib/features/config/operators_screen.dart` | `_SearchField` privado — pendiente migrar a `AppSearchBar` | Pendiente migración |
 
 Pantallas con baja deuda ya migradas o limpias:
 - `lib/features/config/worker_detail_screen.dart` ✅ — referencia de patrón correcto
