@@ -338,9 +338,8 @@ class FlowsApi {
 
   static Future<List<Map<String, dynamic>>> getPreconditionTypes() async {
     try {
-      print('[getPreconditionTypes] calling: ${ApiClient.instance.options.baseUrl}/api/v1/flows/precondition-types');
       final response = await ApiClient.instance.get(
-        '/api/v1/flows/precondition-types',
+        '/flows/precondition-types',
       );
       final raw = response.data;
       final list = raw is Map ? (raw['types'] ?? []) : raw;
