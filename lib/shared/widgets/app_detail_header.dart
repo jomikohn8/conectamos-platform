@@ -86,9 +86,9 @@ class AppDetailHeader extends StatelessWidget implements PreferredSizeWidget {
       children: [
         // ── Fila principal ───────────────────────────────────────────────
         Container(
-          color: AppColors.ctSurface,
           padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
           decoration: const BoxDecoration(
+            color: AppColors.ctSurface,
             border: Border(
               bottom: BorderSide(color: AppColors.ctBorder, width: 1),
             ),
