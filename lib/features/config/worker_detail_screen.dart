@@ -12,6 +12,36 @@ import '../../shared/widgets/app_loading_state.dart';
 import 'channels_screen.dart';
 import 'workflows_screen.dart';
 
+// ── Helpers de archivo ────────────────────────────────────────────────────────
+
+const _kTypeConfig = {
+  'logistics':   (label: 'Logística', bg: Color(0xFFDBEAFE), fg: Color(0xFF1E40AF)),
+  'sales':       (label: 'Ventas',    bg: Color(0xFFEDE9FE), fg: Color(0xFF6D28D9)),
+  'collections': (label: 'Cobranza', bg: Color(0xFFFEF3C7), fg: Color(0xFFB45309)),
+  'custom':      (label: 'Custom',   bg: Color(0xFFF3F4F6), fg: Color(0xFF374151)),
+};
+
+Color _hexColor(String hex) {
+  final h = hex.replaceAll('#', '');
+  return Color(int.parse('FF$h', radix: 16));
+}
+
+String _initials(String name) {
+  final parts = name.trim().split(RegExp(r'\s+'));
+  if (parts.length >= 2) return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+  return name.isEmpty ? '?' : name[0].toUpperCase();
+}
+
+String _fmtDate(String? iso) {
+  if (iso == null) return '—';
+  try {
+    final dt = DateTime.parse(iso).toLocal();
+    return '${dt.day}/${dt.month}/${dt.year}';
+  } catch (_) {
+    return '—';
+  }
+}
+
 class WorkerDetailScreen extends ConsumerStatefulWidget {
   const WorkerDetailScreen({required this.workerId, super.key});
   final String workerId;
@@ -532,15 +562,17 @@ class _IdentityCard extends StatefulWidget {
 }
 
 class _IdentityCardState extends State<_IdentityCard> {
+  bool _editingName = false;
   late TextEditingController _nameCtrl;
-  bool _saving = false;
-  String? _saveError;
+  bool _savingName = false;
 
   @override
   void initState() {
     super.initState();
     _nameCtrl = TextEditingController(
-      text: widget.worker['display_name'] as String? ?? '',
+      text: widget.worker['display_name'] as String? ??
+          widget.worker['catalog_name'] as String? ??
+          '',
     );
   }
 
@@ -550,72 +582,189 @@ class _IdentityCardState extends State<_IdentityCard> {
     super.dispose();
   }
 
-  Future<void> _save() async {
-    setState(() { _saving = true; _saveError = null; });
+  Future<void> _saveName() async {
+    if (_savingName) return;
+    setState(() => _savingName = true);
     try {
       await AiWorkersApi.updateWorker(
         tenantWorkerId: widget.worker['id'] as String,
         displayName: _nameCtrl.text.trim().isEmpty ? null : _nameCtrl.text.trim(),
       );
       if (!mounted) return;
-      setState(() { _saving = false; });
+      setState(() { _editingName = false; _savingName = false; });
       widget.onSaved();
     } catch (e) {
       if (!mounted) return;
-      setState(() { _saving = false; _saveError = e.toString(); });
+      setState(() => _savingName = false);
     }
   }
 
+  String _fmtContractedAt() =>
+      _fmtDate(widget.worker['contracted_at'] as String?);
+
   @override
   Widget build(BuildContext context) {
-    return _SectionCard(
-      title: 'Identidad',
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Nombre personalizado',
-                style: AppTextStyles.bodySmall.copyWith(color: AppColors.ctText2)),
-            const SizedBox(height: 6),
-            TextField(
-              controller: _nameCtrl,
-              enabled: !_saving,
-              style: AppTextStyles.body.copyWith(color: AppColors.ctText),
-              decoration: InputDecoration(
-                hintText: widget.worker['catalog_name'] as String? ?? '',
-                hintStyle: AppTextStyles.body.copyWith(color: AppColors.ctText3),
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                filled: true,
-                fillColor: AppColors.ctSurface2,
-                border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: AppColors.ctBorder)),
-                enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: AppColors.ctBorder)),
-                focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(
-                        color: AppColors.ctTeal, width: 1.5)),
-              ),
+    final colorHex   = widget.worker['catalog_color'] as String? ?? '#59E0CC';
+    final workerType = widget.worker['catalog_worker_type'] as String? ?? 'custom';
+    final iconUrl    = widget.worker['catalog_icon_url'] as String?;
+    final workerColor = _hexColor(colorHex);
+    final typeEntry  = _kTypeConfig[workerType] ?? _kTypeConfig['custom']!;
+    final name       = widget.worker['display_name'] as String? ??
+        widget.worker['catalog_name'] as String? ??
+        'Worker';
+    final initials   = _initials(name);
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.ctSurface,
+        border: Border.all(color: AppColors.ctBorder),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Identidad del worker',
+            style: AppTextStyles.body.copyWith(
+              fontWeight: FontWeight.w600,
+              color: AppColors.ctText2,
             ),
-            if (_saveError != null) ...[
-              const SizedBox(height: 6),
-              Text(_saveError!,
-                  style: AppTextStyles.bodySmall
-                      .copyWith(color: AppColors.ctDanger)),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Avatar 56×56
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: workerColor, width: 2),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(2),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(28),
+                    child: iconUrl != null
+                        ? Image.network(
+                            iconUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context2, err, stack) =>
+                                _InitialAvatar(
+                                    color: workerColor, initials: initials),
+                          )
+                        : _InitialAvatar(
+                            color: workerColor, initials: initials),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              // Nombre + badge
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (!_editingName)
+                      GestureDetector(
+                        onTap: () => setState(() => _editingName = true),
+                        child: MouseRegion(
+                          cursor: SystemMouseCursors.text,
+                          child: Text(
+                            _nameCtrl.text,
+                            style: AppTextStyles.pageTitle
+                                .copyWith(fontSize: 18),
+                          ),
+                        ),
+                      )
+                    else
+                      TextField(
+                        controller: _nameCtrl,
+                        autofocus: true,
+                        style: AppTextStyles.pageTitle.copyWith(fontSize: 18),
+                        decoration: InputDecoration(
+                          isDense: true,
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 6),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(6),
+                            borderSide:
+                                const BorderSide(color: AppColors.ctTeal),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(6),
+                            borderSide: const BorderSide(
+                                color: AppColors.ctTeal, width: 1.5),
+                          ),
+                        ),
+                        onSubmitted: (_) => _saveName(),
+                      ),
+                    const SizedBox(height: 6),
+                    _TypeBadge(
+                      label: typeEntry.label,
+                      bg: typeEntry.bg,
+                      fg: typeEntry.fg,
+                    ),
+                  ],
+                ),
+              ),
             ],
+          ),
+          if (_editingName) ...[
             const SizedBox(height: 12),
-            AppButton(
-              variant: AppButtonVariant.teal,
-              label: _saving ? 'Guardando…' : 'Guardar nombre',
-              isDisabled: _saving,
-              onPressed: _save,
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                AppButton(
+                  label: 'Cancelar',
+                  variant: AppButtonVariant.ghost,
+                  size: AppButtonSize.sm,
+                  onPressed: () => setState(() {
+                    _editingName = false;
+                    _nameCtrl.text = widget.worker['display_name'] as String? ??
+                        widget.worker['catalog_name'] as String? ??
+                        '';
+                  }),
+                ),
+                const SizedBox(width: 8),
+                AppButton(
+                  label: 'Guardar',
+                  variant: AppButtonVariant.teal,
+                  size: AppButtonSize.sm,
+                  isLoading: _savingName,
+                  onPressed: _saveName,
+                ),
+              ],
             ),
           ],
-        ),
+          const SizedBox(height: 16),
+          const Divider(height: 1, color: AppColors.ctBorder),
+          const SizedBox(height: 16),
+          Text(
+            widget.worker['catalog_description'] as String? ?? '—',
+            style: AppTextStyles.body.copyWith(color: AppColors.ctText2),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              const Icon(Icons.calendar_today_outlined,
+                  size: 14, color: AppColors.ctText3),
+              const SizedBox(width: 6),
+              Text(
+                'CONTRATADO DESDE',
+                style: AppTextStyles.navItem.copyWith(
+                    color: AppColors.ctText3, letterSpacing: 0.5),
+              ),
+              const Spacer(),
+              Text(
+                _fmtContractedAt(),
+                style: AppTextStyles.body
+                    .copyWith(fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -851,6 +1000,56 @@ class _MetricCell extends StatelessWidget {
             style: AppTextStyles.bodySmall.copyWith(color: AppColors.ctText3),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── _InitialAvatar ────────────────────────────────────────────────────────────
+
+class _InitialAvatar extends StatelessWidget {
+  const _InitialAvatar({required this.color, required this.initials});
+
+  final Color color;
+  final String initials;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: color.withValues(alpha: 0.18),
+      alignment: Alignment.center,
+      child: Text(
+        initials,
+        style: AppTextStyles.formLabel.copyWith(
+          fontFamily: 'Onest',
+          fontWeight: FontWeight.w700,
+          color: color,
+        ),
+      ),
+    );
+  }
+}
+
+// ── _TypeBadge ────────────────────────────────────────────────────────────────
+
+class _TypeBadge extends StatelessWidget {
+  const _TypeBadge({required this.label, required this.bg, required this.fg});
+
+  final String label;
+  final Color bg;
+  final Color fg;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        label,
+        style: AppTextStyles.badge.copyWith(color: fg),
       ),
     );
   }
