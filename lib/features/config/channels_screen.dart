@@ -303,15 +303,14 @@ class _ChannelCardState extends State<_ChannelCard> {
     final typeEntry   = _kChannelTypeConfig[channelType] ?? _kChannelTypeConfig['whatsapp']!;
 
     final credentials = (ch['channel_config'] as Map<String, dynamic>?)?['credentials'] as Map<String, dynamic>? ?? {};
-    final rawPhone  = credentials['phone_number_id'] as String? ?? '';
+    final rawPhone  = credentials['display_phone_number'] as String? ?? credentials['phone_number_id'] as String? ?? '';
     final rawHandle = credentials['bot_username'] as String? ?? '';
     final identifier = channelType == 'whatsapp'
         ? rawPhone
         : (rawHandle.isNotEmpty ? '@$rawHandle' : '');
 
-    final displayName = ch['display_name'] as String? ?? '';
-    final inviteUrl = channelType == 'whatsapp' && displayName.isNotEmpty
-        ? 'https://wa.me/${displayName.replaceAll('+', '').replaceAll(' ', '').replaceAll('-', '')}'
+    final inviteUrl = channelType == 'whatsapp' && rawPhone.isNotEmpty
+        ? 'https://wa.me/${rawPhone.replaceAll('+', '').replaceAll(' ', '').replaceAll('-', '')}'
         : (rawHandle.isNotEmpty
             ? 'https://t.me/${rawHandle.replaceAll('@', '')}'
             : '');
