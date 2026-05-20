@@ -260,7 +260,7 @@ class _ChannelsBody extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppColors.ctSurface,
           border: Border.all(color: AppColors.ctBorder),
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(16),
         ),
         child: _ChannelCard(
           channel: ch,
@@ -335,7 +335,7 @@ class _ChannelCardState extends State<_ChannelCard> {
                       height: 40,
                       decoration: BoxDecoration(
                           color: const Color(0xFF25D366),
-                          borderRadius: BorderRadius.circular(10)),
+                          borderRadius: BorderRadius.circular(16)),
                       padding: const EdgeInsets.all(6),
                       child: SvgPicture.asset('assets/logos/whatsapp.svg',
                           colorFilter: const ColorFilter.mode(
@@ -346,7 +346,7 @@ class _ChannelCardState extends State<_ChannelCard> {
                       height: 40,
                       decoration: BoxDecoration(
                           color: const Color(0xFF229ED9),
-                          borderRadius: BorderRadius.circular(10)),
+                          borderRadius: BorderRadius.circular(16)),
                       padding: const EdgeInsets.all(6),
                       child: Image.asset(
                         'assets/logos/telegram.png',
@@ -355,7 +355,7 @@ class _ChannelCardState extends State<_ChannelCard> {
                           height: 40,
                           decoration: BoxDecoration(
                               color: const Color(0xFF229ED9),
-                              borderRadius: BorderRadius.circular(10)),
+                              borderRadius: BorderRadius.circular(16)),
                           child: const Icon(Icons.send_rounded,
                               color: Colors.white, size: 20),
                         ),
@@ -1185,7 +1185,7 @@ class _CreateChannelStepperState extends State<_CreateChannelStepper> {
           const SizedBox(height: 24),
           Container(
             padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(color: AppColors.ctSurface2, borderRadius: BorderRadius.circular(10), border: Border.all(color: AppColors.ctBorder)),
+            decoration: BoxDecoration(color: AppColors.ctSurface2, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppColors.ctBorder)),
             child: Column(
               children: [
                 _reviewRow('Tipo de canal', _buildTypeChip()),
@@ -1218,7 +1218,7 @@ class _CreateChannelStepperState extends State<_CreateChannelStepper> {
         const SizedBox(height: 24),
         Container(
           padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(color: AppColors.ctSurface2, borderRadius: BorderRadius.circular(10), border: Border.all(color: AppColors.ctBorder)),
+          decoration: BoxDecoration(color: AppColors.ctSurface2, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppColors.ctBorder)),
           child: Column(
             children: [
               _reviewRow('Tipo de canal', _buildTypeChip()),
@@ -1435,7 +1435,7 @@ class _TypeCardState extends State<_TypeCard> {
                 color: widget.selected ? channelColor : AppColors.ctBorder2,
                 width: widget.selected ? 2 : 1,
               ),
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(16),
             ),
             child: Row(
               children: [
@@ -1479,7 +1479,7 @@ class _EmptyTypeCard extends StatelessWidget {
       height: 90,
       decoration: BoxDecoration(
         border: Border.all(color: AppColors.ctBorder, width: 1.5, style: BorderStyle.solid),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(16),
       ),
       alignment: Alignment.center,
       child: Column(
