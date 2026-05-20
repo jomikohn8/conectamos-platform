@@ -275,7 +275,7 @@ class _WorkersBody extends StatelessWidget {
         children: [
           ...workers.map((w) => SizedBox(
                 width: 380,
-                height: 240,
+                height: 270,
                 child: _WorkerCard(
                   worker: w,
                   onTap: () => onTap(w),
@@ -285,7 +285,7 @@ class _WorkersBody extends StatelessWidget {
               )),
           SizedBox(
             width: 380,
-            height: 240,
+            height: 270,
             child: _AddWorkerCard(
               onTap: () => context.go('/catalog/workers'),
             ),
