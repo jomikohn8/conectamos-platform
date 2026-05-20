@@ -327,7 +327,7 @@ class _WorkerCardState extends State<_WorkerCard> {
     final iconUrl     = w['catalog_icon_url'] as String?;
     final typeEntry   = _kTypeConfig[workerType] ?? _kTypeConfig['custom']!;
     final flowCount   = (w['flows'] as List? ?? []).length;
-    final runningNow  = w['running_now'] as int? ?? 0;
+    final runningNow  = w['execution_count'] as int? ?? 0;
     final channelCount = w['channel_count'] as int? ?? 0;
     final contractedAt = w['contracted_at'] as String?;
     final workerColor = _hexColor(colorHex);
