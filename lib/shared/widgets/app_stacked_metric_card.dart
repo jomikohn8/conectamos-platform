@@ -22,39 +22,33 @@ class AppStackedMetricCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Padding top reserva espacio para que el card de fondo asome hacia arriba.
-    // Stack se dimensiona al card principal (no-Positioned); Positioned desborda
-    // hacia arriba con clipBehavior: Clip.none sin afectar el layout del Stack.
-    final card = Padding(
-      padding: const EdgeInsets.only(top: 8),
-      child: Stack(
-        clipBehavior: Clip.none,
+    final card = Container(
+      decoration: BoxDecoration(
+        color: AppColors.ctSurface,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: accentColor.withValues(alpha: 0.25), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: accentColor.withValues(alpha: 0.08),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          // Card de fondo — desborda 10 px hacia arriba del Stack
-          Positioned(
-            top: -10,
-            left: 8,
-            right: 8,
-            child: Container(
-              height: 18,
-              decoration: BoxDecoration(
-                color: accentColor.withValues(alpha: 0.12),
-                borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(10)),
-                border: Border.all(
-                    color: accentColor.withValues(alpha: 0.25), width: 1),
-              ),
+          Container(
+            height: 4,
+            decoration: BoxDecoration(
+              color: accentColor,
+              borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(9)),
             ),
           ),
-          // Card principal — sin margin, el Stack toma sus dimensiones
-          Container(
+          Padding(
             padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppColors.ctSurface,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                  color: accentColor.withValues(alpha: 0.35), width: 1),
-            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
