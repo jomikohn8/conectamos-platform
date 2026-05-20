@@ -32,11 +32,15 @@ String _initials(String name) {
   return name.isEmpty ? '?' : name[0].toUpperCase();
 }
 
-String _fmtDate(String? iso) {
+const _kMeses = [
+  'ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic',
+];
+
+String _fmtContractDate(String? iso) {
   if (iso == null) return '—';
   try {
     final dt = DateTime.parse(iso).toLocal();
-    return '${dt.day}/${dt.month}/${dt.year}';
+    return '${dt.day} ${_kMeses[dt.month - 1]} ${dt.year}';
   } catch (_) {
     return '—';
   }
@@ -600,7 +604,7 @@ class _IdentityCardState extends State<_IdentityCard> {
   }
 
   String _fmtContractedAt() =>
-      _fmtDate(widget.worker['contracted_at'] as String?);
+      _fmtContractDate(widget.worker['contracted_at'] as String?);
 
   @override
   Widget build(BuildContext context) {
@@ -783,22 +787,22 @@ class _StatusCard extends StatefulWidget {
 }
 
 class _StatusCardState extends State<_StatusCard> {
-  bool _toggling = false;
+  bool _togglingActive = false;
 
-  Future<void> _toggle() async {
+  Future<void> _toggleActive() async {
     final current = widget.worker['is_active'] == true;
-    setState(() { _toggling = true; });
+    setState(() { _togglingActive = true; });
     try {
       await AiWorkersApi.updateWorker(
         tenantWorkerId: widget.worker['id'] as String,
         isActive: !current,
       );
       if (!mounted) return;
-      setState(() { _toggling = false; });
+      setState(() { _togglingActive = false; });
       widget.onSaved();
     } catch (e) {
       if (!mounted) return;
-      setState(() { _toggling = false; });
+      setState(() { _togglingActive = false; });
     }
   }
 
@@ -806,40 +810,67 @@ class _StatusCardState extends State<_StatusCard> {
   Widget build(BuildContext context) {
     final isActive = widget.worker['is_active'] == true;
 
-    return _SectionCard(
-      title: 'Estado',
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        child: Row(
-          children: [
-            Container(
-              width: 8,
-              height: 8,
-              decoration: BoxDecoration(
-                color: isActive ? AppColors.ctOk : AppColors.ctText3,
-                shape: BoxShape.circle,
-              ),
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.ctSurface,
+        border: Border.all(color: AppColors.ctBorder),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Estado del worker',
+                  style: AppTextStyles.body.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.ctText2,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                if (isActive)
+                  Text(
+                    'Worker activo',
+                    style: AppTextStyles.body
+                        .copyWith(fontWeight: FontWeight.w600),
+                  )
+                else
+                  Text(
+                    'Worker inactivo',
+                    style: AppTextStyles.body
+                        .copyWith(fontWeight: FontWeight.w600),
+                  ),
+                const SizedBox(height: 2),
+                Text(
+                  isActive
+                      ? 'Recibiendo mensajes y ejecutando flujos'
+                      : 'No procesa mensajes entrantes',
+                  style: AppTextStyles.navItem
+                      .copyWith(color: AppColors.ctText2),
+                ),
+              ],
             ),
-            const SizedBox(width: 8),
-            Text(
-              isActive ? 'Activo' : 'Inactivo',
-              style: AppTextStyles.body.copyWith(
-                color: isActive ? AppColors.ctOkText : AppColors.ctText2,
-              ),
-            ),
-            const Spacer(),
-            AppButton(
-              variant: isActive
-                  ? AppButtonVariant.ghost
-                  : AppButtonVariant.teal,
-              label: _toggling
-                  ? 'Actualizando…'
-                  : (isActive ? 'Desactivar' : 'Activar'),
-              isDisabled: _toggling,
-              onPressed: _toggle,
-            ),
-          ],
-        ),
+          ),
+          _togglingActive
+              ? const SizedBox(
+                  width: 36,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: AppColors.ctTeal,
+                  ),
+                )
+              : Switch(
+                  value: isActive,
+                  onChanged: (_) => _toggleActive(),
+                  activeThumbColor: AppColors.ctTeal,
+                  activeTrackColor:
+                      AppColors.ctTeal.withValues(alpha: 0.3),
+                ),
+        ],
       ),
     );
   }
