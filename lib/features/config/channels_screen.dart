@@ -15,7 +15,6 @@ import '../../core/api/channels_api.dart';
 import '../../core/providers/permissions_provider.dart';
 import '../../core/providers/tenant_provider.dart';
 import '../../core/theme/app_theme.dart';
-import '../../shared/widgets/app_action_button.dart';
 import '../../shared/widgets/app_button.dart';
 import '../../shared/widgets/page_header.dart';
 
@@ -27,9 +26,9 @@ external void _fbLaunchSignup(JSFunction onFlush, JSFunction onCancel);
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const _kChannelTypeConfig = {
-  'whatsapp': (label: 'WhatsApp', bg: Color(0xFFDBEAFE), fg: Color(0xFF1E40AF)),
-  'telegram': (label: 'Telegram', bg: Color(0xFFEDE9FE), fg: Color(0xFF6D28D9)),
-  'sms':      (label: 'SMS',      bg: Color(0xFFFFEDD5), fg: Color(0xFFC2410C)),
+  'whatsapp': (label: 'WhatsApp', bg: Color(0xFFDCFCE7), fg: AppColors.ctWa),
+  'telegram': (label: 'Telegram', bg: AppColors.ctInfoBg, fg: AppColors.ctTg),
+  'sms':      (label: 'SMS',      bg: AppColors.ctSurface2, fg: AppColors.ctText2),
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -257,6 +256,7 @@ class _ChannelsBody extends StatelessWidget {
     return Column(
       children: channels.map((ch) => Container(
         margin: const EdgeInsets.only(bottom: 8),
+        clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
           color: AppColors.ctSurface,
           border: Border.all(color: AppColors.ctBorder),
@@ -344,21 +344,10 @@ class _ChannelCardState extends State<_ChannelCard> {
                       width: 40,
                       height: 40,
                       decoration: BoxDecoration(
-                          color: const Color(0xFF229ED9),
+                          color: AppColors.ctTg,
                           borderRadius: BorderRadius.circular(16)),
                       padding: const EdgeInsets.all(6),
-                      child: Image.asset(
-                        'assets/logos/telegram.png',
-                        errorBuilder: (context2, err, stack) => Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                              color: const Color(0xFF229ED9),
-                              borderRadius: BorderRadius.circular(16)),
-                          child: const Icon(Icons.send_rounded,
-                              color: Colors.white, size: 20),
-                        ),
-                      ),
+                      child: Image.asset('assets/logos/telegram.png'),
                     ),
               const SizedBox(width: 14),
               // Nombre + badge tipo + identifier + icono copiar
@@ -444,19 +433,6 @@ class _ChannelCardState extends State<_ChannelCard> {
                           .copyWith(color: AppColors.ctTeal)),
                 ),
               ),
-              if (widget.canManage) ...[
-                const SizedBox(width: 8),
-                AppActionButton(
-                    variant: AppActionVariant.edit,
-                    onPressed: widget.onEdit),
-                const SizedBox(width: 4),
-                AppActionButton(
-                  variant: isActive
-                      ? AppActionVariant.suspend
-                      : AppActionVariant.reactivate,
-                  onPressed: widget.onToggleActive,
-                ),
-              ],
             ],
           ),
         ),
@@ -1253,13 +1229,13 @@ class _CreateChannelStepperState extends State<_CreateChannelStepper> {
     if (_channelType == 'telegram') {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-        decoration: BoxDecoration(color: const Color(0xFFEDE9FE), borderRadius: BorderRadius.circular(20)),
+        decoration: BoxDecoration(color: AppColors.ctInfoBg, borderRadius: BorderRadius.circular(20)),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const SizedBox(width: 8, height: 8, child: DecoratedBox(decoration: BoxDecoration(color: Color(0xFF229ED9), shape: BoxShape.circle))),
+            const SizedBox(width: 8, height: 8, child: DecoratedBox(decoration: BoxDecoration(color: AppColors.ctTg, shape: BoxShape.circle))),
             const SizedBox(width: 5),
-            Text('Telegram', style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.w600, color: const Color(0xFF6D28D9))),
+            Text('Telegram', style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.w600, color: AppColors.ctTg)),
           ],
         ),
       );
