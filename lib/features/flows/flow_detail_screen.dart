@@ -2799,6 +2799,8 @@ class _AlCerrarTabState extends State<_AlCerrarTab> {
 
 IconData _actionIcon(String? type) {
   switch (type) {
+    case 'open_flow_n_times':
+      return Icons.account_tree_outlined;
     case 'webhook_out':
       return Icons.webhook_outlined;
     case 'emit_event':
@@ -2812,6 +2814,10 @@ IconData _actionIcon(String? type) {
 
 String _actionLabel(String? type) {
   switch (type) {
+    case 'open_flow':
+      return 'Abrir flujo';
+    case 'open_flow_n_times':
+      return 'Abrir flujo N veces';
     case 'webhook_out':
       return 'Webhook saliente';
     case 'emit_event':
@@ -2829,6 +2835,10 @@ String _actionSubtitle(Map<String, dynamic> action) {
     case 'open_flow':
       final slug = action['target_flow_slug'] as String? ?? '';
       return '→ $slug';
+    case 'open_flow_n_times':
+      final nSlug = action['flow_slug'] as String? ?? '';
+      final field = action['count_field_key'] as String? ?? '';
+      return '→ $nSlug × $field';
     case 'webhook_out':
       final id = action['integration_id'] as String? ?? '';
       final short = id.length > 8 ? id.substring(0, 8) : id;
@@ -2945,6 +2955,7 @@ class _ActionDialogState extends State<_ActionDialog> {
   List<Map<String, dynamic>> _availableFlows = [];
   bool _loadingFlows = false;
   bool _carryAncestors = false;
+  String? _selectedCountFieldKey;
 
   // webhook_out
   final _integrationCtrl = TextEditingController();
@@ -2975,6 +2986,7 @@ class _ActionDialogState extends State<_ActionDialog> {
   bool get _isEdit => widget.action != null;
   bool get _isKnownType => const {
         'open_flow',
+        'open_flow_n_times',
         'webhook_out',
         'emit_event',
         'google_sheets_append_row',
@@ -3094,6 +3106,10 @@ class _ActionDialogState extends State<_ActionDialog> {
       _integrationCtrl.text = a['integration_id'] as String? ?? '';
       _includeAncestors = a['include_ancestors'] as bool? ?? false;
       _eventNameCtrl.text = a['event_name'] as String? ?? '';
+      if (_type == 'open_flow_n_times') {
+        _selectedFlowSlug = a['flow_slug'] as String?;
+        _selectedCountFieldKey = a['count_field_key'] as String?;
+      }
       if (_type == 'google_sheets_append_row') {
         final cfg = a['config'] as Map? ?? {};
         _spreadsheetIdCtrl.text = cfg['spreadsheet_id'] as String? ?? '';
@@ -3200,6 +3216,20 @@ class _ActionDialogState extends State<_ActionDialog> {
         updated.remove('include_ancestors');
         updated.remove('event_name');
         updated.remove('event_data');
+        break;
+      case 'open_flow_n_times':
+        if (_selectedFlowSlug == null) return;
+        if (_selectedCountFieldKey == null) return;
+        updated['flow_slug'] = _selectedFlowSlug!;
+        updated['count_field_key'] = _selectedCountFieldKey!;
+        updated.remove('target_flow_slug');
+        updated.remove('carry_ancestors');
+        updated.remove('carry_fields');
+        updated.remove('integration_id');
+        updated.remove('include_ancestors');
+        updated.remove('event_name');
+        updated.remove('event_data');
+        updated.remove('config');
         break;
       case 'webhook_out':
         if (_integrationCtrl.text.trim().isEmpty) return;
@@ -3381,6 +3411,70 @@ class _ActionDialogState extends State<_ActionDialog> {
                   onChanged: (v) => setState(() => _carryAncestors = v),
                   activeThumbColor: AppColors.ctTeal,
                   activeTrackColor: AppColors.ctTeal.withValues(alpha: 0.4),
+                ),
+              ] else if (_type == 'open_flow_n_times') ...[
+                Text(
+                  'Flow slug',
+                  style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w500),
+                ),
+                const SizedBox(height: 6),
+                _DropdownContainer(
+                  child: _loadingFlows
+                      ? const Center(
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(vertical: 12),
+                            child: CircularProgressIndicator(
+                                color: AppColors.ctTeal, strokeWidth: 2),
+                          ),
+                        )
+                      : DropdownButton<String>(
+                          value: _selectedFlowSlug,
+                          isExpanded: true,
+                          underline: const SizedBox.shrink(),
+                          dropdownColor: AppColors.ctSurface,
+                          hint: Text('Seleccionar flow',
+                              style: AppTextStyles.body
+                                  .copyWith(color: AppColors.ctText3)),
+                          items: _availableFlows
+                              .map((f) => DropdownMenuItem<String>(
+                                    value: f['slug'] as String?,
+                                    child: Text(
+                                      '${f['name'] ?? f['slug']}',
+                                      style: AppTextStyles.body,
+                                    ),
+                                  ))
+                              .toList(),
+                          onChanged: (v) =>
+                              setState(() => _selectedFlowSlug = v),
+                        ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Campo de conteo',
+                  style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w500),
+                ),
+                const SizedBox(height: 6),
+                _DropdownContainer(
+                  child: DropdownButton<String>(
+                    value: _selectedCountFieldKey,
+                    isExpanded: true,
+                    underline: const SizedBox.shrink(),
+                    dropdownColor: AppColors.ctSurface,
+                    hint: Text('Seleccionar campo',
+                        style: AppTextStyles.body
+                            .copyWith(color: AppColors.ctText3)),
+                    items: widget.flowFields
+                        .map((f) => DropdownMenuItem<String>(
+                              value: f['key'] as String?,
+                              child: Text(
+                                '${f['label'] ?? f['key']}',
+                                style: AppTextStyles.body,
+                              ),
+                            ))
+                        .toList(),
+                    onChanged: (v) =>
+                        setState(() => _selectedCountFieldKey = v),
+                  ),
                 ),
               ] else if (_type == 'webhook_out') ...[
                 _FormField(
