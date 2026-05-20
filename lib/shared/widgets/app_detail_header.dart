@@ -61,6 +61,7 @@ class AppDetailHeader extends StatelessWidget implements PreferredSizeWidget {
     this.statusActive,
     this.actions = const [],
     this.bottom,
+    this.avatarRounded = true,
   });
 
   final String title;
@@ -68,6 +69,7 @@ class AppDetailHeader extends StatelessWidget implements PreferredSizeWidget {
   final VoidCallback onBack;
   final String? subtitle;
   final Widget? avatar;
+  final bool avatarRounded;
   final List<Widget>? chips;
   final String? statusLabel;
   final bool? statusActive;
@@ -137,19 +139,26 @@ class AppDetailHeader extends StatelessWidget implements PreferredSizeWidget {
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     if (avatar != null) ...[
-                      Container(
-                        width: 40,
-                        height: 40,
-                        clipBehavior: Clip.antiAlias,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: AppColors.ctTeal.withValues(alpha: 0.25),
-                            width: 2,
-                          ),
-                        ),
-                        child: avatar,
-                      ),
+                      avatarRounded
+                          ? Container(
+                              width: 40,
+                              height: 40,
+                              clipBehavior: Clip.antiAlias,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color:
+                                      AppColors.ctTeal.withValues(alpha: 0.25),
+                                  width: 2,
+                                ),
+                              ),
+                              child: avatar,
+                            )
+                          : SizedBox(
+                              width: 40,
+                              height: 40,
+                              child: Center(child: avatar),
+                            ),
                       const SizedBox(width: 12),
                     ],
                     Column(

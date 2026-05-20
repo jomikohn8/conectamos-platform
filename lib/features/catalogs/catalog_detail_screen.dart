@@ -277,6 +277,7 @@ class _CatalogDetailScreenState extends ConsumerState<CatalogDetailScreen>
             backLabel: 'Catálogos',
             onBack: () => context.go('/catalogs'),
             avatar: avatar,
+            avatarRounded: false,
             actions: [
               if (_canManage)
                 AppActionButton(
