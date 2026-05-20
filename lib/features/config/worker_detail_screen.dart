@@ -259,6 +259,12 @@ class _ConfigTabState extends State<_ConfigTab> {
   String? _fireError;
 
   @override
+  void initState() {
+    super.initState();
+    _confirmCtrl.addListener(() => setState(() {}));
+  }
+
+  @override
   void dispose() {
     _confirmCtrl.dispose();
     super.dispose();
@@ -336,159 +342,270 @@ class _ConfigTabState extends State<_ConfigTab> {
     );
   }
 
-  Widget _buildFireModal() {
-    final bool canFire =
-        _confirmCtrl.text.trim() == _workerName && !_firingWorker;
-
-    return BackdropFilter(
-      filter: ImageFilter.blur(sigmaX: 4, sigmaY: 4),
-      child: Container(
-        color: Colors.black.withValues(alpha: 0.45),
-        alignment: Alignment.center,
-        child: Container(
-          width: 440,
-          margin: const EdgeInsets.all(24),
-          padding: const EdgeInsets.all(28),
-          decoration: BoxDecoration(
-            color: AppColors.ctSurface,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.ctBorder),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.15),
-                blurRadius: 32,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header
-              Row(
-                children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: AppColors.ctRedBg,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(Icons.warning_amber_rounded,
-                        color: AppColors.ctDanger, size: 20),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Dar de baja al worker',
-                            style: AppTextStyles.cardTitle.copyWith(
-                              fontFamily: 'Onest',
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.ctText,
-                            )),
-                        Text('Esta acción no se puede deshacer',
-                            style: AppTextStyles.bodySmall.copyWith(
-                                color: AppColors.ctText3)),
-                      ],
-                    ),
-                  ),
-                  GestureDetector(
-                    onTap: _firingWorker
-                        ? null
-                        : () => setState(() => _showFireModal = false),
-                    child: const Icon(Icons.close,
-                        color: AppColors.ctText3, size: 20),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              // Impact list
-              _ImpactRow(
-                icon: Icons.stop_circle_outlined,
-                label: 'Se abandonarán todas las ejecuciones activas',
-              ),
-              const SizedBox(height: 8),
-              _ImpactRow(
-                icon: Icons.link_off_rounded,
-                label: 'Se desactivarán todos los canales asociados',
-              ),
-              const SizedBox(height: 8),
-              _ImpactRow(
-                icon: Icons.alt_route_rounded,
-                label: 'Se desactivarán todos los flujos asociados',
-              ),
-              const SizedBox(height: 20),
-              // Confirm input
-              Text(
-                'Escribe el nombre del worker para confirmar:',
-                style:
-                    AppTextStyles.formLabel.copyWith(color: AppColors.ctText2),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: _confirmCtrl,
-                enabled: !_firingWorker,
-                onChanged: (_) => setState(() {}),
-                style: AppTextStyles.body.copyWith(color: AppColors.ctText),
-                decoration: InputDecoration(
-                  hintText: _workerName,
-                  hintStyle:
-                      AppTextStyles.body.copyWith(color: AppColors.ctText3),
-                  contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 10),
-                  filled: true,
-                  fillColor: AppColors.ctSurface2,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide:
-                        const BorderSide(color: AppColors.ctBorder),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide:
-                        const BorderSide(color: AppColors.ctBorder),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide:
-                        const BorderSide(color: AppColors.ctDanger, width: 1.5),
-                  ),
-                ),
-              ),
-              if (_fireError != null) ...[
-                const SizedBox(height: 8),
-                Text(_fireError!,
-                    style: AppTextStyles.bodySmall
-                        .copyWith(color: AppColors.ctDanger)),
-              ],
-              const SizedBox(height: 20),
-              // Actions
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  AppButton(
-                    variant: AppButtonVariant.ghost,
-                    label: 'Cancelar',
-                    isDisabled: _firingWorker,
-                    onPressed: () => setState(() => _showFireModal = false),
-                  ),
-                  const SizedBox(width: 8),
-                  AppButton(
-                    variant: AppButtonVariant.danger,
-                    label: _firingWorker ? 'Dando de baja…' : 'Dar de baja',
-                    isDisabled: !canFire,
-                    onPressed: _fireWorker,
-                  ),
-                ],
-              ),
-            ],
-          ),
+  Widget _buildInitialsAvatar(double size) {
+    final colorHex = widget.worker['catalog_color'] as String? ?? '#59E0CC';
+    final name = _workerName;
+    final color = _hexColor(colorHex);
+    return Container(
+      width: size,
+      height: size,
+      color: color.withValues(alpha: 0.18),
+      alignment: Alignment.center,
+      child: Text(
+        _initials(name),
+        style: AppTextStyles.formLabel.copyWith(
+          fontFamily: 'Onest',
+          fontWeight: FontWeight.w700,
+          color: color,
         ),
       ),
+    );
+  }
+
+  Widget _buildFireModal() {
+    final workerName = _workerName;
+    final iconUrl    = widget.worker['catalog_icon_url'] as String?;
+    final workerType = _kTypeConfig[
+          widget.worker['catalog_worker_type'] as String? ?? 'custom'
+        ]?.label ?? 'Custom';
+
+    return Stack(
+      children: [
+        BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
+          child: Container(
+              color: AppColors.ctDanger.withValues(alpha: 0.10)),
+        ),
+        Center(
+          child: Container(
+            width: 500,
+            constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.85),
+            margin: const EdgeInsets.symmetric(horizontal: 24),
+            decoration: BoxDecoration(
+              color: AppColors.ctSurface,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                    color: AppColors.ctDanger.withValues(alpha: 0.15),
+                    blurRadius: 40,
+                    offset: const Offset(0, 8)),
+                BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.12),
+                    blurRadius: 20,
+                    offset: const Offset(0, 4)),
+              ],
+            ),
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.all(28),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Header
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                              color: AppColors.ctRedBg,
+                              borderRadius: BorderRadius.circular(10)),
+                          child: const Icon(Icons.warning_amber_rounded,
+                              color: AppColors.ctDanger, size: 22),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '¿Despedir a $workerName?',
+                                style: AppTextStyles.pageTitle
+                                    .copyWith(fontSize: 18),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Esta acción no se puede deshacer. El worker será removido de tu operación de forma permanente.',
+                                style: AppTextStyles.navItem
+                                    .copyWith(color: AppColors.ctText2),
+                              ),
+                            ],
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: () => setState(() {
+                            _showFireModal = false;
+                            _confirmCtrl.clear();
+                          }),
+                          child: MouseRegion(
+                            cursor: SystemMouseCursors.click,
+                            child: const Icon(Icons.close,
+                                size: 18, color: AppColors.ctText3),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    // Qué ocurrirá
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                          color: AppColors.ctBg,
+                          borderRadius: BorderRadius.circular(10)),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'QUÉ OCURRIRÁ',
+                            style: AppTextStyles.navItem.copyWith(
+                                color: AppColors.ctText3,
+                                letterSpacing: 0.6,
+                                fontWeight: FontWeight.w600),
+                          ),
+                          const SizedBox(height: 12),
+                          _ImpactRow(
+                            icon: Icons.hub_outlined,
+                            text:
+                                '${widget.worker['channel_count'] ?? 0} canales desactivados inmediatamente',
+                          ),
+                          const SizedBox(height: 8),
+                          _ImpactRow(
+                            icon: Icons.chat_bubble_outline_rounded,
+                            text:
+                                'Historial de mensajes eliminado permanentemente',
+                          ),
+                          const SizedBox(height: 8),
+                          _ImpactRow(
+                            icon: Icons.account_tree_outlined,
+                            text:
+                                '${(widget.worker['flows'] as List? ?? []).length} flujos liberados de la operación',
+                          ),
+                          const SizedBox(height: 8),
+                          _ImpactRow(
+                            icon: Icons.bar_chart_rounded,
+                            text:
+                                'Las ejecuciones completadas se conservan en reportes',
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    // Mini-card del worker
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: AppColors.ctRedBg.withValues(alpha: 0.5),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                            color: AppColors.ctDanger.withValues(alpha: 0.2)),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                  color: AppColors.ctDanger
+                                      .withValues(alpha: 0.3),
+                                  width: 1.5),
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(18),
+                              child: iconUrl != null
+                                  ? Image.network(
+                                      iconUrl,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (ctx2, err, stack) =>
+                                          _buildInitialsAvatar(36),
+                                    )
+                                  : _buildInitialsAvatar(36),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(workerName,
+                                  style: AppTextStyles.body
+                                      .copyWith(fontWeight: FontWeight.w600)),
+                              Text(
+                                '$workerType · ${widget.worker['channel_count'] ?? 0} canales · ${(widget.worker['flows'] as List? ?? []).length} flujos',
+                                style: AppTextStyles.navItem
+                                    .copyWith(color: AppColors.ctText2),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    // Confirmación
+                    Text('Escribe "$workerName" para confirmar:',
+                        style: AppTextStyles.formLabel),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _confirmCtrl,
+                      autofocus: false,
+                      style: AppTextStyles.body,
+                      decoration: InputDecoration(
+                        hintText: workerName,
+                        hintStyle: AppTextStyles.navItem
+                            .copyWith(color: AppColors.ctText3),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 12),
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide:
+                                const BorderSide(color: AppColors.ctBorder)),
+                        focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(
+                                color: AppColors.ctDanger, width: 1.5)),
+                        enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide:
+                                const BorderSide(color: AppColors.ctBorder)),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    // Botones
+                    Row(
+                      children: [
+                        Expanded(
+                          child: AppButton(
+                            label: 'Cancelar',
+                            variant: AppButtonVariant.ghost,
+                            onPressed: () => setState(() {
+                              _showFireModal = false;
+                              _confirmCtrl.clear();
+                            }),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: AppButton(
+                            label: 'Sí, despedir a $workerName',
+                            variant: AppButtonVariant.danger,
+                            isLoading: _firingWorker,
+                            isDisabled: _confirmCtrl.text.trim() !=
+                                workerName.trim(),
+                            onPressed: _fireWorker,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -496,21 +613,22 @@ class _ConfigTabState extends State<_ConfigTab> {
 // ── _ImpactRow ────────────────────────────────────────────────────────────────
 
 class _ImpactRow extends StatelessWidget {
-  const _ImpactRow({required this.icon, required this.label});
+  const _ImpactRow({required this.icon, required this.text});
 
   final IconData icon;
-  final String label;
+  final String text;
 
   @override
   Widget build(BuildContext context) {
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 16, color: AppColors.ctDanger),
-        const SizedBox(width: 8),
+        Icon(icon, size: 16, color: AppColors.ctText2),
+        const SizedBox(width: 10),
         Expanded(
           child: Text(
-            label,
-            style: AppTextStyles.bodySmall.copyWith(color: AppColors.ctText2),
+            text,
+            style: AppTextStyles.navItem.copyWith(color: AppColors.ctText2),
           ),
         ),
       ],
@@ -899,39 +1017,63 @@ class _DangerZoneCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _SectionCard(
-      title: 'Zona de peligro',
-      titleColor: AppColors.ctDanger,
-      borderColor: AppColors.ctDanger.withValues(alpha: 0.25),
-      backgroundColor: AppColors.ctRedBg,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Dar de baja al worker',
-                      style: AppTextStyles.formLabel.copyWith(
-                          fontWeight: FontWeight.w600, color: AppColors.ctText)),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Se abandonarán ejecuciones activas y se desactivarán canales y flujos.',
-                    style: AppTextStyles.bodySmall
-                        .copyWith(color: AppColors.ctText2),
-                  ),
-                ],
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: AppColors.ctRedBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.ctDanger.withValues(alpha: 0.25)),
+      ),
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.warning_amber_rounded,
+                  size: 16, color: AppColors.ctDanger),
+              const SizedBox(width: 6),
+              Text(
+                'Zona de peligro',
+                style: AppTextStyles.formLabel.copyWith(
+                  fontFamily: 'Onest',
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.ctDanger,
+                ),
               ),
-            ),
-            const SizedBox(width: 12),
-            AppButton(
-              variant: AppButtonVariant.danger,
-              label: 'Dar de baja',
-              onPressed: onFire,
-            ),
-          ],
-        ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Despedir al worker',
+                      style: AppTextStyles.formLabel.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.ctText),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Se abandonarán ejecuciones activas y se desactivarán canales y flujos.',
+                      style: AppTextStyles.bodySmall
+                          .copyWith(color: AppColors.ctText2),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              AppButton(
+                variant: AppButtonVariant.danger,
+                label: 'Despedir',
+                onPressed: onFire,
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
