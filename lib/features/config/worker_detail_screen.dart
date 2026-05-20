@@ -1225,24 +1225,17 @@ class _SkillsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final skills = (worker['catalog_skills'] as List?)?.cast<String>() ?? [];
-    final description =
-        worker['catalog_description'] as String? ?? '';
 
     return _SectionCard(
-      title: 'Habilidades',
+      title: 'Habilidades del worker',
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (description.isNotEmpty) ...[
-              Text(description,
-                  style: AppTextStyles.body.copyWith(color: AppColors.ctText2)),
-              const SizedBox(height: 12),
-            ],
             if (skills.isEmpty)
-              Text('Sin habilidades registradas.',
-                  style: AppTextStyles.body.copyWith(color: AppColors.ctText3))
+              Text('Sin habilidades definidas',
+                  style: AppTextStyles.navItem.copyWith(color: AppColors.ctText3))
             else
               Wrap(
                 spacing: 8,
