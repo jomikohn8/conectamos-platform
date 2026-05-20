@@ -232,29 +232,31 @@ class _ChannelsBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (channels.isEmpty) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.symmetric(vertical: 60),
-          child: Text('No hay canales configurados aún.'),
-        ),
-      );
-    }
-    return Padding(
-      padding: const EdgeInsets.all(20),
-      child: Wrap(
-        spacing: 16,
-        runSpacing: 16,
-        children: channels.map((ch) => SizedBox(
-          width: 380,
-          child: _ChannelCard(
-            channel: ch,
-            onEdit: () => onEdit(ch),
-            onToggleActive: () => onToggleActive(ch),
-            canManage: canManage,
-          ),
-        )).toList(),
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.ctSurface,
+        border: Border.all(color: AppColors.ctBorder),
+        borderRadius: BorderRadius.circular(10),
       ),
+      child: channels.isEmpty
+          ? const Padding(
+              padding: EdgeInsets.symmetric(vertical: 40),
+              child: Center(child: Text('No hay canales configurados aún.')),
+            )
+          : Column(
+              children: channels.asMap().entries.map((entry) {
+                final isLast = entry.key == channels.length - 1;
+                return Column(children: [
+                  _ChannelCard(
+                    channel: entry.value,
+                    onEdit: () => onEdit(entry.value),
+                    onToggleActive: () => onToggleActive(entry.value),
+                    canManage: canManage,
+                  ),
+                  if (!isLast) const Divider(height: 1, color: AppColors.ctBorder),
+                ]);
+              }).toList(),
+            ),
     );
   }
 }
@@ -298,74 +300,111 @@ class _ChannelCardState extends State<_ChannelCard> {
       onExit:  (_) => setState(() => _hovered = false),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 100),
-        decoration: BoxDecoration(
-          color: AppColors.ctSurface,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: _hovered ? AppColors.ctTeal : AppColors.ctBorder,
-          ),
-        ),
-        padding: const EdgeInsets.all(20),
+        color: _hovered ? AppColors.ctBg : AppColors.ctSurface,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: Opacity(
-          opacity: isActive ? 1.0 : 0.55,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          opacity: isActive ? 1.0 : 0.5,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Row 1 — icon + name + status pill
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 48,
-                    height: 48,
+              // Ícono plataforma 40x40
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: channelType == 'whatsapp'
+                      ? const Color(0xFF25D366)
+                      : const Color(0xFF229ED9),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  channelType == 'whatsapp'
+                      ? Icons.chat_rounded
+                      : Icons.send_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 14),
+              // Nombre + identifier
+              Expanded(
+                flex: 3,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(name,
+                        style: AppTextStyles.body
+                            .copyWith(fontWeight: FontWeight.w600),
+                        overflow: TextOverflow.ellipsis),
+                    if (identifier.isNotEmpty)
+                      Text(identifier,
+                          style: AppTextStyles.navItem
+                              .copyWith(color: AppColors.ctText2),
+                          overflow: TextOverflow.ellipsis),
+                  ],
+                ),
+              ),
+              // Badge tipo
+              Expanded(
+                flex: 1,
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
-                      color: channelType == 'whatsapp'
-                          ? const Color(0xFF25D366)
-                          : const Color(0xFF229ED9),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(
-                      channelType == 'whatsapp'
-                          ? Icons.chat_rounded
-                          : Icons.send_rounded,
-                      color: Colors.white,
-                      size: 22,
+                        color: typeEntry.bg,
+                        borderRadius: BorderRadius.circular(20)),
+                    child: Text(
+                      typeEntry.label,
+                      style: AppTextStyles.badge.copyWith(
+                          color: typeEntry.fg,
+                          fontWeight: FontWeight.w600),
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(name,
-                            style: AppTextStyles.cardTitle,
-                            overflow: TextOverflow.ellipsis),
-                        const SizedBox(height: 4),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                              color: typeEntry.bg,
-                              borderRadius: BorderRadius.circular(20)),
-                          child: Text(
-                            typeEntry.label,
-                            style: AppTextStyles.badge.copyWith(
-                                color: typeEntry.fg,
-                                fontWeight: FontWeight.w600),
-                          ),
-                        ),
-                      ],
+                ),
+              ),
+              // Worker dot + nombre
+              Expanded(
+                flex: 2,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                          color: _hexColor(workerColor),
+                          shape: BoxShape.circle),
                     ),
-                  ),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
+                        workerName.isEmpty ? 'Sin worker' : workerName,
+                        style: AppTextStyles.navItem.copyWith(
+                            color: workerName.isEmpty
+                                ? AppColors.ctText3
+                                : AppColors.ctText2),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Status pill
+              Expanded(
+                flex: 1,
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
-                      color: isActive
-                          ? AppColors.ctOkBg
-                          : AppColors.ctSurface2,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
+                        color: isActive
+                            ? AppColors.ctOkBg
+                            : AppColors.ctSurface2,
+                        borderRadius: BorderRadius.circular(20)),
                     child: Text(
                       isActive ? 'Activo' : 'Inactivo',
                       style: AppTextStyles.badge.copyWith(
@@ -374,55 +413,11 @@ class _ChannelCardState extends State<_ChannelCard> {
                               : AppColors.ctText2),
                     ),
                   ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              const Divider(height: 1, color: AppColors.ctBorder),
-              const SizedBox(height: 12),
-              // Row 2 — identifier
-              if (identifier.isNotEmpty)
-                Row(
-                  children: [
-                    Icon(
-                      channelType == 'whatsapp'
-                          ? Icons.phone_outlined
-                          : Icons.alternate_email,
-                      size: 14,
-                      color: AppColors.ctText3,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(identifier,
-                        style: AppTextStyles.navItem
-                            .copyWith(color: AppColors.ctText2)),
-                  ],
                 ),
-              const SizedBox(height: 8),
-              // Row 3 — worker
-              Row(
-                children: [
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                        color: _hexColor(workerColor),
-                        shape: BoxShape.circle),
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    workerName.isEmpty ? 'Sin worker asignado' : workerName,
-                    style: AppTextStyles.navItem.copyWith(
-                        color: workerName.isEmpty
-                            ? AppColors.ctText3
-                            : AppColors.ctText2),
-                  ),
-                ],
               ),
-              const SizedBox(height: 12),
-              const Divider(height: 1, color: AppColors.ctBorder),
-              const SizedBox(height: 12),
-              // Row 4 — footer actions
+              // Ver detalle + acciones
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   GestureDetector(
                     onTap: widget.onEdit,
@@ -433,22 +428,19 @@ class _ChannelCardState extends State<_ChannelCard> {
                               .copyWith(color: AppColors.ctTeal)),
                     ),
                   ),
-                  if (widget.canManage)
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        AppActionButton(
-                            variant: AppActionVariant.edit,
-                            onPressed: widget.onEdit),
-                        const SizedBox(width: 4),
-                        AppActionButton(
-                          variant: isActive
-                              ? AppActionVariant.suspend
-                              : AppActionVariant.reactivate,
-                          onPressed: widget.onToggleActive,
-                        ),
-                      ],
+                  if (widget.canManage) ...[
+                    const SizedBox(width: 8),
+                    AppActionButton(
+                        variant: AppActionVariant.edit,
+                        onPressed: widget.onEdit),
+                    const SizedBox(width: 4),
+                    AppActionButton(
+                      variant: isActive
+                          ? AppActionVariant.suspend
+                          : AppActionVariant.reactivate,
+                      onPressed: widget.onToggleActive,
                     ),
+                  ],
                 ],
               ),
             ],
