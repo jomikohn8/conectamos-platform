@@ -5,7 +5,9 @@ import 'dart:js_interop';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/api/ai_workers_api.dart';
@@ -288,12 +290,19 @@ class _ChannelCardState extends State<_ChannelCard> {
     final name        = ch['display_name'] as String? ?? ch['name'] as String? ?? '—';
     final channelType = ch['channel_type'] as String? ?? 'whatsapp';
     final isActive    = ch['is_active'] as bool? ?? false;
-    final workerName  = ch['worker_name'] as String? ?? '';
-    final workerColor = ch['worker_color'] as String? ?? '#9CA3AF';
     final typeEntry   = _kChannelTypeConfig[channelType] ?? _kChannelTypeConfig['whatsapp']!;
-    final phone       = ch['phone_number'] as String? ?? ch['phone_number_id'] as String? ?? '';
-    final botHandle   = ch['bot_username'] as String? ?? ch['handle'] as String? ?? '';
-    final identifier  = channelType == 'whatsapp' ? phone : botHandle;
+
+    final rawPhone  = ch['phone_number'] as String? ?? ch['phone_number_id'] as String? ?? '';
+    final rawHandle = ch['bot_username'] as String? ?? ch['handle'] as String? ?? '';
+    final identifier = channelType == 'whatsapp'
+        ? rawPhone
+        : (rawHandle.isNotEmpty ? '@$rawHandle' : '');
+
+    final inviteUrl = identifier.isNotEmpty
+        ? (channelType == 'whatsapp'
+            ? 'https://wa.me/${identifier.replaceAll('+', '').replaceAll(' ', '')}'
+            : 'https://t.me/${identifier.replaceAll('@', '')}')
+        : '';
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
@@ -301,29 +310,20 @@ class _ChannelCardState extends State<_ChannelCard> {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 100),
         color: _hovered ? AppColors.ctBg : AppColors.ctSurface,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         child: Opacity(
           opacity: isActive ? 1.0 : 0.5,
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Ícono plataforma 40x40
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: channelType == 'whatsapp'
-                      ? const Color(0xFF25D366)
-                      : const Color(0xFF229ED9),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(
-                  channelType == 'whatsapp'
-                      ? Icons.chat_rounded
-                      : Icons.send_rounded,
-                  color: Colors.white,
-                  size: 20,
-                ),
+              // Logo real 40x40
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: channelType == 'whatsapp'
+                    ? SvgPicture.asset('assets/logos/whatsapp.svg',
+                        width: 40, height: 40)
+                    : Image.asset('assets/logos/telegram.png',
+                        width: 40, height: 40),
               ),
               const SizedBox(width: 14),
               // Nombre + identifier
@@ -346,103 +346,79 @@ class _ChannelCardState extends State<_ChannelCard> {
                 ),
               ),
               // Badge tipo
-              Expanded(
-                flex: 1,
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                        color: typeEntry.bg,
-                        borderRadius: BorderRadius.circular(20)),
-                    child: Text(
-                      typeEntry.label,
-                      style: AppTextStyles.badge.copyWith(
-                          color: typeEntry.fg,
-                          fontWeight: FontWeight.w600),
-                    ),
-                  ),
-                ),
-              ),
-              // Worker dot + nombre
-              Expanded(
-                flex: 2,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                          color: _hexColor(workerColor),
-                          shape: BoxShape.circle),
-                    ),
-                    const SizedBox(width: 6),
-                    Flexible(
-                      child: Text(
-                        workerName.isEmpty ? 'Sin worker' : workerName,
-                        style: AppTextStyles.navItem.copyWith(
-                            color: workerName.isEmpty
-                                ? AppColors.ctText3
-                                : AppColors.ctText2),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
+              Container(
+                margin: const EdgeInsets.only(right: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                    color: typeEntry.bg,
+                    borderRadius: BorderRadius.circular(20)),
+                child: Text(
+                  typeEntry.label,
+                  style: AppTextStyles.badge.copyWith(
+                      color: typeEntry.fg, fontWeight: FontWeight.w600),
                 ),
               ),
               // Status pill
-              Expanded(
-                flex: 1,
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                        color: isActive
-                            ? AppColors.ctOkBg
-                            : AppColors.ctSurface2,
-                        borderRadius: BorderRadius.circular(20)),
-                    child: Text(
-                      isActive ? 'Activo' : 'Inactivo',
-                      style: AppTextStyles.badge.copyWith(
-                          color: isActive
-                              ? AppColors.ctOkText
-                              : AppColors.ctText2),
+              Container(
+                margin: const EdgeInsets.only(right: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                    color: isActive ? AppColors.ctOkBg : AppColors.ctSurface2,
+                    borderRadius: BorderRadius.circular(20)),
+                child: Text(
+                  isActive ? 'Activo' : 'Inactivo',
+                  style: AppTextStyles.badge.copyWith(
+                      color: isActive ? AppColors.ctOkText : AppColors.ctText2),
+                ),
+              ),
+              const Spacer(),
+              // Icono copiar URL
+              if (inviteUrl.isNotEmpty) ...[
+                GestureDetector(
+                  onTap: () {
+                    Clipboard.setData(ClipboardData(text: inviteUrl));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('URL copiada'),
+                        duration: Duration(seconds: 2),
+                        backgroundColor: AppColors.ctOk,
+                      ),
+                    );
+                  },
+                  child: MouseRegion(
+                    cursor: SystemMouseCursors.click,
+                    child: Tooltip(
+                      message: 'Copiar URL de invitación',
+                      child: const Icon(Icons.link_rounded,
+                          size: 16, color: AppColors.ctText3),
                     ),
                   ),
                 ),
+                const SizedBox(width: 8),
+              ],
+              // Ver detalle
+              GestureDetector(
+                onTap: widget.onEdit,
+                child: MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: Text('Ver detalle →',
+                      style: AppTextStyles.navItem
+                          .copyWith(color: AppColors.ctTeal)),
+                ),
               ),
-              // Ver detalle + acciones
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  GestureDetector(
-                    onTap: widget.onEdit,
-                    child: MouseRegion(
-                      cursor: SystemMouseCursors.click,
-                      child: Text('Ver detalle →',
-                          style: AppTextStyles.navItem
-                              .copyWith(color: AppColors.ctTeal)),
-                    ),
-                  ),
-                  if (widget.canManage) ...[
-                    const SizedBox(width: 8),
-                    AppActionButton(
-                        variant: AppActionVariant.edit,
-                        onPressed: widget.onEdit),
-                    const SizedBox(width: 4),
-                    AppActionButton(
-                      variant: isActive
-                          ? AppActionVariant.suspend
-                          : AppActionVariant.reactivate,
-                      onPressed: widget.onToggleActive,
-                    ),
-                  ],
-                ],
-              ),
+              if (widget.canManage) ...[
+                const SizedBox(width: 8),
+                AppActionButton(
+                    variant: AppActionVariant.edit,
+                    onPressed: widget.onEdit),
+                const SizedBox(width: 4),
+                AppActionButton(
+                  variant: isActive
+                      ? AppActionVariant.suspend
+                      : AppActionVariant.reactivate,
+                  onPressed: widget.onToggleActive,
+                ),
+              ],
             ],
           ),
         ),
