@@ -15,16 +15,11 @@ import '../../core/providers/tenant_provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/identity_config.dart';
 import '../../shared/widgets/app_button.dart';
+import '../../shared/widgets/app_detail_header.dart';
 import 'widgets/operator_form_dialog.dart';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-String _initials(String name) {
-  final parts = name.trim().split(' ').where((p) => p.isNotEmpty).toList();
-  if (parts.isEmpty) return '?';
-  if (parts.length == 1) return parts[0][0].toUpperCase();
-  return '${parts[0][0]}${parts.last[0]}'.toUpperCase();
-}
 
 String _fmtDate(String? iso) {
   if (iso == null) return '—';
@@ -241,14 +236,24 @@ class _OperatorDetailScreenState extends ConsumerState<OperatorDetailScreen>
     if (_loading) {
       return Scaffold(
         backgroundColor: AppColors.ctBg,
-        appBar: _buildAppBar(null),
+        appBar: AppDetailHeader(
+          title: 'Operador',
+          backLabel: 'Operadores',
+          onBack: () => context.go('/operators'),
+          bottom: _tabBar,
+        ),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
     if (_error != null || _op == null) {
       return Scaffold(
         backgroundColor: AppColors.ctBg,
-        appBar: _buildAppBar(null),
+        appBar: AppDetailHeader(
+          title: 'Operador',
+          backLabel: 'Operadores',
+          onBack: () => context.go('/operators'),
+          bottom: _tabBar,
+        ),
         body: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -277,65 +282,81 @@ class _OperatorDetailScreenState extends ConsumerState<OperatorDetailScreen>
 
     return Scaffold(
       backgroundColor: AppColors.ctBg,
-      appBar: _buildAppBar(
-        canManage
-            ? PopupMenuButton<_MenuAction>(
-                icon: const Icon(Icons.more_vert, color: AppColors.ctText),
-                color: AppColors.ctSurface,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8)),
-                onSelected: (action) async {
-                  switch (action) {
-                    case _MenuAction.edit:
-                      await _openEdit();
-                    case _MenuAction.suspend:
-                      await _patchStatus('suspended');
-                    case _MenuAction.reactivate:
-                      await _patchStatus('active');
-                    case _MenuAction.delete:
-                      await _delete();
-                  }
-                },
-                itemBuilder: (_) => [
-                  const PopupMenuItem(
-                    value: _MenuAction.edit,
-                    child: _MenuItem(
-                        icon: Icons.edit_outlined, label: 'Editar'),
-                  ),
-                  if (status == 'active' || status == 'incident')
+      appBar: AppDetailHeader(
+        title: op['display_name'] as String? ?? op['name'] as String? ?? 'Operador',
+        backLabel: 'Operadores',
+        onBack: () => context.go('/operators'),
+        subtitle: op['phone'] as String?,
+        avatar: ((op['profile_picture_url'] as String?) ?? '').isNotEmpty
+            ? Image.network(
+                op['profile_picture_url'] as String,
+                fit: BoxFit.cover,
+                width: 40,
+                height: 40,
+              )
+            : const Icon(Icons.person_rounded, size: 22, color: AppColors.ctText2),
+        statusLabel: _statusStyle(status).label,
+        statusActive: status == 'active',
+        actions: canManage
+            ? [
+                PopupMenuButton<_MenuAction>(
+                  icon: const Icon(Icons.more_vert, color: AppColors.ctText),
+                  color: AppColors.ctSurface,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
+                  onSelected: (action) async {
+                    switch (action) {
+                      case _MenuAction.edit:
+                        await _openEdit();
+                      case _MenuAction.suspend:
+                        await _patchStatus('suspended');
+                      case _MenuAction.reactivate:
+                        await _patchStatus('active');
+                      case _MenuAction.delete:
+                        await _delete();
+                    }
+                  },
+                  itemBuilder: (_) => [
                     const PopupMenuItem(
-                      value: _MenuAction.suspend,
+                      value: _MenuAction.edit,
                       child: _MenuItem(
-                        icon: Icons.pause_circle_outline,
-                        label: 'Suspender',
+                          icon: Icons.edit_outlined, label: 'Editar'),
+                    ),
+                    if (status == 'active' || status == 'incident')
+                      const PopupMenuItem(
+                        value: _MenuAction.suspend,
+                        child: _MenuItem(
+                          icon: Icons.pause_circle_outline,
+                          label: 'Suspender',
+                          danger: true,
+                        ),
+                      )
+                    else
+                      const PopupMenuItem(
+                        value: _MenuAction.reactivate,
+                        child: _MenuItem(
+                          icon: Icons.play_circle_outline,
+                          label: 'Reactivar',
+                          success: true,
+                        ),
+                      ),
+                    const PopupMenuDivider(),
+                    const PopupMenuItem(
+                      value: _MenuAction.delete,
+                      child: _MenuItem(
+                        icon: Icons.delete_outline,
+                        label: 'Eliminar',
                         danger: true,
                       ),
-                    )
-                  else
-                    const PopupMenuItem(
-                      value: _MenuAction.reactivate,
-                      child: _MenuItem(
-                        icon: Icons.play_circle_outline,
-                        label: 'Reactivar',
-                        success: true,
-                      ),
                     ),
-                  const PopupMenuDivider(),
-                  const PopupMenuItem(
-                    value: _MenuAction.delete,
-                    child: _MenuItem(
-                      icon: Icons.delete_outline,
-                      label: 'Eliminar',
-                      danger: true,
-                    ),
-                  ),
-                ],
-              )
-            : null,
+                  ],
+                ),
+              ]
+            : [],
+        bottom: _tabBar,
       ),
       body: Column(
         children: [
-          _OperatorHeader(op: op),
           Expanded(
             child: TabBarView(
               controller: _tabCtrl,
@@ -352,133 +373,34 @@ class _OperatorDetailScreenState extends ConsumerState<OperatorDetailScreen>
     );
   }
 
-  PreferredSizeWidget _buildAppBar(Widget? trailing) {
-    final name = _op?['display_name'] as String? ??
-        _op?['name'] as String? ??
-        'Operador';
-    return AppBar(
-      backgroundColor: AppColors.ctSurface,
-      elevation: 0,
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back, color: AppColors.ctText),
-        onPressed: () => context.go('/operators'),
-      ),
-      title: Text(name,
-          style: AppTextStyles.pageTitle.copyWith(fontFamily: 'Geist', fontWeight: FontWeight.w600)),
-      actions: [
-        ?trailing,
-      ],
-      bottom: TabBar(
-        controller: _tabCtrl,
-        labelColor: AppColors.ctTeal,
-        unselectedLabelColor: AppColors.ctText2,
-        indicatorColor: AppColors.ctTeal,
-        labelStyle: AppTextStyles.formLabel,
-        unselectedLabelStyle: AppTextStyles.navItem,
-        tabs: const [
-          Tab(text: 'DATOS'),
-          Tab(text: 'FLUJOS'),
-          Tab(text: 'PERMISOS'),
-          Tab(text: 'HISTORIAL'),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Header ─────────────────────────────────────────────────────────────────────
-
-class _OperatorHeader extends StatelessWidget {
-  const _OperatorHeader({required this.op});
-  final Map<String, dynamic> op;
-
-  @override
-  Widget build(BuildContext context) {
-    final name =
-        op['display_name'] as String? ?? op['name'] as String? ?? '—';
-    final phone = op['phone'] as String? ?? '—';
-    final email = op['email'] as String?;
-    final status = op['status'] as String?;
-    final pic = op['profile_picture_url'] as String?;
-    final st = _statusStyle(status);
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
-      decoration: const BoxDecoration(
-        color: AppColors.ctSurface,
-        border: Border(bottom: BorderSide(color: AppColors.ctBorder)),
-      ),
-      child: Row(
-        children: [
-          // Avatar
-          (pic != null && pic.isNotEmpty)
-              ? CircleAvatar(
-                  radius: 36,
-                  backgroundImage: NetworkImage(pic),
-                  backgroundColor: AppColors.ctSurface2,
-                )
-              : Container(
-                  width: 72,
-                  height: 72,
-                  decoration: const BoxDecoration(
-                    color: AppColors.ctTealLight,
-                    shape: BoxShape.circle,
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    _initials(name),
-                    style: AppTextStyles.kpiValue.copyWith(fontFamily: 'Geist', fontSize: 24, color: AppColors.ctTealDark),
-                  ),
-                ),
-          const SizedBox(width: 20),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Flexible(
-                      child: Text(name,
-                          style: AppTextStyles.kpiValue.copyWith(fontFamily: 'Geist', fontSize: 20),
-                          overflow: TextOverflow.ellipsis),
-                    ),
-                    const SizedBox(width: 10),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: st.bg,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(st.label,
-                          style: AppTextStyles.badge.copyWith(color: st.fg)),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Row(children: [
-                  const Icon(Icons.phone, size: 14, color: AppColors.ctText2),
-                  const SizedBox(width: 4),
-                  Text(phone,
-                      style: AppTextStyles.body.copyWith(color: AppColors.ctText2)),
-                ]),
-                if (email != null && email.isNotEmpty) ...[
-                  const SizedBox(height: 3),
-                  Row(children: [
-                    const Icon(Icons.email_outlined,
-                        size: 14, color: AppColors.ctText2),
-                    const SizedBox(width: 4),
-                    Text(email,
-                        style: AppTextStyles.body.copyWith(color: AppColors.ctText2)),
-                  ]),
-                ],
-              ],
+  PreferredSize get _tabBar => PreferredSize(
+        preferredSize: const Size.fromHeight(44),
+        child: Container(
+          decoration: const BoxDecoration(
+            color: AppColors.ctSurface,
+            border: Border(
+              bottom: BorderSide(color: AppColors.ctBorder, width: 1),
             ),
           ),
-        ],
-      ),
-    );
-  }
+          child: TabBar(
+            controller: _tabCtrl,
+            isScrollable: true,
+            labelColor: AppColors.ctTeal,
+            unselectedLabelColor: AppColors.ctText2,
+            indicatorColor: AppColors.ctTeal,
+            indicatorWeight: 2,
+            dividerColor: Colors.transparent,
+            labelStyle: AppTextStyles.formLabel,
+            unselectedLabelStyle: AppTextStyles.navItem,
+            tabs: const [
+              Tab(text: 'Datos'),
+              Tab(text: 'Flujos'),
+              Tab(text: 'Permisos'),
+              Tab(text: 'Historial'),
+            ],
+          ),
+        ),
+      );
 }
 
 // ── Tab DATOS ──────────────────────────────────────────────────────────────────
