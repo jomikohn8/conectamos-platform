@@ -593,14 +593,11 @@ class _AddWorkerCardState extends State<_AddWorkerCard> {
         onTap: widget.onTap,
         child: CustomPaint(
           painter: _DashedBorderPainter(
-            color: _hovered
-                ? AppColors.ctTeal
-                : AppColors.ctText3.withValues(alpha: 0.4),
-            isHovered: _hovered,
+            color: AppColors.ctText3.withValues(alpha: 0.4),
           ),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 120),
-            constraints: const BoxConstraints(minHeight: 200),
+            constraints: const BoxConstraints(minHeight: 220, maxHeight: 220),
             decoration: BoxDecoration(
               color: _hovered
                   ? AppColors.ctTeal.withValues(alpha: 0.06)
@@ -636,9 +633,8 @@ class _AddWorkerCardState extends State<_AddWorkerCard> {
 // ── Dashed border painter ─────────────────────────────────────────────────────
 
 class _DashedBorderPainter extends CustomPainter {
-  const _DashedBorderPainter({required this.color, required this.isHovered});
+  const _DashedBorderPainter({required this.color});
   final Color color;
-  final bool isHovered;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -667,8 +663,7 @@ class _DashedBorderPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_DashedBorderPainter old) =>
-      old.color != color || old.isHovered != isHovered;
+  bool shouldRepaint(_DashedBorderPainter old) => old.color != color;
 }
 
 // ── Rename dialog ─────────────────────────────────────────────────────────────
