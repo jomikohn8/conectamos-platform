@@ -868,6 +868,50 @@ class _TemplatesTabState extends State<_TemplatesTab> {
     }
   }
 
+  Future<void> _deleteTemplate(Map<String, dynamic> template) async {
+    final name = template['name'] as String? ?? 'esta plantilla';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: AppColors.ctSurface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: Text('Eliminar plantilla', style: AppTextStyles.cardTitle),
+        content: Text(
+          '¿Eliminar "$name"? Esta acción no se puede deshacer.',
+          style: AppTextStyles.body.copyWith(color: AppColors.ctText2),
+        ),
+        actions: [
+          AppButton(
+            label: 'Cancelar',
+            variant: AppButtonVariant.outline,
+            size: AppButtonSize.sm,
+            onPressed: () => Navigator.of(context).pop(false),
+          ),
+          const SizedBox(width: 8),
+          AppButton(
+            label: 'Eliminar',
+            variant: AppButtonVariant.danger,
+            size: AppButtonSize.sm,
+            onPressed: () => Navigator.of(context).pop(true),
+          ),
+        ],
+        actionsAlignment: MainAxisAlignment.end,
+        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await TemplatesApi.deleteTemplate(
+        templateId: template['id'] as String,
+        channelId: widget.channelId,
+      );
+      widget.onSuccess('Plantilla eliminada');
+      await _fetchTemplates();
+    } catch (e) {
+      widget.onError(_dioError(e));
+    }
+  }
+
   Future<void> _sync() async {
     setState(() => _syncing = true);
     try {
@@ -903,14 +947,42 @@ class _TemplatesTabState extends State<_TemplatesTab> {
       children: [
         // Toolbar
         Container(
-          height: 48,
-          padding: const EdgeInsets.symmetric(horizontal: 24),
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 12),
           decoration: const BoxDecoration(
             color: AppColors.ctSurface,
             border: Border(bottom: BorderSide(color: AppColors.ctBorder)),
           ),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Plantillas de WhatsApp',
+                    style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${_templates.length} plantillas sincronizadas',
+                    style: AppTextStyles.bodySmall.copyWith(color: AppColors.ctText2),
+                  ),
+                ],
+              ),
+              const Expanded(child: SizedBox()),
+              _syncing
+                  ? const SizedBox(
+                      width: 18, height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.ctTeal),
+                    )
+                  : AppButton(
+                      label: 'Sincronizar con Meta',
+                      onPressed: _sync,
+                      variant: AppButtonVariant.outline,
+                      size: AppButtonSize.sm,
+                    ),
+              const SizedBox(width: 8),
               AppButton(
                 label: '+ Nueva plantilla',
                 onPressed: () async {
@@ -927,23 +999,6 @@ class _TemplatesTabState extends State<_TemplatesTab> {
                 variant: AppButtonVariant.teal,
                 size: AppButtonSize.sm,
               ),
-              const SizedBox(width: 12),
-              Text(
-                '${_templates.length} plantillas',
-                style: AppTextStyles.body.copyWith(color: AppColors.ctText2),
-              ),
-              const Expanded(child: SizedBox()),
-              _syncing
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2))
-                  : AppButton(
-                      label: 'Sincronizar con Meta',
-                      onPressed: _sync,
-                      variant: AppButtonVariant.outline,
-                      size: AppButtonSize.sm,
-                    ),
             ],
           ),
         ),
@@ -974,6 +1029,7 @@ class _TemplatesTabState extends State<_TemplatesTab> {
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Expanded(
                                 child: Column(
@@ -983,43 +1039,70 @@ class _TemplatesTabState extends State<_TemplatesTab> {
                                       t['name'] as String? ?? '—',
                                       style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w600),
                                     ),
-                                    if ((t['body_text'] as String?) != null)
-                                      Padding(
-                                        padding: const EdgeInsets.only(top: 4),
-                                        child: Text(
-                                          t['body_text'] as String,
-                                          maxLines: 2,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: AppTextStyles.bodySmall,
-                                        ),
+                                    if ((t['body_text'] as String?) != null) ...[
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        t['body_text'] as String,
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: AppTextStyles.bodySmall.copyWith(color: AppColors.ctText2),
                                       ),
+                                    ],
                                   ],
                                 ),
                               ),
                               const SizedBox(width: 16),
                               Column(
                                 crossAxisAlignment: CrossAxisAlignment.end,
+                                mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 8, vertical: 3),
-                                    decoration: BoxDecoration(
-                                      color: style.bg,
-                                      borderRadius: BorderRadius.circular(20),
-                                    ),
-                                    child: Text(
-                                      style.label,
-                                      style: AppTextStyles.badge.copyWith(color: style.fg),
-                                    ),
-                                  ),
-                                  if ((t['language'] as String?) != null)
-                                    Padding(
-                                      padding: const EdgeInsets.only(top: 4),
-                                      child: Text(
-                                        t['language'] as String,
-                                        style: AppTextStyles.bodySmall.copyWith(color: AppColors.ctText3),
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      if ((t['category'] as String?) != null)
+                                        Container(
+                                          margin: const EdgeInsets.only(right: 6),
+                                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.ctSurface2,
+                                            borderRadius: BorderRadius.circular(20),
+                                            border: Border.all(color: AppColors.ctBorder),
+                                          ),
+                                          child: Text(
+                                            (t['category'] as String).toUpperCase(),
+                                            style: AppTextStyles.caption.copyWith(
+                                              color: AppColors.ctText2,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                        decoration: BoxDecoration(
+                                          color: style.bg,
+                                          borderRadius: BorderRadius.circular(20),
+                                        ),
+                                        child: Text(
+                                          style.label,
+                                          style: AppTextStyles.badge.copyWith(color: style.fg),
+                                        ),
                                       ),
+                                    ],
+                                  ),
+                                  if ((t['language'] as String?) != null) ...[
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      t['language'] as String,
+                                      style: AppTextStyles.bodySmall.copyWith(color: AppColors.ctText3),
                                     ),
+                                  ],
+                                  const SizedBox(height: 8),
+                                  AppButton(
+                                    label: 'Eliminar',
+                                    variant: AppButtonVariant.danger,
+                                    size: AppButtonSize.sm,
+                                    onPressed: () => _deleteTemplate(t),
+                                  ),
                                 ],
                               ),
                             ],
