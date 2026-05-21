@@ -396,12 +396,27 @@ class _ChannelSidePanel extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  AppButton(
-                    label: '← Volver a canales',
-                    variant: AppButtonVariant.ghost,
-                    size: AppButtonSize.sm,
-                    expand: true,
-                    onPressed: onBack,
+                  MouseRegion(
+                    cursor: SystemMouseCursors.click,
+                    child: GestureDetector(
+                      onTap: onBack,
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 7),
+                        decoration: BoxDecoration(
+                          color: AppColors.ctSurface2,
+                          border: Border.all(
+                              color: AppColors.ctBorder, width: 1),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          '← Volver a canales',
+                          style: AppTextStyles.bodySmall
+                              .copyWith(color: AppColors.ctText2),
+                        ),
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 20),
 
