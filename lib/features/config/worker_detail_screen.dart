@@ -10,6 +10,7 @@ import '../../shared/widgets/app_button.dart';
 import '../../shared/widgets/app_detail_header.dart';
 import '../../shared/widgets/app_loading_state.dart';
 import '../../shared/widgets/app_stacked_metric_card.dart';
+import 'channel_detail_screen.dart';
 import 'channels_screen.dart';
 import 'workflows_screen.dart';
 
@@ -62,6 +63,8 @@ class _WorkerDetailScreenState extends ConsumerState<WorkerDetailScreen>
   Map<String, dynamic>? _worker;
   bool _loading = true;
   String? _error;
+  String? _selectedChannelId;
+  int _activeChannelCount = 0;
 
   @override
   void initState() {
@@ -225,7 +228,52 @@ class _WorkerDetailScreenState extends ConsumerState<WorkerDetailScreen>
             onTabCanales: () => _tabCtrl.animateTo(1),
             onTabFlujos: () => _tabCtrl.animateTo(2),
           ),
-          ChannelsScreen(tenantWorkerId: widget.workerId),
+          _selectedChannelId != null
+              ? ChannelDetailPanel(
+                  key: ValueKey(_selectedChannelId),
+                  channelId: _selectedChannelId!,
+                  onBack: () => setState(() => _selectedChannelId = null),
+                )
+              : Column(
+                  children: [
+                    if (_activeChannelCount == 0)
+                      Container(
+                        margin: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: AppColors.ctWarnBg,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: AppColors.ctWarnText.withValues(alpha: 0.3),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.warning_amber_rounded,
+                                color: AppColors.ctWarnText, size: 16),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Este worker no tiene canales activos — los operadores no pueden recibir ni enviar mensajes.',
+                                style: AppTextStyles.bodySmall.copyWith(
+                                    color: AppColors.ctWarnText),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    Expanded(
+                      child: ChannelsScreen(
+                        tenantWorkerId: widget.workerId,
+                        onChannelSelected: (id) =>
+                            setState(() => _selectedChannelId = id),
+                        onActiveCountChanged: (count) =>
+                            setState(() => _activeChannelCount = count),
+                      ),
+                    ),
+                  ],
+                ),
           WorkflowsScreen(tenantWorkerId: widget.workerId),
         ],
       ),
