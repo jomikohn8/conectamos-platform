@@ -1029,15 +1029,44 @@ class _TemplatesTabState extends State<_TemplatesTab> {
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                            crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(
-                                      t['name'] as String? ?? '—',
-                                      style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w600),
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            t['name'] as String? ?? '—',
+                                            style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w600),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                        if ((t['language'] as String?) != null) ...[
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            t['language'] as String,
+                                            style: AppTextStyles.caption.copyWith(color: AppColors.ctText3),
+                                          ),
+                                        ],
+                                        const SizedBox(width: 8),
+                                        MouseRegion(
+                                          cursor: SystemMouseCursors.click,
+                                          child: GestureDetector(
+                                            onTap: () => _deleteTemplate(t),
+                                            child: Tooltip(
+                                              message: 'Eliminar plantilla',
+                                              child: Icon(
+                                                Icons.delete_outline_rounded,
+                                                size: 16,
+                                                color: AppColors.ctText3,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                     if ((t['body_text'] as String?) != null) ...[
                                       const SizedBox(height: 4),
@@ -1056,52 +1085,33 @@ class _TemplatesTabState extends State<_TemplatesTab> {
                                 crossAxisAlignment: CrossAxisAlignment.end,
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      if ((t['category'] as String?) != null)
-                                        Container(
-                                          margin: const EdgeInsets.only(right: 6),
-                                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                                          decoration: BoxDecoration(
-                                            color: AppColors.ctSurface2,
-                                            borderRadius: BorderRadius.circular(20),
-                                            border: Border.all(color: AppColors.ctBorder),
-                                          ),
-                                          child: Text(
-                                            (t['category'] as String).toUpperCase(),
-                                            style: AppTextStyles.caption.copyWith(
-                                              color: AppColors.ctText2,
-                                              fontWeight: FontWeight.w500,
-                                            ),
-                                          ),
-                                        ),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                        decoration: BoxDecoration(
-                                          color: style.bg,
-                                          borderRadius: BorderRadius.circular(20),
-                                        ),
-                                        child: Text(
-                                          style.label,
-                                          style: AppTextStyles.badge.copyWith(color: style.fg),
+                                  if ((t['category'] as String?) != null)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.ctSurface2,
+                                        borderRadius: BorderRadius.circular(20),
+                                        border: Border.all(color: AppColors.ctBorder),
+                                      ),
+                                      child: Text(
+                                        (t['category'] as String).toUpperCase(),
+                                        style: AppTextStyles.caption.copyWith(
+                                          color: AppColors.ctText2,
+                                          fontWeight: FontWeight.w500,
                                         ),
                                       ),
-                                    ],
-                                  ),
-                                  if ((t['language'] as String?) != null) ...[
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      t['language'] as String,
-                                      style: AppTextStyles.bodySmall.copyWith(color: AppColors.ctText3),
                                     ),
-                                  ],
-                                  const SizedBox(height: 8),
-                                  AppButton(
-                                    label: 'Eliminar',
-                                    variant: AppButtonVariant.danger,
-                                    size: AppButtonSize.sm,
-                                    onPressed: () => _deleteTemplate(t),
+                                  const SizedBox(height: 4),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: style.bg,
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Text(
+                                      style.label,
+                                      style: AppTextStyles.badge.copyWith(color: style.fg),
+                                    ),
                                   ),
                                 ],
                               ),
