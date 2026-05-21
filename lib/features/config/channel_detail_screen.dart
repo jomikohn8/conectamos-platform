@@ -20,7 +20,7 @@ const _kChannelTypeConfig = {
 };
 
 // WhatsApp usa 3 tabs; Telegram renderiza contenido directo sin TabBar.
-const _kWaTabs = ['Información', 'Credenciales', 'Plantillas'];
+const _kWaTabs = ['Información', 'Plantillas'];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -282,7 +282,6 @@ class _ChannelDetailPanelState extends ConsumerState<ChannelDetailPanel>
                 onError: _showError,
                 onSuccess: _showSuccess,
               ),
-              _CredentialsTab(channel: ch),
               _TemplatesTab(
                 channelId: widget.channelId,
                 tenantId: _tenantId,
@@ -741,14 +740,43 @@ class _InfoTabState extends State<_InfoTab> {
               ],
             ),
           ),
+          const SizedBox(height: 20),
+          _SectionCard(
+            title: 'Credenciales del canal',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _ReadOnlyCredentialRow(
+                  label: 'Phone Number ID',
+                  value: widget.channel['phone_number_id'] as String?
+                      ?? (widget.channel['channel_config']
+                              ?['credentials']?['phone_number_id']
+                          as String?)
+                      ?? '—',
+                ),
+                const SizedBox(height: 16),
+                _ReadOnlyCredentialRow(
+                  label: 'WABA ID',
+                  value: widget.channel['waba_id'] as String?
+                      ?? (widget.channel['channel_config']
+                              ?['credentials']?['waba_id']
+                          as String?)
+                      ?? '—',
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
 }
 
-// ── TAB 2 — Credenciales ──────────────────────────────────────────────────────
+// ── TAB 2 — Credenciales (DEPRECATED) ─────────────────────────────────────────
 
+// DEPRECATED — sesión 2026-05-20. Contenido movido a _InfoTab.
+// Eliminar cuando se confirme que ninguna referencia externa persiste.
+// ignore: unused_element
 class _CredentialsTab extends StatelessWidget {
   const _CredentialsTab({required this.channel});
   final Map<String, dynamic> channel;
