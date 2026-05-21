@@ -405,15 +405,15 @@ class _ChannelSidePanel extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 12, vertical: 7),
                         decoration: BoxDecoration(
-                          color: AppColors.ctSurface2,
+                          color: AppColors.ctNavy,
                           border: Border.all(
-                              color: AppColors.ctBorder, width: 1),
+                              color: AppColors.ctNavy, width: 1),
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Text(
                           '← Volver a canales',
                           style: AppTextStyles.bodySmall
-                              .copyWith(color: AppColors.ctText2),
+                              .copyWith(color: Colors.white),
                         ),
                       ),
                     ),
